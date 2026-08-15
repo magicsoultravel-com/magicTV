@@ -1,29 +1,6 @@
 import { IptvOrgTvProvider } from './iptvOrgTv.js';
 import { PROVIDER_IPTV_ORG } from './channelShape.js';
-
-const STATE_KEY = 'matrix_tv_state';
-
-// Appearance settings defaults
-const DEFAULT_TEXT_SIZE = 16;  // root px (scales rem-based UI relatively)
-const DEFAULT_TILE_WIDTH = 180; // px
-const TEXT_SIZE_MIN = 8;
-const TEXT_SIZE_MAX = 18;
-const TILE_WIDTH_MIN = 100;
-const TILE_WIDTH_MAX = 300;
-const TILE_WIDTH_STEP = 10;
-
-function clampTextSize(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return DEFAULT_TEXT_SIZE;
-    return Math.min(TEXT_SIZE_MAX, Math.max(TEXT_SIZE_MIN, Math.round(n)));
-}
-
-function clampTileWidth(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return DEFAULT_TILE_WIDTH;
-    const rounded = Math.round(n / TILE_WIDTH_STEP) * TILE_WIDTH_STEP;
-    return Math.min(TILE_WIDTH_MAX, Math.max(TILE_WIDTH_MIN, rounded));
-}
+import { readPersistedState, patchPersistedState } from '../storage/persistedState.js';
 
 const PROVIDERS = {
     [PROVIDER_IPTV_ORG]: IptvOrgTvProvider
@@ -31,26 +8,19 @@ const PROVIDERS = {
 
 function loadSettings() {
     try {
-        const raw = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
+        const raw = readPersistedState();
         return {
-            catalogProvider: raw.catalogProvider || PROVIDER_IPTV_ORG,
-            textSize: raw.textSize != null ? clampTextSize(raw.textSize) : DEFAULT_TEXT_SIZE,
-            tileWidth: raw.tileWidth != null ? clampTileWidth(raw.tileWidth) : DEFAULT_TILE_WIDTH
+            catalogProvider: raw.catalogProvider || PROVIDER_IPTV_ORG
         };
     } catch {
         return {
-            catalogProvider: PROVIDER_IPTV_ORG,
-            textSize: DEFAULT_TEXT_SIZE,
-            tileWidth: DEFAULT_TILE_WIDTH
+            catalogProvider: PROVIDER_IPTV_ORG
         };
     }
 }
 
 function saveSettings(patch) {
-    const current = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
-    const next = { ...current, ...patch };
-    localStorage.setItem(STATE_KEY, JSON.stringify(next));
-    return next;
+    return patchPersistedState(patch);
 }
 
 export const TvProviderRegistry = {
@@ -95,41 +65,6 @@ export const TvProviderRegistry = {
 
     setHideOffline() {
         // No-op: kept for API compatibility with older callers/tests.
-    },
-
-    // Appearance settings
-    getTextSize() {
-        return loadSettings().textSize;
-    },
-
-    setTextSize(value) {
-        const clampedValue = clampTextSize(value);
-        saveSettings({ textSize: clampedValue });
-        return clampedValue;
-    },
-
-    getTextSizeOptions() {
-        return Array.from(
-            { length: TEXT_SIZE_MAX - TEXT_SIZE_MIN + 1 },
-            (_, i) => TEXT_SIZE_MIN + i
-        );
-    },
-
-    getTileWidth() {
-        return loadSettings().tileWidth;
-    },
-
-    setTileWidth(value) {
-        const clampedValue = clampTileWidth(value);
-        saveSettings({ tileWidth: clampedValue });
-        return clampedValue;
-    },
-
-    getTileWidthOptions() {
-        return Array.from(
-            { length: (TILE_WIDTH_MAX - TILE_WIDTH_MIN) / TILE_WIDTH_STEP + 1 },
-            (_, i) => TILE_WIDTH_MIN + i * TILE_WIDTH_STEP
-        );
     },
 
     async getCountries(opts = {}) {

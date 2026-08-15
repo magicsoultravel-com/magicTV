@@ -1,21 +1,22 @@
 let hlsPromise = null;
 
-// Pinned CDN build with SRI (sha256 from jsDelivr package metadata for this exact file).
-const HLS_SCRIPT_SRC = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js';
-const HLS_SCRIPT_INTEGRITY = 'sha256-p4s2A9diQoyrou8hZ05NR/vE50likrKPhFunNyhJNgs=';
+/** Same-origin vendor copy (adblock-resistant). */
+const HLS_LOCAL_SRC = new URL('../vendor/hls.min.js', import.meta.url).href;
+/** CDN fallback when local script is missing (dev without vendor file). */
+const HLS_CDN_SRC = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js';
+const HLS_CDN_INTEGRITY = 'sha256-p4s2A9diQoyrou8hZ05NR/vE50likrKPhFunNyhJNgs=';
 
-export function loadHlsLibrary() {
-    if (typeof window !== 'undefined' && window.Hls) {
-        return Promise.resolve(window.Hls);
-    }
-    if (hlsPromise) return hlsPromise;
-
-    hlsPromise = new Promise((resolve, reject) => {
+function loadScript(src, { integrity = null, crossOrigin = null } = {}) {
+    return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = HLS_SCRIPT_SRC;
+        script.src = src;
         script.async = true;
-        script.integrity = HLS_SCRIPT_INTEGRITY;
-        script.crossOrigin = 'anonymous';
+        if (integrity) {
+            script.integrity = integrity;
+            script.crossOrigin = crossOrigin || 'anonymous';
+        } else if (crossOrigin) {
+            script.crossOrigin = crossOrigin;
+        }
         script.onload = () => {
             if (window.Hls) resolve(window.Hls);
             else reject(new Error('hls.js failed to load'));
@@ -23,6 +24,26 @@ export function loadHlsLibrary() {
         script.onerror = () => reject(new Error('hls.js failed to load'));
         document.head.appendChild(script);
     });
+}
+
+/**
+ * Load hls.js: prefer same-origin vendor build, then jsDelivr CDN.
+ */
+export function loadHlsLibrary() {
+    if (typeof window !== 'undefined' && window.Hls) {
+        return Promise.resolve(window.Hls);
+    }
+    if (hlsPromise) return hlsPromise;
+
+    hlsPromise = loadScript(HLS_LOCAL_SRC)
+        .catch(() => loadScript(HLS_CDN_SRC, {
+            integrity: HLS_CDN_INTEGRITY,
+            crossOrigin: 'anonymous'
+        }))
+        .catch((err) => {
+            hlsPromise = null;
+            throw err;
+        });
 
     return hlsPromise;
 }

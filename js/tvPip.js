@@ -5,8 +5,8 @@
  * Works in Chrome and Firefox on desktop; buttons are hidden where unsupported.
  */
 import { TvPlayer } from './tvPlayer.js';
-import { showAppToast } from './toast.js';
-import { ACTION_ICONS } from './icons.js';
+import { showAppToast } from './ui/toast.js';
+import { ACTION_ICONS } from './ui/icons.js';
 
 const POP_OUT_LABEL = 'Pop out';
 const POP_IN_LABEL = 'Pop in';

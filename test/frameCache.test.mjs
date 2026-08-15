@@ -89,9 +89,3 @@ test('removeFrames batch-deletes many keys in one write', async () => {
     assert.equal(await FrameCache.getFrame(b), null);
     assert.equal(await FrameCache.getFrame(c), 'data:image/jpeg;base64,c');
 });
-
-test('preloadFrames is a harmless no-op without a DOM (Node)', async () => {
-    // Guard for non-browser environments; must not throw.
-    await FrameCache.preloadFrames(['https://example.test/x.m3u8']);
-    assert.ok(true);
-});

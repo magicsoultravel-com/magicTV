@@ -303,7 +303,8 @@
 }
 
 .channel-tile:hover .channel-tile__fav-btn,
-.channel-tile:focus-within .channel-tile__fav-btn {
+.channel-tile:focus-within .channel-tile__fav-btn,
+.channel-tile__fav-btn.is-active {
     opacity: 1;
     pointer-events: auto;
 }
@@ -495,33 +496,6 @@
 .channel-tile__frame-loading.is-hidden {
     display: none;
 }
-
-/* Corner spinner while a provisional logo is on-screen and a live grab runs. */
-.channel-tile__frame-loading-chip {
-    position: absolute;
-    right: 1px;
-    bottom: 1px;
-    width: 14px;
-    height: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.55);
-    color: var(--tv-primary);
-    line-height: 1;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.channel-tile__frame-loading-chip svg {
-    display: block;
-    width: 10px;
-    height: 10px;
-    animation: spin 0.8s linear infinite;
-}
-
-.channel-tile__frame-loading-chip.is-hidden { display: none; }
 
 .channel-tile__capture-frame[data-frame-state="loading"] .channel-tile__letter-avatar {
     opacity: 0.35;

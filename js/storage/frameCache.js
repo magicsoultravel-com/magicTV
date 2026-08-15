@@ -8,7 +8,7 @@
 
 import { IndexedDBStore } from './indexedDbStore.js';
 
-const FRAME_CACHE_KEY = 'matrix_tv_frame_cache';
+const FRAME_CACHE_KEY = 'matrix_tv_frame_cache_v2';
 const FRAME_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /** Serialize blob read-modify-write so concurrent captures don't clobber each other. */
@@ -168,70 +168,11 @@ async function clearFrames() {
     });
 }
 
-/**
- * Preload frames for a list of URLs in parallel (up to limit).
- * Useful for prefetching channels in current view.
- * @param {string[]} urls - Array of channel URLs to preload.
- * @param {number} limit - Maximum concurrent fetches.
- * @returns {Promise<void>}
- */
-async function preloadFrames(urls, limit = 3) {
-    if (!urls || !urls.length) return;
-    // Guard for non-browser environments (like Node.js tests)
-    if (typeof document === 'undefined') return;
-
-    // Filter out URLs we already have cached
-    const toFetch = [];
-    for (const url of urls) {
-        const cached = await getFrame(url);
-        if (!cached) {
-            toFetch.push(url);
-        }
-    }
-
-    if (toFetch.length === 0) return;
-
-    // Fetch in batches
-    let index = 0;
-    while (index < toFetch.length) {
-        const batch = toFetch.slice(index, index + limit);
-        index += limit;
-
-        await Promise.allSettled(
-            batch.map(async (url) => {
-                try {
-                    // Create an offscreen image to load and convert to dataURL
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-
-                    await new Promise((resolve, reject) => {
-                        img.onload = resolve;
-                        img.onerror = reject;
-                        img.src = url;
-                    });
-
-                    // Convert to data URL
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 56;
-                    canvas.height = 56;
-                    canvas.getContext('2d').drawImage(img, 0, 0, 56, 56);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-
-                    await setFrame(url, dataUrl);
-                } catch {
-                    // Individual fetch failures are OK - skip this frame
-                }
-            })
-        );
-    }
-}
-
 export const FrameCache = {
     getFrame,
     getFrames,
     setFrame,
     removeFrame,
     removeFrames,
-    clearFrames,
-    preloadFrames
+    clearFrames
 };
