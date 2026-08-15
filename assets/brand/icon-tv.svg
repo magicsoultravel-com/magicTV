@@ -14,8 +14,18 @@
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
+    <filter id="screen-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
+   <!-- Dark grey square background for favicon -->
+  <rect x="2" y="2" width="124" height="124" fill="#2d2d2d" rx="8" ry="8"/>
+  
   <!-- Antenna left -->
   <line x1="38" y1="12" x2="32" y2="2" stroke="#00FFFF" stroke-width="2.5" stroke-linecap="round" filter="url(#neon-glow)"/>
   
@@ -34,20 +44,30 @@
 
   <!-- Screen bezel (rounded rectangle) -->
   <rect x="18" y="18" width="92" height="76" rx="6" ry="6" 
+        fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.3"/>
+  <rect x="18" y="18" width="92" height="76" rx="6" ry="6" 
         fill="none" stroke="#00FFFF" stroke-width="2.2" filter="url(#neon-glow)"/>
 
   <!-- Screen inner frame (darker) -->
   <rect x="22" y="22" width="84" height="68" rx="3" ry="3" 
-        fill="none" stroke="#FF00FF" stroke-width="1.5" filter="url(#neon-glow)" opacity="0.7"/>
+        fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.2"/>
+  <rect x="22" y="22" width="84" height="68" rx="3" ry="3" 
+        fill="none" stroke="#FF00FF" stroke-width="1.5" filter="url(#neon-glow)" opacity="0.85"/>
 
-  <!-- Screen glass reflection (gradient effect) -->
-  <rect x="24" y="24" width="80" height="32" rx="2" ry="2"
-        fill="#00FFFF" opacity="0.08"/>
-
+  <!-- Tri-color neon horizontal stripes (cyan, pink, green) -->
+  <g filter="url(#screen-glow)">
+    <!-- Stripe 1 - Cyan -->
+    <rect x="28" y="32" width="80" height="8" fill="#00FFFF" opacity="0.75"/>
+    <!-- Stripe 2 - Pink (Magenta) -->
+    <rect x="28" y="48" width="80" height="8" fill="#FF00FF" opacity="0.75"/>
+    <!-- Stripe 3 - Green -->
+    <rect x="28" y="64" width="80" height="8" fill="#00FF00" opacity="0.75"/>
+  </g>
+  
   <!-- Play symbol inside screen -->
   <path d="M 54 48 L 54 68 L 74 58 Z" 
-        fill="none" stroke="#00FFFF" stroke-width="2" stroke-linejoin="round" 
-        filter="url(#neon-glow)" opacity="0.85"/>
+        fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" 
+        filter="url(#neon-glow)" opacity="0.95"/>
 
   <!-- Glitch accent (magenta line) -->
   <line x1="26" y1="44" x2="40" y2="44" stroke="#FF00FF" stroke-width="1.5" 

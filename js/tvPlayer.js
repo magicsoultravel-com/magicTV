@@ -192,11 +192,11 @@ export const TvPlayer = {
         this.video.playsInline = true;
         this.video.setAttribute('playsinline', '');
         this.video.autoplay = true; // Required for autoplay policy compliance
-        this.video.preload = 'metadata'; // Allow initial metadata load for faster startup
-        this.video.muted = this.volume === 0;
+        this.video.preload = 'auto'; // Preload enables faster autoplay start
+        // Autoplay requires muted in modern browsers; start muted for auto-start
+        this.video.muted = true;
         this.video.volume = this.volume;
-        if (this.volume === 0) this.video.muted = true;
-        this.muted = this.volume === 0;
+        this.muted = true; // Start muted so autoplay works
         this.lastVolume = this.volume > 0 ? this.volume : 0.85;
         this.videoHolder.appendChild(this.video);
 
@@ -453,6 +453,8 @@ export const TvPlayer = {
         if (clamped > 0) {
             this.lastVolume = clamped;
             this.muted = false;
+        } else if (clamped === 0) {
+            this.muted = true;
         }
         if (this.video) {
             this.video.volume = clamped;
@@ -805,7 +807,7 @@ export const TvPlayer = {
     },
 
     async resumeIfWasPlaying() {
-        if (!this.getWasPlaying() || !this.channel) return;
+        if (!this.channel) return;
         try {
             await this.playChannel(this.channel);
         } catch (e) {
