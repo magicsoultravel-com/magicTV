@@ -1,0 +1,72 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" focusable="false">
+  <defs>
+    <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="bright-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Antenna left -->
+  <line x1="38" y1="12" x2="32" y2="2" stroke="#00FFFF" stroke-width="2.5" stroke-linecap="round" filter="url(#neon-glow)"/>
+  
+  <!-- Antenna right -->
+  <line x1="90" y1="12" x2="96" y2="2" stroke="#FF00FF" stroke-width="2.5" stroke-linecap="round" filter="url(#neon-glow)"/>
+
+  <!-- Antenna spark left -->
+  <circle cx="32" cy="2" r="2" fill="#00FFFF" filter="url(#bright-glow)" opacity="0.9"/>
+  <circle cx="30" cy="4" r="1.2" fill="#00FFFF" opacity="0.6"/>
+  <circle cx="34" cy="0" r="1.2" fill="#00FFFF" opacity="0.6"/>
+
+  <!-- Antenna spark right -->
+  <circle cx="96" cy="2" r="2" fill="#FF00FF" filter="url(#bright-glow)" opacity="0.9"/>
+  <circle cx="98" cy="4" r="1.2" fill="#FF00FF" opacity="0.6"/>
+  <circle cx="94" cy="0" r="1.2" fill="#FF00FF" opacity="0.6"/>
+
+  <!-- Screen bezel (rounded rectangle) -->
+  <rect x="18" y="18" width="92" height="76" rx="6" ry="6" 
+        fill="none" stroke="#00FFFF" stroke-width="2.2" filter="url(#neon-glow)"/>
+
+  <!-- Screen inner frame (darker) -->
+  <rect x="22" y="22" width="84" height="68" rx="3" ry="3" 
+        fill="none" stroke="#FF00FF" stroke-width="1.5" filter="url(#neon-glow)" opacity="0.7"/>
+
+  <!-- Screen glass reflection (gradient effect) -->
+  <rect x="24" y="24" width="80" height="32" rx="2" ry="2"
+        fill="#00FFFF" opacity="0.08"/>
+
+  <!-- Play symbol inside screen -->
+  <path d="M 54 48 L 54 68 L 74 58 Z" 
+        fill="none" stroke="#00FFFF" stroke-width="2" stroke-linejoin="round" 
+        filter="url(#neon-glow)" opacity="0.85"/>
+
+  <!-- Glitch accent (magenta line) -->
+  <line x1="26" y1="44" x2="40" y2="44" stroke="#FF00FF" stroke-width="1.5" 
+        filter="url(#neon-glow)" opacity="0.6"/>
+
+  <!-- Stand left -->
+  <line x1="42" y1="96" x2="42" y2="108" stroke="#00FFFF" stroke-width="2" 
+        stroke-linecap="round" filter="url(#neon-glow)" opacity="0.8"/>
+
+  <!-- Stand right -->
+  <line x1="86" y1="96" x2="86" y2="108" stroke="#FF00FF" stroke-width="2" 
+        stroke-linecap="round" filter="url(#neon-glow)" opacity="0.8"/>
+
+  <!-- Base plate -->
+  <rect x="36" y="106" width="56" height="4" rx="1" 
+        fill="none" stroke="#00FFFF" stroke-width="1.5" filter="url(#neon-glow)" opacity="0.7"/>
+
+  <!-- Magic spark accent (top right corner) -->
+  <circle cx="105" cy="22" r="1.8" fill="#FF00FF" filter="url(#bright-glow)" opacity="0.9"/>
+  <circle cx="108" cy="20" r="1" fill="#FF00FF" opacity="0.5"/>
+  <circle cx="103" cy="19" r="1" fill="#FF00FF" opacity="0.5"/>
+</svg>

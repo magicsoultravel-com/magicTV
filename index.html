@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e27">
+    <title>magicTV</title>
+    <link rel="icon" href="./assets/brand/icon-tv.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./css/base.tv.css">
+    <link rel="stylesheet" href="./css/tv-landing.css">
+</head>
+<body>
+    <div id="app-container">
+        <header class="tv-header">
+            <div class="tv-brand">
+                <img src="./assets/brand/icon-tv.svg" alt="magicTV" class="tv-icon">
+                <h1>magicTV</h1>
+            </div>
+        </header>
+
+        <div class="tv-content">            
+            <div id="now-playing-slot" class="now-playing-card is-hidden">
+                <div class="now-playing-card__info">
+                    <h2 class="now-playing-card__title" id="now-playing-title">-</h2>
+                </div>
+            </div>
+
+            <div id="player-slot" class="tv-player-slot">
+                <div id="tv-playback-surface" class="tv-playback-surface"></div>
+                <div class="tv-player-controls">
+                    <div class="tv-controls__playback">
+                        <button class="tv-controls__btn" id="play-btn">▶</button>
+                        <button class="tv-controls__btn" id="pause-btn">⏸</button>
+                        <button class="tv-controls__btn" id="stop-btn">⏹</button>
+                        <button class="tv-controls__action-btn" id="pip-btn">⬆</button>
+                        <button class="tv-controls__action-btn" id="fullscreen-btn">⛶</button>
+                    </div>
+                    <div class="tv-controls__volume">
+                        <span>🔊</span>
+                        <input type="range" class="tv-controls__volume-slider" id="volume-slider" min="0" max="100" value="85">
+                    </div>
+                    <div class="tv-controls__info">
+                        <span id="buffer-info">Buffer: -</span>
+                        <span id="quality-info">Quality: -</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="browse-panel" class="tv-panel is-active">
+                <button id="back-btn" class="back-btn is-hidden">← Back to countries</button>
+
+                <div class="browse-header">
+                    <h2 class="browse-title">🌍 Browse by Country</h2>
+                    <input type="search" id="search-countries" class="search-input" placeholder="Search...">
+                </div>
+                <div id="countries-container" class="country-grid"></div>
+                <div id="channels-container" class="channel-grid is-hidden"></div>
+                <div id="load-more-container" class="load-more is-hidden">
+                    <button class="load-more__btn" id="load-more-btn">Load More</button>
+                </div>
+            </div>
+
+            <div id="favorites-panel" class="tv-panel">
+                <div id="favorites-grid" class="channel-grid"></div>
+                <div id="favorites-empty" class="empty-state"><div class="empty-state__icon">❤️</div><p class="empty-state__text">No favorites!</p></div>
+            </div>
+
+            <div id="recents-panel" class="tv-panel">
+                <div id="recents-grid" class="channel-grid"></div>
+                <div id="recents-empty" class="empty-state"><div class="empty-state__icon">📺</div><p class="empty-state__text">No recents!</p></div>
+            </div>
+
+            <div id="settings-panel" class="tv-panel">
+                <div class="settings-panel">
+                    <div class="settings-section">
+                        <h3 class="settings-section__title">🎬 Playback</h3>
+                        <div class="settings-section__item">
+                            <label class="settings-section__label">Buffer Size</label>
+                            <select id="buffer-size-select">
+                                <option value="5">5s (Fast)</option>
+                                <option value="15" selected>15s (Stable)</option>
+                                <option value="30">30s (Very Stable)</option>
+                            </select>
+                        </div>
+                        <div class="settings-section__item">
+                            <label class="settings-section__label">Hide Offline</label>
+                            <button class="settings-toggle is-active" id="hide-offline-toggle"></button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3 class="settings-section__title">📊 Storage</h3>
+                        <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">
+                            <span>Favorites: —</span>
+                            <span>Recents: —</span>
+                            <span>localStorage: —</span>
+                            <span>Cache: —</span>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3 class="settings-section__title">ℹ️ About</h3>
+                        <p style="font-size: 0.875rem; margin: 0; color: var(--tv-text-secondary);">magicTV v1.0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tv-tabs" role="tablist">
+                <button class="tv-tab is-active" data-tab="browse">🌍 Browse</button>
+                <button class="tv-tab" data-tab="favorites">❤️ Favorites</button>
+                <button class="tv-tab" data-tab="recents">📺 Recents</button>
+                <button class="tv-tab" data-tab="settings">⚙️ Settings</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast-container" style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;"></div>
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>

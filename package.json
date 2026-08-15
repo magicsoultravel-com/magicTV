@@ -1,0 +1,16 @@
+{
+  "name": "magicTV",
+  "version": "1.0.0",
+  "description": "Neon-styled TV streaming browser. Browse and play live channels from iptv-org.",
+  "type": "module",
+  "private": true,
+  "keywords": ["tv", "streaming", "iptv", "live-channels", "browser"],
+  "author": "magicTV",
+  "license": "MIT",
+  "scripts": {
+    "dev": "python3 -m http.server 3000",
+    "start": "python3 -m http.server 8000",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  }
+}

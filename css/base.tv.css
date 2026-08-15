@@ -1,0 +1,217 @@
+/** @css {"owns":"magicTV base styles, theme variables, responsive layout"} */
+
+:root {
+    /* Neon color palette */
+    --tv-primary: #00FFFF;      /* Bright cyan */
+    --tv-secondary: #FF00FF;    /* Magenta */
+    --tv-accent: #00FF88;       /* Neon green accent */
+    
+    /* Dark theme */
+    --tv-bg: #0a0e27;           /* Very dark blue */
+    --tv-bg-secondary: #141829; /* Slightly lighter */
+    --tv-border: rgba(255, 255, 255, 0.08);
+    --tv-border-light: rgba(255, 255, 255, 0.15);
+    
+    /* Text colors */
+    --tv-text-primary: #ffffff;
+    --tv-text-secondary: rgba(255, 255, 255, 0.7);
+    --tv-text-muted: rgba(255, 255, 255, 0.45);
+    
+    /* Shadows & glows */
+    --tv-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --tv-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    
+    /* Spacing */
+    --tv-spacing-xs: 0.25rem;
+    --tv-spacing-sm: 0.5rem;
+    --tv-spacing-md: 1rem;
+    --tv-spacing-lg: 1.5rem;
+    --tv-spacing-xl: 2rem;
+    
+    /* Border radius */
+    --tv-radius-sm: 4px;
+    --tv-radius-md: 8px;
+    --tv-radius-lg: 12px;
+    
+    /* Transitions */
+    --tv-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+}
+
+body {
+    background: var(--tv-bg);
+    color: var(--tv-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.5;
+    overflow: hidden;
+}
+
+/* Typography */
+h1, h2, h3 {
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+h1 {
+    font-size: 1.75rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+}
+
+h3 {
+    font-size: 1rem;
+}
+
+p {
+    margin-bottom: var(--tv-spacing-md);
+    color: var(--tv-text-secondary);
+}
+
+/* Buttons */
+button {
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: var(--tv-transition);
+    border-radius: var(--tv-radius-sm);
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: var(--tv-text-primary);
+}
+
+button:hover {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: var(--tv-primary);
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Links */
+a {
+    color: var(--tv-primary);
+    text-decoration: none;
+    transition: var(--tv-transition);
+}
+
+a:hover {
+    color: var(--tv-secondary);
+    text-decoration: underline;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--tv-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--tv-border-light);
+    border-radius: var(--tv-radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--tv-primary);
+}
+
+/* Input fields */
+input, select, textarea {
+    font-family: inherit;
+    font-size: 1rem;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border-light);
+    color: var(--tv-text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--tv-radius-sm);
+    transition: var(--tv-transition);
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--tv-primary);
+    box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.1);
+}
+
+input::placeholder {
+    color: var(--tv-text-muted);
+}
+
+/* Utility classes */
+.is-hidden {
+    display: none !important;
+}
+
+.is-invisible {
+    visibility: hidden !important;
+}
+
+/* Responsive grid mixin values */
+@media (max-width: 480px) {
+    :root {
+        --tv-grid-cols: 2;
+        --tv-grid-gap: 0.5rem;
+    }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+    :root {
+        --tv-grid-cols: 3;
+        --tv-grid-gap: 0.75rem;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    :root {
+        --tv-grid-cols: 4;
+        --tv-grid-gap: 1rem;
+    }
+}
+
+@media (min-width: 1025px) {
+    :root {
+        --tv-grid-cols: 5;
+        --tv-grid-gap: 1rem;
+    }
+}
+
+/* Touch target minimum size (accessibility) */
+@media (pointer: coarse) {
+    button, a, [role="button"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
