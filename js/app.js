@@ -902,6 +902,7 @@ function bindPlayerControls() {
     const pauseBtn = el('pause-btn');
     const stopBtn = el('stop-btn');
     const volume = el('volume-slider');
+    const muteBtn = el('mute-btn');
     const fullscreenBtn = el('fullscreen-btn');
     const pipBtn = el('pip-btn');
 
@@ -927,6 +928,17 @@ function bindPlayerControls() {
         volume.addEventListener('input', (e) => {
             TvPlayer.setVolume(parseFloat(e.target.value) / 100);
         });
+    }
+    if (muteBtn) {
+        muteBtn.addEventListener('click', () => TvPlayer.toggleMute());
+        // Update mute button icon on state changes
+        const updateMuteIcon = () => {
+            const isMuted = TvPlayer.muted || TvPlayer.volume === 0;
+            muteBtn.textContent = isMuted ? '🔇' : '🔊';
+            muteBtn.setAttribute('aria-pressed', String(isMuted));
+        };
+        window.addEventListener('tv:state_changed', updateMuteIcon);
+        updateMuteIcon();
     }
 }
 

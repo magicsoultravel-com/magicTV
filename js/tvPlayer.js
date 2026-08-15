@@ -153,7 +153,7 @@ export const TvPlayer = {
     recentRecordedForKey: null,
     volume: loadState().volume,
     lastVolume: loadState().volume || 0.85,
-    muted: false,
+    muted: true, // Start muted for autoplay compliance; will be updated on user interaction
     videoMount: null,
 
     // Buffer management
