@@ -132,7 +132,11 @@ function bindTabs() {
     });
 }
 
+let refreshInFlight = false;
+
 async function handleManualRefresh() {
+    if (refreshInFlight) return;
+    refreshInFlight = true;
     const btn = el('refresh-btn');
     const spin = () => btn && btn.classList.add('is-loading');
     const unspin = () => btn && btn.classList.remove('is-loading');
@@ -172,6 +176,7 @@ async function handleManualRefresh() {
     } catch {
         showAppToast('Refresh failed — try again');
     } finally {
+        refreshInFlight = false;
         unspin();
         updateRefreshAge();
     }

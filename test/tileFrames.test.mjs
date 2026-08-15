@@ -341,7 +341,7 @@ test('settleFrameCapture still writes IDB when tile is disconnected', async () =
     assert.equal(await FrameCache.getFrame(url), dataUrl);
 });
 
-test('settleFrameCapture ignores stale epoch for UI but still caches', async () => {
+test('settleFrameCapture ignores stale epoch for UI and cache', async () => {
     await FrameCache.clearFrames();
     TileFrames._resetForTests();
     const url = 'https://example.test/stale-epoch.m3u8';
@@ -353,7 +353,7 @@ test('settleFrameCapture ignores stale epoch for UI but still caches', async () 
     settleFrameCapture(frame, dataUrl, url, oldEpoch);
     assert.equal(frame.dataset.frameState, 'loading', 'stale epoch must not paint UI');
     await new Promise((r) => setTimeout(r, 10));
-    assert.equal(await FrameCache.getFrame(url), dataUrl);
+    assert.equal(await FrameCache.getFrame(url), null, 'stale epoch must not refill cache');
 });
 
 test('observe eagerly enqueues even when IntersectionObserver never fires', async () => {

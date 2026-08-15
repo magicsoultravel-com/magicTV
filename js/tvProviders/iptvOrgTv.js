@@ -12,6 +12,8 @@ const CACHE_KEY = 'matrix_tv_iptv_cache';
 // IndexedDB reads, no hydration — so favorites/recents tiles render instantly.
 let catalogMemory = null;
 let lastRefreshedAt = 0;
+/** Shared in-flight network load so overlapping refresh/boot calls do not race. */
+let catalogNetworkPromise = null;
 
 // Cache-first forever: the app boots straight from history (even when the
 // cached catalog is stale) and only talks to the network when the user taps
@@ -75,15 +77,7 @@ async function readCachedCatalog(refresh) {
     return catalog;
 }
 
-async function loadCatalog(refresh = false) {
-    if (!refresh && catalogMemory) return catalogMemory;
-
-    const cached = await readCachedCatalog(refresh);
-    if (cached) {
-        catalogMemory = cached;
-        return cached;
-    }
-
+async function fetchCatalogFromNetwork() {
     const [channelsRes, streamsRes, countriesRes, blocklistRes] = await Promise.all([
         fetch(IPTV_CHANNELS_URL),
         fetch(IPTV_STREAMS_URL),
@@ -161,6 +155,23 @@ async function loadCatalog(refresh = false) {
     catalogMemory = catalog;
     lastRefreshedAt = Date.now();
     return catalog;
+}
+
+async function loadCatalog(refresh = false) {
+    if (!refresh && catalogMemory) return catalogMemory;
+
+    const cached = await readCachedCatalog(refresh);
+    if (cached) {
+        catalogMemory = cached;
+        return cached;
+    }
+
+    if (catalogNetworkPromise) return catalogNetworkPromise;
+
+    catalogNetworkPromise = fetchCatalogFromNetwork().finally(() => {
+        catalogNetworkPromise = null;
+    });
+    return catalogNetworkPromise;
 }
 
 export const IptvOrgTvProvider = {
