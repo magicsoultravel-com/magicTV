@@ -1,4 +1,4 @@
-/** @css {"owns":"magicTV landing page layout, header, tabs, channel grid, now-playing card"} */
+/** @css {"owns":"magicTV landing page layout, header, tabs, channel grid, refresh arrow"} */
 
 #app-container {
     display: flex;
@@ -12,7 +12,7 @@
 /* ===== HEADER ===== */
 .tv-header {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: flex-start;
     padding: var(--tv-spacing-md) var(--tv-spacing-lg);
     background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.03) 100%);
@@ -23,14 +23,15 @@
 
 .tv-brand {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--tv-spacing-md);
 }
 
 .tv-icon {
     width: 32px;
     height: 32px;
-    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.6));
+    filter: drop-shadow(0 0 16px var(--tv-primary)) drop-shadow(0 0 8px rgba(0, 255, 255, 0.8));
+    vertical-align: middle;
 }
 
 .tv-brand h1 {
@@ -40,9 +41,50 @@
     background-clip: text;
     font-size: 1.5rem;
     letter-spacing: 0.05em;
-    text-transform: uppercase;
     margin: 0;
+    line-height: 1.2;
+    vertical-align: baseline;
 }
+
+.tv-channel-info {
+    display: flex;
+    align-items: baseline;
+    gap: var(--tv-spacing-sm);
+    min-width: 0;
+}
+
+.tv-header-now-playing {
+    font-size: 0.8rem;
+    color: var(--tv-text-secondary);
+    margin-right: var(--tv-spacing-xs);
+    vertical-align: baseline;
+    line-height: 1.2;
+}
+
+/* Channel identity in the header uses the same neon-gradient treatment the
+   now-playing card used to, so live playback stays visible at the top. */
+.tv-header-channel-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2;
+    vertical-align: baseline;
+}
+
+.tv-header-channel-flag {
+    font-size: 1.5rem;
+    filter: drop-shadow(0 0 4px rgba(0, 255, 255, 0.3));
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
 
 /* ===== TABS (bottom) ===== */
 .tv-tabs {
@@ -88,6 +130,43 @@
     background: rgba(0, 255, 255, 0.05);
 }
 
+.tv-tab.is-active:hover {
+    color: var(--tv-primary);
+    border-top-color: var(--tv-primary);
+    background: rgba(0, 255, 255, 0.1);
+}
+
+.tv-tab.is-pink-active {
+    color: var(--tv-secondary);
+    border-top-color: var(--tv-secondary);
+    box-shadow: 0 -2px 0 var(--tv-secondary);
+    background: rgba(255, 0, 255, 0.05);
+}
+
+.tv-tab.is-pink-active:hover {
+    color: var(--tv-secondary);
+    border-top-color: var(--tv-secondary);
+    background: rgba(255, 0, 255, 0.1);
+}
+
+/* Manual refresh arrow — sits at the end of the bottom tab bar and pulls
+   fresh catalog data for whichever tab is currently active. */
+.tv-tab--refresh {
+    color: var(--tv-accent);
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.tv-tab--refresh.is-loading {
+    animation: spin 0.8s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ===== CONTENT AREA ===== */
 .tv-content {
     display: flex;
@@ -108,39 +187,37 @@
     animation: fadeIn 0.3s ease;
 }
 
-/* ===== NOW PLAYING CARD ===== */
-.now-playing-card {
-    background: linear-gradient(135deg, rgba(0, 255, 255, 0.08) 0%, rgba(255, 0, 255, 0.03) 100%);
-    border: 1px solid var(--tv-border-light);
-    border-radius: var(--tv-radius-lg);
-    padding: var(--tv-spacing-sm) var(--tv-spacing-lg);
-    margin-bottom: var(--tv-spacing-lg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+/* ===== BROWSE TOOLBAR (filter lives in the bottom tab bar now) ===== */
+/* The shared Filter input sits in the tab bar and applies to the active list:
+   countries, a country's channels, favorites or recents. */
+.tv-tab--filter {
+    flex: 1 1 160px;
+    max-width: 240px;
+    min-width: 0;
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--tv-border);
+    color: var(--tv-text-primary);
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--tv-radius-sm);
+    outline: none;
 }
 
-.now-playing-card.is-hidden {
-    display: none;
+.tv-tab--filter:focus {
+    border-color: var(--tv-primary);
+    box-shadow: 0 0 0 1px var(--tv-primary);
 }
 
-.now-playing-card__info {
-    display: flex;
-    align-items: center;
-    gap: var(--tv-spacing-md);
+.tv-tab--filter::placeholder {
+    color: var(--tv-text-muted);
 }
 
-.now-playing-card__title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--tv-primary);
-    margin: 0;
-    text-align: center;
-    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+/* Relative "last refreshed" label beside the arrow (e.g. "3h ago"). */
+.tv-refresh-age {
+    font-size: 0.7rem;
+    color: var(--tv-text-muted);
+    white-space: nowrap;
 }
 
 /* ===== CHANNEL GRID ===== */
@@ -169,6 +246,10 @@
     text-align: left;
     position: relative;
     overflow: hidden;
+    /* Skip layout/paint entirely for tiles that are far off-screen; kept in
+       reserve so long countries scroll without reflowing the whole grid. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 76px;
 }
 
 .channel-tile:hover {
@@ -401,15 +482,22 @@
 
 /* The live <video> is created by TvPlayer.init() and mounted here */
 .tv-playback-surface {
+    position: relative;
     width: 100%;
+    aspect-ratio: 16 / 9;
     max-height: 400px;
     background: #000;
     display: block;
 }
 
+/* Keep the player window full-size whether or not the stream is playing:
+   an idle <video> collapses to its intrinsic size, so the surface reserves
+   a 16:9 box and the video fills it (letterboxed once a stream appears). */
 .tv-playback-surface video {
     width: 100%;
+    height: 100%;
     max-height: 400px;
+    object-fit: contain;
     background: #000;
     display: block;
 }
@@ -594,6 +682,8 @@
     border-radius: 50%;
     top: 2px;
     left: 2px;
+    transition: var(--tv-transition);
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
@@ -622,18 +712,6 @@
 
     .tv-content {
         padding: var(--tv-spacing-md);
-    }
-
-    .now-playing-card {
-        flex-direction: column;
-    }
-
-    .browse-header {
-        flex-direction: column;
-    }
-
-    .search-input {
-        width: 100%;
     }
 
     .tv-player-video {
@@ -675,9 +753,6 @@
     .tv-controls__info {
         font-size: 0.65rem;
     }
-}
-
-    transition: var(--tv-transition);
 }
 
 .settings-toggle.is-active::after {

@@ -54,12 +54,23 @@ function loadState() {
         const favorites = Array.isArray(raw.favorites)
             ? raw.favorites.map(migrateFavoriteRef)
             : [];
+        // Lightweight display metadata kept with favorite refs so the
+        // favorites tab can draw real tiles immediately (no catalog wait).
+        const favoritesMeta = (Array.isArray(raw.favoritesMeta) ? raw.favoritesMeta : [])
+            .map((e) => ({
+                key: migrateFavoriteRef(typeof e === 'string' ? e : e.key),
+                name: (e && e.name) || '',
+                logo: (e && e.logo) || '',
+                countrycode: (e && e.countrycode) || ''
+            }))
+            .filter((e) => e.key && favorites.includes(e.key));
         const recentsMeta = migrateRecentsMeta(raw);
         const recents = recentsMeta.map((e) => e.key);
         const lastKey = raw.lastChannelKey || null;
 
         return {
             favorites,
+            favoritesMeta,
             recents,
             recentsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
@@ -83,6 +94,7 @@ function loadState() {
     } catch {
         return {
             favorites: [],
+            favoritesMeta: [],
             recents: [],
             recentsMeta: [],
             volume: 0.85,
@@ -109,6 +121,13 @@ function saveState(patch) {
     const next = { ...current, ...patch };
     if (next.recentsMeta) {
         next.recents = next.recentsMeta.map((e) => e.key);
+    }
+    if (next.favorites) {
+        const favKeys = new Set(next.favorites);
+        const seen = new Set();
+        next.favoritesMeta = Array.isArray(next.favoritesMeta)
+            ? next.favoritesMeta.filter((e) => favKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true))
+            : [];
     }
     delete next.miniPlayerDocked;
     delete next.miniPlayerX;
@@ -303,6 +322,7 @@ export const TvPlayer = {
             resumeBlocked: this.resumeBlocked,
             volume: this.volume,
             favorites: this.getFavorites(),
+            favoritesMeta: this.getFavoritesMeta(),
             recents: this.getRecents(),
             recentsMeta: this.getRecentsMeta(),
             seekInfo: this.getSeekInfo()
@@ -311,6 +331,10 @@ export const TvPlayer = {
 
     getFavorites() {
         return [...loadState().favorites];
+    },
+
+    getFavoritesMeta() {
+        return loadState().favoritesMeta.map((e) => ({ ...e }));
     },
 
     getRecents() {
@@ -404,12 +428,19 @@ export const TvPlayer = {
         const idx = favorites.indexOf(key);
         if (idx >= 0) {
             favorites.splice(idx, 1);
-            saveState({ favorites });
+            saveState({ favorites, favoritesMeta: loadState().favoritesMeta.filter((e) => e.key !== key) });
             this.emitState();
             return false;
         }
         favorites.unshift(key);
-        saveState({ favorites });
+        const favoritesMeta = loadState().favoritesMeta.filter((e) => e.key !== key);
+        favoritesMeta.unshift({
+            key,
+            name: channel?.name || '',
+            logo: channel?.logo || '',
+            countrycode: channel?.countrycode || ''
+        });
+        saveState({ favorites, favoritesMeta });
         const parsed = parseChannelKey(key);
         TvProviderRegistry.getChannel(parsed).catch(() => {});
         this.emitState();

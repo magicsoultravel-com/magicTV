@@ -1,7 +1,7 @@
 /** Unit tests for js/tvUtils.js (pure helpers, no DOM needed). */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml, countryFlagEmoji, debounce } from '../js/tvUtils.js';
+import { escapeHtml, countryFlagEmoji, debounce, formatRelativeTime } from '../js/tvUtils.js';
 
 test('escapeHtml escapes HTML metacharacters', () => {
     assert.equal(escapeHtml('<script>&"quoted"</script>'),
@@ -40,4 +40,19 @@ test('debounce waits and invokes once', async () => {
 
     await new Promise((r) => setTimeout(r, 40));
     assert.equal(calls, 1, 'no extra calls without new input');
+});
+test('formatRelativeTime buckets timestamps into friendly labels', () => {
+    const now = 1_000_000_000_000;
+    assert.equal(formatRelativeTime(now - 10_000, now), 'just now');
+    assert.equal(formatRelativeTime(now - 3 * 60_000, now), '3m ago');
+    assert.equal(formatRelativeTime(now - 2 * 3_600_000, now), '2h ago');
+    assert.equal(formatRelativeTime(now - 5 * 86_400_000, now), '5d ago');
+    assert.equal(formatRelativeTime(now - 3 * 7 * 86_400_000, now), '3w ago');
+});
+
+test('formatRelativeTime returns empty for missing timestamps', () => {
+    assert.equal(formatRelativeTime(0), '');
+    assert.equal(formatRelativeTime(null), '');
+    assert.equal(formatRelativeTime(undefined), '');
+    assert.equal(formatRelativeTime(NaN), '');
 });

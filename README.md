@@ -41,16 +41,17 @@ cd /path/to/magicTV
 npm test            # or: node --test
 ```
 
-28 tests cover:
+36 tests cover:
 
 | File | Covers |
 |------|--------|
 | `test/moduleGraph.test.mjs` | **Module-graph integrity** — every local import reachable from `app.js` must resolve (regression test for the empty-page bug) |
 | `test/appBoot.test.mjs` | `app.js` imports safely without a DOM + every `el('id')` the app uses exists in `index.html` |
 | `test/bootSmoke.test.mjs` | Runs the real `init()` with a DOM stub & mocked offline fetch — asserts the app boots and renders a graceful empty state |
-| `test/tvPlayer.test.mjs` | Favorites, recents (cap 20, newest-first), buffer-size clamping (5–120s), volume clamping, provider settings |
-| `test/tvUtils.test.mjs` | `escapeHtml`, `countryFlagEmoji`, `debounce` |
+| `test/tvPlayer.test.mjs` | Favorites, favorites metadata, recents (cap 20, newest-first), buffer-size clamping (5–120s), volume clamping, provider settings |
+| `test/tvUtils.test.mjs` | `escapeHtml`, `countryFlagEmoji`, `debounce`, `formatRelativeTime` |
 | `test/channelShape.test.mjs` | `channelKey`, `parseChannelKey`, `normalizeChannel`, `migrateFavoriteRef` |
+| `test/frameCache.test.mjs` | `FrameCache.setFrame`/`getFrame` round-trip, 7-day TTL expiry, per-key remove |
 
 ## 📁 Project Structure
 
@@ -92,7 +93,7 @@ magicTV/
 ### Browsing
 1. **Select Country** — Click a country tile to browse channels
 2. **Search** — Use search box to filter countries
-3. **Load More** — Pagination for large country channel lists
+3. **Infinite scroll** — Channels load automatically as you scroll down
 
 ### Playing
 1. **Click Channel** — Inline video player appears

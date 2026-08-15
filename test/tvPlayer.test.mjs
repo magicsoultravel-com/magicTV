@@ -65,6 +65,20 @@ test('favorites are persisted under matrix_tv_state', () => {
     assert.equal(TvPlayer.getFavorites()[0], 'iptv-org:CNN.us');
 });
 
+test('favorites keep display metadata for instant tab rendering', () => {
+    TvPlayer.toggleFavorite(CHANNEL);
+    const meta = TvPlayer.getFavoritesMeta();
+    assert.equal(meta.length, 1);
+    assert.equal(meta[0].key, 'iptv-org:CNN.us');
+    assert.equal(meta[0].name, 'CNN');
+    assert.equal(meta[0].logo, 'https://example.com/cnn.png');
+
+    TvPlayer.toggleFavorite(CHANNEL); // remove
+    assert.equal(TvPlayer.getFavoritesMeta().length, 0, 'meta removed with the favorite');
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.ok(!Array.isArray(raw.favoritesMeta) || raw.favoritesMeta.length === 0);
+});
+
 test('favorites work with bare channel ids (migration path)', () => {
     TvPlayer.toggleFavorite({ channelId: 'BBC.uk', url_resolved: 'x' });
     assert.equal(TvPlayer.isFavorite('BBC.uk'), true, 'legacy unprefixed ref resolves');

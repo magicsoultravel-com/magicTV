@@ -16,15 +16,14 @@
                 <img src="./assets/brand/icon-tv.svg" alt="magicTV" class="tv-icon">
                 <h1>magicTV</h1>
             </div>
+            <div class="tv-channel-info is-hidden">
+                <span id="header-now-playing" class="tv-header-now-playing">now playing</span>
+                <span id="header-channel-name" class="tv-header-channel-name"></span>
+                <span id="header-channel-flag" class="tv-header-channel-flag"></span>
+            </div>
         </header>
 
         <div class="tv-content">            
-            <div id="now-playing-slot" class="now-playing-card is-hidden">
-                <div class="now-playing-card__info">
-                    <h2 class="now-playing-card__title" id="now-playing-title">-</h2>
-                </div>
-            </div>
-
             <div id="player-slot" class="tv-player-slot">
                 <div id="tv-playback-surface" class="tv-playback-surface"></div>
                 <div class="tv-player-controls">
@@ -47,17 +46,8 @@
             </div>
 
             <div id="browse-panel" class="tv-panel is-active">
-                <button id="back-btn" class="back-btn is-hidden">← Back to countries</button>
-
-                <div class="browse-header">
-                    <h2 class="browse-title">🌍 Browse by Country</h2>
-                    <input type="search" id="search-countries" class="search-input" placeholder="Search...">
-                </div>
                 <div id="countries-container" class="country-grid"></div>
                 <div id="channels-container" class="channel-grid is-hidden"></div>
-                <div id="load-more-container" class="load-more is-hidden">
-                    <button class="load-more__btn" id="load-more-btn">Load More</button>
-                </div>
             </div>
 
             <div id="favorites-panel" class="tv-panel">
@@ -104,10 +94,14 @@
             </div>
 
             <div class="tv-tabs" role="tablist">
+                <button id="back-btn" class="tv-tab is-hidden" data-tab="back-to-countries" title="Back to countries">&lt;</button>
                 <button class="tv-tab is-active" data-tab="browse">🌍 Browse</button>
                 <button class="tv-tab" data-tab="favorites">❤️ Favorites</button>
                 <button class="tv-tab" data-tab="recents">📺 Recents</button>
                 <button class="tv-tab" data-tab="settings">⚙️ Settings</button>
+                <input type="search" id="search-countries" class="search-input tv-tab--filter" placeholder="Filter" autocomplete="off" aria-label="Filter current list">
+                <span id="refresh-age" class="tv-refresh-age"></span>
+                <button id="refresh-btn" class="tv-tab tv-tab--refresh" data-tab="refresh" title="Refresh this tab" aria-label="Refresh this tab">↻</button>
             </div>
         </div>
     </div>

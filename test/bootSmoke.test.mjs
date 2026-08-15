@@ -10,12 +10,10 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 const KNOWN_IDS = [
-    'tv-settings-btn', 'back-btn', 'search-countries', 'load-more-btn',
-    'now-playing-slot', 'now-playing-title', 'now-playing-country',
-    'now-playing-logo', 'now-playing-fallback', 'resume-btn', 'stop-btn',
-    'player-slot', 'tv-playback-surface', 'play-btn', 'pause-btn',
+    'tv-settings-btn', 'back-btn', 'search-countries', 'refresh-btn', 'refresh-age',
+    'player-slot', 'tv-playback-surface', 'play-btn', 'pause-btn', 'stop-btn',
     'volume-slider', 'buffer-info', 'quality-info', 'pip-btn', 'fullscreen-btn',
-    'countries-container', 'channels-container', 'load-more-container',
+    'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select', 'hide-offline-toggle'
 ];

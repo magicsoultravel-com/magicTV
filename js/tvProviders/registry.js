@@ -83,6 +83,10 @@ export const TvProviderRegistry = {
         });
     },
 
+    getLastRefreshed() {
+        return this.getActiveProvider().getLastRefreshed?.() || 0;
+    },
+
     async getChannel(ref, opts = {}) {
         const providerId = ref?.providerId || loadSettings().catalogProvider;
         const channelId = ref?.channelId || ref;

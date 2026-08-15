@@ -6,14 +6,24 @@ const IPTV_STREAMS_URL = 'https://iptv-org.github.io/api/streams.json';
 const IPTV_COUNTRIES_URL = 'https://iptv-org.github.io/api/countries.json';
 const IPTV_BLOCKLIST_URL = 'https://iptv-org.github.io/api/blocklist.json';
 const CACHE_KEY = 'matrix_tv_iptv_cache';
-const TTL = 24 * 60 * 60 * 1000;
 
+// In-memory catalog + last successful (re)load timestamp. After the first
+// load the catalog is served from memory for tab switches/searches — no
+// IndexedDB reads, no hydration — so favorites/recents tiles render instantly.
+let catalogMemory = null;
+let lastRefreshedAt = 0;
+
+// Cache-first forever: the app boots straight from history (even when the
+// cached catalog is stale) and only talks to the network when the user taps
+// the refresh arrow in the tab bar. No auto-refetch on site reload.
 async function loadCache() {
     try {
         const cached = await IndexedDBStore.get(CACHE_KEY, CACHE_KEY);
-        if (!cached) return null;
-        if (!isFresh(cached)) return null;
-        return cached.data;
+        if (cached) {
+            lastRefreshedAt = cached.cachedAt || Date.now();
+            return cached.data;
+        }
+        return null;
     } catch {
         return null;
     }
@@ -25,10 +35,6 @@ async function saveCachePayload(data) {
     } catch {
         /* quota or private mode — in-memory catalog still works this session */
     }
-}
-
-function isFresh(entry) {
-    return entry && Number.isFinite(entry.cachedAt) && (Date.now() - entry.cachedAt) < TTL;
 }
 
 function isValidCachedData(data) {
@@ -70,8 +76,13 @@ async function readCachedCatalog(refresh) {
 }
 
 async function loadCatalog(refresh = false) {
+    if (!refresh && catalogMemory) return catalogMemory;
+
     const cached = await readCachedCatalog(refresh);
-    if (cached) return cached;
+    if (cached) {
+        catalogMemory = cached;
+        return cached;
+    }
 
     const [channelsRes, streamsRes, countriesRes, blocklistRes] = await Promise.all([
         fetch(IPTV_CHANNELS_URL),
@@ -147,6 +158,8 @@ async function loadCatalog(refresh = false) {
 
     const catalog = hydrateCatalog({ channels: channelsOut, countryList });
     await saveCachePayload(catalog);
+    catalogMemory = catalog;
+    lastRefreshedAt = Date.now();
     return catalog;
 }
 
@@ -161,6 +174,7 @@ export const IptvOrgTvProvider = {
 
     async searchChannels({
         countrycode = '',
+        query = '',
         limit = 100,
         offset = 0,
         order = 'name',
@@ -172,6 +186,17 @@ export const IptvOrgTvProvider = {
         let list = countrycode
             ? [...(catalog.byCountry.get(countrycode) || [])]
             : [...catalog.channels];
+
+        // Whole-dataset filter: the catalog is fully resident (memory/IDB),
+        // so filtering happens against every channel — not just the pages
+        // already painted — and pagination scrolls the *filtered* results.
+        const q = String(query || '').trim().toLowerCase();
+        if (q) {
+            list = list.filter((s) =>
+                (s.name || '').toLowerCase().includes(q)
+                || (s.id || '').toLowerCase().includes(q)
+            );
+        }
 
         if (hideOffline) {
             list = list.filter((s) => s.url_resolved);
@@ -195,13 +220,19 @@ export const IptvOrgTvProvider = {
     },
 
     async getChannelsByIds(ids, opts = {}) {
-        const results = await Promise.all(
-            ids.map((id) => this.getChannelById(id, opts))
-        );
-        return results.filter(Boolean);
+        const catalog = await loadCatalog(opts.refresh);
+        return ids
+            .map((id) => normalizeChannel(catalog.byId.get(id), PROVIDER_IPTV_ORG))
+            .filter(Boolean);
+    },
+
+    // When was the catalog data we're serving last fetched from the network?
+    getLastRefreshed() {
+        return lastRefreshedAt;
     },
 
     async invalidateCache() {
+        catalogMemory = null;
         await IndexedDBStore.remove(CACHE_KEY);
     },
 
