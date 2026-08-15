@@ -141,7 +141,7 @@
             </div>
         </div>
     </div>
-    <div id="toast-container" style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;"></div>
+    <div id="toast-container" style="position: fixed; bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem)); right: max(2rem, env(safe-area-inset-right, 0px)); z-index: 9999;"></div>
     <script type="module" src="./js/app.js"></script>
 </body>
 </html>

@@ -3,10 +3,17 @@
 #app-container {
     display: flex;
     flex-direction: column;
+    /* 100vh is taller than the visible area on mobile browsers (URL bar),
+       which pushes the bottom tabs off-screen. dvh tracks the visible viewport. */
     height: 100vh;
-    width: 100vw;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    width: 100%;
     overflow: hidden;
     background: var(--tv-bg);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* ===== HEADER =====
@@ -17,6 +24,7 @@
     align-items: center;
     justify-content: flex-start;
     padding: 16px 24px;
+    padding-top: max(16px, env(safe-area-inset-top, 0px));
     background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.03) 100%);
     border-bottom: 1px solid var(--tv-border);
     flex-shrink: 0;
@@ -93,6 +101,7 @@
     display: flex;
     gap: var(--tv-spacing-sm);
     padding: var(--tv-spacing-sm) var(--tv-spacing-lg);
+    padding-bottom: max(var(--tv-spacing-sm), env(safe-area-inset-bottom, 0px));
     background: rgba(0, 0, 0, 0.4);
     border-top: 1px solid var(--tv-border);
     overflow-x: auto;
@@ -174,6 +183,7 @@
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-height: 0;
     overflow: hidden;
     position: relative;
 }
@@ -261,23 +271,22 @@
     box-shadow: 0 4px 16px rgba(0, 255, 255, 0.15);
 }
 
-/* Hover fav — 30px box flush to the tile's top-right corner */
+/* Hover fav — 20px thin SVG star flush to the tile's top-right corner */
 .channel-tile__fav-btn {
     position: absolute;
     top: 0;
     right: 0;
     z-index: 2;
     box-sizing: border-box;
-    width: 30px;
-    height: 30px;
+    width: 20px;
+    height: 20px;
     padding: 0;
     margin: 0;
     border: none;
     border-radius: 0;
     background: transparent;
     color: var(--tv-text-muted);
-    font-size: 30px;
-    line-height: 1;
+    line-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -285,6 +294,12 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.channel-tile__fav-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
 }
 
 .channel-tile:hover .channel-tile__fav-btn,
@@ -450,14 +465,67 @@
 
 .channel-tile__logo-img.is-hidden { display: none; }
 
-.channel-tile__frame-loader {
+.channel-tile__frame-waiting,
+.channel-tile__frame-loading {
     position: absolute;
-    font-size: 0.75rem;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--tv-text-muted);
+    line-height: 1;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.channel-tile__frame-waiting {
     animation: pulse 1.2s ease-in-out infinite;
 }
 
-.channel-tile__frame-loader.is-hidden { display: none; }
+.channel-tile__frame-loading {
+    color: var(--tv-primary);
+}
+
+.channel-tile__frame-loading svg {
+    display: block;
+    animation: spin 0.8s linear infinite;
+}
+
+.channel-tile__frame-waiting.is-hidden,
+.channel-tile__frame-loading.is-hidden {
+    display: none;
+}
+
+/* Corner spinner while a provisional logo is on-screen and a live grab runs. */
+.channel-tile__frame-loading-chip {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--tv-primary);
+    line-height: 1;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.channel-tile__frame-loading-chip svg {
+    display: block;
+    width: 10px;
+    height: 10px;
+    animation: spin 0.8s linear infinite;
+}
+
+.channel-tile__frame-loading-chip.is-hidden { display: none; }
+
+.channel-tile__capture-frame[data-frame-state="loading"] .channel-tile__letter-avatar {
+    opacity: 0.35;
+}
 
 @keyframes pulse {
     0%, 100% { opacity: 0.3; }
@@ -565,7 +633,10 @@
 
 .tv-player-video {
     width: 100%;
+    /* Cap by viewport height so the browse list keeps room on phones —
+       including "desktop site" mode, which skips width-only breakpoints. */
     max-height: 400px;
+    max-height: min(400px, 40dvh);
     background: #000;
     display: block;
 }
@@ -576,6 +647,7 @@
     width: 100%;
     aspect-ratio: 16 / 9;
     max-height: 400px;
+    max-height: min(400px, 40dvh);
     background: #000;
     display: block;
 }
@@ -587,6 +659,7 @@
     width: 100%;
     height: 100%;
     max-height: 400px;
+    max-height: min(400px, 40dvh);
     object-fit: contain;
     background: #000;
     display: block;
@@ -939,6 +1012,7 @@
 @media (max-width: 768px) {
     .tv-header {
         padding: 16px;
+        padding-top: max(16px, env(safe-area-inset-top, 0px));
     }
 
     .tv-brand h1 {
@@ -957,6 +1031,7 @@
 
     .tv-tabs {
         padding: var(--tv-spacing-sm) var(--tv-spacing-md);
+        padding-bottom: max(var(--tv-spacing-sm), env(safe-area-inset-bottom, 0px));
         gap: var(--tv-spacing-xs);
     }
 
@@ -971,17 +1046,20 @@
 
     .tv-player-video {
         max-height: 280px;
+        max-height: min(280px, 32dvh);
     }
 
     .tv-playback-surface,
     .tv-playback-surface video {
         max-height: 280px;
+        max-height: min(280px, 32dvh);
     }
 }
 
 @media (max-width: 480px) {
     .tv-header {
         padding: 8px 16px;
+        padding-top: max(8px, env(safe-area-inset-top, 0px));
     }
 
     .tv-brand h1 {
@@ -1008,6 +1086,52 @@
 
     .tv-controls__info {
         font-size: 0.65rem;
+    }
+}
+
+/* Short viewports: phones, landscape, and "Request desktop site" (wide CSS
+   width but phone height). Width-only breakpoints miss that case. */
+@media (max-height: 720px) {
+    .tv-player-video,
+    .tv-playback-surface,
+    .tv-playback-surface video {
+        max-height: 220px;
+        max-height: min(220px, 28dvh);
+    }
+
+    .tv-player-controls {
+        padding: 0.35rem var(--tv-spacing-sm);
+        gap: var(--tv-spacing-sm);
+    }
+
+    .tv-controls__info {
+        display: none;
+    }
+}
+
+@media (max-height: 560px) {
+    .tv-player-video,
+    .tv-playback-surface,
+    .tv-playback-surface video {
+        max-height: 140px;
+        max-height: min(140px, 22dvh);
+    }
+
+    .tv-header {
+        padding-top: max(8px, env(safe-area-inset-top, 0px));
+        padding-bottom: 8px;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .tv-brand h1,
+    .tv-header-channel-name,
+    .tv-header-channel-flag {
+        font-size: 18px;
+    }
+
+    .tv-player-slot {
+        margin-bottom: var(--tv-spacing-sm);
     }
 }
 

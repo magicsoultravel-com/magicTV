@@ -556,12 +556,14 @@ function tileHtml(ch) {
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
     return `
         <div class="channel-tile" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
-            <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? '★' : '☆'}</button>
+            <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
             <div class="channel-tile__icon">
-                <div class="channel-tile__capture-frame" data-frame="${escapeHtml(channelKey(ch))}">
+                <div class="channel-tile__capture-frame" data-frame="${escapeHtml(channelKey(ch))}" data-frame-state="waiting">
                     <div class="channel-tile__letter-avatar">${initial}</div>
                     <img class="channel-tile__logo-img is-hidden" alt="" loading="lazy" decoding="async">
-                    <span class="channel-tile__frame-loader">⏳</span>
+                    <span class="channel-tile__frame-waiting" aria-hidden="true">${CARD_ICONS.waiting}</span>
+                    <span class="channel-tile__frame-loading is-hidden" aria-hidden="true">${CARD_ICONS.loading}</span>
+                    <span class="channel-tile__frame-loading-chip is-hidden" aria-hidden="true">${CARD_ICONS.loading}</span>
                     <span class="channel-tile__offline-badge is-hidden" aria-hidden="true">${CARD_ICONS.prohibited}</span>
                 </div>
             </div>
@@ -605,7 +607,7 @@ function renderChannelGrid(container, channels, { append = false } = {}) {
 function syncTileFavBtn(btn, isFav) {
     if (!btn) return;
     btn.classList.toggle('is-active', isFav);
-    btn.textContent = isFav ? '★' : '☆';
+    btn.innerHTML = isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar;
     const label = isFav ? 'Remove from favorites' : 'Add to favorites';
     btn.title = label;
     btn.setAttribute('aria-label', label);
@@ -662,6 +664,8 @@ const frameCapture = {
     warm: [],
     pending: new Set(),
     forceHeavy: new WeakSet(),
+    /** Frames currently inside captureFrame (for provisional+loading chip). */
+    active: new WeakSet(),
     running: 0,
     heavyRunning: 0,
     paused: false,
@@ -685,14 +689,16 @@ function observeFrames(container) {
                 if (!entry.isIntersecting) continue;
                 const f = entry.target;
                 if (f.dataset.captured || frameCapture.pending.has(f)) continue;
-                // Post-↻ folder pass: live grab even for lazily loaded pages.
+                // Post-↻ folder pass: skip stale cache (see captureFrame) but still
+                // allow the fast logo path — do NOT forceHeavy or playback-pause
+                // leaves the whole grid stuck on waiting.
                 if (isFolderFrameRefreshActive()) {
                     const logo = (f.closest('.channel-tile')?.dataset?.logo || '').trim();
                     if (logo) applyFrameProvisional(f, logo);
-                    frameCapture.forceHeavy.add(f);
                 }
                 (isInViewport(f) ? frameCapture.hot : frameCapture.warm).push(f);
                 frameCapture.pending.add(f);
+                markFrameWaiting(f);
             }
             drainFrameCapture();
         }, { rootMargin: '200px 0px 200px 0px' });
@@ -725,72 +731,153 @@ function isNearViewport(frame, margin = 200) {
 }
 
 function applyFrameSuccess(frame, src) {
-    const img = frame.querySelector('.channel-tile__logo-img');
-    const letter = frame.querySelector('.channel-tile__letter-avatar');
-    const loader = frame.querySelector('.channel-tile__frame-loader');
-    const badge = frame.querySelector('.channel-tile__offline-badge');
-    if (img) { img.src = src; img.classList.remove('is-hidden'); }
-    if (letter) letter.classList.add('is-hidden');
-    if (loader) loader.classList.add('is-hidden');
-    if (badge) badge.classList.add('is-hidden');
-    frame.dataset.captured = '1';
-    delete frame.dataset.provisional;
+    setFrameState(frame, 'captured', src);
 }
 
 // Fast placeholder (usually the channel logo) while a live grab is still running.
 // Does NOT set captured — the heavy pass can still replace it.
 function applyFrameProvisional(frame, src) {
     if (!frame || !src || frame.dataset.captured) return;
-    const img = frame.querySelector('.channel-tile__logo-img');
-    const letter = frame.querySelector('.channel-tile__letter-avatar');
-    const loader = frame.querySelector('.channel-tile__frame-loader');
-    const badge = frame.querySelector('.channel-tile__offline-badge');
-    if (img) { img.src = src; img.classList.remove('is-hidden'); }
-    if (letter) letter.classList.add('is-hidden');
-    if (loader) loader.classList.add('is-hidden');
-    if (badge) badge.classList.add('is-hidden');
-    frame.dataset.provisional = '1';
+    setFrameState(frame, 'provisional', src);
 }
 
 function applyFrameFailure(frame) {
     // Keep a provisional logo rather than flashing the prohibition badge —
     // dead streams fail fast, which made the top of the list look "broken"
     // long before live frames arrived.
-    if (frame.dataset.provisional && frame.querySelector('.channel-tile__logo-img')?.src) {
-        frame.dataset.captured = '1';
-        delete frame.dataset.provisional;
-        const loader = frame.querySelector('.channel-tile__frame-loader');
-        const badge = frame.querySelector('.channel-tile__offline-badge');
-        if (loader) loader.classList.add('is-hidden');
-        if (badge) badge.classList.add('is-hidden');
+    if (frame.dataset.provisional && frame.querySelector('.channel-tile__logo-img')?.getAttribute('src')) {
+        setFrameState(frame, 'captured');
         return;
     }
-    const img = frame.querySelector('.channel-tile__logo-img');
-    const letter = frame.querySelector('.channel-tile__letter-avatar');
-    const loader = frame.querySelector('.channel-tile__frame-loader');
-    const badge = frame.querySelector('.channel-tile__offline-badge');
-    if (img) img.classList.add('is-hidden');
-    if (letter) letter.classList.add('is-hidden');
-    if (loader) loader.classList.add('is-hidden');
-    if (badge) badge.classList.remove('is-hidden');
-    frame.dataset.captured = '1';
-    delete frame.dataset.provisional;
+    setFrameState(frame, 'offline');
 }
 
 function resetFrameUi(frame) {
+    setFrameState(frame, 'waiting');
+}
+
+/** Queued but not yet capturing — keep provisional logo if present. */
+function markFrameWaiting(frame) {
+    if (!frame || frame.dataset.captured) return;
+    if (frame.dataset.provisional && frame.querySelector('.channel-tile__logo-img')?.getAttribute('src')) {
+        setFrameState(frame, 'provisional');
+        return;
+    }
+    setFrameState(frame, 'waiting');
+}
+
+/** Capture slot started for this frame. */
+function markFrameLoading(frame) {
+    if (!frame || frame.dataset.captured) return;
+    setFrameState(frame, 'loading');
+}
+
+/**
+ * Single UI setter for the tile avatar.
+ * @param {'waiting'|'loading'|'provisional'|'captured'|'offline'} state
+ * @param {string} [src] image URL for provisional/captured
+ */
+function setFrameState(frame, state, src) {
+    if (!frame || !state) return;
     const img = frame.querySelector('.channel-tile__logo-img');
     const letter = frame.querySelector('.channel-tile__letter-avatar');
-    const loader = frame.querySelector('.channel-tile__frame-loader');
+    const waiting = frame.querySelector('.channel-tile__frame-waiting');
+    const loading = frame.querySelector('.channel-tile__frame-loading');
+    const chip = frame.querySelector('.channel-tile__frame-loading-chip');
     const badge = frame.querySelector('.channel-tile__offline-badge');
-    if (img) {
-        img.removeAttribute('src');
-        img.classList.add('is-hidden');
+    const hide = (el) => el && el.classList.add('is-hidden');
+    const show = (el) => el && el.classList.remove('is-hidden');
+
+    frame.dataset.frameState = state;
+
+    if (state === 'waiting') {
+        if (img) {
+            img.removeAttribute('src');
+            hide(img);
+        }
+        show(letter);
+        show(waiting);
+        hide(loading);
+        hide(chip);
+        hide(badge);
+        delete frame.dataset.captured;
+        delete frame.dataset.provisional;
+        return;
     }
-    if (letter) letter.classList.remove('is-hidden');
-    if (loader) loader.classList.remove('is-hidden');
-    if (badge) badge.classList.add('is-hidden');
-    delete frame.dataset.captured;
-    delete frame.dataset.provisional;
+
+    if (state === 'loading') {
+        const provisionalSrc = frame.dataset.provisional
+            ? (img?.getAttribute('src') || '')
+            : '';
+        if (provisionalSrc) {
+            show(img);
+            hide(letter);
+            hide(waiting);
+            hide(loading);
+            show(chip);
+            hide(badge);
+        } else {
+            if (img) hide(img);
+            show(letter);
+            hide(waiting);
+            show(loading);
+            hide(chip);
+            hide(badge);
+        }
+        delete frame.dataset.captured;
+        return;
+    }
+
+    if (state === 'provisional') {
+        if (src && img) {
+            img.src = src;
+            show(img);
+        } else if (img?.getAttribute('src')) {
+            show(img);
+        } else {
+            return;
+        }
+        hide(letter);
+        hide(waiting);
+        hide(loading);
+        if (frameCapture.active.has(frame)) show(chip);
+        else hide(chip);
+        hide(badge);
+        frame.dataset.provisional = '1';
+        delete frame.dataset.captured;
+        return;
+    }
+
+    if (state === 'captured') {
+        if (src && img) {
+            img.src = src;
+            show(img);
+        } else if (img?.getAttribute('src')) {
+            show(img);
+        }
+        hide(letter);
+        hide(waiting);
+        hide(loading);
+        hide(chip);
+        hide(badge);
+        frame.dataset.captured = '1';
+        delete frame.dataset.provisional;
+        return;
+    }
+
+    if (state === 'offline') {
+        if (img) {
+            img.removeAttribute('src');
+            hide(img);
+        }
+        hide(letter);
+        hide(waiting);
+        hide(loading);
+        hide(chip);
+        show(badge);
+        frame.dataset.captured = '1';
+        delete frame.dataset.provisional;
+    }
 }
 
 function paintProvisionalLogos(container) {
@@ -827,17 +914,17 @@ function queueFrameForFolderRefresh(frame, { hot, warm, hotBudget, keys }) {
     }
     if (!url) return false;
     if (frame.dataset.captured || frameCapture.pending.has(frame)) return false;
-    frameCapture.forceHeavy.add(frame);
     frameCapture.pending.add(frame);
+    markFrameWaiting(frame);
     if (hot.length < hotBudget) hot.push(frame);
     else warm.push(frame);
     return true;
 }
 
 // Refresh frames for the open folder:
-//  1) logos immediately on every loaded tile
-//  2) live-grab the whole loaded page in DOM order (top first = hot)
-//  3) not-yet-paginated channels join later via sticky folder refresh
+//  1) bust cached thumbs + paint logos immediately
+//  2) re-queue the loaded page (normal cheap→heavy path — logos first)
+//  3) sticky folder key skips stale cache for pages loaded later while scrolling
 function refreshTileFrames(container) {
     if (!container) return;
     const frames = Array.from(container.querySelectorAll('.channel-tile__capture-frame'));
@@ -863,25 +950,22 @@ function refreshTileFrames(container) {
         const logo = (tile?.dataset?.logo || '').trim();
 
         frameCapture.pending.delete(frame);
+        frameCapture.forceHeavy.delete(frame);
         resetFrameUi(frame);
         if (logo) applyFrameProvisional(frame, logo);
 
         if (!url) {
             if (!logo) applyFrameFailure(frame);
-            else {
-                frame.dataset.captured = '1';
-                delete frame.dataset.provisional;
-            }
+            else setFrameState(frame, 'captured', logo);
             continue;
         }
 
-        // Queue every loaded tile. Dense/small-tile grids fit many rows in the
-        // first page; a getBoundingClientRect "near viewport" cut-off often only
-        // caught the first row once content-visibility skipped the rest.
         if (url) keys.push(url);
         if (logo) keys.push(logo);
-        frameCapture.forceHeavy.add(frame);
+        // Normal tiering (logo/cache first). Forcing every tile onto live HLS
+        // made the grid hang whenever playback paused heavy capture.
         frameCapture.pending.add(frame);
+        markFrameWaiting(frame);
         if (hot.length < hotBudget) hot.push(frame);
         else warm.push(frame);
     }
@@ -891,6 +975,7 @@ function refreshTileFrames(container) {
 
     FrameCache.removeFrames(keys).catch(() => {});
     drainFrameCapture();
+    if (frameCapture.paused) softenPendingFramesWhilePaused();
 }
 
 // During the ↻ button pass, fold newly filled pages into the queue (top of
@@ -934,8 +1019,8 @@ function promoteUncapturedFolderFrames(container) {
         if (logo) applyFrameProvisional(frame, logo);
         if (url) keys.push(url);
         if (logo) keys.push(logo);
-        frameCapture.forceHeavy.add(frame);
         frameCapture.pending.add(frame);
+        markFrameWaiting(frame);
         if (hot.length < hotBudget) hot.push(frame);
         else warm.push(frame);
         added = true;
@@ -992,6 +1077,10 @@ function primeFramesFromCache(container) {
             for (const key of keys) {
                 const dataUrl = cached.get(key);
                 if (!dataUrl) continue;
+                if (await isMostlyBlackDataUrl(dataUrl)) {
+                    FrameCache.removeFrame(key).catch(() => {});
+                    continue;
+                }
                 applyFrameSuccess(frame, dataUrl);
                 break;
             }
@@ -1025,6 +1114,7 @@ function canStartTier(tier) {
         if (frameCapture.paused) return false;
         return frameCapture.heavyRunning < frameCapture.MAX_HEAVY;
     }
+    // Logos/cache still run while playback pauses heavy stream grabs.
     return (frameCapture.running - frameCapture.heavyRunning) < frameCapture.MAX_CHEAP;
 }
 
@@ -1052,7 +1142,23 @@ function setFrameCapturePaused(paused) {
     const next = !!paused;
     if (frameCapture.paused === next) return;
     frameCapture.paused = next;
-    if (!next) drainFrameCapture();
+    if (next) {
+        // Heavy live grabs yield to playback. Without this, a folder ↻ leaves
+        // every tile on the waiting hourglass until the user stops the channel.
+        softenPendingFramesWhilePaused();
+    } else {
+        drainFrameCapture();
+    }
+}
+
+/** Show channel logos on queued tiles while live capture is paused for playback. */
+function softenPendingFramesWhilePaused() {
+    for (const frame of frameCapture.pending) {
+        if (!frame?.isConnected || frame.dataset.captured) continue;
+        const logo = (frame.closest('.channel-tile')?.dataset?.logo || '').trim();
+        if (logo) applyFrameProvisional(frame, logo);
+    }
+    paintProvisionalLogos(activeChannelGrid());
 }
 
 function drainFrameCapture() {
@@ -1063,6 +1169,8 @@ function drainFrameCapture() {
         const epoch = frameCapture.refreshEpoch;
         frameCapture.running++;
         if (tier === 'heavy') frameCapture.heavyRunning++;
+        frameCapture.active.add(frame);
+        markFrameLoading(frame);
         let requeued = false;
         captureFrame(frame, tier, epoch)
             .then((result) => {
@@ -1071,10 +1179,12 @@ function drainFrameCapture() {
                 frameCapture.forceHeavy.add(frame);
                 frameCapture.pending.add(frame);
                 (isInViewport(frame) ? frameCapture.hot : frameCapture.warm).unshift(frame);
+                markFrameWaiting(frame);
             })
             .finally(() => {
                 frameCapture.running--;
                 if (tier === 'heavy') frameCapture.heavyRunning--;
+                frameCapture.active.delete(frame);
                 // A newer ↻ may have re-queued this frame — don't clear its slots.
                 if (!requeued && epoch === frameCapture.refreshEpoch) {
                     frameCapture.pending.delete(frame);
@@ -1096,15 +1206,23 @@ async function captureFrame(frame, tier, epoch = frameCapture.refreshEpoch) {
     const url = (tile?.dataset?.url || '').trim();
     const logo = (tile?.dataset?.logo || '').trim();
     const alreadyHeavy = frameCapture.forceHeavy.has(frame);
+    // After ↻, skip stale IndexedDB thumbs but still allow logos (fast) then
+    // live grabs — never force every tile onto HLS-only.
+    const skipCache = isFolderFrameRefreshActive();
 
     // Tier 0 — persistent thumbnail cache (IndexedDB), keyed by stream or logo URL.
-    // Skip when forcing a live re-grab (manual ↻) so we don't paint a stale thumb.
-    if (!alreadyHeavy) {
+    if (!alreadyHeavy && !skipCache) {
         for (const key of [url, logo]) {
             if (!key) continue;
             const cached = await FrameCache.getFrame(key).catch(() => null);
             if (stale()) return;
-            if (cached) { applyFrameSuccess(frame, cached); return; }
+            if (!cached) continue;
+            if (await isMostlyBlackDataUrl(cached)) {
+                FrameCache.removeFrame(key).catch(() => {});
+                continue;
+            }
+            applyFrameSuccess(frame, cached);
+            return;
         }
     }
 
@@ -1114,6 +1232,9 @@ async function captureFrame(frame, tier, epoch = frameCapture.refreshEpoch) {
             if (stale()) return;
             applyFrameSuccess(frame, logo);
             persistFrameBestEffort(logo); // background cache write, if CORS allows
+            // Folder ↻: keep going for a live snap when heavy slots are free
+            // (logos first so the grid never sits on waiting hourglasses).
+            if (isFolderFrameRefreshActive() && url) return 'requeue-heavy';
             return;
         }
         if (stale()) return;
@@ -1226,6 +1347,29 @@ function isMostlyBlackImageData(data) {
         if (data[i] < 18 && data[i + 1] < 18 && data[i + 2] < 18) dark++;
     }
     return n > 0 && dark / n >= 0.92;
+}
+
+/** Drop stale black JPEG thumbs left in IndexedDB from older capture bugs. */
+async function isMostlyBlackDataUrl(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return false;
+    if (typeof Image === 'undefined' || typeof document === 'undefined') return false;
+    try {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = 56;
+        canvas.height = 56;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return false;
+        ctx.drawImage(img, 0, 0, 56, 56);
+        return isMostlyBlackImageData(ctx.getImageData(0, 0, 56, 56).data);
+    } catch {
+        return false;
+    }
 }
 
 function snapshotVideoFrame(video) {

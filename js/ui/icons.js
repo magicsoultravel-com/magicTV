@@ -3,11 +3,18 @@
 export const CARD_ICONS = {
     star: '<svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linejoin="round"/></svg>',
     starFilled: '<svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="currentColor" stroke="currentColor" stroke-width="0.9" stroke-linejoin="round"/></svg>',
+    /** Large tile hover fav — thin outline so it stays light at 20px. */
+    tileStar: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/></svg>',
+    tileStarFilled: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="currentColor" stroke="none"/></svg>',
     close: '<svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
     chevronRight: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M4.8 3.2 7.6 6 4.8 8.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     chevronDown: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     /** Prohibition / “no signal” road-sign for failed tile frame grabs. */
     prohibited: '<svg viewBox="0 0 12 12" width="18" height="18" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.15"/><path d="M3.1 3.1l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>',
+    /** Queued / not yet capturing — simple hourglass. */
+    waiting: '<svg viewBox="0 0 12 12" width="16" height="16" focusable="false" aria-hidden="true"><path d="M3.2 2.2h5.6M3.2 9.8h5.6M3.6 2.2 8.4 6 3.6 9.8M8.4 2.2 3.6 6 8.4 9.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Capture in flight — arc spinner (CSS rotates the element). */
+    loading: '<svg viewBox="0 0 12 12" width="16" height="16" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="18 10" opacity="0.95"/></svg>',
 };
 
 export const ACTION_ICONS = {
