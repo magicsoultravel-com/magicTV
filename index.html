@@ -80,6 +80,26 @@
                         </div>
                     </div>
                     <div class="settings-section">
+                        <h3 class="settings-section__title">🎨 Appearance</h3>
+                        <div class="settings-section__item">
+                            <label class="settings-section__label">Text Size</label>
+                            <div class="settings-section__control">
+                                <button class="settings-increment-btn" id="text-size-decrement" aria-label="Decrease text size">−</button>
+                                <span class="settings-value" id="text-size-value">16px</span>
+                                <button class="settings-increment-btn" id="text-size-increment" aria-label="Increase text size">+</button>
+                            </div>
+                        </div>
+                        <div class="settings-section__item">
+                            <label class="settings-section__label">Tile Width</label>
+                            <div class="settings-section__control">
+                                <button class="settings-increment-btn" id="tile-width-decrement" aria-label="Decrease tile width">−</button>
+                                <span class="settings-value" id="tile-width-value">180px</span>
+                                <button class="settings-increment-btn" id="tile-width-increment" aria-label="Increase tile width">+</button>
+                            </div>
+                        </div>
+                        <button id="reset-appearance-btn" class="tv-controls__btn" style="margin-top: var(--tv-spacing-sm); font-size: 0.8rem;">Reset to Default</button>
+                    </div>
+                    <div class="settings-section">
                         <h3 class="settings-section__title">📊 Storage</h3>
                         <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">
                             <span>Favorites: —</span>

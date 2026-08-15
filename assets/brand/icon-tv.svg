@@ -54,25 +54,18 @@
   <rect x="22" y="22" width="84" height="68" rx="3" ry="3" 
         fill="none" stroke="#FF00FF" stroke-width="1.5" filter="url(#neon-glow)" opacity="0.85"/>
 
-  <!-- Tri-color neon horizontal stripes (cyan, pink, green) -->
+  <!-- Tri-color vertical stripes with equal spacing and padding -->
   <g filter="url(#screen-glow)">
-    <!-- Stripe 1 - Cyan -->
-    <rect x="28" y="32" width="80" height="8" fill="#00FFFF" opacity="0.75"/>
-    <!-- Stripe 2 - Pink (Magenta) -->
-    <rect x="28" y="48" width="80" height="8" fill="#FF00FF" opacity="0.75"/>
-    <!-- Stripe 3 - Green -->
-    <rect x="28" y="64" width="80" height="8" fill="#00FF00" opacity="0.75"/>
+    <!-- Stripe 1 - Cyan (left) -->
+    <rect x="24" y="23" width="26" height="65" fill="#00FFFF" opacity="0.85"/>
+    <!-- Gap of 1px -->
+    <!-- Stripe 2 - Pink (center) -->
+    <rect x="51" y="23" width="26" height="65" fill="#FF00FF" opacity="0.85"/>
+    <!-- Gap of 1px -->
+    <!-- Stripe 3 - Green (right) -->
+    <rect x="78" y="23" width="26" height="65" fill="#00FF00" opacity="0.85"/>
   </g>
   
-  <!-- Play symbol inside screen -->
-  <path d="M 54 48 L 54 68 L 74 58 Z" 
-        fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" 
-        filter="url(#neon-glow)" opacity="0.95"/>
-
-  <!-- Glitch accent (magenta line) -->
-  <line x1="26" y1="44" x2="40" y2="44" stroke="#FF00FF" stroke-width="1.5" 
-        filter="url(#neon-glow)" opacity="0.6"/>
-
   <!-- Stand left -->
   <line x1="42" y1="96" x2="42" y2="108" stroke="#00FFFF" stroke-width="2" 
         stroke-linecap="round" filter="url(#neon-glow)" opacity="0.8"/>

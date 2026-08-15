@@ -3,6 +3,12 @@ import { PROVIDER_IPTV_ORG } from './channelShape.js';
 
 const STATE_KEY = 'matrix_tv_state';
 
+// Appearance settings defaults
+const DEFAULT_TEXT_SIZE = 16;  // px
+const DEFAULT_TILE_WIDTH = 180; // px
+const TEXT_SIZE_OPTIONS = [12, 14, 16, 18];
+const TILE_WIDTH_OPTIONS = [120, 150, 180, 220, 260];
+
 const PROVIDERS = {
     [PROVIDER_IPTV_ORG]: IptvOrgTvProvider
 };
@@ -12,12 +18,16 @@ function loadSettings() {
         const raw = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
         return {
             catalogProvider: raw.catalogProvider || PROVIDER_IPTV_ORG,
-            hideOfflineChannels: raw.hideOfflineChannels !== false
+            hideOfflineChannels: raw.hideOfflineChannels !== false,
+            textSize: TEXT_SIZE_OPTIONS.includes(raw.textSize) ? raw.textSize : DEFAULT_TEXT_SIZE,
+            tileWidth: TILE_WIDTH_OPTIONS.includes(raw.tileWidth) ? raw.tileWidth : DEFAULT_TILE_WIDTH
         };
     } catch {
         return {
             catalogProvider: PROVIDER_IPTV_ORG,
-            hideOfflineChannels: true
+            hideOfflineChannels: true,
+            textSize: DEFAULT_TEXT_SIZE,
+            tileWidth: DEFAULT_TILE_WIDTH
         };
     }
 }
@@ -69,6 +79,37 @@ export const TvProviderRegistry = {
 
     setHideOffline(value) {
         saveSettings({ hideOfflineChannels: !!value });
+    },
+
+    // Appearance settings
+    getTextSize() {
+        return loadSettings().textSize;
+    },
+
+    setTextSize(value) {
+        const newValue = Number.isFinite(value) ? value : DEFAULT_TEXT_SIZE;
+        const clampedValue = TEXT_SIZE_OPTIONS.includes(newValue) ? newValue : DEFAULT_TEXT_SIZE;
+        saveSettings({ textSize: clampedValue });
+        return clampedValue;
+    },
+
+    getTextSizeOptions() {
+        return TEXT_SIZE_OPTIONS;
+    },
+
+    getTileWidth() {
+        return loadSettings().tileWidth;
+    },
+
+    setTileWidth(value) {
+        const newValue = Number.isFinite(value) ? value : DEFAULT_TILE_WIDTH;
+        const clampedValue = TILE_WIDTH_OPTIONS.includes(newValue) ? newValue : DEFAULT_TILE_WIDTH;
+        saveSettings({ tileWidth: clampedValue });
+        return clampedValue;
+    },
+
+    getTileWidthOptions() {
+        return TILE_WIDTH_OPTIONS;
     },
 
     async getCountries(opts = {}) {
