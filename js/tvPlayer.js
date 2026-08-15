@@ -117,8 +117,14 @@ function loadState() {
 }
 
 function saveState(patch) {
+    // Merge onto the raw localStorage blob so sibling writers (registry
+    // appearance settings, etc.) are not wiped by a filtered loadState().
+    let raw = {};
+    try {
+        raw = JSON.parse(localStorage.getItem(STATE_KEY) || '{}') || {};
+    } catch { /* ignore */ }
     const current = loadState();
-    const next = { ...current, ...patch };
+    const next = { ...raw, ...current, ...patch };
     if (next.recentsMeta) {
         next.recents = next.recentsMeta.map((e) => e.key);
     }
@@ -177,6 +183,9 @@ export const TvPlayer = {
 
     // Quality adaptation
     currentMaxBitrate: null,
+
+    // Bumps on each playChannel so stale attachStream / play() results are ignored
+    playGeneration: 0,
 
     init() {
         if (this.video) return;
@@ -505,16 +514,6 @@ export const TvPlayer = {
         return loadState().bufferSize || DEFAULT_BUFFER_SIZE;
     },
 
-    updateBufferSize() {
-        const size = this.bufferSize || this.getBufferSize();
-        this.bufferSize = size;
-        if (this.hls) {
-            this.hls.config.maxBufferLength = size;
-            this.hls.config.maxBufferSize = 20 * 1024 * 1024; // Keep 20MB max
-            this.hls.config.maxBitrate = 5000000; // Allow up to 5Mbps
-        }
-    },
-
     getBufferInfo() {
         const video = this.video;
         if (!video || !video.buffered || video.buffered.length === 0) {
@@ -681,8 +680,9 @@ export const TvPlayer = {
         }
     },
 
-    async attachStream(url) {
+    async attachStream(url, generation = this.playGeneration) {
         await this.destroyHls();
+        if (generation !== this.playGeneration) return;
         const video = this.video;
         this.connection = 'connecting';
         video.removeAttribute('src');
@@ -690,15 +690,21 @@ export const TvPlayer = {
 
         if (isHlsUrl(url)) {
             if (canPlayNativeHls(video)) {
+                if (generation !== this.playGeneration) return;
                 video.src = url;
                 this.updateBufferSize();
                 return;
             }
             const Hls = await loadHlsLibrary();
+            if (generation !== this.playGeneration) return;
             if (!Hls.isSupported()) {
                 throw new Error('HLS not supported');
             }
             await new Promise((resolve, reject) => {
+                if (generation !== this.playGeneration) {
+                    resolve();
+                    return;
+                }
                 this.hls = new Hls({
                     maxBufferSize: 20 * 1024 * 1024, // 20MB max buffer (in bytes)
                     maxBufferLength: this.getBufferSize(), // Current target in seconds
@@ -714,6 +720,10 @@ export const TvPlayer = {
                     liveMaxLatencyDurationCount: 10 // Max latency for live streams
                 });
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (generation !== this.playGeneration) {
+                        resolve();
+                        return;
+                    }
                     this.connection = 'connected';
                     this.qualityLevel = 0;
                     this.qualityLabel = 'auto';
@@ -721,18 +731,22 @@ export const TvPlayer = {
                     resolve();
                 });
                 this.hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+                    if (generation !== this.playGeneration || !this.hls) return;
                     if (data.level !== undefined && this.hls.levels && this.hls.levels[data.level]) {
                         this.qualityLabel = `${this.hls.levels[data.level].height}p`;
                     }
                     this.emitState();
                 });
                 this.hls.on(Hls.Events.ERROR, (_, data) => {
+                    if (generation !== this.playGeneration) return;
                     if (data.fatal) {
                         this.error = 'Stream unavailable';
                         this.errorCount = (this.errorCount || 0) + 1;
                         reject(new Error('Stream unavailable'));
+                        return;
                     }
                     // Auto-recover non-fatal errors
+                    if (!this.hls) return;
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
                         this.hls.startLoad();
                     } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -740,12 +754,14 @@ export const TvPlayer = {
                     }
                 });
                 this.hls.on(Hls.Events.LEVEL_SWITCHING, (_, data) => {
+                    if (generation !== this.playGeneration || !this.hls) return;
                     if (data.level !== undefined && this.hls.levels && this.hls.levels[data.level]) {
                         this.qualityLabel = `${this.hls.levels[data.level].height}p`;
                     }
                     this.emitState();
                 });
                 this.hls.on(Hls.Events.BUFFER_DEPTH_UPDATE, () => {
+                    if (generation !== this.playGeneration) return;
                     this.emitState();
                 });
                 this.hls.loadSource(url);
@@ -754,6 +770,7 @@ export const TvPlayer = {
             return;
         }
 
+        if (generation !== this.playGeneration) return;
         video.src = url;
         this.updateBufferSize();
     },
@@ -799,9 +816,15 @@ export const TvPlayer = {
     },
 
     updateBufferSize() {
-        const bufferSize = this.getBufferSize();
+        const size = this.bufferSize || this.getBufferSize();
+        this.bufferSize = size;
+        if (this.hls) {
+            this.hls.config.maxBufferLength = size;
+            this.hls.config.maxBufferSize = 20 * 1024 * 1024;
+            this.hls.config.maxBitrate = 5000000;
+        }
         if (this.video) {
-            this.video.preload = bufferSize > 60 ? 'auto' : 'metadata';
+            this.video.preload = size > 60 ? 'auto' : 'metadata';
         }
         this.emitState();
     },
@@ -823,6 +846,7 @@ export const TvPlayer = {
 
     async playChannel(channelOrKey) {
         this.init();
+        const generation = ++this.playGeneration;
         let channel = typeof channelOrKey === 'object' && channelOrKey !== null
             ? channelOrKey
             : null;
@@ -830,11 +854,13 @@ export const TvPlayer = {
         if (!channel && typeof channelOrKey === 'string') {
             const parsed = parseChannelKey(channelOrKey);
             channel = await TvProviderRegistry.getChannel(parsed);
+            if (generation !== this.playGeneration) return;
         }
 
         if (channel && !channel.url_resolved) {
             const parsed = parseChannelKey(channelKey(channel));
             channel = await TvProviderRegistry.getChannel(parsed);
+            if (generation !== this.playGeneration) return;
         }
 
         const key = channelKey(channel);
@@ -851,9 +877,6 @@ export const TvPlayer = {
             if (!channel.url_resolved) {
                 throw new Error('No stream URL');
             }
-            if (channel.lastcheckok === 0) {
-                throw new Error('Channel offline');
-            }
 
             this.channel = normalizeChannel(channel, channel.providerId) || channel;
             saveState({
@@ -861,9 +884,12 @@ export const TvPlayer = {
                 lastChannelName: channel.name || ''
             });
 
-            await this.attachStream(channel.url_resolved);
+            await this.attachStream(channel.url_resolved, generation);
+            if (generation !== this.playGeneration) return;
             await this.video.play();
+            if (generation !== this.playGeneration) return;
         } catch (e) {
+            if (generation !== this.playGeneration) return;
             this.loading = false;
             this.loadPhase = 'idle';
             this.playing = false;
@@ -874,7 +900,7 @@ export const TvPlayer = {
                 this.resumeBlocked = true;
                 saveState({ wasPlaying: false });
             } else {
-                this.error = e?.message === 'Channel offline' ? 'Channel offline' : 'Stream unavailable';
+                this.error = 'Stream unavailable';
             }
             if (typeof channelOrKey === 'object' && channelOrKey?.name) {
                 this.channel = normalizeChannel(channelOrKey, channelOrKey.providerId) || channelOrKey;
@@ -882,69 +908,6 @@ export const TvPlayer = {
             this.emitState();
             if (blocked) throw e;
         }
-    },
-
-    // Phase 3: Advanced Quality Strategies
-
-    async reduceQuality() {
-        if (!this.hls || !this.hls.levels || this.hls.levels.length <= 1) return false;
-        
-        try {
-            const currentLevel = this.hls.nextQualityLevel;
-            if (currentLevel < this.hls.levels.length - 1) {
-                // Force lower quality
-                const newLevel = Math.min(currentLevel + 1, this.hls.levels.length - 1);
-                this.hls.nextQualityLevel = newLevel;
-                this.hls.startLoad();
-                if (this.hls.levels[newLevel]) {
-                    this.qualityLabel = `${this.hls.levels[newLevel].height}p`;
-                }
-                this.emitState();
-                return true;
-            }
-        } catch (e) {
-            // Fallback: use default quality reduction
-        }
-        return false;
-    },
-
-    async improveQuality() {
-        if (!this.hls) return false;
-        this.hls.nextQualityLevel = -1; // Auto
-        this.hls.startLoad();
-        return true;
-    },
-
-    async retryStream(maxRetries = 3) {
-        if (this.retryCount >= maxRetries) return false;
-        
-        this.retryCount = Math.min(this.retryCount + 1, maxRetries);
-        this.error = null;
-        
-        // Exponential backoff: 2^retryCount seconds
-        const delay = Math.pow(2, this.retryCount) * 1000;
-        await new Promise(r => setTimeout(r, delay));
-        
-        if (this.channel && this.channel.url_resolved) {
-            await this.attachStream(this.channel.url_resolved);
-            return true;
-        }
-        return false;
-    },
-
-    async prefetchBuffer() {
-        if (!this.hls || !this.video) return false;
-        
-        const bufferInfo = this.getBufferInfo();
-        const targetBuffer = this.bufferSize;
-        
-        // If buffer is less than 50% of target, trigger proactive load
-        if (bufferInfo.buffered < targetBuffer * 0.5) {
-            this.connection = 'buffering';
-            this.hls.startLoad();
-            return true;
-        }
-        return false;
     },
 
     getQualityLevelIndex() {
@@ -963,27 +926,18 @@ export const TvPlayer = {
         if (!this.hls) return false;
         const target = Number.isFinite(index) ? index : -1;
         try {
+            // hls.js: currentLevel = -1 enables ABR; otherwise pin the level.
+            this.hls.currentLevel = target;
             if (target < 0) {
-                // Auto: allow ABR to switch freely.
-                this.hls.nextQualityLevel = -1;
-                this.hls.startLoad();
                 this.qualityLabel = 'Auto';
-                this.emitState();
-                return true;
+            } else if (this.hls.levels?.[target]?.height) {
+                this.qualityLabel = `${this.hls.levels[target].height}p`;
             }
-            if (this.hls.levels && target < this.hls.levels.length) {
-                this.hls.nextQualityLevel = target;
-                this.hls.startLoad();
-                if (this.hls.levels[target]?.height) {
-                    this.qualityLabel = `${this.hls.levels[target].height}p`;
-                }
-                this.emitState();
-                return true;
-            }
-        } catch (e) {
+            this.emitState();
+            return true;
+        } catch {
             return false;
         }
-        return false;
     },
 
     getQualityLabels() {
@@ -1004,6 +958,7 @@ export const TvPlayer = {
 
     // Close everything and cleanup
     async stop() {
+        this.playGeneration += 1;
         // If the video is floating in a Picture-in-Picture window, bring it back first.
         if (document.pictureInPictureElement && typeof document.exitPictureInPicture === 'function') {
             try { await document.exitPictureInPicture(); } catch { /* ignore */ }

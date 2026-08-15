@@ -18,6 +18,7 @@ let appState = {
     browseOffset: 0,
     browseHasMore: false,
     browseLoading: false,
+    browseGeneration: 0,
     activeTab: 'browse',
     countryFilter: '',
     browseQuery: '',
@@ -27,7 +28,17 @@ let appState = {
     recentsList: [],
     lastKey: null,
     lastName: '',
-    lastCountry: ''
+    lastCountry: '',
+    // Per-navigation refresh clocks for the bottom-right age label.
+    // Keys: browseCountries | browse:<iso> | favorites | recents | settings
+    lastRefreshedByView: Object.create(null),
+    // While true, skip priming tiles from FrameCache so a manual ↻ can
+    // force fresh live-stream grabs instead of painting stale thumbs.
+    refreshFramesPending: false,
+    // After ↻ on a channel folder, keep forcing live frame grabs for that
+    // view as lazy pages appear. Cleared when leaving the folder.
+    // Keys match currentRefreshKey() for browse:<iso> | favorites | recents.
+    folderFrameRefreshKey: null
 };
 
 function el(id) { return document.getElementById(id); }
@@ -38,8 +49,6 @@ const DEFAULT_FIRST_CHANNEL_URL = 'https://channels.trace.plus/Traceprod/CARIBBE
 const DEFAULT_FIRST_CHANNEL_NAME = 'CARIBBEAN';
 
 async function init() {
-    console.log('🎬 magicTV initializing...');
-
     // Let TvPlayer create & wire its own <video> (listeners, recents, buffer).
     TvPlayer.init();
     TvPip.init();
@@ -84,7 +93,6 @@ async function init() {
     } else if (TvPlayer.channel) {
         TvPlayer.resumeIfWasPlaying().catch(() => {});
     }
-    console.log('✨ magicTV ready!');
 }
 
 function loadLocalState() {
@@ -107,6 +115,7 @@ function bindBackButton() {
 
 function showCountriesView() {
     appState.browseCountry = null;
+    clearFolderFrameRefresh();
     appState.countryFilter = currentFilter();
     const countries = el('countries-container');
     const channels = el('channels-container');
@@ -120,6 +129,7 @@ function showCountriesView() {
     // Ensure browse tab is active when in countries view
     els('.tv-tab[data-tab="browse"]').forEach(tab => tab.classList.add('is-active'));
     renderCountries();
+    updateRefreshAge();
 }
 
 if (typeof document !== 'undefined') {
@@ -153,45 +163,127 @@ function bindTabs() {
 }
 
 // Manual cache refresh: bust the IndexedDB catalog (and channel metadata
-// for the favorites/recents tabs) and reload from the network. Without this
-// the app boots straight from history — no auto-refetch on site reload.
+// for the favorites/recents tabs), reload from the network, and re-capture
+// live preview frames for the open channel folder. The channel *list* stays
+// lazy-paginated; folder frame refresh sticks so pages that load later still
+// get fresh live grabs instead of stale cache/logo thumbs.
 async function handleManualRefresh() {
     const btn = el('refresh-btn');
     const spin = () => btn && btn.classList.add('is-loading');
     const unspin = () => btn && btn.classList.remove('is-loading');
     spin();
     showAppToast('Refreshing…');
+    appState.refreshFramesPending = true;
     try {
         const tab = appState.activeTab;
+        const viewKey = currentRefreshKey();
         if (tab === 'browse') {
             if (appState.browseCountry === null) {
+                clearFolderFrameRefresh();
                 appState.countries = await TvProviderRegistry.refreshCatalog();
                 renderCountries();
+                stampRefreshView('browseCountries', TvProviderRegistry.getLastRefreshed());
             } else {
                 await refreshBrowseCountry();
+                stampRefreshView(viewKey);
+                beginFolderFrameRefresh(viewKey);
             }
         } else if (tab === 'favorites') {
             await refreshFavoritesTab(true);
+            stampRefreshView('favorites');
+            beginFolderFrameRefresh('favorites');
         } else if (tab === 'recents') {
             await refreshRecentsTab(true);
+            stampRefreshView('recents');
+            beginFolderFrameRefresh('recents');
         } else {
+            clearFolderFrameRefresh();
             updateStorageStats();
+            stampRefreshView('settings');
+        }
+        const grid = activeChannelGrid();
+        if (grid) {
+            // Wait a frame so layout/tile metrics are ready for hot-budget sizing.
+            await new Promise((resolve) => {
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                } else {
+                    setTimeout(resolve, 0);
+                }
+            });
+            refreshTileFrames(grid);
         }
         showAppToast('✅ Refreshed');
     } catch {
         showAppToast('Refresh failed — try again');
     } finally {
+        appState.refreshFramesPending = false;
+        const grid = activeChannelGrid();
+        // Tiles skipped by content-visibility / fill-check may have missed the
+        // first queue pass — re-arm observer and promote anything still on-screen.
+        reobserveUncapturedFrames(grid);
+        promoteUncapturedFolderFrames(grid);
         unspin();
         updateRefreshAge();
     }
 }
 
-// The age label beside the ↻ arrow shows when the catalog was last reloaded
-// from the network (e.g. "3h ago"); empty until the first load.
+// Channel grid for the current navigation (null on countries list / settings).
+function activeChannelGrid() {
+    const tab = appState.activeTab;
+    if (tab === 'browse' && appState.browseCountry != null) return el('channels-container');
+    if (tab === 'favorites') return el('favorites-grid');
+    if (tab === 'recents') return el('recents-grid');
+    return null;
+}
+
+function beginFolderFrameRefresh(key) {
+    if (!key || key === 'browseCountries' || key === 'settings') {
+        appState.folderFrameRefreshKey = null;
+        return;
+    }
+    appState.folderFrameRefreshKey = key;
+}
+
+function clearFolderFrameRefresh() {
+    appState.folderFrameRefreshKey = null;
+}
+
+// True while this view is still under a post-↻ "refresh the whole folder"
+// pass — list pagination stays lazy, but new tiles skip cache/logo and grab live.
+function isFolderFrameRefreshActive() {
+    return !!appState.folderFrameRefreshKey
+        && appState.folderFrameRefreshKey === currentRefreshKey();
+}
+
+function syncFolderFrameRefreshToView() {
+    if (!isFolderFrameRefreshActive()) clearFolderFrameRefresh();
+}
+
+// Navigation key for the bottom-right refresh age (countries vs a country
+// channel list vs favorites / recents / settings).
+function currentRefreshKey() {
+    const tab = appState.activeTab;
+    if (tab === 'browse') {
+        return appState.browseCountry == null
+            ? 'browseCountries'
+            : `browse:${appState.browseCountry}`;
+    }
+    return tab;
+}
+
+function stampRefreshView(key, ts = Date.now()) {
+    if (!key || !ts) return;
+    appState.lastRefreshedByView[key] = ts;
+}
+
+// Age beside ↻ is per active view (e.g. "3h ago"); empty until that view
+// has been loaded/refreshed at least once.
 function updateRefreshAge() {
     const label = el('refresh-age');
     if (!label) return;
-    label.textContent = formatRelativeTime(TvProviderRegistry.getLastRefreshed());
+    const ts = appState.lastRefreshedByView[currentRefreshKey()] || 0;
+    label.textContent = formatRelativeTime(ts);
 }
 
 function switchTab(tabName) {
@@ -217,6 +309,7 @@ function switchTab(tabName) {
     }
 
     appState.activeTab = tabName;
+    syncFolderFrameRefreshToView();
     if (tabName === 'favorites') {
         appState.favFilter = currentFilter();
         refreshFavoritesTab();
@@ -230,6 +323,7 @@ function switchTab(tabName) {
     } else if (tabName === 'settings') {
         updateStorageStats();
     }
+    updateRefreshAge();
 }
 
 // ===== BROWSE / FILTER =====
@@ -272,6 +366,7 @@ function applyFilter(q) {
 async function refreshCountries() {
     try {
         appState.countries = await TvProviderRegistry.getCountries();
+        stampRefreshView('browseCountries', TvProviderRegistry.getLastRefreshed());
     } catch (err) {
         console.error('Failed to load countries:', err);
         showAppToast('Countries unavailable — check your connection');
@@ -288,9 +383,11 @@ function renderCountries() {
     );
     container.innerHTML = list.map(c => `
         <div class="country-tile" data-country="${escapeHtml(c.iso_3166_1 || '')}" role="button" tabindex="0">
-            <div class="country-tile__flag">${countryFlagEmoji(c.iso_3166_1)}</div>
-            <h3 class="country-tile__name">${escapeHtml(c.name)}</h3>
-            <div class="country-tile__count">${c.stationcount || 0} channels</div>
+            <div class="country-tile__icon">${countryFlagEmoji(c.iso_3166_1)}</div>
+            <div class="country-tile__body">
+                <h3 class="country-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(c.name)}</span><span class="marquee-text" aria-hidden="true">${escapeHtml(c.name)}</span></span></h3>
+                <div class="country-tile__count">${c.stationcount || 0} channels</div>
+            </div>
         </div>
     `).join('') || '<div class="empty-state"><p class="empty-state__text">No countries found</p></div>';
 
@@ -301,10 +398,16 @@ function renderCountries() {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
         });
     });
+    // Apply appearance settings (text size, tile width, narrow clipping) to new tiles
+    applyAppearanceToTiles(container);
 }
 
 async function browseCountry(countryCode) {
+    appState.browseGeneration += 1;
+    appState.browseLoading = false;
     appState.browseCountry = countryCode;
+    // Entering a country is a new folder — don't inherit another view's ↻.
+    clearFolderFrameRefresh();
     appState.browseChannels = [];
     appState.browseOffset = 0;
     appState.browseHasMore = true;
@@ -323,6 +426,7 @@ async function browseCountry(countryCode) {
         els('.tv-tab[data-tab="browse"]').forEach(tab => tab.classList.remove('is-active', 'is-pink-active'));
     }
     if (channels) channels.innerHTML = '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
+    updateRefreshAge();
 
     await loadMoreChannels();
     setupScrollLoading();
@@ -330,18 +434,19 @@ async function browseCountry(countryCode) {
 
 async function loadMoreChannels(forceRefresh = false) {
     if (appState.browseLoading || !appState.browseHasMore) return;
+    const generation = appState.browseGeneration;
     appState.browseLoading = true;
     try {
-        const hideOffline = TvProviderRegistry.getHideOffline();
         const results = await TvProviderRegistry.searchChannels({
             countrycode: appState.browseCountry,
             query: appState.browseQuery,
             offset: appState.browseOffset,
             limit: PAGE_SIZE,
             order: 'name',
-            hideOffline,
             refresh: forceRefresh
         });
+        // A newer search/refresh superseded this request — drop stale results.
+        if (generation !== appState.browseGeneration) return;
         if (results.length < PAGE_SIZE) {
             appState.browseHasMore = false;
         }
@@ -351,16 +456,42 @@ async function loadMoreChannels(forceRefresh = false) {
         // already-captured tiles (keeps DOM stable + preserves scroll perf).
         renderChannelGrid(el('channels-container'), results, { append: true });
     } catch (err) {
+        if (generation !== appState.browseGeneration) return;
         console.error('Failed to load channels:', err);
         showAppToast('Failed to load channels');
     } finally {
-        appState.browseLoading = false;
+        if (generation === appState.browseGeneration) {
+            appState.browseLoading = false;
+            // Dense tile grids can fit a full page in the panel with no overflow.
+            // Scroll never fires then, so keep loading until the panel can scroll
+            // or the catalog is exhausted.
+            scheduleBrowseFillCheck();
+        }
     }
+}
+
+function browsePanelNeedsMore() {
+    const panel = el('browse-panel');
+    if (!panel || !appState.browseHasMore || appState.browseLoading) return false;
+    // Near bottom (or not yet scrollable): same threshold as the scroll handler.
+    return panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 20;
+}
+
+function scheduleBrowseFillCheck() {
+    if (typeof requestAnimationFrame !== 'function') {
+        if (browsePanelNeedsMore()) loadMoreChannels();
+        return;
+    }
+    requestAnimationFrame(() => {
+        if (browsePanelNeedsMore()) loadMoreChannels();
+    });
 }
 
 // Restart the whole channel search for a country (e.g. when the filter text
 // changes): pagination then scrolls through the *filtered* result set.
 function startChannelSearch(query) {
+    appState.browseGeneration += 1;
+    appState.browseLoading = false;
     appState.browseQuery = query || '';
     appState.browseChannels = [];
     appState.browseOffset = 0;
@@ -377,6 +508,8 @@ function startChannelSearch(query) {
 // Manual refresh for the open-country view: drop what's on screen, bust the
 // cached catalog and reload the first page from the network.
 async function refreshBrowseCountry() {
+    appState.browseGeneration += 1;
+    appState.browseLoading = false;
     appState.browseChannels = [];
     appState.browseOffset = 0;
     appState.browseHasMore = true;
@@ -404,13 +537,10 @@ function setupScrollLoading() {
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(() => {
-            const scrollTop = panel.scrollTop;
-            const scrollHeight = panel.scrollHeight;
-            const clientHeight = panel.clientHeight;
-            // When user has scrolled near bottom (20px threshold)
-            if (scrollTop + clientHeight >= scrollHeight - 20) {
-                loadMoreChannels();
-            }
+            if (browsePanelNeedsMore()) loadMoreChannels();
+            // Small-tile layouts keep many rows "lazy" via content-visibility;
+            // keep folder ↻ moving as the user scrolls.
+            if (isFolderFrameRefreshActive()) promoteUncapturedFolderFrames(el('channels-container'));
             ticking = false;
         });
     }
@@ -420,26 +550,25 @@ function setupScrollLoading() {
 
 
 // ===== CHANNEL GRID =====
-function tileHtml(ch, { forceFav = false } = {}) {
-    const isFav = forceFav || TvPlayer.isFavorite(channelKey(ch));
-    const starIcon = isFav ? CARD_ICONS.starFilled : CARD_ICONS.star;
+function tileHtml(ch) {
     const initial = (ch.name || '?')[0].toUpperCase();
-    const offline = ch.lastcheckok === 0;
+    const isFav = TvPlayer.isFavorite(ch);
+    const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
     return `
         <div class="channel-tile" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
+            <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? '★' : '☆'}</button>
             <div class="channel-tile__icon">
                 <div class="channel-tile__capture-frame" data-frame="${escapeHtml(channelKey(ch))}">
                     <div class="channel-tile__letter-avatar">${initial}</div>
                     <img class="channel-tile__logo-img is-hidden" alt="" loading="lazy" decoding="async">
                     <span class="channel-tile__frame-loader">⏳</span>
-                    <span class="channel-tile__offline-badge ${offline ? '' : 'is-hidden'}">🚫</span>
+                    <span class="channel-tile__offline-badge is-hidden" aria-hidden="true">${CARD_ICONS.prohibited}</span>
                 </div>
             </div>
             <div class="channel-tile__body">
-                <h3 class="channel-tile__name">${escapeHtml(ch.name || 'Unknown')}</h3>
+                <h3 class="channel-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(ch.name || 'Unknown')}</span><span class="marquee-text" aria-hidden="true">${escapeHtml(ch.name || 'Unknown')}</span></span></h3>
                 <span class="channel-tile__flag">${countryFlagEmoji(ch.countrycode)}</span>
             </div>
-            <button class="channel-tile__star ${isFav ? 'is-active' : ''}" data-star="${escapeHtml(channelKey(ch))}" title="Favorite">${starIcon}</button>
         </div>
     `;
 }
@@ -458,7 +587,37 @@ function renderChannelGrid(container, channels, { append = false } = {}) {
     }
     wireTiles(container, channels);
     observeFrames(container);
-    primeFramesFromCache(container);
+    // Folder ↻ keeps the channel list paginated. Skip cached thumbs so pages
+    // that appear later still get live grabs — but paint logos immediately so
+    // the top of the list isn't empty while streams spin up.
+    if (appState.refreshFramesPending) {
+        queueMicrotask(() => enqueueFolderFramesForRefresh(container));
+    } else if (isFolderFrameRefreshActive()) {
+        paintProvisionalLogos(container);
+        scheduleFolderFramePump();
+    } else {
+        primeFramesFromCache(container);
+    }
+    // Apply appearance settings (text size, tile width, narrow clipping) to new tiles
+    applyAppearanceToTiles(container);
+}
+
+function syncTileFavBtn(btn, isFav) {
+    if (!btn) return;
+    btn.classList.toggle('is-active', isFav);
+    btn.textContent = isFav ? '★' : '☆';
+    const label = isFav ? 'Remove from favorites' : 'Add to favorites';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', String(isFav));
+}
+
+function syncChannelTileFavButtons() {
+    document.querySelectorAll('.channel-tile__fav-btn').forEach((btn) => {
+        const key = btn.closest('.channel-tile')?.dataset.channel;
+        if (!key) return;
+        syncTileFavBtn(btn, TvPlayer.isFavorite(key));
+    });
 }
 
 function wireTiles(container, channels) {
@@ -469,44 +628,48 @@ function wireTiles(container, channels) {
         const key = tile.dataset.channel;
         const ch = channels.find(c => channelKey(c) === key);
         const play = (e) => {
-            if (e.target.closest('[data-star]')) return;
             if (ch) startPlayback(ch);
         };
         tile.addEventListener('click', play);
         tile.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(e); }
         });
-        const star = tile.querySelector('[data-star]');
-        if (star) {
-            star.addEventListener('click', (e) => {
+        const favBtn = tile.querySelector('.channel-tile__fav-btn');
+        if (favBtn && ch) {
+            favBtn.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                if (!ch) return;
                 const isFav = TvPlayer.toggleFavorite(ch);
-                star.classList.toggle('is-active', isFav);
-                star.innerHTML = isFav ? CARD_ICONS.starFilled : CARD_ICONS.star;
+                syncTileFavBtn(favBtn, isFav);
+                updateFavBtn();
                 showAppToast(isFav ? '❤️ Added to favorites' : '💔 Removed from favorites');
                 if (appState.activeTab === 'favorites') refreshFavoritesTab();
-                else if (appState.activeTab === 'recents') refreshRecentsTab();
             });
+            favBtn.addEventListener('keydown', (e) => e.stopPropagation());
         }
     });
 }
 // ===== LAZY FRAME / LOGO CAPTURE =====
 // Two-tier scheduler:
 //  - cheap tier = cached thumbnail + natively-displayed channel logo (several at once)
-//  - heavy tier = live-stream frame grab via a hidden <video> (serialized, max 2)
+//  - heavy tier = live-stream frame grab via a hidden <video> (max 4; never under cheap budget)
 // Tiles inside the viewport ("hot") are drained before tiles in the 200px
 // prefetch margin ("warm"), so what the user is looking at paints first.
+// Heavy work pauses while a channel is playing so click-to-play keeps bandwidth.
 const frameCapture = {
     observer: null,
     hot: [],
     warm: [],
     pending: new Set(),
+    forceHeavy: new WeakSet(),
     running: 0,
     heavyRunning: 0,
-    MAX_TOTAL: 6,
-    MAX_CHEAP: 4,
-    MAX_HEAVY: 2,
+    paused: false,
+    // Bumped by refreshTileFrames so in-flight captures can't paint stale thumbs.
+    refreshEpoch: 0,
+    MAX_TOTAL: 8,
+    MAX_CHEAP: 6,
+    MAX_HEAVY: 4,
     LOGO_TIMEOUT: 3500,
     VIDEO_TIMEOUT: 5500
 };
@@ -515,10 +678,19 @@ function observeFrames(container) {
     if (!container || typeof IntersectionObserver === 'undefined') return;
     if (!frameCapture.observer) {
         frameCapture.observer = new IntersectionObserver((entries) => {
+            // While the ↻ button pass owns queuing, don't start cache/logo
+            // captures that would race the forced live grab.
+            if (appState.refreshFramesPending) return;
             for (const entry of entries) {
                 if (!entry.isIntersecting) continue;
                 const f = entry.target;
                 if (f.dataset.captured || frameCapture.pending.has(f)) continue;
+                // Post-↻ folder pass: live grab even for lazily loaded pages.
+                if (isFolderFrameRefreshActive()) {
+                    const logo = (f.closest('.channel-tile')?.dataset?.logo || '').trim();
+                    if (logo) applyFrameProvisional(f, logo);
+                    frameCapture.forceHeavy.add(f);
+                }
                 (isInViewport(f) ? frameCapture.hot : frameCapture.warm).push(f);
                 frameCapture.pending.add(f);
             }
@@ -532,9 +704,269 @@ function observeFrames(container) {
 }
 
 function isInViewport(frame) {
+    return isNearViewport(frame, 0);
+}
+
+function isNearViewport(frame, margin = 200) {
     const r = frame.getBoundingClientRect();
+    if (!r) return false;
+    // Tiles scroll inside .tv-panel, not the window — use the panel's
+    // visible box so "hot" matches what the user actually sees.
+    const panel = frame.closest?.('.tv-panel');
+    if (panel) {
+        const pr = panel.getBoundingClientRect();
+        return r.bottom > pr.top - margin
+            && r.top < pr.bottom + margin
+            && r.right > pr.left
+            && r.left < pr.right;
+    }
     const h = globalThis.innerHeight || 0;
-    return !!r && r.top < h && r.bottom > 0;
+    return r.bottom > -margin && r.top < h + margin;
+}
+
+function applyFrameSuccess(frame, src) {
+    const img = frame.querySelector('.channel-tile__logo-img');
+    const letter = frame.querySelector('.channel-tile__letter-avatar');
+    const loader = frame.querySelector('.channel-tile__frame-loader');
+    const badge = frame.querySelector('.channel-tile__offline-badge');
+    if (img) { img.src = src; img.classList.remove('is-hidden'); }
+    if (letter) letter.classList.add('is-hidden');
+    if (loader) loader.classList.add('is-hidden');
+    if (badge) badge.classList.add('is-hidden');
+    frame.dataset.captured = '1';
+    delete frame.dataset.provisional;
+}
+
+// Fast placeholder (usually the channel logo) while a live grab is still running.
+// Does NOT set captured — the heavy pass can still replace it.
+function applyFrameProvisional(frame, src) {
+    if (!frame || !src || frame.dataset.captured) return;
+    const img = frame.querySelector('.channel-tile__logo-img');
+    const letter = frame.querySelector('.channel-tile__letter-avatar');
+    const loader = frame.querySelector('.channel-tile__frame-loader');
+    const badge = frame.querySelector('.channel-tile__offline-badge');
+    if (img) { img.src = src; img.classList.remove('is-hidden'); }
+    if (letter) letter.classList.add('is-hidden');
+    if (loader) loader.classList.add('is-hidden');
+    if (badge) badge.classList.add('is-hidden');
+    frame.dataset.provisional = '1';
+}
+
+function applyFrameFailure(frame) {
+    // Keep a provisional logo rather than flashing the prohibition badge —
+    // dead streams fail fast, which made the top of the list look "broken"
+    // long before live frames arrived.
+    if (frame.dataset.provisional && frame.querySelector('.channel-tile__logo-img')?.src) {
+        frame.dataset.captured = '1';
+        delete frame.dataset.provisional;
+        const loader = frame.querySelector('.channel-tile__frame-loader');
+        const badge = frame.querySelector('.channel-tile__offline-badge');
+        if (loader) loader.classList.add('is-hidden');
+        if (badge) badge.classList.add('is-hidden');
+        return;
+    }
+    const img = frame.querySelector('.channel-tile__logo-img');
+    const letter = frame.querySelector('.channel-tile__letter-avatar');
+    const loader = frame.querySelector('.channel-tile__frame-loader');
+    const badge = frame.querySelector('.channel-tile__offline-badge');
+    if (img) img.classList.add('is-hidden');
+    if (letter) letter.classList.add('is-hidden');
+    if (loader) loader.classList.add('is-hidden');
+    if (badge) badge.classList.remove('is-hidden');
+    frame.dataset.captured = '1';
+    delete frame.dataset.provisional;
+}
+
+function resetFrameUi(frame) {
+    const img = frame.querySelector('.channel-tile__logo-img');
+    const letter = frame.querySelector('.channel-tile__letter-avatar');
+    const loader = frame.querySelector('.channel-tile__frame-loader');
+    const badge = frame.querySelector('.channel-tile__offline-badge');
+    if (img) {
+        img.removeAttribute('src');
+        img.classList.add('is-hidden');
+    }
+    if (letter) letter.classList.remove('is-hidden');
+    if (loader) loader.classList.remove('is-hidden');
+    if (badge) badge.classList.add('is-hidden');
+    delete frame.dataset.captured;
+    delete frame.dataset.provisional;
+}
+
+function paintProvisionalLogos(container) {
+    if (!container) return;
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (frame.dataset.captured || frame.dataset.provisional) return;
+        const logo = (frame.closest('.channel-tile')?.dataset?.logo || '').trim();
+        if (logo) applyFrameProvisional(frame, logo);
+    });
+}
+
+// How many tiles fit on ~one screen (+1 row). Used to keep the top of a dense
+// small-tile grid on the hot queue without relying on getBoundingClientRect
+// (unreliable with content-visibility: auto on skipped rows).
+function hotFrameBudget(container) {
+    const panel = container?.closest?.('.tv-panel') || container;
+    const panelH = panel?.clientHeight || 700;
+    const panelW = panel?.clientWidth || 900;
+    const tileW = Number(TvProviderRegistry.getTileWidth?.()) || 180;
+    const tileH = 72;
+    const cols = Math.max(1, Math.floor(panelW / Math.max(60, tileW)));
+    const rows = Math.max(3, Math.ceil(panelH / tileH) + 1);
+    return cols * rows;
+}
+
+function queueFrameForFolderRefresh(frame, { hot, warm, hotBudget, keys }) {
+    const tile = frame.closest('.channel-tile');
+    const url = (tile?.dataset?.url || '').trim();
+    const logo = (tile?.dataset?.logo || '').trim();
+    if (url) keys.push(url);
+    if (logo) keys.push(logo);
+    if (logo && !frame.dataset.provisional && !frame.dataset.captured) {
+        applyFrameProvisional(frame, logo);
+    }
+    if (!url) return false;
+    if (frame.dataset.captured || frameCapture.pending.has(frame)) return false;
+    frameCapture.forceHeavy.add(frame);
+    frameCapture.pending.add(frame);
+    if (hot.length < hotBudget) hot.push(frame);
+    else warm.push(frame);
+    return true;
+}
+
+// Refresh frames for the open folder:
+//  1) logos immediately on every loaded tile
+//  2) live-grab the whole loaded page in DOM order (top first = hot)
+//  3) not-yet-paginated channels join later via sticky folder refresh
+function refreshTileFrames(container) {
+    if (!container) return;
+    const frames = Array.from(container.querySelectorAll('.channel-tile__capture-frame'));
+    if (!frames.length) return;
+
+    frameCapture.refreshEpoch++;
+
+    const frameSet = new Set(frames);
+    for (const queue of [frameCapture.hot, frameCapture.warm]) {
+        for (let i = queue.length - 1; i >= 0; i--) {
+            if (frameSet.has(queue[i])) queue.splice(i, 1);
+        }
+    }
+
+    const keys = [];
+    const hot = [];
+    const warm = [];
+    const hotBudget = hotFrameBudget(container);
+
+    for (const frame of frames) {
+        const tile = frame.closest('.channel-tile');
+        const url = (tile?.dataset?.url || '').trim();
+        const logo = (tile?.dataset?.logo || '').trim();
+
+        frameCapture.pending.delete(frame);
+        resetFrameUi(frame);
+        if (logo) applyFrameProvisional(frame, logo);
+
+        if (!url) {
+            if (!logo) applyFrameFailure(frame);
+            else {
+                frame.dataset.captured = '1';
+                delete frame.dataset.provisional;
+            }
+            continue;
+        }
+
+        // Queue every loaded tile. Dense/small-tile grids fit many rows in the
+        // first page; a getBoundingClientRect "near viewport" cut-off often only
+        // caught the first row once content-visibility skipped the rest.
+        if (url) keys.push(url);
+        if (logo) keys.push(logo);
+        frameCapture.forceHeavy.add(frame);
+        frameCapture.pending.add(frame);
+        if (hot.length < hotBudget) hot.push(frame);
+        else warm.push(frame);
+    }
+
+    frameCapture.hot.push(...hot);
+    frameCapture.warm.push(...warm);
+
+    FrameCache.removeFrames(keys).catch(() => {});
+    drainFrameCapture();
+}
+
+// During the ↻ button pass, fold newly filled pages into the queue (top of
+// the new chunk stays hot while budget remains).
+function enqueueFolderFramesForRefresh(container) {
+    if (!container || !appState.refreshFramesPending) return;
+    paintProvisionalLogos(container);
+    const keys = [];
+    const hot = [];
+    const warm = [];
+    const hotBudget = Math.max(0, hotFrameBudget(container) - frameCapture.hot.length);
+    let added = false;
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (queueFrameForFolderRefresh(frame, { hot, warm, hotBudget, keys })) added = true;
+    });
+    frameCapture.hot.push(...hot);
+    frameCapture.warm.push(...warm);
+    if (keys.length) FrameCache.removeFrames(keys).catch(() => {});
+    if (added) drainFrameCapture();
+}
+
+// Pick up on-screen tiles that never entered the queue (content-visibility /
+// observer gaps) while a folder ↻ is active.
+function promoteUncapturedFolderFrames(container) {
+    if (!container) return;
+    if (!appState.refreshFramesPending && !isFolderFrameRefreshActive()) return;
+    paintProvisionalLogos(container);
+    const keys = [];
+    const hot = [];
+    const warm = [];
+    const hotBudget = hotFrameBudget(container);
+    let added = false;
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (frame.dataset.captured || frameCapture.pending.has(frame)) return;
+        const url = (frame.closest('.channel-tile')?.dataset?.url || '').trim();
+        if (!url) return;
+        // Prefer tiles that are actually on-screen; DOM-order backlog is already
+        // on warm from refreshTileFrames.
+        if (!isNearViewport(frame)) return;
+        const logo = (frame.closest('.channel-tile')?.dataset?.logo || '').trim();
+        if (logo) applyFrameProvisional(frame, logo);
+        if (url) keys.push(url);
+        if (logo) keys.push(logo);
+        frameCapture.forceHeavy.add(frame);
+        frameCapture.pending.add(frame);
+        if (hot.length < hotBudget) hot.push(frame);
+        else warm.push(frame);
+        added = true;
+    });
+    if (!added) return;
+    frameCapture.hot.unshift(...hot);
+    frameCapture.warm.push(...warm);
+    FrameCache.removeFrames(keys).catch(() => {});
+    drainFrameCapture();
+}
+
+let folderFramePumpQueued = false;
+function scheduleFolderFramePump() {
+    if (folderFramePumpQueued) return;
+    folderFramePumpQueued = true;
+    const run = () => {
+        folderFramePumpQueued = false;
+        if (frameCapture.running > 0) return;
+        promoteUncapturedFolderFrames(activeChannelGrid());
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else setTimeout(run, 0);
+}
+
+function reobserveUncapturedFrames(container) {
+    if (!container || !frameCapture.observer) return;
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (frame.dataset.captured || frameCapture.pending.has(frame)) return;
+        frameCapture.observer.unobserve(frame);
+        frameCapture.observer.observe(frame);
+    });
 }
 
 // Sync-apply already-cached thumbnails as soon as a grid is (re)rendered —
@@ -542,26 +974,29 @@ function isInViewport(frame) {
 // round-trip. Un-cached tiles are left to the normal lazy pipeline.
 function primeFramesFromCache(container) {
     if (!container) return;
+    const frames = [];
+    const allKeys = [];
     container.querySelectorAll('.channel-tile__capture-frame').forEach(frame => {
         if (frame.dataset.captured) return;
-        (async () => {
-            const tile = frame.closest('.channel-tile');
-            const keys = [(tile?.dataset?.url || '').trim(), (tile?.dataset?.logo || '').trim()];
-            for (const key of keys) {
-                if (!key) continue;
-                const cached = await FrameCache.getFrame(key).catch(() => null);
-                if (!cached || frame.dataset.captured) continue;
-                const img = frame.querySelector('.channel-tile__logo-img');
-                const letter = frame.querySelector('.channel-tile__letter-avatar');
-                const loader = frame.querySelector('.channel-tile__frame-loader');
-                if (img) { img.src = cached; img.classList.remove('is-hidden'); }
-                if (letter) letter.classList.add('is-hidden');
-                if (loader) loader.classList.add('is-hidden');
-                frame.dataset.captured = '1';
-                return;
-            }
-        })();
+        const tile = frame.closest('.channel-tile');
+        const keys = [(tile?.dataset?.url || '').trim(), (tile?.dataset?.logo || '').trim()].filter(Boolean);
+        frames.push({ frame, keys });
+        allKeys.push(...keys);
     });
+    if (!frames.length) return;
+
+    (async () => {
+        const cached = await FrameCache.getFrames([...new Set(allKeys)]).catch(() => new Map());
+        for (const { frame, keys } of frames) {
+            if (frame.dataset.captured || !frame.isConnected) continue;
+            for (const key of keys) {
+                const dataUrl = cached.get(key);
+                if (!dataUrl) continue;
+                applyFrameSuccess(frame, dataUrl);
+                break;
+            }
+        }
+    })();
 }
 
 // Drop frames whose tiles were torn down (e.g. country switch) so stale
@@ -578,6 +1013,7 @@ function pruneUnconnectedFrames() {
 }
 
 function captureTier(frame) {
+    if (frameCapture.forceHeavy.has(frame)) return 'heavy';
     const tile = frame.closest('.channel-tile');
     const logo = (tile?.dataset?.logo || '').trim();
     return logo ? 'cheap' : 'heavy';
@@ -585,7 +1021,10 @@ function captureTier(frame) {
 
 function canStartTier(tier) {
     if (frameCapture.running >= frameCapture.MAX_TOTAL) return false;
-    if (tier === 'heavy') return frameCapture.heavyRunning < frameCapture.MAX_HEAVY;
+    if (tier === 'heavy') {
+        if (frameCapture.paused) return false;
+        return frameCapture.heavyRunning < frameCapture.MAX_HEAVY;
+    }
     return (frameCapture.running - frameCapture.heavyRunning) < frameCapture.MAX_CHEAP;
 }
 
@@ -609,64 +1048,103 @@ function pickNextCapture() {
     return null;
 }
 
+function setFrameCapturePaused(paused) {
+    const next = !!paused;
+    if (frameCapture.paused === next) return;
+    frameCapture.paused = next;
+    if (!next) drainFrameCapture();
+}
+
 function drainFrameCapture() {
     pruneUnconnectedFrames();
     let next;
     while ((next = pickNextCapture())) {
         const { frame, tier } = next;
+        const epoch = frameCapture.refreshEpoch;
         frameCapture.running++;
         if (tier === 'heavy') frameCapture.heavyRunning++;
-        captureFrame(frame).finally(() => {
-            frameCapture.running--;
-            if (tier === 'heavy') frameCapture.heavyRunning--;
-            frameCapture.pending.delete(frame);
-            drainFrameCapture();
-        });
+        let requeued = false;
+        captureFrame(frame, tier, epoch)
+            .then((result) => {
+                if (result !== 'requeue-heavy') return;
+                requeued = true;
+                frameCapture.forceHeavy.add(frame);
+                frameCapture.pending.add(frame);
+                (isInViewport(frame) ? frameCapture.hot : frameCapture.warm).unshift(frame);
+            })
+            .finally(() => {
+                frameCapture.running--;
+                if (tier === 'heavy') frameCapture.heavyRunning--;
+                // A newer ↻ may have re-queued this frame — don't clear its slots.
+                if (!requeued && epoch === frameCapture.refreshEpoch) {
+                    frameCapture.pending.delete(frame);
+                    frameCapture.forceHeavy.delete(frame);
+                }
+                drainFrameCapture();
+                if (frameCapture.running === 0
+                    && frameCapture.hot.length === 0
+                    && frameCapture.warm.length === 0) {
+                    scheduleFolderFramePump();
+                }
+            });
     }
 }
 
-async function captureFrame(frame) {
+async function captureFrame(frame, tier, epoch = frameCapture.refreshEpoch) {
+    const stale = () => epoch !== frameCapture.refreshEpoch || !frame.isConnected;
     const tile = frame.closest('.channel-tile');
     const url = (tile?.dataset?.url || '').trim();
     const logo = (tile?.dataset?.logo || '').trim();
-
-    const loader = frame.querySelector('.channel-tile__frame-loader');
-    const letter = frame.querySelector('.channel-tile__letter-avatar');
-    const img = frame.querySelector('.channel-tile__logo-img');
-
-    const show = (src) => {
-        if (img) { img.src = src; img.classList.remove('is-hidden'); }
-        if (letter) letter.classList.add('is-hidden');
-        if (loader) loader.classList.add('is-hidden');
-        frame.dataset.captured = '1';
-    };
+    const alreadyHeavy = frameCapture.forceHeavy.has(frame);
 
     // Tier 0 — persistent thumbnail cache (IndexedDB), keyed by stream or logo URL.
-    for (const key of [url, logo]) {
-        if (!key) continue;
-        const cached = await FrameCache.getFrame(key).catch(() => null);
-        if (cached) { show(cached); return; }
-    }
-
-    // Tier 1 — channel logo, displayed natively (no canvas/CORS needed).
-    // Falls back to a stream frame grab only when the logo is absent.
-    if (logo) {
-        if (await imageLoad(logo, frameCapture.LOGO_TIMEOUT)) {
-            show(logo);
-            persistFrameBestEffort(logo); // background cache write, if CORS allows
-            return;
+    // Skip when forcing a live re-grab (manual ↻) so we don't paint a stale thumb.
+    if (!alreadyHeavy) {
+        for (const key of [url, logo]) {
+            if (!key) continue;
+            const cached = await FrameCache.getFrame(key).catch(() => null);
+            if (stale()) return;
+            if (cached) { applyFrameSuccess(frame, cached); return; }
         }
     }
 
-    // Tier 2 — grab a frame from the live stream via a hidden <video>.
-    if (!url) { frame.dataset.captured = '1'; return; }
-    const dataUrl = await captureStreamFrame(url);
-    if (dataUrl) {
-        show(dataUrl);
-        FrameCache.setFrame(url, dataUrl).catch(() => {});
-    } else {
-        frame.dataset.captured = '1'; // give up this session — letter avatar stays
+    // Tier 1 — channel logo (skip when re-entering as heavy after a logo miss).
+    if (logo && !alreadyHeavy) {
+        if (await imageLoad(logo, frameCapture.LOGO_TIMEOUT)) {
+            if (stale()) return;
+            applyFrameSuccess(frame, logo);
+            persistFrameBestEffort(logo); // background cache write, if CORS allows
+            return;
+        }
+        if (stale()) return;
     }
+
+    // Tier 2 — grab a frame from the live stream via a hidden <video>.
+    // Stream grabs always use the heavy budget (never under a cheap slot).
+    if (!url) {
+        if (!stale()) applyFrameFailure(frame);
+        return;
+    }
+    if (tier === 'cheap') return 'requeue-heavy';
+
+    const dataUrl = await captureStreamFrame(url);
+    if (stale()) return;
+    if (dataUrl) {
+        applyFrameSuccess(frame, dataUrl);
+        FrameCache.setFrame(url, dataUrl).catch(() => {});
+        return;
+    }
+
+    // Live grab failed or was still black — keep/show the channel logo so the
+    // top of the list isn't littered with prohibition badges (failures are fast;
+    // real frames are slow).
+    if (logo && await imageLoad(logo, frameCapture.LOGO_TIMEOUT)) {
+        if (stale()) return;
+        applyFrameSuccess(frame, logo);
+        persistFrameBestEffort(logo);
+        return;
+    }
+    if (!stale()) applyFrameFailure(frame);
 }
 
 function imageLoad(src, timeout) {
@@ -719,36 +1197,131 @@ async function persistFrameBestEffort(url) {
     } catch { /* CORS/network — fine, display path already worked */ }
 }
 
+const CAPTURE_HLS_CONFIG = {
+    enableWorker: true,
+    lowLatencyMode: true,
+    maxBufferLength: 2,
+    maxMaxBufferLength: 4,
+    maxBufferSize: 2 * 1024 * 1024,
+    maxBufferHole: 0.5,
+    startLevel: 0,
+    abrEwmaDefaultEstimate: 500000,
+    manifestLoadingTimeOut: 3000,
+    levelLoadingTimeOut: 3000,
+    fragLoadingTimeOut: 3000
+};
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Reject blank/black snapshots (common when drawing before the first decoded frame).
+function isMostlyBlackImageData(data) {
+    if (!data?.length) return true;
+    let dark = 0;
+    let n = 0;
+    // Sample every 8th pixel (RGBA stride 32).
+    for (let i = 0; i < data.length; i += 32) {
+        n++;
+        if (data[i] < 18 && data[i + 1] < 18 && data[i + 2] < 18) dark++;
+    }
+    return n > 0 && dark / n >= 0.92;
+}
+
+function snapshotVideoFrame(video) {
+    if (!video?.videoWidth || !video.videoHeight) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 56;
+    canvas.height = 56;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    try {
+        ctx.drawImage(video, 0, 0, 56, 56);
+        const pixels = ctx.getImageData(0, 0, 56, 56).data;
+        if (isMostlyBlackImageData(pixels)) return null;
+        return canvas.toDataURL('image/jpeg', 0.6);
+    } catch {
+        return null;
+    }
+}
+
+async function waitForVideoFrame(video, budgetMs) {
+    const deadline = Date.now() + Math.max(0, budgetMs);
+    while (Date.now() < deadline) {
+        if (video.videoWidth > 0 && video.readyState >= 2) {
+            const snap = snapshotVideoFrame(video);
+            if (snap) return snap;
+        }
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        if (typeof video.requestVideoFrameCallback === 'function') {
+            await new Promise((resolve) => {
+                const id = video.requestVideoFrameCallback(() => resolve());
+                setTimeout(() => {
+                    try { video.cancelVideoFrameCallback?.(id); } catch { /* ignore */ }
+                    resolve();
+                }, Math.min(200, remaining));
+            });
+        } else {
+            await sleep(Math.min(120, remaining));
+        }
+    }
+    return null;
+}
+
 async function captureStreamFrame(url) {
     let video, hls;
+    const started = Date.now();
     try {
         video = document.createElement('video');
         video.muted = true;
+        video.defaultMuted = true;
         video.playsInline = true;
+        video.setAttribute('playsinline', '');
         video.preload = 'auto';
-        video.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px';
+        // Real dimensions matter — a 1×1 offscreen video often never paints
+        // a decoded frame, which produced black tile thumbs after ↻.
+        video.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:160px;height:90px;opacity:0;pointer-events:none;';
         document.body.appendChild(video);
 
         if (url.includes('.m3u8')) {
             const { default: Hls } = await loadHlsForCapture();
-            if (Hls) { hls = new Hls(); hls.attachMedia(video); hls.loadSource(url); }
-            else { video.src = url; }
+            if (Hls) {
+                hls = new Hls(CAPTURE_HLS_CONFIG);
+                hls.attachMedia(video);
+                hls.loadSource(url);
+            } else {
+                video.src = url;
+            }
         } else {
             video.src = url;
         }
 
         await new Promise((resolve, reject) => {
-            const t = setTimeout(() => reject(new Error('timeout')), frameCapture.VIDEO_TIMEOUT);
-            const done = () => clearTimeout(t);
-            video.addEventListener('loadeddata', () => { done(); resolve(); }, { once: true });
-            video.addEventListener('error', () => { done(); reject(new Error('media error')); }, { once: true });
+            let settled = false;
+            const finish = (err, isError) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(t);
+                if (isError) reject(err);
+                else resolve();
+            };
+            const t = setTimeout(() => finish(new Error('timeout'), true), frameCapture.VIDEO_TIMEOUT);
+            video.addEventListener('loadeddata', () => finish(null, false), { once: true });
+            video.addEventListener('error', () => finish(new Error('media error'), true), { once: true });
+            if (hls && window.Hls?.Events) {
+                hls.on(window.Hls.Events.FRAG_BUFFERED, () => finish(null, false));
+                hls.on(window.Hls.Events.ERROR, (_e, data) => {
+                    if (data?.fatal) finish(new Error('hls error'), true);
+                });
+            }
             video.load();
         });
 
-        const canvas = document.createElement('canvas');
-        canvas.width = 56; canvas.height = 56;
-        canvas.getContext('2d').drawImage(video, 0, 0, 56, 56);
-        return canvas.toDataURL('image/jpeg', 0.6);
+        try { await video.play(); } catch { /* autoplay policies — muted should allow */ }
+
+        const remaining = frameCapture.VIDEO_TIMEOUT - (Date.now() - started) + 1500;
+        return await waitForVideoFrame(video, remaining);
     } catch {
         return null;
     } finally {
@@ -766,8 +1339,14 @@ async function loadHlsForCapture() {
 
 // Reveal the player immediately (before the stream loads) and start playback.
 function startPlayback(channel) {
+    setFrameCapturePaused(true);
     try { TvPlayer.mountVideo(el('tv-playback-surface')); } catch { /* ignore */ }
-    TvPlayer.playChannel(channel).catch(() => {});
+    TvPlayer.playChannel(channel).catch((e) => {
+        const blocked = e?.name === 'NotAllowedError'
+            || String(e?.message || '').toLowerCase().includes('not allowed');
+        if (!blocked) showAppToast('Stream unavailable');
+        if (!TvPlayer.playing) setFrameCapturePaused(false);
+    });
 }
 
 async function refreshFavoritesTab(forceRefresh = false) {
@@ -934,12 +1513,53 @@ function bindPlayerControls() {
         // Update mute button icon on state changes
         const updateMuteIcon = () => {
             const isMuted = TvPlayer.muted || TvPlayer.volume === 0;
-            muteBtn.textContent = isMuted ? '🔇' : '🔊';
+            const wave = muteBtn.querySelector('#mute-wave');
+            if (wave) wave.style.opacity = isMuted ? '0' : '1';
             muteBtn.setAttribute('aria-pressed', String(isMuted));
+            muteBtn.title = isMuted ? 'Unmute' : 'Mute';
         };
         window.addEventListener('tv:state_changed', updateMuteIcon);
         updateMuteIcon();
     }
+    const favBtn = el('fav-btn');
+    if (favBtn) {
+        favBtn.addEventListener('click', () => {
+            const ch = TvPlayer.channel;
+            if (!ch) {
+                showAppToast('No channel playing');
+                return;
+            }
+            const isFav = TvPlayer.toggleFavorite(ch);
+            favBtn.classList.toggle('is-active', isFav);
+            favBtn.textContent = isFav ? '★' : '☆';
+            favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+            showAppToast(isFav ? '❤️ Added to favorites' : '💔 Removed from favorites');
+            if (appState.activeTab === 'favorites') refreshFavoritesTab();
+        });
+        // Keep fav button in sync when channel changes
+        window.addEventListener('tv:state_changed', updateFavBtn);
+    }
+    const volPct = el('volume-pct');
+    if (volPct) {
+        const updateVolPct = () => {
+            const shown = TvPlayer.muted ? 0 : TvPlayer.volume;
+            volPct.textContent = `${Math.round((shown || 0) * 100)}%`;
+        };
+        window.addEventListener('tv:state_changed', updateVolPct);
+        updateVolPct();
+    }
+}
+
+function updateFavBtn() {
+    const favBtn = el('fav-btn');
+    if (favBtn) {
+        const ch = TvPlayer.channel;
+        const isFav = ch ? TvPlayer.isFavorite(ch) : false;
+        favBtn.classList.toggle('is-active', isFav);
+        favBtn.textContent = isFav ? '★' : '☆';
+        favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+    }
+    syncChannelTileFavButtons();
 }
 
 // ===== NOW PLAYING (header) =====
@@ -993,29 +1613,159 @@ function bindSettings() {
             showAppToast(`Buffer size: ${clamped}s`);
         });
     }
-    const hideOffline = el('hide-offline-toggle');
-    if (hideOffline) {
-        hideOffline.addEventListener('click', () => {
-            const active = hideOffline.classList.contains('is-active');
-            TvProviderRegistry.setHideOffline(!active);
-            hideOffline.classList.toggle('is-active', !active);
-            hideOffline.setAttribute('aria-pressed', String(!active));
-            showAppToast(!active ? 'Hiding offline channels' : 'Showing all channels');
+    bindAppearance();
+}
+
+// ===== APPEARANCE SETTINGS =====
+function formatTextSizeLabel(size) {
+    return `${Math.round((size / 16) * 100)}%`;
+}
+
+function bindAppearance() {
+    const textSlider = el('text-size-slider');
+    const textValue = el('text-size-value');
+    const tileSlider = el('tile-width-slider');
+    const tileValue = el('tile-width-value');
+
+    const syncTextUi = (size) => {
+        if (textSlider) textSlider.value = String(size);
+        if (textValue) textValue.textContent = formatTextSizeLabel(size);
+        if (textSlider) textSlider.setAttribute('aria-valuetext', formatTextSizeLabel(size));
+    };
+
+    const syncTileUi = (width) => {
+        if (tileSlider) tileSlider.value = String(width);
+        if (tileValue) tileValue.textContent = `${width}px`;
+        if (tileSlider) tileSlider.setAttribute('aria-valuetext', `${width}px`);
+    };
+
+    if (textSlider) {
+        textSlider.addEventListener('input', () => {
+            const size = TvProviderRegistry.setTextSize(Number(textSlider.value));
+            syncTextUi(size);
+            applyAppearanceStyles();
         });
     }
+
+    if (tileSlider) {
+        tileSlider.addEventListener('input', () => {
+            const width = TvProviderRegistry.setTileWidth(Number(tileSlider.value));
+            syncTileUi(width);
+            applyAppearanceStyles();
+        });
+    }
+
+    const resetBtn = el('reset-appearance-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            const size = TvProviderRegistry.setTextSize(16);
+            const width = TvProviderRegistry.setTileWidth(180);
+            syncTextUi(size);
+            syncTileUi(width);
+            applyAppearanceStyles();
+            showAppToast('Appearance reset to defaults');
+        });
+    }
+}
+
+function applyAppearanceStyles() {
+    // Guard for test environments without full DOM
+    if (!document.documentElement) return;
+    
+    const root = document.documentElement;
+    const textSize = TvProviderRegistry.getTextSize();
+    const tileWidth = TvProviderRegistry.getTileWidth();
+    
+    // Relative text scale via root font-size — rem-based UI scales everywhere
+    root.style.fontSize = `${textSize}px`;
+    root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
+    
+    // Update the preview tile
+    updatePreviewTile();
+    
+    // Measure marquee on all tiles — immediately and again after layout settles,
+    // since the tile-width change reflows the auto-fill grid columns.
+    document.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
+        });
+    }
+}
+
+// Also apply appearance styles after any new tiles are rendered
+function applyAppearanceToTiles(container) {
+    if (!container || !document.documentElement) return;
+    
+    // CSS variables auto-cascade, but we need to handle narrow class + shift for new tiles.
+    // Measure immediately (best effort) and again after layout settles so the
+    // scrollWidth/clientWidth reflect the final rendered widths.
+    container.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+            container.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
+        });
+    }
+}
+
+// Detect each tile's name overflow and toggle the "narrow" class.
+// The marquee animation is handled purely in CSS with the duplicate-text
+// track (.marquee-track), which never reveals whitespace.
+function measureTileMarquee(tile) {
+    if (!tile || typeof tile.classList?.toggle !== 'function') return;
+    const name = tile.querySelector?.('.channel-tile__name, .country-tile__name');
+    if (!name) return;
+    // Only measure when the browser exposes real layout metrics.
+    if (typeof name.scrollWidth !== 'number' || typeof name.clientWidth !== 'number') {
+        return;
+    }
+    const overflow = name.scrollWidth - name.clientWidth;
+    tile.classList.toggle('narrow', overflow > 0);
+}
+
+// Update the settings preview tile with current channel or a default
+function updatePreviewTile() {
+    const preview = el('appearance-preview-tile');
+    if (!preview) return;
+    const name = el('preview-name');
+    const flag = el('preview-flag');
+    const avatar = el('preview-avatar');
+    
+    // Try to use the currently playing channel
+    const channel = TvPlayer.channel;
+    const nameText = channel?.name || 'Now Playing';
+    const countryCode = channel?.countrycode || '';
+    const initial = (nameText[0] || 'P').toUpperCase();
+    const safeName = escapeHtml(nameText);
+    
+    if (name) name.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span><span class="marquee-text" aria-hidden="true">${safeName}</span></span>`;
+    if (flag) flag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
+    if (avatar) avatar.textContent = initial;
 }
 
 function syncSettingsFromState() {
     const buffer = el('buffer-size-select');
     if (buffer) buffer.value = String(TvPlayer.getBufferSize());
-    const hideOffline = el('hide-offline-toggle');
-    if (hideOffline) {
-        const active = TvProviderRegistry.getHideOffline();
-        hideOffline.classList.toggle('is-active', active);
-        hideOffline.setAttribute('aria-pressed', String(active));
-    }
     const volume = el('volume-slider');
     if (volume) volume.value = String(Math.round((TvPlayer.volume || 0.85) * 100));
+    
+    // Sync appearance settings
+    const textSize = TvProviderRegistry.getTextSize();
+    const textSlider = el('text-size-slider');
+    const textValue = el('text-size-value');
+    if (textSlider) textSlider.value = String(textSize);
+    if (textValue) textValue.textContent = formatTextSizeLabel(textSize);
+    if (textSlider) textSlider.setAttribute('aria-valuetext', formatTextSizeLabel(textSize));
+
+    const tileWidthPx = TvProviderRegistry.getTileWidth();
+    const tileSlider = el('tile-width-slider');
+    const tileWidth = el('tile-width-value');
+    if (tileSlider) tileSlider.value = String(tileWidthPx);
+    if (tileWidth) tileWidth.textContent = `${tileWidthPx}px`;
+    if (tileSlider) tileSlider.setAttribute('aria-valuetext', `${tileWidthPx}px`);
+    
+    // Apply appearance styles on load
+    applyAppearanceStyles();
 }
 
 function updateStorageStats() {
@@ -1053,9 +1803,11 @@ function updateStorageStats() {
 }
 
 // ===== STATE CHANGES =====
-// ===== STATE CHANGES =====
 function onPlayerStateChanged(e) {
     const state = e.detail || {};
+
+    // Heavy tile grabs yield bandwidth while a channel is loading or playing.
+    setFrameCapturePaused(state.playing === true || state.loading === true);
 
     // Keep the video element mounted in the player surface (always visible).
     try { TvPlayer.mountVideo(el('tv-playback-surface')); } catch { /* ignore */ }
@@ -1087,11 +1839,16 @@ function onPlayerStateChanged(e) {
     if (state.resumeBlocked) {
         showAppToast('Tap ▶ to start playback');
     } else if (state.error && !state.resumeBlocked) {
-        showAppToast(state.error === 'Channel offline' ? 'Channel offline' : 'Stream unavailable');
+        showAppToast('Stream unavailable');
     }
 
     updateNowPlayingHeader();
 
     // Don't refresh favorites/recents here — it causes flickering on every buffer tick.
     // They are refreshed when the tab is switched or when a star is toggled.
+
+    // Update the settings preview tile when channel changes
+    if (state.channel) {
+        updatePreviewTile();
+    }
 }

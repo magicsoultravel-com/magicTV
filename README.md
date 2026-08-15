@@ -7,7 +7,7 @@
 - **🌍 Browse Channels** — Filter by country, search, infinite scroll
 - **❤️ Favorites** — Heart channels for quick access
 - **📺 Recents** — Auto-tracked watch history
-- **⚙️ Settings** — Buffer size, offline channel filter, volume control
+- **⚙️ Settings** — Buffer size, offline channel filter, volume control, text size, tile width
 - **📱 Responsive** — Works on mobile, tablet, TV browser, desktop
 - **🎨 Neon Design** — Cyan/magenta cyberpunk aesthetics
 - **🔊 Full Controls** — Play, pause, volume, quality, Picture-in-Picture, fullscreen
@@ -64,9 +64,8 @@ magicTV/
 ├── js/
 │   ├── app.js             # Main app logic (tabs, events, state)
 │   ├── tvPlayer.js        # HLS player state machine (extracted)
-│   ├── tvPopover.js       # Channel browser logic (extracted, not wired)
 │   ├── tvUtils.js         # Helpers (flags, HTML escape, etc.)
-│   ├── tvHls.js           # HLS.js library loader
+│   ├── tvHls.js           # HLS.js library loader (CDN + SRI)
 │   ├── tvPip.js           # Picture-in-Picture support
 │   ├── toast.js           # Bridge re-export → ui/toast.js
 │   ├── icons.js           # Bridge re-export → ui/icons.js
@@ -76,12 +75,13 @@ magicTV/
 │   │   ├── channelShape.js # Channel data model
 │   │   └── iptvOrgTv.js   # iptv-org API provider
 │   ├── storage/
-│   │   └── indexedDbStore.js # IndexedDB catalog caching
+│   │   ├── indexedDbStore.js # IndexedDB catalog caching
+│   │   └── frameCache.js  # Thumbnail frame cache
 │   └── ui/
 │       ├── icons.js       # SVG icon constants
 │       ├── toast.js       # Toast notifications
 │       └── clipboard.js   # Copy to clipboard
-├── test/                  # Node built-in test suite (28 tests)
+├── test/                  # Node built-in test suite
 └── assets/
 │   └── brand/
 │       └── icon-tv.svg    # Neon TV icon
@@ -101,14 +101,17 @@ magicTV/
 3. **Resume** — "Now Playing" card shows last watched; click Resume to continue
 
 ### Favorites & Recents
-- **Heart Button** — Click star on channel tile to favorite
+- **Favorite Button** — Use ★ on the player controls while a channel is playing
 - **Auto-tracked** — Recents tab fills as you watch
 - **Persistent** — Data saved to localStorage
 
 ### Settings
 - **Buffer Size** — Adjust for your network (5-30 seconds)
-- **Hide Offline** — Toggle to show/hide offline channels
 - **Volume** — Per-session or system audio control
+- **Appearance** (🎨):
+  - **Text Size** — Scales UI text everywhere (50%–112% of default; rem-based)
+  - **Tile Width** — Adjust channel card width (100px–300px)
+  - **↺** — Reset text size and tile width to defaults
 
 ## 🔌 Data Source
 
@@ -120,7 +123,7 @@ magicTV/
 ## 💾 Storage
 
 - **localStorage** — Favorites, recents, settings (same keys as magiclists for compatibility)
-- **IndexedDB** — Catalog cache (24-hour TTL)
+- **IndexedDB** — Catalog + frame cache (manual refresh; frames TTL 7 days)
 
 ## 🎨 Color Scheme
 
@@ -140,24 +143,19 @@ magicTV/
 
 ## 🐛 Debugging
 
-Open browser console and access:
+Open browser console after the app loads:
 ```javascript
-// See player state
-console.log(magicTV.TvPlayer);
-
-// See app state
-console.log(magicTV.appState);
-
-// See all DOM elements cached
-console.log(magicTV.elements);
+import { TvPlayer } from './js/tvPlayer.js';
+import { TvProviderRegistry } from './js/tvProviders/registry.js';
 ```
+(Or inspect `TvPlayer` / network activity from the Sources panel — there is no global `window.magicTV`.)
 
 ## 🚧 Known Limitations (MVP)
 
 - Player inline in page (no auto-fullscreen on play — user must click fullscreen manually)
 - No HLS stream stats dashboard yet
 - No multi-provider support yet (iptv-org only)
-- No search within country yet
+- Catalog has no real offline-health signal (channels without a URL are simply omitted)
 - Mobile volume control hidden on small screens
 
 ## 📦 Next Steps (Post-MVP)

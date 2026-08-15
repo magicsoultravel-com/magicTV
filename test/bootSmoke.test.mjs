@@ -15,7 +15,12 @@ const KNOWN_IDS = [
     'volume-slider', 'buffer-info', 'quality-info', 'pip-btn', 'fullscreen-btn',
     'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
-    'buffer-size-select', 'hide-offline-toggle'
+    'buffer-size-select',
+    'text-size-slider', 'text-size-value',
+    'tile-width-slider', 'tile-width-value',
+    'reset-appearance-btn', 'appearance-preview-tile',
+    'preview-avatar', 'preview-name', 'preview-flag',
+    'fav-btn', 'mute-icon', 'mute-wave', 'volume-pct'
 ];
 
 function makeEl(id = '') {

@@ -5,16 +5,17 @@
  * bug: tvPip.js imported './toast.js' and './icons.js', which did not exist
  * at that path, so the ENTIRE ES module graph failed to load.
  *
- * It walks every local import reachable from app.js and asserts each
- * file exists and parses.
+ * It walks every local import reachable from app.js, plus every top-level
+ * module under js/, and asserts each file exists and parses.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const GRAPH_ROOT = fileURLToPath(new URL('../js/app.js', import.meta.url));
+const JS_ROOT = fileURLToPath(new URL('../js', import.meta.url));
 
 function localImportSpecifiers(source) {
     const specs = [];
@@ -55,10 +56,30 @@ function resolveGraph(entry) {
     return { seen, missing };
 }
 
+function listJsFiles(dir) {
+    const out = [];
+    for (const name of readdirSync(dir)) {
+        const abs = join(dir, name);
+        const st = statSync(abs);
+        if (st.isDirectory()) out.push(...listJsFiles(abs));
+        else if (name.endsWith('.js')) out.push(abs);
+    }
+    return out;
+}
+
 test('module graph from app.js resolves with no missing files', () => {
     const { seen, missing } = resolveGraph(GRAPH_ROOT);
     assert.ok(seen.size >= 10, 'expected at least 10 reachable modules');
     assert.deepEqual(missing, [], 'all local imports must resolve');
+});
+
+test('every js/ module resolves its local imports', () => {
+    const missing = [];
+    for (const file of listJsFiles(JS_ROOT)) {
+        const { missing: fileMissing } = resolveGraph(file);
+        missing.push(...fileMissing);
+    }
+    assert.deepEqual(missing, [], 'orphan modules must also have resolvable imports');
 });
 
 test('app.js boot handler is DOM-safe (guarded)', () => {

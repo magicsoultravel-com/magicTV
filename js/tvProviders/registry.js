@@ -4,10 +4,26 @@ import { PROVIDER_IPTV_ORG } from './channelShape.js';
 const STATE_KEY = 'matrix_tv_state';
 
 // Appearance settings defaults
-const DEFAULT_TEXT_SIZE = 16;  // px
+const DEFAULT_TEXT_SIZE = 16;  // root px (scales rem-based UI relatively)
 const DEFAULT_TILE_WIDTH = 180; // px
-const TEXT_SIZE_OPTIONS = [12, 14, 16, 18];
-const TILE_WIDTH_OPTIONS = [120, 150, 180, 220, 260];
+const TEXT_SIZE_MIN = 8;
+const TEXT_SIZE_MAX = 18;
+const TILE_WIDTH_MIN = 100;
+const TILE_WIDTH_MAX = 300;
+const TILE_WIDTH_STEP = 10;
+
+function clampTextSize(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_TEXT_SIZE;
+    return Math.min(TEXT_SIZE_MAX, Math.max(TEXT_SIZE_MIN, Math.round(n)));
+}
+
+function clampTileWidth(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_TILE_WIDTH;
+    const rounded = Math.round(n / TILE_WIDTH_STEP) * TILE_WIDTH_STEP;
+    return Math.min(TILE_WIDTH_MAX, Math.max(TILE_WIDTH_MIN, rounded));
+}
 
 const PROVIDERS = {
     [PROVIDER_IPTV_ORG]: IptvOrgTvProvider
@@ -18,14 +34,12 @@ function loadSettings() {
         const raw = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
         return {
             catalogProvider: raw.catalogProvider || PROVIDER_IPTV_ORG,
-            hideOfflineChannels: raw.hideOfflineChannels !== false,
-            textSize: TEXT_SIZE_OPTIONS.includes(raw.textSize) ? raw.textSize : DEFAULT_TEXT_SIZE,
-            tileWidth: TILE_WIDTH_OPTIONS.includes(raw.tileWidth) ? raw.tileWidth : DEFAULT_TILE_WIDTH
+            textSize: raw.textSize != null ? clampTextSize(raw.textSize) : DEFAULT_TEXT_SIZE,
+            tileWidth: raw.tileWidth != null ? clampTileWidth(raw.tileWidth) : DEFAULT_TILE_WIDTH
         };
     } catch {
         return {
             catalogProvider: PROVIDER_IPTV_ORG,
-            hideOfflineChannels: true,
             textSize: DEFAULT_TEXT_SIZE,
             tileWidth: DEFAULT_TILE_WIDTH
         };
@@ -74,11 +88,13 @@ export const TvProviderRegistry = {
     },
 
     getHideOffline() {
-        return loadSettings().hideOfflineChannels;
+        // Offline health is not available from the iptv-org catalog shape we use;
+        // channels without a stream URL are already dropped during normalize.
+        return true;
     },
 
-    setHideOffline(value) {
-        saveSettings({ hideOfflineChannels: !!value });
+    setHideOffline() {
+        // No-op: kept for API compatibility with older callers/tests.
     },
 
     // Appearance settings
@@ -87,14 +103,16 @@ export const TvProviderRegistry = {
     },
 
     setTextSize(value) {
-        const newValue = Number.isFinite(value) ? value : DEFAULT_TEXT_SIZE;
-        const clampedValue = TEXT_SIZE_OPTIONS.includes(newValue) ? newValue : DEFAULT_TEXT_SIZE;
+        const clampedValue = clampTextSize(value);
         saveSettings({ textSize: clampedValue });
         return clampedValue;
     },
 
     getTextSizeOptions() {
-        return TEXT_SIZE_OPTIONS;
+        return Array.from(
+            { length: TEXT_SIZE_MAX - TEXT_SIZE_MIN + 1 },
+            (_, i) => TEXT_SIZE_MIN + i
+        );
     },
 
     getTileWidth() {
@@ -102,14 +120,16 @@ export const TvProviderRegistry = {
     },
 
     setTileWidth(value) {
-        const newValue = Number.isFinite(value) ? value : DEFAULT_TILE_WIDTH;
-        const clampedValue = TILE_WIDTH_OPTIONS.includes(newValue) ? newValue : DEFAULT_TILE_WIDTH;
+        const clampedValue = clampTileWidth(value);
         saveSettings({ tileWidth: clampedValue });
         return clampedValue;
     },
 
     getTileWidthOptions() {
-        return TILE_WIDTH_OPTIONS;
+        return Array.from(
+            { length: (TILE_WIDTH_MAX - TILE_WIDTH_MIN) / TILE_WIDTH_STEP + 1 },
+            (_, i) => TILE_WIDTH_MIN + i * TILE_WIDTH_STEP
+        );
     },
 
     async getCountries(opts = {}) {
@@ -117,11 +137,7 @@ export const TvProviderRegistry = {
     },
 
     async searchChannels(opts = {}) {
-        const settings = loadSettings();
-        return this.getActiveProvider().searchChannels({
-            ...opts,
-            hideOffline: opts.hideOffline ?? settings.hideOfflineChannels
-        });
+        return this.getActiveProvider().searchChannels(opts);
     },
 
     getLastRefreshed() {

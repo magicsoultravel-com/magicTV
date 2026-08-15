@@ -6,6 +6,8 @@ export const CARD_ICONS = {
     close: '<svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
     chevronRight: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M4.8 3.2 7.6 6 4.8 8.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     chevronDown: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Prohibition / “no signal” road-sign for failed tile frame grabs. */
+    prohibited: '<svg viewBox="0 0 12 12" width="18" height="18" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.15"/><path d="M3.1 3.1l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>',
 };
 
 export const ACTION_ICONS = {

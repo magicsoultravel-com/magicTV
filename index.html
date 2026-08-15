@@ -33,11 +33,15 @@
                         <button class="tv-controls__btn" id="play-btn">▶</button>
                         <button class="tv-controls__btn" id="pause-btn">⏸</button>
                         <button class="tv-controls__btn" id="stop-btn">⏹</button>
-                        <button class="tv-controls__action-btn" id="pip-btn">⬆</button>
+                        <button class="tv-controls__btn" id="pip-btn">⬆</button>
                         <button class="tv-controls__action-btn" id="fullscreen-btn">⛶</button>
+                        <button class="tv-controls__btn tv-controls__fav-btn" id="fav-btn" title="Favorite" aria-label="Toggle favorite">☆</button>
                     </div>
                     <div class="tv-controls__volume">
-                        <button type="button" class="tv-controls__btn" id="mute-btn" title="Mute or unmute" aria-label="Mute or unmute">🔊</button>
+                        <button type="button" class="tv-controls__volume-btn" id="mute-btn" title="Mute or unmute" aria-label="Mute or unmute">
+                            <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" id="mute-icon"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path id="mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>
+                        </button>
+                        <span class="tv-controls__volume-pct" id="volume-pct">85%</span>
                         <input type="range" class="tv-controls__volume-slider" id="volume-slider" min="0" max="100" value="85">
                     </div>
                     <div class="tv-controls__info">
@@ -74,30 +78,40 @@
                                 <option value="30">30s (Very Stable)</option>
                             </select>
                         </div>
-                        <div class="settings-section__item">
-                            <label class="settings-section__label">Hide Offline</label>
-                            <button class="settings-toggle is-active" id="hide-offline-toggle"></button>
-                        </div>
                     </div>
                     <div class="settings-section">
-                        <h3 class="settings-section__title">🎨 Appearance</h3>
+                        <div class="settings-section__header">
+                            <h3 class="settings-section__title">🎨 Appearance</h3>
+                            <button type="button" id="reset-appearance-btn" class="settings-reset-btn" aria-label="Reset to defaults" title="Reset to defaults">↺</button>
+                        </div>
                         <div class="settings-section__item">
-                            <label class="settings-section__label">Text Size</label>
+                            <label class="settings-section__label" for="text-size-slider">Text Size</label>
                             <div class="settings-section__control">
-                                <button class="settings-increment-btn" id="text-size-decrement" aria-label="Decrease text size">−</button>
-                                <span class="settings-value" id="text-size-value">16px</span>
-                                <button class="settings-increment-btn" id="text-size-increment" aria-label="Increase text size">+</button>
+                                <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="16" aria-valuetext="100%">
+                                <span class="settings-value" id="text-size-value">100%</span>
                             </div>
                         </div>
                         <div class="settings-section__item">
-                            <label class="settings-section__label">Tile Width</label>
+                            <label class="settings-section__label" for="tile-width-slider">Tile Width</label>
                             <div class="settings-section__control">
-                                <button class="settings-increment-btn" id="tile-width-decrement" aria-label="Decrease tile width">−</button>
+                                <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="180" aria-valuetext="180px">
                                 <span class="settings-value" id="tile-width-value">180px</span>
-                                <button class="settings-increment-btn" id="tile-width-increment" aria-label="Increase tile width">+</button>
                             </div>
                         </div>
-                        <button id="reset-appearance-btn" class="tv-controls__btn" style="margin-top: var(--tv-spacing-sm); font-size: 0.8rem;">Reset to Default</button>
+                        <div class="settings-preview">
+                            <div class="settings-preview__label">Preview</div>
+                            <div id="appearance-preview-tile" class="channel-tile" role="presentation">
+                                <div class="channel-tile__icon">
+                                    <div class="channel-tile__capture-frame">
+                                        <div class="channel-tile__letter-avatar" id="preview-avatar">P</div>
+                                    </div>
+                                </div>
+                                <div class="channel-tile__body">
+                                    <h3 class="channel-tile__name" id="preview-name">Now Playing</h3>
+                                    <span class="channel-tile__flag" id="preview-flag"></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="settings-section">
                         <h3 class="settings-section__title">📊 Storage</h3>

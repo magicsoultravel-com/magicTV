@@ -179,8 +179,7 @@ export const IptvOrgTvProvider = {
         offset = 0,
         order = 'name',
         reverse = false,
-        refresh = false,
-        hideOffline = true
+        refresh = false
     } = {}) {
         const catalog = await loadCatalog(refresh);
         let list = countrycode
@@ -190,16 +189,13 @@ export const IptvOrgTvProvider = {
         // Whole-dataset filter: the catalog is fully resident (memory/IDB),
         // so filtering happens against every channel — not just the pages
         // already painted — and pagination scrolls the *filtered* results.
+        // Channels without a resolved URL are dropped by normalizeChannel.
         const q = String(query || '').trim().toLowerCase();
         if (q) {
             list = list.filter((s) =>
                 (s.name || '').toLowerCase().includes(q)
                 || (s.id || '').toLowerCase().includes(q)
             );
-        }
-
-        if (hideOffline) {
-            list = list.filter((s) => s.url_resolved);
         }
 
         if (order === 'name') {

@@ -140,16 +140,74 @@ test('volume clamps to 0..1 and persists', () => {
 
 // ----- Registry settings -----
 
-test('hide-offline defaults to on and toggles', () => {
-    assert.equal(Registry.getHideOffline(), true, 'defaults to hiding offline');
-    Registry.setHideOffline(false);
-    assert.equal(Registry.getHideOffline(), false);
-    Registry.setHideOffline(true);
+test('hide-offline API is a no-op (catalog has no offline health)', () => {
     assert.equal(Registry.getHideOffline(), true);
+    Registry.setHideOffline(false);
+    assert.equal(Registry.getHideOffline(), true, 'offline filter is not configurable');
 });
 
 test('registry reports the iptv-org provider', () => {
     const providers = Registry.listProviders();
     assert.ok(providers.some((p) => p.id === 'iptv-org'));
     assert.equal(Registry.getActiveProviderId(), 'iptv-org');
+});
+
+// ----- Appearance Settings -----
+
+test('textSize defaults to 16 and can be set and retrieved', () => {
+    assert.equal(Registry.getTextSize(), 16, 'defaults to 16px');
+    Registry.setTextSize(14);
+    assert.equal(Registry.getTextSize(), 14);
+    Registry.setTextSize(18);
+    assert.equal(Registry.getTextSize(), 18);
+});
+
+test('textSize clamps to range', () => {
+    Registry.setTextSize(100);
+    assert.equal(Registry.getTextSize(), 18, 'above max clamps to 18');
+    Registry.setTextSize(3);
+    assert.equal(Registry.getTextSize(), 8, 'below min clamps to 8');
+    Registry.setTextSize('invalid');
+    assert.equal(Registry.getTextSize(), 16, 'non-number falls back to default');
+});
+
+test('textSize persists in localStorage', () => {
+    Registry.setTextSize(14);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.textSize, 14);
+});
+
+test('tileWidth defaults to 180 and can be set and retrieved', () => {
+    assert.equal(Registry.getTileWidth(), 180, 'defaults to 180px');
+    Registry.setTileWidth(150);
+    assert.equal(Registry.getTileWidth(), 150);
+    Registry.setTileWidth(220);
+    assert.equal(Registry.getTileWidth(), 220);
+});
+
+test('tileWidth clamps to range', () => {
+    Registry.setTileWidth(500);
+    assert.equal(Registry.getTileWidth(), 300, 'above max clamps to 300');
+    Registry.setTileWidth(40);
+    assert.equal(Registry.getTileWidth(), 100, 'below min clamps to 100');
+    Registry.setTileWidth('invalid');
+    assert.equal(Registry.getTileWidth(), 180, 'non-number falls back to default');
+});
+
+test('tileWidth persists in localStorage', () => {
+    Registry.setTileWidth(150);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.tileWidth, 150);
+});
+
+test('textSizeOptions and tileWidthOptions return valid arrays', () => {
+    const textOptions = Registry.getTextSizeOptions();
+    assert.ok(Array.isArray(textOptions));
+    assert.ok(textOptions.includes(16));
+    assert.equal(textOptions[0], 8);
+    assert.equal(textOptions[textOptions.length - 1], 18);
+    
+    const tileOptions = Registry.getTileWidthOptions();
+    assert.ok(Array.isArray(tileOptions));
+    assert.ok(tileOptions.includes(180));
 });
