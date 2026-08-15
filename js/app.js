@@ -385,7 +385,7 @@ function renderCountries() {
         <div class="country-tile" data-country="${escapeHtml(c.iso_3166_1 || '')}" role="button" tabindex="0">
             <div class="country-tile__icon">${countryFlagEmoji(c.iso_3166_1)}</div>
             <div class="country-tile__body">
-                <h3 class="country-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(c.name)}</span><span class="marquee-text" aria-hidden="true">${escapeHtml(c.name)}</span></span></h3>
+                <h3 class="country-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(c.name)}</span></span></h3>
                 <div class="country-tile__count">${c.stationcount || 0} channels</div>
             </div>
         </div>
@@ -566,7 +566,7 @@ function tileHtml(ch) {
                 </div>
             </div>
             <div class="channel-tile__body">
-                <h3 class="channel-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(ch.name || 'Unknown')}</span><span class="marquee-text" aria-hidden="true">${escapeHtml(ch.name || 'Unknown')}</span></span></h3>
+                <h3 class="channel-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(ch.name || 'Unknown')}</span></span></h3>
                 <span class="channel-tile__flag">${countryFlagEmoji(ch.countrycode)}</span>
             </div>
         </div>
@@ -1709,18 +1709,36 @@ function applyAppearanceToTiles(container) {
 }
 
 // Detect each tile's name overflow and toggle the "narrow" class.
-// The marquee animation is handled purely in CSS with the duplicate-text
-// track (.marquee-track), which never reveals whitespace.
+// Clone a second .marquee-text only when the single copy overflows — same
+// pattern as syncMarquee in tvUtils.js — so fitting names never show doubled.
 function measureTileMarquee(tile) {
     if (!tile || typeof tile.classList?.toggle !== 'function') return;
     const name = tile.querySelector?.('.channel-tile__name, .country-tile__name');
     if (!name) return;
+
+    const track = name.querySelector('.marquee-track');
+    const firstText = track?.querySelector('.marquee-text');
+    if (!track || !firstText) return;
+
+    // Strip any prior clone before measuring a single copy.
+    track.querySelectorAll('.marquee-text[aria-hidden="true"]').forEach((node) => node.remove());
+    tile.classList.remove('narrow');
+
     // Only measure when the browser exposes real layout metrics.
-    if (typeof name.scrollWidth !== 'number' || typeof name.clientWidth !== 'number') {
+    if (typeof firstText.scrollWidth !== 'number' || typeof name.clientWidth !== 'number') {
         return;
     }
-    const overflow = name.scrollWidth - name.clientWidth;
-    tile.classList.toggle('narrow', overflow > 0);
+
+    const reducedMotion = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const overflows = firstText.scrollWidth > name.clientWidth + 2;
+
+    if (overflows && !reducedMotion) {
+        const clone = firstText.cloneNode(true);
+        clone.setAttribute('aria-hidden', 'true');
+        track.appendChild(clone);
+        tile.classList.add('narrow');
+    }
 }
 
 // Update the settings preview tile with current channel or a default
@@ -1738,7 +1756,7 @@ function updatePreviewTile() {
     const initial = (nameText[0] || 'P').toUpperCase();
     const safeName = escapeHtml(nameText);
     
-    if (name) name.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span><span class="marquee-text" aria-hidden="true">${safeName}</span></span>`;
+    if (name) name.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span></span>`;
     if (flag) flag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
     if (avatar) avatar.textContent = initial;
 }
