@@ -1,5 +1,33 @@
 /** @css {"owns":"magicTV landing page layout, header, tabs, channel grid, refresh arrow"} */
 
+/* ===== SVG RENDERING =====
+   Smooth, crisp icon rendering across all viewports. */
+.ui-icon,
+.tv-controls__btn svg,
+.tv-player-tile__dismiss svg,
+.tv-player-tile__audio svg {
+    shape-rendering: geometricPrecision;
+    vector-effect: none;
+    width: auto;
+    height: auto;
+}
+
+.ui-icon circle,
+.ui-icon path,
+.ui-icon rect,
+.ui-icon ellipse,
+.tv-controls__btn svg circle,
+.tv-controls__btn svg path,
+.tv-controls__btn svg rect,
+.tv-controls__btn svg ellipse,
+.tv-controls__btn svg line,
+.tv-player-tile__dismiss svg circle,
+.tv-player-tile__dismiss svg path,
+.tv-player-tile__audio svg circle,
+.tv-player-tile__audio svg path {
+    vector-effect: non-scaling-stroke;
+}
+
 /* First-paint boot cover: hide shell until theme is applied, then grain-reveal. */
 html.is-booting #app-container {
     visibility: hidden;
@@ -179,57 +207,10 @@ html.is-booting #toast-container {
     line-height: 1;
 }
 
-/* Mosaic top-center chrome — mute-all + reset layout */
-.mosaic-chrome {
-    position: absolute;
-    top: 0.45rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 40;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    pointer-events: none;
-}
-
-.mosaic-mute-all-btn,
-.mosaic-reset-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    color: rgba(242, 242, 242, 0.72);
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-/* Mute-all: always visible when all quiet; otherwise player hover */
-#app-container.is-mute-all-active .mosaic-mute-all-btn,
-#app-container.is-player-hovered .mosaic-mute-all-btn,
-#app-container .mosaic-mute-all-btn:focus-visible {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-#app-container.has-custom-mosaic-placement.is-player-hovered .mosaic-reset-btn,
-#app-container.has-custom-mosaic-placement .mosaic-reset-btn:focus-visible {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.mosaic-mute-all-btn:hover,
-.mosaic-mute-all-btn:focus-visible,
-.mosaic-reset-btn:hover,
-.mosaic-reset-btn:focus-visible {
-    color: #fff;
-    background: transparent;
+/* Mosaic reset lives in the main suite; shown only with a custom layout */
+#mosaic-reset-btn.is-hidden,
+#mosaic-reset-btn[hidden] {
+    display: none;
 }
 
 
@@ -272,6 +253,14 @@ html.is-booting #toast-container {
 .tv-tab .ui-icon {
     flex-shrink: 0;
     display: block;
+    width: 14px;
+    height: 14px;
+    shape-rendering: geometricPrecision;
+    transition: transform 0.15s ease;
+}
+
+.tv-tab.is-active .tv-tab .ui-icon {
+    transform: scale(1.1);
 }
 
 .tv-tab:hover {
@@ -321,6 +310,21 @@ html.is-booting #toast-container {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* ===== TAB RESPONSIVE BEHAVIOR =====
+   When viewport width is tight, hide tab text labels to show only icons.
+   This prevents horizontal scrolling overflow and improves touch targets.
+   The threshold at 560px ensures text doesn't get clipped in narrow viewports
+   (e.g., modals on phones, split-screen, or landscape tablets). */
+@media (max-width: 560px) {
+    .tv-tab-text {
+        display: none;
+    }
+    .tv-tab {
+        padding: 0.5rem;
+        min-width: 44px; /* Minimum touch target size */
+    }
 }
 
 /* ===== CONTENT AREA ===== */
@@ -1495,7 +1499,8 @@ html.is-booting #toast-container {
     cursor: pointer;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s ease, background 0.15s ease;
+    transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease;
+    will-change: transform;
 }
 
 .tv-player-tile:not(.is-primary):hover .tv-player-tile__dismiss,
@@ -1506,6 +1511,7 @@ html.is-booting #toast-container {
 
 .tv-player-tile__dismiss:hover {
     background: rgba(160, 40, 40, 0.9);
+    transform: scale(1.05);
 }
 
 .tv-player-tile__audio {
@@ -1634,13 +1640,15 @@ html.is-booting #toast-container {
     color: var(--tv-main-1);
     border-radius: 50%;
     font-size: 1rem;
-    transition: var(--tv-transition);
+    transition: var(--tv-transition), transform 0.15s ease;
     cursor: pointer;
+    will-change: transform;
 }
 
 .tv-controls__btn:hover {
     background: color-mix(in srgb, var(--tv-main-1) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1) 40%, transparent);
+    transform: scale(1.05);
 }
 
 .tv-controls__btn--main-1 {
@@ -1653,6 +1661,7 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-main-1) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1) 40%, transparent);
     color: var(--tv-main-1);
+    transform: scale(1.05);
 }
 
 .tv-controls__btn--main-1.is-active,
@@ -1667,6 +1676,7 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-main-1-flip) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1-flip) 40%, transparent);
     color: var(--tv-main-1-flip);
+    transform: scale(1.05);
 }
 
 .tv-controls__btn--main-2 {
@@ -1679,6 +1689,7 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-main-2) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-2) 40%, transparent);
     color: var(--tv-main-2);
+    transform: scale(1.05);
 }
 
 .tv-controls__btn--main-2.is-active,
@@ -1693,6 +1704,7 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-main-2-flip) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-2-flip) 40%, transparent);
     color: var(--tv-main-2-flip);
+    transform: scale(1.05);
 }
 
 .tv-controls__btn--main-3 {
@@ -1705,6 +1717,7 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-main-3) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-3) 40%, transparent);
     color: var(--tv-main-3);
+    transform: scale(1.05);
 }
 
 .tv-controls__btn--main-3.is-active,
@@ -1719,6 +1732,7 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-main-3-flip) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-3-flip) 40%, transparent);
     color: var(--tv-main-3-flip);
+    transform: scale(1.05);
 }
 
 /* Compact volume section */
@@ -1786,11 +1800,6 @@ html.is-booting #toast-container {
     text-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-3-flip) 60%, transparent);
 }
 
-.tv-controls__quality-select {
-    padding: 0.35rem 0.5rem;
-    font-size: 0.75rem;
-}
-
 .tv-controls__actions {
     display: flex;
     gap: var(--tv-spacing-sm);
@@ -1829,6 +1838,9 @@ html.is-booting #toast-container {
 .settings-section__title .ui-icon {
     flex-shrink: 0;
     color: currentColor;
+    width: 16px;
+    height: 16px;
+    shape-rendering: geometricPrecision;
 }
 
 .settings-section__item {
@@ -2234,11 +2246,6 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
 
     .tv-controls__volume {
         display: none;
-    }
-
-    .tv-controls__quality-select {
-        font-size: 0.65rem;
-        padding: 0.25rem 0.35rem;
     }
 
     .tv-controls__info {
