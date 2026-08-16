@@ -152,7 +152,10 @@ export const BrowseView = {
         if (backBtn) {
             backBtn.classList.remove('is-hidden');
             backBtn.classList.add('is-active', 'is-pink-active');
-            els('.tv-tab[data-tab="browse"]').forEach(tab => tab.classList.remove('is-active', 'is-pink-active'));
+            els('.tv-tab[data-tab="browse"]').forEach(tab => {
+                tab.classList.add('is-active');
+                tab.classList.remove('is-pink-active');
+            });
         }
         if (channels) channels.innerHTML = '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
         deps.updateRefreshAge();

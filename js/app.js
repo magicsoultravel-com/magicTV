@@ -903,7 +903,6 @@ function switchTab(tabName) {
         if (appState.browseCountry !== null && tabName === 'browse') {
             backBtn.classList.remove('is-hidden');
             backBtn.classList.add('is-active', 'is-pink-active');
-            els('.tv-tab[data-tab="browse"]').forEach(tab => tab.classList.remove('is-active', 'is-pink-active'));
         } else {
             backBtn.classList.add('is-hidden');
             backBtn.classList.remove('is-active', 'is-pink-active');
