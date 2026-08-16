@@ -77,10 +77,13 @@ function stampRefreshView(key, ts = Date.now()) {
 }
 
 function updateRefreshAge() {
-    const label = el('refresh-age');
-    if (!label) return;
+    const btn = el('refresh-btn');
+    if (!btn) return;
     const ts = appState.lastRefreshedByView[currentRefreshKey()] || 0;
-    label.textContent = formatRelativeTime(ts);
+    const age = formatRelativeTime(ts);
+    const label = age ? `Refresh this tab · ${age}` : 'Refresh this tab · Never refreshed';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
 }
 
 function activeChannelGrid() {
@@ -182,6 +185,12 @@ function bindTabBarPopups() {
         if (sortSelect) sortSelect.classList.remove('is-visible');
     };
 
+    const togglePopup = (target) => {
+        const wasOpen = target?.classList.contains('is-visible');
+        closePopups();
+        if (!wasOpen) target?.classList.add('is-visible');
+    };
+
     // Click outside closes all popups
     document.addEventListener('click', (e) => {
         if (e.target.closest('.tv-tab')) return;
@@ -194,24 +203,22 @@ function bindTabBarPopups() {
     if (filterBtn) {
         filterBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            closePopups();
-            filterInput?.classList.toggle('is-visible');
+            togglePopup(filterInput);
+            if (filterInput?.classList.contains('is-visible')) filterInput.focus();
         });
     }
 
     if (categoryBtn) {
         categoryBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            closePopups();
-            categorySelect?.classList.toggle('is-visible');
+            togglePopup(categorySelect);
         });
     }
 
     if (sortBtn) {
         sortBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            closePopups();
-            sortSelect?.classList.toggle('is-visible');
+            togglePopup(sortSelect);
         });
     }
 }
@@ -223,10 +230,6 @@ function bindTabs() {
             // Controls styled with `.tv-tab` that are not actual tabs (e.g. the
             // ASC/DESC arrow) have no data-tab. Do not treat them as a tab switch.
             if (!tabName) return;
-            if (tabName === 'refresh') {
-                handleManualRefresh();
-                return;
-            }
             if (tabName === 'back-to-countries') {
                 BrowseView.showCountriesView();
                 return;
@@ -589,6 +592,17 @@ function bindCatalogLayout() {
         SettingsStore.setCatalogLayout(next);
         Appearance.applyStyles();
         syncCatalogLayoutBtn();
+    });
+}
+
+function bindRefreshBtn() {
+    const btn = el('refresh-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.innerHTML = ACTION_ICONS.refresh;
+    updateRefreshAge();
+    btn.addEventListener('click', () => {
+        handleManualRefresh();
     });
 }
 
@@ -969,6 +983,7 @@ async function init() {
         bindCatalogToggle();
         bindPlayFavoritesMosaic();
         bindCatalogLayout();
+        bindRefreshBtn();
         syncPlayFavoritesMosaicBtn();
         syncCatalogLayoutBtn();
         bindContentSplitter();

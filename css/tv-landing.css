@@ -260,24 +260,27 @@ html.is-booting #toast-container {
 .tv-tabs {
     position: relative;
     display: flex;
+    align-items: center;
     gap: var(--tv-spacing-sm);
     padding: var(--tv-spacing-sm) var(--tv-spacing-lg);
     padding-bottom: max(var(--tv-spacing-sm), env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+    flex-shrink: 0;
     background: rgba(0, 0, 0, 0.4);
     border-top: 1px solid var(--tv-border);
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-shrink: 0;
-    scroll-behavior: smooth;
 }
 
-.tv-tabs::-webkit-scrollbar {
-    height: 4px;
+.tv-tab-popup {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
 }
 
 .tv-tab {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
     padding: 0.5rem 1.25rem;
     border: 2px solid transparent;
@@ -337,20 +340,6 @@ html.is-booting #toast-container {
     background: color-mix(in srgb, var(--tv-secondary) 10%, transparent);
 }
 
-/* Manual refresh arrow — sits at the end of the bottom tab bar and pulls
-   fresh catalog data for whichever tab is currently active. */
-.tv-tab--refresh {
-    color: var(--tv-accent);
-    font-size: 1.1rem;
-    line-height: 1;
-}
-
-.tv-tab--refresh.is-loading {
-    animation: spin 0.8s linear infinite;
-    pointer-events: none;
-    opacity: 0.7;
-}
-
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
@@ -367,8 +356,16 @@ html.is-booting #toast-container {
         display: none;
     }
     .tv-tab {
-        padding: 0.5rem;
-        min-width: 44px; /* Minimum touch target size */
+        justify-content: center;
+        align-items: center;
+        padding: 0.35rem;
+        min-width: 36px;
+        width: 36px;
+        box-sizing: border-box;
+    }
+    .tv-tab .ui-icon {
+        width: 12px;
+        height: 12px;
     }
 }
 
@@ -377,8 +374,16 @@ body.has-channel-picker .tv-tab-text {
     display: none;
 }
 body.has-channel-picker .tv-tab {
-    padding: 0.5rem;
-    min-width: 44px;
+    justify-content: center;
+    align-items: center;
+    padding: 0.35rem;
+    min-width: 36px;
+    width: 36px;
+    box-sizing: border-box;
+}
+body.has-channel-picker .tv-tab .ui-icon {
+    width: 12px;
+    height: 12px;
 }
 
 /* ===== CONTENT AREA ===== */
@@ -490,9 +495,56 @@ body.has-channel-picker .tv-tab {
     background: transparent;
 }
 
+.tv-catalog__action.is-loading {
+    animation: spin 0.8s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
 .tv-catalog.is-animating .tv-catalog__toggle,
 .tv-catalog.is-animating .tv-catalog__action {
     pointer-events: auto;
+}
+
+/* Catalog chrome: reveal toggle / layout / refresh on browser hover (pointer devices). */
+@media (hover: hover) {
+    .tv-catalog:not(.is-collapsed) .tv-catalog__toggle,
+    .tv-catalog:not(.is-collapsed) #catalog-layout-btn,
+    .tv-catalog:not(.is-collapsed) #refresh-btn {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease, color var(--tv-transition);
+    }
+
+    .tv-catalog:not(.is-collapsed):hover .tv-catalog__toggle,
+    .tv-catalog:not(.is-collapsed):focus-within .tv-catalog__toggle,
+    .tv-catalog:not(.is-collapsed):hover #catalog-layout-btn,
+    .tv-catalog:not(.is-collapsed):focus-within #catalog-layout-btn,
+    .tv-catalog:not(.is-collapsed):hover #refresh-btn,
+    .tv-catalog:not(.is-collapsed):focus-within #refresh-btn {
+        opacity: 0.4;
+        pointer-events: auto;
+    }
+
+    .tv-catalog:not(.is-collapsed) .tv-catalog__toggle:hover,
+    .tv-catalog:not(.is-collapsed) .tv-catalog__toggle:focus-visible,
+    .tv-catalog:not(.is-collapsed) #catalog-layout-btn:hover,
+    .tv-catalog:not(.is-collapsed) #catalog-layout-btn:focus-visible,
+    .tv-catalog:not(.is-collapsed) #refresh-btn:hover,
+    .tv-catalog:not(.is-collapsed) #refresh-btn:focus-visible {
+        opacity: 1;
+        color: var(--tv-primary);
+    }
+}
+
+/* Teleported chrome in the channel picker stays always visible. */
+.channel-picker-modal__host > .tv-catalog__actions--end .tv-catalog__action {
+    opacity: 0.55;
+    pointer-events: auto;
+}
+.channel-picker-modal__host > .tv-catalog__actions--end .tv-catalog__action:hover,
+.channel-picker-modal__host > .tv-catalog__actions--end .tv-catalog__action:focus-visible {
+    opacity: 1;
 }
 
 .tv-catalog__clip {
@@ -648,26 +700,16 @@ body.has-channel-picker .tv-tab {
 }
 
 .tv-tab--sort-dir {
-    flex: 0 0 auto;
-    justify-content: center;
-    align-items: center;
-    width: 2.25rem;
-    min-width: 2.25rem;
-    padding: 0.5rem 0;
     line-height: 1;
 }
 
 .tv-tab--sort.is-hidden,
 .tv-tab--sort-dir.is-hidden,
-.tv-tab--category.is-hidden {
+.tv-tab--sort-btn.is-hidden,
+.tv-tab--category.is-hidden,
+.tv-tab--category-btn.is-hidden,
+.tv-tab-popup.is-hidden {
     display: none;
-}
-
-/* Relative "last refreshed" label beside the arrow (e.g. "3h ago"). */
-.tv-refresh-age {
-    font-size: 0.7rem;
-    color: var(--tv-text-muted);
-    white-space: nowrap;
 }
 
 /* ===== CHANNEL GRID ===== */
@@ -2368,13 +2410,16 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
         gap: var(--tv-spacing-xs);
     }
 
+    .tv-content {
+        padding: var(--tv-spacing-md);
+    }
+}
+
+/* Tablet-only tab label sizing — do not override icon-only narrow mode below 560px. */
+@media (max-width: 768px) and (min-width: 561px) {
     .tv-tab {
         padding: 0.5rem 1rem;
         font-size: 0.7rem;
-    }
-
-    .tv-content {
-        padding: var(--tv-spacing-md);
     }
 }
 
@@ -2671,7 +2716,7 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
     position: absolute;
     width: 14px;
     height: 14px;
-    z-index: 2;
+    z-index: 10;
     touch-action: none;
 }
 
@@ -2724,17 +2769,20 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
 
 /* ===== TAB BAR POPUP CONTROLS =====
    Filter input, category select, and sort select appear as popups
-   below their toggle buttons when activated. */
+   above their toggle buttons when activated. */
 .tv-tab--filter-input {
     position: absolute;
-    top: calc(100% + 4px);
+    bottom: calc(100% + 4px);
+    top: auto;
     right: 0;
+    left: auto;
     min-width: 180px;
+    margin: 0;
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
     transition: opacity 0.2s ease, transform 0.2s ease;
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(10px);
     pointer-events: none;
     background: var(--tv-bg-secondary);
     border: 1px solid var(--tv-border);
@@ -2750,14 +2798,17 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
 
 .tv-tab--category {
     position: absolute;
-    top: calc(100% + 4px);
-    right: 90px;
+    bottom: calc(100% + 4px);
+    top: auto;
+    right: 0;
+    left: auto;
     min-width: 160px;
+    margin: 0;
     padding: 0.25rem;
     font-size: 0.875rem;
     transition: opacity 0.2s ease, transform 0.2s ease;
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(10px);
     pointer-events: none;
     background: var(--tv-bg-secondary);
     border: 1px solid var(--tv-border);
@@ -2773,14 +2824,17 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
 
 .tv-tab--sort {
     position: absolute;
-    top: calc(100% + 4px);
-    right: 180px;
+    bottom: calc(100% + 4px);
+    top: auto;
+    right: 0;
+    left: auto;
     min-width: 140px;
+    margin: 0;
     padding: 0.25rem;
     font-size: 0.875rem;
     transition: opacity 0.2s ease, transform 0.2s ease;
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(10px);
     pointer-events: none;
     background: var(--tv-bg-secondary);
     border: 1px solid var(--tv-border);

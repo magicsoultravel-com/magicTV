@@ -10,7 +10,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 const KNOWN_IDS = [
-    'tv-settings-btn', 'back-btn', 'search-countries', 'refresh-btn', 'refresh-age',
+    'tv-settings-btn', 'back-btn', 'search-countries', 'refresh-btn',
     'player-slot', 'player-mosaic', 'content-splitter',
     'player-tile-topLeft', 'player-tile-center', 'player-tile-topRight',
     'player-tile-bottomLeft', 'player-tile-bottomRight',
@@ -37,7 +37,10 @@ function makeEl(id = '') {
     const el = {
         id,
         dataset: {},
-        style: {},
+        style: {
+            setProperty() {},
+            removeProperty() {}
+        },
         children: [],
         parentElement: null,
         _innerHTML: '',
@@ -98,6 +101,7 @@ before(async () => {
         readyState: 'complete', // triggers init() synchronously at import
         body: makeEl('body'),
         head: makeEl('head'),
+        documentElement: makeEl('html'),
         createElement: (tag) => makeEl(tag),
         getElementById: (id) => els.get(id) || null,
         querySelectorAll: () => [],

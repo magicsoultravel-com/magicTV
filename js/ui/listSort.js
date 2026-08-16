@@ -239,18 +239,25 @@ export const ListSort = {
     syncSortControls() {
         const select = el('sort-select');
         const dirBtn = el('sort-dir-btn');
+        const sortBtn = el('sort-btn');
+        const sortPopup = sortBtn?.closest('.tv-tab-popup') || select?.closest('.tv-tab-popup');
         const { context, sortBy, sortDir } = getSortPrefs();
         if (!select || !dirBtn) return;
 
         if (!context) {
             select.classList.add('is-hidden');
+            select.classList.remove('is-visible');
             dirBtn.classList.add('is-hidden');
+            if (sortBtn) sortBtn.classList.add('is-hidden');
+            if (sortPopup) sortPopup.classList.add('is-hidden');
             this.syncCategoryFilterControls();
             return;
         }
 
         select.classList.remove('is-hidden');
         dirBtn.classList.remove('is-hidden');
+        if (sortBtn) sortBtn.classList.remove('is-hidden');
+        if (sortPopup) sortPopup.classList.remove('is-hidden');
 
         const options = SORT_OPTIONS[context] || [];
         const html = options.map((o) =>
@@ -270,14 +277,21 @@ export const ListSort = {
 
     syncCategoryFilterControls() {
         const catSelect = el('category-filter');
+        const catBtn = el('category-btn');
+        const catPopup = catBtn?.closest('.tv-tab-popup') || catSelect?.closest('.tv-tab-popup');
         if (!catSelect) return;
         const ctx = currentSortContext();
         if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx)) {
             catSelect.classList.add('is-hidden');
+            catSelect.classList.remove('is-visible');
+            if (catBtn) catBtn.classList.add('is-hidden');
+            if (catPopup) catPopup.classList.add('is-hidden');
             return;
         }
 
         catSelect.classList.remove('is-hidden');
+        if (catBtn) catBtn.classList.remove('is-hidden');
+        if (catPopup) catPopup.classList.remove('is-hidden');
         const html = buildCategoryOptionsHtml();
         if (catSelect.innerHTML !== html) catSelect.innerHTML = html;
 
