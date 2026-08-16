@@ -28,7 +28,7 @@
     vector-effect: non-scaling-stroke;
 }
 
-/* First-paint boot cover: hide shell until theme is applied, then grain-reveal. */
+/* First-paint boot cover: hide shell until theme is applied, then reveal. */
 html.is-booting #app-container {
     visibility: hidden;
     pointer-events: none;
@@ -54,10 +54,52 @@ html.is-booting #app-container {
     inset: 0;
     width: 100%;
     height: 100%;
-    display: block;
+    display: none;
     opacity: 0.7;
     mix-blend-mode: screen;
     image-rendering: pixelated;
+}
+
+.boot-screen__bars {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: #5a5a5a;
+}
+
+.boot-screen__test-card {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Mode: grain (default) */
+.boot-screen[data-boot-style="grain"] .boot-screen__bars {
+    display: none;
+}
+
+.boot-screen[data-boot-style="grain"] .boot-screen__veil,
+.boot-screen[data-boot-style="grain"] .boot-screen__canvas {
+    display: block;
+}
+
+/* Mode: Philips-style test card (GFX only, no beep) */
+.boot-screen[data-boot-style="colorbars"] {
+    background: #5a5a5a;
+}
+
+.boot-screen[data-boot-style="colorbars"] .boot-screen__veil,
+.boot-screen[data-boot-style="colorbars"] .boot-screen__canvas {
+    display: none;
+}
+
+.boot-screen[data-boot-style="colorbars"] .boot-screen__bars {
+    display: block;
 }
 
 html.is-booting .app-toast-host,
@@ -216,6 +258,7 @@ html.is-booting #toast-container {
 
 /* ===== TABS (bottom) ===== */
 .tv-tabs {
+    position: relative;
     display: flex;
     gap: var(--tv-spacing-sm);
     padding: var(--tv-spacing-sm) var(--tv-spacing-lg);
@@ -2677,4 +2720,76 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
 .tv-content:has(.tv-catalog.is-catalog-teleported) #player-slot {
     flex: 1 1 0;
     min-height: 0;
+}
+
+/* ===== TAB BAR POPUP CONTROLS =====
+   Filter input, category select, and sort select appear as popups
+   below their toggle buttons when activated. */
+.tv-tab--filter-input {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 180px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+    z-index: 100;
+}
+.tv-tab--filter-input.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.tv-tab--category {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 90px;
+    min-width: 160px;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+    z-index: 100;
+}
+.tv-tab--category.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.tv-tab--sort {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 180px;
+    min-width: 140px;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+    z-index: 100;
+}
+.tv-tab--sort.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }

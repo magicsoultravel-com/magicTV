@@ -22,10 +22,9 @@ import {
     VIEW_MOTION,
     fillViewTransitionSelect,
     resolveViewTransition,
-    runWipeTransition,
-    primeBootGrain,
-    revealBootWithGrain
+    runWipeTransition
 } from './ui/viewTransitions.js';
+import { primeBootScreen, revealBootScreen } from './ui/bootScreen.js';
 
 const DEFAULT_FIRST_CHANNEL_URL = 'https://channels.trace.plus/Traceprod/CARIBBEAN_hd/index.m3u8';
 const DEFAULT_FIRST_CHANNEL_NAME = 'CARIBBEAN';
@@ -166,6 +165,54 @@ function bindBackButton() {
     const back = el('back-btn');
     if (back) {
         back.addEventListener('click', () => BrowseView.showCountriesView());
+    }
+}
+
+function bindTabBarPopups() {
+    const filterBtn = el('filter-btn');
+    const filterInput = el('search-countries');
+    const categoryBtn = el('category-btn');
+    const categorySelect = el('category-filter');
+    const sortBtn = el('sort-btn');
+    const sortSelect = el('sort-select');
+
+    const closePopups = () => {
+        if (filterInput) filterInput.classList.remove('is-visible');
+        if (categorySelect) categorySelect.classList.remove('is-visible');
+        if (sortSelect) sortSelect.classList.remove('is-visible');
+    };
+
+    // Click outside closes all popups
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.tv-tab')) return;
+        if (e.target.closest('.tv-tab--filter-input')) return;
+        if (e.target.closest('.tv-tab--category')) return;
+        if (e.target.closest('.tv-tab--sort')) return;
+        closePopups();
+    });
+
+    if (filterBtn) {
+        filterBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closePopups();
+            filterInput?.classList.toggle('is-visible');
+        });
+    }
+
+    if (categoryBtn) {
+        categoryBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closePopups();
+            categorySelect?.classList.toggle('is-visible');
+        });
+    }
+
+    if (sortBtn) {
+        sortBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closePopups();
+            sortSelect?.classList.toggle('is-visible');
+        });
     }
 }
 
@@ -875,7 +922,7 @@ async function init() {
         if (revealed) return;
         revealed = true;
         try {
-            await revealBootWithGrain();
+            await revealBootScreen();
         } catch {
             document.documentElement.classList.remove('is-booting');
             el('boot-screen')?.remove();
@@ -884,7 +931,7 @@ async function init() {
 
     try {
         showAppToast('Loading theme…');
-        primeBootGrain();
+        primeBootScreen();
         Appearance.applyStyles();
 
         showAppToast('Preparing screens…');
@@ -933,23 +980,19 @@ async function init() {
         ListSort.bind();
         ListSort.syncSortControls();
         bindBackButton();
+        bindTabBarPopups();
 
         PlayerChrome.syncSettingsFromState();
-
-        showAppToast('Ready');
-        await reveal();
 
         window.addEventListener('tv:state_changed', (e) => PlayerChrome.onPlayerStateChanged(e));
 
         await restoreLastChannelMeta();
 
-        // Mosaic stubs already painted in MultiView.init; attach streams in parallel with catalog.
+        // Mosaic stubs already painted in MultiView.init; attach streams under cover.
+        // Catalog/countries can be slow on cold cache — kick off but do not gate reveal.
+        showAppToast('Restoring screens…');
         const restorePromise = MultiView.restoreSlots().catch(() => false);
-
-        await BrowseView.refreshCountries();
-        updateRefreshAge();
-        const refreshAgeTimer = setInterval(updateRefreshAge, 60 * 1000);
-        if (refreshAgeTimer?.unref) refreshAgeTimer.unref();
+        const countriesPromise = BrowseView.refreshCountries().catch(() => {});
 
         const restored = await restorePromise;
         if (restored) {
@@ -974,7 +1017,16 @@ async function init() {
             TvPlayer.resumeIfWasPlaying().catch(() => {});
         }
 
+        // Docked → modal teleport finishes under the boot cover.
         ChannelPickerModal.restoreOpenIfNeeded();
+
+        showAppToast('Ready');
+        await reveal();
+
+        await countriesPromise;
+        updateRefreshAge();
+        const refreshAgeTimer = setInterval(updateRefreshAge, 60 * 1000);
+        if (refreshAgeTimer?.unref) refreshAgeTimer.unref();
     } finally {
         await reveal();
     }
