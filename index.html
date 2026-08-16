@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/brand/icon-tv.svg">
     <link rel="stylesheet" href="./css/base.tv.css">
     <link rel="stylesheet" href="./css/tv-landing.css">
+    <link rel="stylesheet" href="./css/tv-clock.css">
 </head>
 <body>
     <div id="app-container">
@@ -22,6 +23,31 @@
                 <span id="header-now-playing" class="tv-header-now-playing">now playing</span>
                 <span id="header-channel-name" class="tv-header-channel-name"></span>
                 <span id="header-channel-flag" class="tv-header-channel-flag"></span>
+            </div>
+            <div id="tv-clock-zone" class="tv-clock-zone" data-clock-style="digital">
+                <div class="tv-clock-display">
+                    <span id="tv-clock-date" class="clock-chip clock-chip--date">—</span>
+                    <span id="tv-clock-time" class="clock-chip clock-chip--time">—</span>
+                    <div id="tv-clock-analog" class="clock-analog">
+                        <div class="clock-departure">
+                            <div class="clock-departure-face"></div>
+                            <span id="tv-clock-analog-date" class="clock-departure-date"></span>
+                        </div>
+                    </div>
+                    <div id="tv-clock-segment" class="clock-segment">
+                        <div class="clock-segment-board">
+                            <div id="tv-clock-segment-time" class="clock-segment-time" role="timer" aria-live="off"></div>
+                        </div>
+                    </div>
+                    <div id="tv-clock-mantel" class="clock-mantel">
+                        <div class="clock-mantel-frame">
+                            <div class="clock-mantel-face">
+                                <span id="tv-clock-mantel-date" class="clock-mantel-date"></span>
+                                <span id="tv-clock-mantel-time" class="clock-mantel-time"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -316,6 +342,14 @@
 
                     <div id="settings-panel" class="tv-panel">
                         <div class="settings-panel">
+                            <div class="settings-section">
+                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 3.6v2.4l1.8 1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Clock</h3>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="tv-clock-style-select">Clock Style</label>
+                                    <select id="tv-clock-style-select" aria-label="Clock style"></select>
+                                </div>
+                            </div>
+
                             <div class="settings-section">
                                 <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 2.6v6.8L9.4 6 4.2 2.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg> Playback</h3>
                                 <div class="settings-section__item">

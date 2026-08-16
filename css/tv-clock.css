@@ -1,0 +1,215 @@
+/* ==========================================================================
+   TV Header Clock Styles (reused from magiclists clockStyle / board.css)
+   ========================================================================== */
+
+.tv-clock-zone {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.tv-clock-zone[data-clock-hidden="1"] {
+    display: none !important;
+}
+
+.tv-clock-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--tv-text-primary, #fff);
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.clock-chip {
+    display: inline-flex;
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.clock-chip--date {
+    text-transform: uppercase;
+    opacity: 0.8;
+    font-size: 0.85rem;
+}
+
+.clock-chip--time {
+    font-weight: 600;
+}
+
+/* Analog clock style */
+.tv-clock-zone:not([data-clock-style="analog"]) .clock-analog {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="analog"] .clock-chip {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="analog"] .clock-analog {
+    display: inline-flex;
+}
+
+.clock-analog {
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.clock-departure {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.32rem 0.55rem;
+    border-radius: 8px;
+    border: 1px solid var(--tv-border, rgba(255, 255, 255, 0.15));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--tv-surface) 90%, #000) 0%, var(--tv-surface) 100%);
+}
+
+.clock-departure-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    color: var(--tv-primary, #38bdf8);
+}
+
+.clock-analog-face {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.clock-departure-date {
+    margin: 0;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--tv-border, rgba(255, 255, 255, 0.15));
+    text-align: left;
+    font-family: ui-serif, Georgia, 'Times New Roman', serif;
+    font-size: 0.56rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tv-text-secondary, #94a3b8);
+    white-space: nowrap;
+}
+
+/* 7-Segment clock style */
+.tv-clock-zone:not([data-clock-style="segment"]) .clock-segment {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="segment"] .clock-chip {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="segment"] .clock-segment {
+    display: inline-flex;
+}
+
+.clock-segment {
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.clock-segment-board {
+    padding: 0.32rem 0.42rem;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #1a0a0a 0%, #0d0505 100%);
+    border: 1px solid rgba(120, 30, 30, 0.45);
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.65);
+}
+
+.clock-segment-time {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+}
+
+.seg-digit,
+.seg-colon {
+    height: 22px;
+    width: auto;
+    flex-shrink: 0;
+}
+
+.seg--ghost {
+    fill: rgba(200, 40, 40, 0.13);
+}
+
+.seg--on {
+    fill: #ff2e2e;
+    filter: drop-shadow(0 0 2px rgba(255, 50, 50, 0.9));
+}
+
+/* Mantel clock style */
+.tv-clock-zone:not([data-clock-style="mantel"]) .clock-mantel {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="mantel"] .clock-chip {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="mantel"] .clock-mantel {
+    display: inline-flex;
+}
+
+.clock-mantel {
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.clock-mantel-frame {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #2c221e 0%, #1a1412 100%);
+    border: 1px solid rgba(212, 168, 83, 0.35);
+}
+
+.clock-mantel-face {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.clock-mantel-date {
+    font-family: serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: #e8c47c;
+    text-transform: uppercase;
+}
+
+.clock-mantel-time {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #f7eedf;
+}
+
+/* Style variations visibility overrides */
+.tv-clock-zone[data-clock-style="compact"] .clock-chip--date {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="military"] .clock-chip--date,
+.tv-clock-zone[data-clock-style="digital-seconds"] .clock-chip--date {
+    display: none;
+}
+
+.tv-clock-zone[data-clock-style="retro"] .clock-chip--time {
+    color: var(--tv-primary, #38bdf8);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--tv-primary) 60%, transparent);
+}

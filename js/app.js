@@ -12,6 +12,8 @@ import { BrowseView } from './browse/browseView.js';
 import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
 import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
+import { TvClock } from './ui/tvClock.js';
+
 import { ACTION_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
 import { loadPlayerState, DEFAULT_SORT_BY, DEFAULT_SORT_DIR, DEFAULT_CATEGORY_FILTER } from './storage/playerState.js';
@@ -863,6 +865,8 @@ async function init() {
     bindPlayFavoritesMosaic();
     syncPlayFavoritesMosaicBtn();
     bindContentSplitter();
+    TvClock.init();
+
     PlayerChrome.bindControls();
     PlayerChrome.bindSettings();
     BrowseView.bind();
