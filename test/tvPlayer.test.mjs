@@ -250,6 +250,37 @@ test('tileWidth persists in localStorage', () => {
     assert.equal(raw.tileWidth, 150);
 });
 
+test('listWidth defaults to 300 and can be set and retrieved', () => {
+    assert.equal(SettingsStore.getListWidth(), 300, 'defaults to 300px');
+    SettingsStore.setListWidth(150);
+    assert.equal(SettingsStore.getListWidth(), 150);
+    SettingsStore.setListWidth(220);
+    assert.equal(SettingsStore.getListWidth(), 220);
+});
+
+test('listWidth clamps to range', () => {
+    SettingsStore.setListWidth(500);
+    assert.equal(SettingsStore.getListWidth(), 300, 'above max clamps to 300');
+    SettingsStore.setListWidth(40);
+    assert.equal(SettingsStore.getListWidth(), 100, 'below min clamps to 100');
+    SettingsStore.setListWidth('invalid');
+    assert.equal(SettingsStore.getListWidth(), 300, 'non-number falls back to default');
+});
+
+test('listWidth persists in localStorage', () => {
+    SettingsStore.setListWidth(200);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.listWidth, 200);
+});
+
+test('catalogLayout defaults to tiles and toggles', () => {
+    assert.equal(SettingsStore.getCatalogLayout(), 'tiles');
+    SettingsStore.setCatalogLayout('list');
+    assert.equal(SettingsStore.getCatalogLayout(), 'list');
+    SettingsStore.setCatalogLayout('bogus');
+    assert.equal(SettingsStore.getCatalogLayout(), 'tiles', 'invalid falls back to tiles');
+});
+
 test('textSizeOptions and tileWidthOptions return valid arrays', () => {
     const textOptions = SettingsStore.getTextSizeOptions();
     assert.ok(Array.isArray(textOptions));
@@ -260,6 +291,10 @@ test('textSizeOptions and tileWidthOptions return valid arrays', () => {
     const tileOptions = SettingsStore.getTileWidthOptions();
     assert.ok(Array.isArray(tileOptions));
     assert.ok(tileOptions.includes(180));
+
+    const listOptions = SettingsStore.getListWidthOptions();
+    assert.ok(Array.isArray(listOptions));
+    assert.ok(listOptions.includes(300));
 });
 test('screen toggles persist and retrieve correctly', () => {
     assert.equal(SettingsStore.getScreenTopLeft(), false, 'defaults to false');

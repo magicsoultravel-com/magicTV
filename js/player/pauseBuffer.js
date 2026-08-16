@@ -137,3 +137,42 @@ export function shouldClearWantPlayingOnPlayFail() {
 export function shouldFallbackPlayChannelOnDoubleAbort() {
     return true;
 }
+
+/**
+ * After attachStream, playChannel may call video.play() only while the same
+ * load + transport intent is still active (pause mid-load must not restart play).
+ */
+export function shouldContinuePlayAfterAttach({
+    generation,
+    playGeneration,
+    wantPlaying,
+    transportGen,
+    transportAtStart
+}) {
+    return generation === playGeneration
+        && wantPlaying === true
+        && transportGen === transportAtStart;
+}
+
+/**
+ * Pause during an in-flight load must bump playGeneration so attach cancels.
+ */
+export function shouldBumpPlayGenerationOnPause({ loading, loadPhase }) {
+    return loading === true || (loadPhase != null && loadPhase !== 'idle');
+}
+
+/**
+ * Browser autoplay policy / gesture requirement.
+ */
+export function isAutoplayNotAllowedError(err) {
+    if (!err) return false;
+    if (err.name === 'NotAllowedError') return true;
+    return String(err.message || '').toLowerCase().includes('not allowed');
+}
+
+/**
+ * On NotAllowedError, mute once and retry play when still unmuted.
+ */
+export function shouldRetryPlayMuted({ blocked, muted }) {
+    return blocked === true && muted !== true;
+}

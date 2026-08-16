@@ -325,6 +325,11 @@
     gap: 0.35rem;
 }
 
+.tv-catalog__actions--end {
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
+}
+
 .tv-catalog__toggle,
 .tv-catalog__action {
     width: 28px;
@@ -508,9 +513,12 @@
 
 .tv-tab--sort-dir {
     flex: 0 0 auto;
+    justify-content: center;
+    align-items: center;
+    width: 2.25rem;
     min-width: 2.25rem;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    padding: 0.5rem 0;
+    line-height: 1;
 }
 
 .tv-tab--sort.is-hidden,
@@ -979,6 +987,13 @@
     cursor: grab;
     touch-action: none;
     box-sizing: border-box;
+    transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tv-player-tile:hover,
+.tv-player-tile:focus-within {
+    border-color: var(--tv-primary);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
 }
 
 .tv-player-tile.is-hidden {
@@ -1446,7 +1461,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.2rem;
     padding: 0.25rem 0.35rem;
     border-radius: 8px;
@@ -1555,18 +1570,14 @@
 }
 
 .tv-controls__btn--main-1.is-active,
-.tv-controls__btn--main-1.is-muted,
-#pause-btn.tv-controls__btn--main-1,
-.tv-controls__btn--main-1[data-tile-action="pause"] {
+.tv-controls__btn--main-1.is-muted {
     background: color-mix(in srgb, var(--tv-main-1-flip) 15%, transparent);
     border-color: var(--tv-main-1-flip);
     color: var(--tv-main-1-flip);
 }
 
 .tv-controls__btn--main-1.is-active:hover,
-.tv-controls__btn--main-1.is-muted:hover,
-#pause-btn.tv-controls__btn--main-1:hover,
-.tv-controls__btn--main-1[data-tile-action="pause"]:hover {
+.tv-controls__btn--main-1.is-muted:hover {
     background: color-mix(in srgb, var(--tv-main-1-flip) 30%, transparent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1-flip) 40%, transparent);
     color: var(--tv-main-1-flip);
@@ -1937,9 +1948,10 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Tile width CSS variable - controls channel tile width */
+/* Tile / list width CSS variables - controlled by appearance settings */
 :root {
     --tv-tile-width: 180px;
+    --tv-list-width: 300px;
 }
 
 /* Channel tile width - controlled by appearance setting */
@@ -1947,6 +1959,68 @@
     width: var(--tv-tile-width);
     min-width: var(--tv-tile-width);
     max-width: var(--tv-tile-width);
+}
+
+/* Channel / country grids in list layout — compact rows, multi-column fill.
+   Scoped on html so teleported modal catalog still matches. */
+html[data-channel-layout="list"] .channel-grid,
+html[data-channel-layout="list"] .country-grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--tv-list-width, 300px), 1fr));
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile,
+html[data-channel-layout="list"] .country-grid .country-tile {
+    width: var(--tv-list-width, 300px);
+    min-width: var(--tv-list-width, 300px);
+    max-width: var(--tv-list-width, 300px);
+    min-height: 32px;
+    gap: 0.35rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--tv-radius-sm);
+    contain-intrinsic-size: auto 34px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__icon,
+html[data-channel-layout="list"] .country-grid .country-tile__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.95rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__letter-avatar {
+    font-size: 0.7rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__name,
+html[data-channel-layout="list"] .country-grid .country-tile__name {
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__body,
+html[data-channel-layout="list"] .country-grid .country-tile__body {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__flag {
+    font-size: 0.7rem;
+}
+
+html[data-channel-layout="list"] .country-grid .country-tile__count {
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn {
+    width: 14px;
+    height: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
+    width: 14px;
+    height: 14px;
 }
 
 /* Channel tile body - with text clipping when narrow */
@@ -2207,4 +2281,210 @@
     .catalog-grain-overlay__canvas {
         opacity: 0.35;
     }
+}
+
+/* ===== Channel picker modal (teleported catalog) ===== */
+.channel-picker-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 8000;
+    display: block;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.channel-picker-modal.is-hidden,
+.channel-picker-modal[hidden] {
+    display: none !important;
+}
+
+.channel-picker-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--tv-bg, #0A0E27) 55%, transparent);
+    backdrop-filter: blur(4px);
+    pointer-events: auto;
+}
+
+.channel-picker-modal.is-pinned .channel-picker-modal__backdrop {
+    background: transparent;
+    backdrop-filter: none;
+    pointer-events: none;
+}
+
+.channel-picker-modal__dialog {
+    position: fixed;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(1100px, calc(100vw - 2rem));
+    height: min(70vh, 640px);
+    min-width: 360px;
+    min-height: 280px;
+    max-width: calc(100vw - 0.5rem);
+    max-height: calc(100vh - 0.5rem);
+    box-sizing: border-box;
+    background: var(--tv-bg-secondary, #141829);
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-radius: 10px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+.channel-picker-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--tv-border, #2A2E3A);
+    background: rgba(0, 0, 0, 0.25);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.channel-picker-modal__header.is-dragging {
+    cursor: grabbing;
+}
+
+.channel-picker-modal__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--tv-text-primary, #fff);
+    pointer-events: none;
+}
+
+.channel-picker-modal__header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.channel-picker-modal__pin,
+.channel-picker-modal__close {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--tv-text-secondary, #B3B3B3);
+    cursor: pointer;
+}
+
+.channel-picker-modal__pin:hover,
+.channel-picker-modal__pin:focus-visible,
+.channel-picker-modal__close:hover,
+.channel-picker-modal__close:focus-visible {
+    color: var(--tv-main-3, #FF00FF);
+    border-color: color-mix(in srgb, var(--tv-main-3, #FF00FF) 45%, transparent);
+    outline: none;
+}
+
+.channel-picker-modal__pin.is-active,
+.channel-picker-modal__pin[aria-pressed="true"] {
+    color: var(--tv-main-3, #FF00FF);
+    border-color: color-mix(in srgb, var(--tv-main-3, #FF00FF) 55%, transparent);
+    background: color-mix(in srgb, var(--tv-main-3, #FF00FF) 12%, transparent);
+}
+
+.channel-picker-modal__host {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Layout toggle teleported with the catalog body — float top-right over the host */
+.channel-picker-modal__host > .tv-catalog__actions--end {
+    position: absolute;
+    top: 0.2rem;
+    right: var(--tv-spacing-sm, 0.5rem);
+    left: auto;
+    z-index: 3;
+    pointer-events: auto;
+}
+
+.channel-picker-modal__host .tv-catalog__body {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+}
+
+.channel-picker-modal__host .tv-panel.is-active {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.channel-picker-modal__resize {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    z-index: 2;
+    touch-action: none;
+}
+
+.channel-picker-modal__resize[data-picker-resize="nw"] {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
+}
+
+.channel-picker-modal__resize[data-picker-resize="ne"] {
+    top: 0;
+    right: 0;
+    cursor: nesw-resize;
+}
+
+.channel-picker-modal__resize[data-picker-resize="sw"] {
+    bottom: 0;
+    left: 0;
+    cursor: nesw-resize;
+}
+
+.channel-picker-modal__resize[data-picker-resize="se"] {
+    bottom: 0;
+    right: 0;
+    cursor: nwse-resize;
+}
+
+/* Channel-focused: hide Settings while catalog lives in the modal */
+.channel-picker-modal .tv-tab[data-tab="settings"],
+body.has-channel-picker .tv-tab[data-tab="settings"] {
+    display: none !important;
+}
+
+/* Docked catalog shell while body is teleported */
+.tv-catalog.is-catalog-teleported {
+    flex: 0 0 0;
+    min-height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Left actions (collapse / mosaic) stay docked and hidden; end actions teleport into the modal */
+.tv-catalog.is-catalog-teleported > .tv-catalog__actions:not(.tv-catalog__actions--end),
+.tv-catalog.is-catalog-teleported .tv-catalog__clip {
+    display: none;
+}
+
+.tv-content:has(.tv-catalog.is-catalog-teleported) #content-splitter {
+    display: none;
+}
+
+.tv-content:has(.tv-catalog.is-catalog-teleported) #player-slot {
+    flex: 1 1 0;
+    min-height: 0;
 }

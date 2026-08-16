@@ -55,7 +55,7 @@ export const TvPlayer = {
     },
 
     mountVideo(_targetEl) {
-        MultiView.ensureMounted();
+        MultiView.mountAll();
     },
 
     emitState() {
@@ -98,19 +98,16 @@ export const TvPlayer = {
 
     mute() {
         MultiView.getPrimary()?.mute();
-        MultiView.refreshTiles();
         MultiView.persistSlots();
     },
 
     unmute() {
         MultiView.getPrimary()?.unmute();
-        MultiView.refreshTiles();
         MultiView.persistSlots();
     },
 
     toggleMute() {
         MultiView.getPrimary()?.toggleMute();
-        MultiView.refreshTiles();
         MultiView.persistSlots();
     },
 

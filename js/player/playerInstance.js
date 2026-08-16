@@ -25,7 +25,11 @@ import {
     shouldClearWasPlayingOnAutoplayBlock,
     shouldPauseOnToggle,
     shouldClearWantPlayingOnPlayFail,
-    shouldFallbackPlayChannelOnDoubleAbort
+    shouldFallbackPlayChannelOnDoubleAbort,
+    shouldContinuePlayAfterAttach,
+    shouldBumpPlayGenerationOnPause,
+    isAutoplayNotAllowedError,
+    shouldRetryPlayMuted
 } from './pauseBuffer.js';
 
 /**
@@ -102,7 +106,6 @@ export function createPlayerInstance(options) {
             this.video.className = 'tv-video';
             this.video.playsInline = true;
             this.video.setAttribute('playsinline', '');
-            this.video.autoplay = true;
             this.video.preload = 'auto';
             this.video.dataset.playerId = id;
             this.applyAudioToVideo();
@@ -153,7 +156,6 @@ export function createPlayerInstance(options) {
             this.video.addEventListener('progress', () => {
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
-                    this.emitState();
                 }
             });
             this.video.addEventListener('pause', () => {
@@ -334,6 +336,7 @@ export function createPlayerInstance(options) {
 
         updatePauseBuffer() {
             if (this.pausePhase === 'idle') return;
+            const prevPhase = this.pausePhase;
             const info = this.getBufferInfo();
             const target = this.bufferSize || DEFAULT_BUFFER_SIZE;
             if (info.buffered >= target * 0.9) {
@@ -342,7 +345,9 @@ export function createPlayerInstance(options) {
                 this.pausePhase = 'buffering';
                 if (this.hls) this.hls.startLoad();
             }
-            this.emitState();
+            if (this.pausePhase !== prevPhase) {
+                this.emitState();
+            }
         },
 
         /**
@@ -460,6 +465,25 @@ export function createPlayerInstance(options) {
                         });
                         return;
                     }
+                    if (
+                        shouldRetryPlayMuted({
+                            blocked: isAutoplayNotAllowedError(err),
+                            muted: this.muted
+                        })
+                    ) {
+                        this.muted = true;
+                        this.applyAudioToVideo();
+                        const mutedPlay = video.play();
+                        mutedPlay?.then(() => {
+                            if (gen !== this.transportGen || !this.wantPlaying) {
+                                try { video.pause(); } catch { /* ignore */ }
+                            }
+                        }).catch(() => {
+                            if (gen !== this.transportGen || !this.wantPlaying) return;
+                            this._failResume(gen);
+                        });
+                        return;
+                    }
                     this._failResume(gen);
                 });
             };
@@ -550,6 +574,13 @@ export function createPlayerInstance(options) {
         pause() {
             const gen = this.beginTransport(false);
             this.stopped = false;
+            // Cancel in-flight playChannel attach so pause mid-load cannot restart play.
+            if (shouldBumpPlayGenerationOnPause({
+                loading: this.loading,
+                loadPhase: this.loadPhase
+            })) {
+                this.playGeneration += 1;
+            }
 
             if (this.video?.videoWidth > 0) {
                 const poster = snapshotVideoPoster(this.video, { rejectBlack: false });
@@ -596,8 +627,7 @@ export function createPlayerInstance(options) {
             try {
                 await this.playChannel(this.channel);
             } catch (e) {
-                const blocked = e?.name === 'NotAllowedError'
-                    || String(e?.message || '').toLowerCase().includes('not allowed');
+                const blocked = isAutoplayNotAllowedError(e);
                 if (blocked) {
                     this.resumeBlocked = true;
                     // Autoplay block is not a user pause — keep wasPlaying.
@@ -638,7 +668,7 @@ export function createPlayerInstance(options) {
             this.resumeBlocked = false;
             this.stopped = false;
             this.pausePhase = 'idle';
-            this.beginTransport(true);
+            const transportAtStart = this.beginTransport(true);
             this.setPauseLiveSync(false);
             // Every intentional PLAY arms a fresh channel-tile snap (even same URL).
             TileFrames.armLiveSnap(channel.url_resolved || '');
@@ -659,20 +689,71 @@ export function createPlayerInstance(options) {
                 }
 
                 await this.attachStream(channel.url_resolved, generation);
-                if (generation !== this.playGeneration) return;
+                if (!shouldContinuePlayAfterAttach({
+                    generation,
+                    playGeneration: this.playGeneration,
+                    wantPlaying: this.wantPlaying,
+                    transportGen: this.transportGen,
+                    transportAtStart
+                })) {
+                    if (generation === this.playGeneration && !this.wantPlaying) {
+                        this.loading = false;
+                        this.loadPhase = 'idle';
+                    }
+                    return;
+                }
                 this.applyAudioToVideo();
-                await this.video.play();
-                if (generation !== this.playGeneration) return;
+                try {
+                    await this.video.play();
+                } catch (playErr) {
+                    if (!shouldContinuePlayAfterAttach({
+                        generation,
+                        playGeneration: this.playGeneration,
+                        wantPlaying: this.wantPlaying,
+                        transportGen: this.transportGen,
+                        transportAtStart
+                    })) {
+                        if (generation === this.playGeneration && !this.wantPlaying) {
+                            this.loading = false;
+                            this.loadPhase = 'idle';
+                        }
+                        return;
+                    }
+                    if (shouldRetryPlayMuted({
+                        blocked: isAutoplayNotAllowedError(playErr),
+                        muted: this.muted
+                    })) {
+                        this.muted = true;
+                        this.applyAudioToVideo();
+                        await this.video.play();
+                    } else {
+                        throw playErr;
+                    }
+                }
+                if (!shouldContinuePlayAfterAttach({
+                    generation,
+                    playGeneration: this.playGeneration,
+                    wantPlaying: this.wantPlaying,
+                    transportGen: this.transportGen,
+                    transportAtStart
+                })) {
+                    try { this.video?.pause(); } catch { /* ignore */ }
+                    if (generation === this.playGeneration && !this.wantPlaying) {
+                        this.loading = false;
+                        this.loadPhase = 'idle';
+                    }
+                    return;
+                }
             } catch (e) {
                 if (generation !== this.playGeneration) return;
+                if (!this.wantPlaying || this.transportGen !== transportAtStart) return;
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.playing = false;
                 if (shouldClearWantPlayingOnPlayFail()) {
                     this.wantPlaying = false;
                 }
-                const blocked = e?.name === 'NotAllowedError'
-                    || String(e?.message || '').toLowerCase().includes('not allowed');
+                const blocked = isAutoplayNotAllowedError(e);
                 if (blocked) {
                     this.error = null;
                     this.resumeBlocked = true;

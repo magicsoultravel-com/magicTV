@@ -8,33 +8,31 @@ import {
 } from './storage/playerState.js';
 import { SettingsStore } from './storage/settingsStore.js';
 import { FavoritesRecents } from './storage/favoritesRecents.js';
-import { channelKey, parseChannelKey } from './tvProviders/channelShape.js';
-import { TvProviderRegistry } from './tvProviders/registry.js';
+import { channelKey } from './tvProviders/channelShape.js';
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { showAppToast } from './ui/toast.js';
 import { TvPopoutWindows } from './tvPopoutWindows.js';
 import { el } from './tvUtils.js';
 import { TileFrames } from './tileFrames.js';
-import { PosterCache } from './storage/posterCache.js';
 import {
-    TILE_SWAP_DURATIONS,
     fillViewTransitionSelect,
-    resolveViewTransition,
-    runWipeTransition,
     VIEW_TRANSITION_LABELS
 } from './ui/viewTransitions.js';
-import { classifyTilePlayback, resolveRestorePlayMute } from './player/pauseBuffer.js';
+import { classifyTilePlayback } from './player/pauseBuffer.js';
+import {
+    CORNER_IDS,
+    SLOT_IDS,
+    MAX_MOSAIC_SLOTS,
+    PLAY_FILL_ORDER,
+    clearTilePlacementStyle,
+    slotIsOccupied
+} from './mosaic/constants.js';
+import { freeLayoutMethods } from './mosaic/freeLayout.js';
+import { swapMethods } from './mosaic/swap.js';
+import { persistMethods } from './mosaic/persist.js';
+import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
 
-const CORNER_IDS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
-const SLOT_IDS = ['topLeft', 'center', 'topRight', 'bottomLeft', 'bottomRight'];
-/** Fill order for batch play: primary first, then corners. Raise with mosaic capacity later. */
-export const MAX_MOSAIC_SLOTS = 5;
-const PLAY_FILL_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
-
-const DRAG_THRESHOLD_PX = 6;
-const RESIZE_MIN_W = 72;
-const RESIZE_MIN_H = 64;
-const RESIZE_EDGES = new Set(['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']);
+export { MAX_MOSAIC_SLOTS };
 
 const SCREEN_GETTERS = {
     topLeft: () => SettingsStore.getScreenTopLeft(),
@@ -57,43 +55,6 @@ const TOGGLE_IDS = {
     bottomRight: 'screen-bottom-right-toggle'
 };
 
-function prefersReducedMotion() {
-    return typeof window !== 'undefined'
-        && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-const SWAP_DURATIONS = TILE_SWAP_DURATIONS;
-
-function waitMs(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function clearSwapClasses(tile) {
-    if (!tile) return;
-    tile.classList.remove(
-        'tv-swap-out',
-        'tv-swap-in',
-        'tv-swap--smooth',
-        'tv-swap--slide',
-        'tv-swap--fade',
-        'tv-swap--spring',
-        'tv-swap--crossfade',
-        'tv-swap--flip',
-        'is-swapping'
-    );
-}
-
-function clearTilePlacementStyle(tile) {
-    if (!tile) return;
-    tile.style.left = '';
-    tile.style.top = '';
-    tile.style.width = '';
-    tile.style.height = '';
-    tile.style.zIndex = '';
-    tile.classList.remove('is-placed');
-}
-
 function savedVolume() {
     return loadPlayerState().volume || 0.85;
 }
@@ -107,6 +68,10 @@ function pipSupported() {
 }
 
 export const MultiView = {
+    ...persistMethods,
+    ...freeLayoutMethods,
+    ...swapMethods,
+
     initialized: false,
     sharedVolume: savedVolume(),
     lastVolume: savedVolume() || 0.85,
@@ -132,84 +97,26 @@ export const MultiView = {
     dragSession: null,
     _resizeBound: false,
     _hoverBound: false,
+    _refreshTilesRaf: 0,
 
     getPrimary() {
         return this.slots.center.player;
     },
 
     /**
-     * Apply saved mosaic assignments immediately (name + cached poster) before catalog/HLS.
+     * Coalesce mosaic chrome DOM sync to one walk per animation frame.
      */
-    applySavedSlotStubs() {
-        const state = loadPlayerState();
-        let mosaic = state.mosaicSlots && Object.keys(state.mosaicSlots).length
-            ? state.mosaicSlots
-            : null;
-        if (!mosaic && state.lastChannelKey) {
-            mosaic = {
-                center: {
-                    key: state.lastChannelKey,
-                    name: state.lastChannelName || '',
-                    muted: true,
-                    url: ''
-                }
-            };
-        }
-        this.rememberedSlotKeys = {};
-        if (!mosaic) {
+    scheduleRefreshTiles() {
+        if (this._refreshTilesRaf) return;
+        const run = () => {
+            this._refreshTilesRaf = 0;
             this.refreshTiles();
-            return;
+        };
+        if (typeof requestAnimationFrame === 'function') {
+            this._refreshTilesRaf = requestAnimationFrame(run);
+        } else {
+            this._refreshTilesRaf = setTimeout(run, 0);
         }
-
-        const keys = [];
-        SLOT_IDS.forEach((id) => {
-            const entry = mosaic[id];
-            if (!entry?.key) return;
-            this.rememberedSlotKeys[id] = entry.key;
-            keys.push(entry.key);
-
-            if (id !== 'center' && !this.slots[id]?.enabled) {
-                this.setSideEnabled(id, true, { silent: true });
-            }
-
-            const startMuted = entry.muted !== false;
-            const player = this.ensurePlayer(id, { startMuted });
-            if (!player) return;
-            player.muted = startMuted;
-            player.applyAudioToVideo();
-
-            if (!player.channel) {
-                const parsed = parseChannelKey(entry.key);
-                player.channel = {
-                    providerId: parsed?.providerId,
-                    channelId: parsed?.channelId,
-                    channeluuid: entry.key,
-                    name: entry.name || 'Last channel',
-                    url_resolved: entry.url || undefined
-                };
-            }
-        });
-
-        this.syncLayout();
-        this.mountAll();
-        this.refreshTiles();
-
-        if (!keys.length) return;
-        PosterCache.getPosters(keys).then((map) => {
-            let painted = false;
-            SLOT_IDS.forEach((id) => {
-                const key = this.rememberedSlotKeys[id];
-                const player = this.slots[id]?.player;
-                if (!key || !player) return;
-                const poster = map.get(key);
-                if (!poster) return;
-                if (!player.posterDataUrl) {
-                    player.posterDataUrl = poster;
-                    painted = true;
-                }
-            });
-            if (painted) this.refreshTiles();
-        }).catch(() => {});
     },
 
     /**
@@ -230,86 +137,6 @@ export const MultiView = {
 
     getLastVolume() {
         return this.lastVolume;
-    },
-
-    hasCustomPlacement() {
-        return SLOT_IDS.some((id) => Boolean(this.mosaicPlacement[id]));
-    },
-
-    /** Validate existing placement entries only (partial free-layout is OK). */
-    isPlacementSane() {
-        if (!this.hasCustomPlacement()) return true;
-        for (const id of SLOT_IDS) {
-            const p = this.mosaicPlacement[id];
-            if (!p) continue;
-            if (p.w < 0.05 || p.h < 0.08) return false;
-        }
-        return true;
-    },
-
-    /** Drop disabled corner entries; center stays when present. */
-    sanitizePlacementMap(raw = {}) {
-        const next = { ...raw };
-        CORNER_IDS.forEach((id) => {
-            if (!next[id]) return;
-            if (!this.slots[id]?.enabled) delete next[id];
-        });
-        if (next.center && !this.slots.center?.enabled) delete next.center;
-        return next;
-    },
-
-    /** Keep center strictly above every other placed tile (repairs saved state). */
-    ensureCenterOnTop() {
-        if (!this.hasCustomPlacement() || !this.mosaicPlacement.center) return;
-        let maxOther = 0;
-        for (const id of SLOT_IDS) {
-            if (id === 'center') continue;
-            const p = this.mosaicPlacement[id];
-            if (!p) continue;
-            maxOther = Math.max(maxOther, p.z || 1);
-        }
-        const centerZ = this.mosaicPlacement.center.z || 1;
-        if (centerZ <= maxOther) {
-            this.placementZTop = Math.max(this.placementZTop, maxOther + 1);
-            this.mosaicPlacement.center.z = this.placementZTop;
-        } else {
-            this.placementZTop = Math.max(this.placementZTop, centerZ);
-        }
-    },
-
-    /**
-     * Raise a tile in the free-layout stack.
-     * Center always gets the top z; a non-center slot becomes second-from-top.
-     */
-    raiseTileInStack(slotId) {
-        if (!this.hasCustomPlacement()) return;
-
-        this.placementZTop += 1;
-        const top = this.placementZTop;
-
-        if (this.mosaicPlacement.center) {
-            this.mosaicPlacement.center.z = top;
-            const centerTile = el('player-tile-center');
-            if (centerTile) centerTile.style.zIndex = String(top);
-        }
-
-        if (slotId && slotId !== 'center' && this.mosaicPlacement[slotId]) {
-            this.mosaicPlacement[slotId].z = top - 1;
-            const tile = el(`player-tile-${slotId}`);
-            if (tile) tile.style.zIndex = String(top - 1);
-        }
-    },
-
-    placementZForSlot(slotId) {
-        const p = this.mosaicPlacement[slotId];
-        if (p?.z != null) return p.z;
-        return slotId === 'center' ? this.placementZTop : Math.max(1, this.placementZTop - 1);
-    },
-
-    syncPlacementChrome() {
-        if (typeof document === 'undefined') return;
-        const app = el('app-container') || document.body;
-        app.classList.toggle('has-custom-mosaic-placement', this.hasCustomPlacement());
     },
 
     init() {
@@ -348,7 +175,7 @@ export const MultiView = {
         if (this.hasCustomPlacement()) {
             requestAnimationFrame(() => this.applyFreeLayout());
         }
-        window.addEventListener('tv:popout_changed', () => this.refreshTiles());
+        window.addEventListener('tv:popout_changed', () => this.scheduleRefreshTiles());
 
         // If app never calls restoreSlots (nothing saved), allow persist to clear empties.
         const savedSlots = loadPlayerState().mosaicSlots || {};
@@ -375,7 +202,7 @@ export const MultiView = {
             },
             shouldBroadcast: () => this.slots.center.player === player,
             onState: () => {
-                this.refreshTiles();
+                this.scheduleRefreshTiles();
                 this.noteSlotPlayingForTiles(player);
             },
             shouldRecordRecents: () => this.slots.center.player === player
@@ -391,12 +218,12 @@ export const MultiView = {
         this.pipWatchers.add(video);
         video.addEventListener('enterpictureinpicture', () => {
             window.dispatchEvent(new CustomEvent('tv:pip_changed'));
-            this.refreshTiles();
+            this.scheduleRefreshTiles();
         });
         video.addEventListener('leavepictureinpicture', () => {
             window.dispatchEvent(new CustomEvent('tv:pip_changed'));
             this.getPrimary()?.emitState();
-            this.refreshTiles();
+            this.scheduleRefreshTiles();
         });
     },
 
@@ -418,18 +245,21 @@ export const MultiView = {
                 if (slotId && action) this.handleTileAction(slotId, action);
                 return;
             }
-            // Tile swap is handled on pointerup when the gesture was a click.
+            // Tile focus (z-raise) is handled on pointerup when the gesture was a click.
         });
 
         mosaic.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             if (e.target.closest?.('[data-tile-action]')) return;
             const tile = e.target.closest?.('.tv-player-tile');
-            if (!tile || tile.getAttribute('data-slot') === 'center') return;
+            if (!tile) return;
             e.preventDefault();
             const slotId = tile.getAttribute('data-slot');
             if (!slotId || !this.slots[slotId]?.enabled) return;
-            this.swapWithCenter(slotId);
+            if (this.hasCustomPlacement()) {
+                this.raiseTileInStack(slotId);
+                this.persistPlacement();
+            }
         });
 
         if (!this._resizeBound) {
@@ -516,8 +346,9 @@ export const MultiView = {
             slot.player.mute();
         });
         this.persistSlots();
-        this.refreshTiles();
+        // emitState → onState → scheduleRefreshTiles
         this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
     },
 
     unmuteAll() {
@@ -531,8 +362,8 @@ export const MultiView = {
             slot.player.unmute();
         });
         this.persistSlots();
-        this.refreshTiles();
         this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
     },
 
     syncMosaicChrome() {
@@ -553,412 +384,6 @@ export const MultiView = {
         if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
     },
 
-    onTilePointerDown(e) {
-        if (e.button != null && e.button !== 0) return;
-        if (e.target.closest?.('[data-tile-action]')) return;
-        if (this.swapBusy) return;
-
-        const tile = e.target.closest?.('.tv-player-tile');
-        if (!tile || tile.classList.contains('is-hidden')) return;
-        const slotId = tile.getAttribute('data-slot');
-        if (!slotId || !SLOT_IDS.includes(slotId)) return;
-        if (!this.slots[slotId]?.enabled) return;
-
-        const mosaic = el('player-mosaic');
-        if (!mosaic) return;
-
-        const resizeHandle = e.target.closest?.('[data-resize]');
-        const resizeEdge = resizeHandle?.getAttribute('data-resize');
-        if (resizeHandle && (!resizeEdge || !RESIZE_EDGES.has(resizeEdge))) return;
-
-        e.preventDefault();
-        const startX = e.clientX;
-        const startY = e.clientY;
-        this.dragSession = {
-            mode: resizeHandle ? 'resize' : 'drag',
-            edges: resizeEdge || '',
-            slotId,
-            tile,
-            pointerId: e.pointerId,
-            startX,
-            startY,
-            originLeft: 0,
-            originTop: 0,
-            width: 0,
-            height: 0,
-            dragged: Boolean(resizeHandle),
-            startedFree: false
-        };
-
-        if (resizeHandle) {
-            this.beginTileResize(this.dragSession);
-        }
-
-        const onMove = (ev) => {
-            if (!this.dragSession || ev.pointerId !== this.dragSession.pointerId) return;
-            if (this.dragSession.mode === 'resize') {
-                this.moveTileResize(this.dragSession, ev.clientX, ev.clientY);
-                return;
-            }
-            const dx = ev.clientX - this.dragSession.startX;
-            const dy = ev.clientY - this.dragSession.startY;
-            if (!this.dragSession.dragged) {
-                if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-                this.beginTileDrag(this.dragSession);
-            }
-            this.moveTileDrag(this.dragSession, ev.clientX, ev.clientY);
-        };
-
-        const onUp = (ev) => {
-            if (!this.dragSession || ev.pointerId !== this.dragSession.pointerId) return;
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-            window.removeEventListener('pointercancel', onUp);
-            if (this.dragSession.mode === 'resize') {
-                this.endTileResize(this.dragSession);
-            } else {
-                this.endTileDrag(this.dragSession);
-            }
-            this.dragSession = null;
-        };
-
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        try { tile.setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
-    },
-
-    beginTileDrag(session) {
-        const mosaic = el('player-mosaic');
-        if (!mosaic || !session?.tile) return;
-
-        session.dragged = true;
-        if (!this.hasCustomPlacement()) {
-            this.captureGridAsPlacement();
-            session.startedFree = true;
-        }
-
-        this.raiseTileInStack(session.slotId);
-
-        this.applyFreeLayout();
-
-        const mosaicRect = mosaic.getBoundingClientRect();
-        const tileRect = session.tile.getBoundingClientRect();
-        session.originLeft = tileRect.left - mosaicRect.left;
-        session.originTop = tileRect.top - mosaicRect.top;
-        session.width = tileRect.width;
-        session.height = tileRect.height;
-        session.dragOriginClientX = session.startX;
-        session.dragOriginClientY = session.startY;
-        session.dragOriginLeft = session.originLeft;
-        session.dragOriginTop = session.originTop;
-
-        session.tile.classList.add('is-dragging');
-        session.tile.classList.add('is-placed');
-        session.tile.style.zIndex = String(this.placementZForSlot(session.slotId));
-    },
-
-    moveTileDrag(session, clientX, clientY) {
-        const mosaic = el('player-mosaic');
-        if (!mosaic || !session?.tile) return;
-
-        const mw = mosaic.clientWidth;
-        let baseH = Number(mosaic.dataset.freeBaseHeight);
-        if (!Number.isFinite(baseH) || baseH <= 0) {
-            baseH = mosaic.clientHeight || 1;
-        }
-        const dx = clientX - (session.dragOriginClientX ?? session.startX);
-        const dy = clientY - (session.dragOriginClientY ?? session.startY);
-        let left = (session.dragOriginLeft ?? session.originLeft) + dx;
-        let top = (session.dragOriginTop ?? session.originTop) + dy;
-        const w = session.width;
-        const h = session.height;
-
-        left = Math.min(Math.max(0, left), Math.max(0, mw - w));
-        top = Math.min(Math.max(0, top), Math.max(0, baseH - h));
-
-        session.tile.style.left = `${left}px`;
-        session.tile.style.top = `${top}px`;
-        session.tile.style.width = `${w}px`;
-        session.tile.style.height = `${h}px`;
-
-        if (mw > 0 && baseH > 0) {
-            this.mosaicPlacement[session.slotId] = {
-                x: left / mw,
-                y: top / baseH,
-                w: w / mw,
-                h: h / baseH,
-                z: this.placementZForSlot(session.slotId)
-            };
-        }
-
-        const maxBottom = top + h;
-        mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, maxBottom + 8))}px`;
-    },
-
-    endTileDrag(session) {
-        if (!session?.tile) return;
-        session.tile.classList.remove('is-dragging');
-        try { session.tile.releasePointerCapture?.(session.pointerId); } catch { /* ignore */ }
-
-        if (session.dragged) {
-            this.persistPlacement();
-            this.applyFreeLayout();
-            this.syncPlacementChrome();
-            return;
-        }
-
-        // Click (no drag): corner tiles swap with center.
-        const { slotId } = session;
-        if (slotId && slotId !== 'center' && CORNER_IDS.includes(slotId) && this.slots[slotId]?.enabled) {
-            if (this.hasCustomPlacement()) {
-                this.raiseTileInStack(slotId);
-                this.persistPlacement();
-            }
-            this.swapWithCenter(slotId);
-        }
-    },
-
-    beginTileResize(session) {
-        const mosaic = el('player-mosaic');
-        if (!mosaic || !session?.tile) return;
-
-        if (!this.hasCustomPlacement()) {
-            this.captureGridAsPlacement();
-            session.startedFree = true;
-        }
-
-        this.raiseTileInStack(session.slotId);
-
-        this.applyFreeLayout();
-
-        const mosaicRect = mosaic.getBoundingClientRect();
-        const tileRect = session.tile.getBoundingClientRect();
-        session.originLeft = tileRect.left - mosaicRect.left;
-        session.originTop = tileRect.top - mosaicRect.top;
-        session.width = tileRect.width;
-        session.height = tileRect.height;
-        session.dragOriginClientX = session.startX;
-        session.dragOriginClientY = session.startY;
-
-        session.tile.classList.add('is-resizing');
-        session.tile.classList.add('is-placed');
-        session.tile.style.zIndex = String(this.placementZForSlot(session.slotId));
-    },
-
-    moveTileResize(session, clientX, clientY) {
-        const mosaic = el('player-mosaic');
-        if (!mosaic || !session?.tile) return;
-
-        const mw = mosaic.clientWidth;
-        let baseH = Number(mosaic.dataset.freeBaseHeight);
-        if (!Number.isFinite(baseH) || baseH <= 0) {
-            baseH = mosaic.clientHeight || 1;
-        }
-
-        const dx = clientX - (session.dragOriginClientX ?? session.startX);
-        const dy = clientY - (session.dragOriginClientY ?? session.startY);
-        const edges = session.edges || '';
-
-        let left = session.originLeft;
-        let top = session.originTop;
-        let w = session.width;
-        let h = session.height;
-        const right = session.originLeft + session.width;
-        const bottom = session.originTop + session.height;
-
-        if (edges.includes('e')) {
-            w = Math.max(RESIZE_MIN_W, session.width + dx);
-            w = Math.min(w, Math.max(RESIZE_MIN_W, mw - left));
-        }
-        if (edges.includes('s')) {
-            h = Math.max(RESIZE_MIN_H, session.height + dy);
-            h = Math.min(h, Math.max(RESIZE_MIN_H, baseH - top));
-        }
-        if (edges.includes('w')) {
-            const nextLeft = Math.min(right - RESIZE_MIN_W, Math.max(0, session.originLeft + dx));
-            w = right - nextLeft;
-            left = nextLeft;
-        }
-        if (edges.includes('n')) {
-            const nextTop = Math.min(bottom - RESIZE_MIN_H, Math.max(0, session.originTop + dy));
-            h = bottom - nextTop;
-            top = nextTop;
-        }
-
-        left = Math.min(Math.max(0, left), Math.max(0, mw - w));
-        top = Math.min(Math.max(0, top), Math.max(0, baseH - h));
-        w = Math.max(RESIZE_MIN_W, Math.min(w, mw - left));
-        h = Math.max(RESIZE_MIN_H, Math.min(h, baseH - top));
-
-        session.tile.style.left = `${left}px`;
-        session.tile.style.top = `${top}px`;
-        session.tile.style.width = `${w}px`;
-        session.tile.style.height = `${h}px`;
-
-        if (mw > 0 && baseH > 0) {
-            this.mosaicPlacement[session.slotId] = {
-                x: left / mw,
-                y: top / baseH,
-                w: w / mw,
-                h: h / baseH,
-                z: this.placementZForSlot(session.slotId)
-            };
-        }
-
-        mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, top + h + 8))}px`;
-    },
-
-    endTileResize(session) {
-        if (!session?.tile) return;
-        session.tile.classList.remove('is-resizing');
-        try { session.tile.releasePointerCapture?.(session.pointerId); } catch { /* ignore */ }
-
-        this.persistPlacement();
-        this.applyFreeLayout();
-        this.syncPlacementChrome();
-    },
-
-    captureGridAsPlacement() {
-        const mosaic = el('player-mosaic');
-        if (!mosaic) return;
-        const mosaicRect = mosaic.getBoundingClientRect();
-        const mw = mosaicRect.width || mosaic.clientWidth;
-        const mh = mosaicRect.height || mosaic.clientHeight;
-        if (mw <= 0 || mh <= 0) return;
-
-        const next = {};
-        let z = 1;
-        // Measure every visible tile before absolutizing into free-layout.
-        SLOT_IDS.forEach((id) => {
-            if (!this.slots[id]?.enabled) return;
-            const tile = el(`player-tile-${id}`);
-            if (!tile || tile.classList.contains('is-hidden')) return;
-            const r = tile.getBoundingClientRect();
-            const left = r.left - mosaicRect.left;
-            const top = r.top - mosaicRect.top;
-            const width = Math.max(48, r.width);
-            const height = Math.max(36, r.height);
-            next[id] = {
-                x: left / mw,
-                y: top / mh,
-                w: width / mw,
-                h: height / mh,
-                z: z++
-            };
-            tile.style.left = `${left}px`;
-            tile.style.top = `${top}px`;
-            tile.style.width = `${width}px`;
-            tile.style.height = `${height}px`;
-            tile.style.zIndex = String(next[id].z);
-            tile.classList.add('is-placed');
-        });
-
-        if (!Object.keys(next).length) return;
-
-        this.mosaicPlacement = next;
-        this.placementZTop = Object.values(next).reduce((max, p) => Math.max(max, p.z || 1), 1);
-        this.ensureCenterOnTop();
-        if (next.center) {
-            const centerTile = el('player-tile-center');
-            if (centerTile) centerTile.style.zIndex = String(next.center.z);
-        }
-        mosaic.dataset.freeBaseHeight = String(Math.ceil(mh));
-        mosaic.style.minHeight = `${Math.ceil(mh)}px`;
-        mosaic.classList.add('is-free-layout');
-        this.syncLayout();
-        this.syncPlacementChrome();
-    },
-
-    applyFreeLayout() {
-        const mosaic = el('player-mosaic');
-        if (!mosaic || !this.hasCustomPlacement()) return;
-
-        this.mosaicPlacement = this.sanitizePlacementMap(this.mosaicPlacement);
-        this.ensureCenterOnTop();
-
-        if (!this.isPlacementSane()) {
-            this.mosaicPlacement = {};
-            this.placementZTop = 1;
-            this.clearFreeLayoutStyles();
-            this.persistPlacement();
-            this.syncLayout();
-            this.syncPlacementChrome();
-            return;
-        }
-
-        const mw = mosaic.clientWidth;
-        if (mw <= 0) return;
-
-        let baseH = Number(mosaic.dataset.freeBaseHeight);
-        if (!Number.isFinite(baseH) || baseH < 120) {
-            const measured = mosaic.classList.contains('is-free-layout')
-                ? 0
-                : mosaic.clientHeight;
-            baseH = Math.max(measured, 240);
-            mosaic.dataset.freeBaseHeight = String(Math.ceil(baseH));
-        }
-
-        mosaic.classList.add('is-free-layout');
-
-        let maxBottom = 0;
-        SLOT_IDS.forEach((id) => {
-            const tile = el(`player-tile-${id}`);
-            if (!tile) return;
-            const enabled = this.slots[id]?.enabled;
-            if (!enabled) {
-                clearTilePlacementStyle(tile);
-                return;
-            }
-            const p = this.mosaicPlacement[id];
-            if (!p) {
-                clearTilePlacementStyle(tile);
-                return;
-            }
-            const left = p.x * mw;
-            const top = p.y * baseH;
-            const width = Math.max(RESIZE_MIN_W, p.w * mw);
-            const height = Math.max(RESIZE_MIN_H, p.h * baseH);
-            tile.style.left = `${left}px`;
-            tile.style.top = `${top}px`;
-            tile.style.width = `${width}px`;
-            tile.style.height = `${height}px`;
-            tile.style.zIndex = String(p.z || 1);
-            tile.classList.add('is-placed');
-            maxBottom = Math.max(maxBottom, top + height);
-        });
-
-        mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, maxBottom + 8))}px`;
-        this.syncPlacementChrome();
-    },
-
-    clearFreeLayoutStyles() {
-        const mosaic = el('player-mosaic');
-        mosaic?.classList.remove('is-free-layout');
-        if (mosaic) {
-            mosaic.style.minHeight = '';
-            delete mosaic.dataset.freeBaseHeight;
-        }
-        SLOT_IDS.forEach((id) => clearTilePlacementStyle(el(`player-tile-${id}`)));
-    },
-
-    persistPlacement() {
-        const cleaned = this.sanitizePlacementMap(this.mosaicPlacement);
-        this.mosaicPlacement = cleaned;
-        savePlayerState({ mosaicPlacement: { ...cleaned } });
-    },
-
-    resetMosaicPlacement() {
-        this.mosaicPlacement = {};
-        this.placementZTop = 1;
-        this.clearFreeLayoutStyles();
-        this.persistPlacement();
-        this.syncLayout();
-        this.mountAll();
-        this.refreshTiles();
-        this.syncPlacementChrome();
-    },
-
     async handleTileAction(slotId, action) {
         if (slotId === 'center') return;
 
@@ -967,13 +392,18 @@ export const MultiView = {
             return;
         }
 
+        if (action === 'browse') {
+            const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
+            ChannelPickerModal.open(slotId);
+            return;
+        }
+
         const player = this.slots[slotId]?.player;
         if (!player) return;
 
         switch (action) {
             case 'play':
-            case 'pause':
-                // Same stable control: toggle intent (hiding swap drops mash clicks).
+                // Stable hit-target: icon swaps on this button (no separate pause control).
                 player.toggle();
                 break;
             case 'stop':
@@ -983,6 +413,9 @@ export const MultiView = {
             case 'mute':
                 if (player.channel) player.toggleMute();
                 this.persistSlots();
+                break;
+            case 'swap':
+                this.swapWithCenter(slotId);
                 break;
             case 'fav':
                 if (player.channel) {
@@ -1019,86 +452,32 @@ export const MultiView = {
             default:
                 break;
         }
-        this.refreshTiles();
+        this.scheduleRefreshTiles();
     },
 
     syncLayout() {
         const mosaic = el('player-mosaic');
         if (!mosaic) return;
 
-        const hasTopLeft = this.slots.topLeft.enabled;
-        const hasTopRight = this.slots.topRight.enabled;
-        const hasBottomLeft = this.slots.bottomLeft.enabled;
-        const hasBottomRight = this.slots.bottomRight.enabled;
-        const hasLeft = hasTopLeft || hasBottomLeft;
-        const hasRight = hasTopRight || hasBottomRight;
-        const hasTop = hasTopLeft || hasTopRight;
-        const hasBottom = hasBottomLeft || hasBottomRight;
-        const hasAnyCorner = hasLeft || hasRight;
+        const grid = resolveMosaicGridTemplate({
+            freeLayout: this.hasCustomPlacement(),
+            topLeft: this.slots.topLeft.enabled,
+            topRight: this.slots.topRight.enabled,
+            bottomLeft: this.slots.bottomLeft.enabled,
+            bottomRight: this.slots.bottomRight.enabled
+        });
 
-        mosaic.classList.toggle('has-left', hasLeft);
-        mosaic.classList.toggle('has-right', hasRight);
-        mosaic.classList.toggle('has-top-left', hasTopLeft);
-        mosaic.classList.toggle('has-top-right', hasTopRight);
-        mosaic.classList.toggle('has-bottom-left', hasBottomLeft);
-        mosaic.classList.toggle('has-bottom-right', hasBottomRight);
-        mosaic.classList.toggle('has-corners', hasAnyCorner);
+        mosaic.classList.toggle('has-left', grid.hasLeft);
+        mosaic.classList.toggle('has-right', grid.hasRight);
+        mosaic.classList.toggle('has-top-left', this.slots.topLeft.enabled);
+        mosaic.classList.toggle('has-top-right', this.slots.topRight.enabled);
+        mosaic.classList.toggle('has-bottom-left', this.slots.bottomLeft.enabled);
+        mosaic.classList.toggle('has-bottom-right', this.slots.bottomRight.enabled);
+        mosaic.classList.toggle('has-corners', grid.hasAnyCorner);
 
-        let areas = '"center"';
-        let columns = '1fr';
-        let rows = '1fr';
-
-        // While tiles are free-placed, keep a single-cell grid shell as the floor;
-        // all players (including center) overlay via absolute placement.
-        if (this.hasCustomPlacement()) {
-            areas = '"center"';
-            columns = '1fr';
-            rows = '1fr';
-        } else if (!hasAnyCorner) {
-            areas = '"center"';
-            columns = '1fr';
-            rows = '1fr';
-        } else if (hasTop && hasBottom) {
-            if (hasLeft && hasRight) {
-                areas = '"topLeft center topRight" "bottomLeft center bottomRight"';
-                columns = 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)';
-                rows = '1fr 1fr';
-            } else if (hasLeft) {
-                areas = '"topLeft center" "bottomLeft center"';
-                columns = 'minmax(0, 1fr) minmax(0, 2.2fr)';
-                rows = '1fr 1fr';
-            } else {
-                areas = '"center topRight" "center bottomRight"';
-                columns = 'minmax(0, 2.2fr) minmax(0, 1fr)';
-                rows = '1fr 1fr';
-            }
-        } else if (hasTop) {
-            if (hasLeft && hasRight) {
-                areas = '"topLeft center topRight"';
-                columns = 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)';
-            } else if (hasLeft) {
-                areas = '"topLeft center"';
-                columns = 'minmax(0, 1fr) minmax(0, 2.2fr)';
-            } else {
-                areas = '"center topRight"';
-                columns = 'minmax(0, 2.2fr) minmax(0, 1fr)';
-            }
-        } else if (hasBottom) {
-            if (hasLeft && hasRight) {
-                areas = '"bottomLeft center bottomRight"';
-                columns = 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)';
-            } else if (hasLeft) {
-                areas = '"bottomLeft center"';
-                columns = 'minmax(0, 1fr) minmax(0, 2.2fr)';
-            } else {
-                areas = '"center bottomRight"';
-                columns = 'minmax(0, 2.2fr) minmax(0, 1fr)';
-            }
-        }
-
-        mosaic.style.gridTemplateAreas = areas;
-        mosaic.style.gridTemplateColumns = columns;
-        mosaic.style.gridTemplateRows = rows;
+        mosaic.style.gridTemplateAreas = grid.areas;
+        mosaic.style.gridTemplateColumns = grid.columns;
+        mosaic.style.gridTemplateRows = grid.rows;
 
         SLOT_IDS.forEach((id) => {
             const tile = el(`player-tile-${id}`);
@@ -1130,10 +509,6 @@ export const MultiView = {
         });
     },
 
-    ensureMounted() {
-        this.mountAll();
-    },
-
     setSideEnabled(sideId, enabled, { silent = false } = {}) {
         if (!CORNER_IDS.includes(sideId)) return;
         const slot = this.slots[sideId];
@@ -1141,7 +516,7 @@ export const MultiView = {
         if (slot.enabled === next && slot.player) {
             this.syncLayout();
             this.mountAll();
-            this.refreshTiles();
+            this.scheduleRefreshTiles();
             return;
         }
 
@@ -1173,7 +548,7 @@ export const MultiView = {
 
         this.syncLayout();
         this.mountAll();
-        this.refreshTiles();
+        this.scheduleRefreshTiles();
         if (!silent) {
             this.syncSettingsToggles();
             this.getPrimary()?.emitState();
@@ -1183,317 +558,35 @@ export const MultiView = {
         }
     },
 
-    persistSlots() {
-        const prev = loadPlayerState().mosaicSlots || {};
-        const mosaicSlots = { ...prev };
-
-        SLOT_IDS.forEach((id) => {
-            const slot = this.slots[id];
-            // Keep prior memory for disabled corners; only rewrite enabled slots.
-            if (!slot?.enabled) {
-                delete mosaicSlots[id];
-                return;
-            }
-
-            if (!slot.player?.channel) {
-                // Before hydrate, empty players must not wipe saved satellites.
-                if (!this.slotsHydrated) return;
-                // Keep remembered stub assignments (instant restore) even if HLS failed.
-                if (this.rememberedSlotKeys[id]) return;
-                delete mosaicSlots[id];
-                return;
-            }
-            const key = channelKey(slot.player.channel);
-            if (!key || key.endsWith(':')) {
-                if (!this.slotsHydrated) return;
-                delete mosaicSlots[id];
-                return;
-            }
-            mosaicSlots[id] = {
-                key,
-                name: slot.player.channel.name || '',
-                muted: slot.player.muted !== false,
-                url: slot.player.channel.url_resolved || slot.player.channel.url || ''
-            };
-        });
-
-        const primary = this.getPrimary();
-        const primaryKey = primary?.channel ? channelKey(primary.channel) : null;
-        savePlayerState({
-            mosaicSlots,
-            ...(primaryKey && !primaryKey.endsWith(':')
-                ? {
-                    lastChannelKey: primaryKey,
-                    lastChannelName: primary.channel.name || ''
-                }
-                : {})
-        });
-    },
-
-    /**
-     * Restore remembered channels into all slots. Only the center plays when
-     * wasPlaying was true; every other slot loads paused (+ cached poster when available).
-     * Stubs/posters are applied in applySavedSlotStubs(); this attaches streams in parallel.
-     */
-    async restoreSlots() {
-        const state = loadPlayerState();
-        let mosaic = state.mosaicSlots && Object.keys(state.mosaicSlots).length
-            ? state.mosaicSlots
-            : null;
-
-        if (!mosaic && state.lastChannelKey) {
-            mosaic = {
-                center: {
-                    key: state.lastChannelKey,
-                    name: state.lastChannelName || '',
-                    muted: true
-                }
-            };
-        }
-        if (!mosaic) {
-            this.slotsHydrated = true;
-            return false;
-        }
-
-        try {
-            // Re-enable any satellite that has a saved channel so restore cannot skip it.
-            CORNER_IDS.forEach((id) => {
-                if (!mosaic[id]?.key) return;
-                if (!this.slots[id]?.enabled) {
-                    this.setSideEnabled(id, true, { silent: true });
-                }
-            });
-            this.syncLayout();
-            this.mountAll();
-            this.syncSettingsToggles();
-
-            const resolveEntry = async (entry) => {
-                let channel = null;
-                try {
-                    channel = await TvProviderRegistry.getChannel(parseChannelKey(entry.key));
-                } catch { /* ignore */ }
-
-                if (channel?.url_resolved) return channel;
-
-                const parsed = parseChannelKey(entry.key);
-                const url = entry.url || channel?.url_resolved || '';
-                if (!url && !parsed) return null;
-
-                return {
-                    providerId: parsed?.providerId || channel?.providerId,
-                    channelId: parsed?.channelId || channel?.channelId,
-                    channeluuid: entry.key,
-                    name: entry.name || channel?.name || 'Last channel',
-                    url_resolved: url || undefined,
-                    countrycode: channel?.countrycode || ''
-                };
-            };
-
-            const restoreOne = async (id, { play } = {}) => {
-                const entry = mosaic[id];
-                if (!entry?.key) return;
-                if (id !== 'center' && !this.slots[id]?.enabled) return;
-
-                const desiredMuted = entry.muted !== false;
-                const player = this.ensurePlayer(id, { startMuted: desiredMuted });
-                player.muted = desiredMuted;
-                player.applyAudioToVideo();
-
-                const surface = el(`tv-playback-surface-${id}`);
-                if (surface) player.mountVideo(surface);
-
-                const channel = await resolveEntry(entry);
-                if (!channel) {
-                    const parsed = parseChannelKey(entry.key);
-                    player.channel = {
-                        providerId: parsed?.providerId,
-                        channelId: parsed?.channelId,
-                        channeluuid: entry.key,
-                        name: entry.name || 'Last channel'
-                    };
-                    player.emitState();
-                    return;
-                }
-
-                if (!channel.url_resolved) {
-                    player.channel = channel;
-                    player.emitState();
-                    return;
-                }
-
-                this.rememberedSlotKeys[id] = entry.key;
-
-                if (play) {
-                    // Muted-first autoplay (historical boot behavior); re-apply saved mute after.
-                    const mutePlan = resolveRestorePlayMute(entry.muted);
-                    player.muted = mutePlan.duringPlay;
-                    player.applyAudioToVideo();
-                    try {
-                        await player.playChannel(channel);
-                    } catch { /* autoplay may block */ }
-                    // Keep last poster until live video paints; do not force-clear.
-                    // Only unmute when playback actually started.
-                    if (player.playing === true && !player.resumeBlocked) {
-                        player.muted = mutePlan.afterPlay;
-                    }
-                } else {
-                    await player.loadChannelPaused(channel);
-                    player.muted = desiredMuted;
-                }
-
-                player.applyAudioToVideo();
-                this.refreshTiles();
-            };
-
-            const centerPlay = state.wasPlaying === true;
-            await Promise.all([
-                restoreOne('center', { play: centerPlay }),
-                ...CORNER_IDS.map((id) => restoreOne(id, { play: false }))
-            ]);
-
-            this.mountAll();
-            this.refreshTiles();
-            this.getPrimary()?.emitState();
-            this.persistSlots();
-            if (this.hasCustomPlacement()) {
-                requestAnimationFrame(() => this.applyFreeLayout());
-            }
-            return true;
-        } finally {
-            this.slotsHydrated = true;
-        }
-    },
-
-    swapWithCenter(sideId) {
-        if (!CORNER_IDS.includes(sideId)) return;
-        if (this.swapBusy) return;
-        const side = this.slots[sideId];
-        const center = this.slots.center;
-        if (!side.enabled || !side.player || !center.player) return;
-
-        let mode = resolveViewTransition(SettingsStore.getSwapTransition(), 'swap');
-        // Absolute free-layout tiles fight scale/flip transforms — keep opacity only.
-        if (this.hasCustomPlacement() && (mode === 'smooth' || mode === 'flip' || mode === 'slide' || mode === 'spring')) {
-            mode = 'crossfade';
-        }
-        if (mode === 'instant' || prefersReducedMotion()) {
-            this.commitSwap(sideId);
-            return;
-        }
-        if (mode === 'dissolve' || mode === 'grain') {
-            this.animateSwapWipe(sideId, mode);
-            return;
-        }
-        // fade shares tile CSS with crossfade naming when needed
-        const tileMode = mode === 'fade' ? 'fade' : mode;
-        if (!SWAP_DURATIONS[tileMode] && !SWAP_DURATIONS[mode]) {
-            this.commitSwap(sideId);
-            return;
-        }
-        this.animateSwap(sideId, tileMode);
-    },
-
-    commitSwap(sideId) {
-        const side = this.slots[sideId];
-        const center = this.slots.center;
-        if (!side?.player || !center?.player) return;
-
-        const centerWasPlaying = center.player.playing === true;
-        const sideWasPlaying = side.player.playing === true;
-
-        const tmp = center.player;
-        center.player = side.player;
-        side.player = tmp;
-
-        center.player.id = 'center';
-        side.player.id = sideId;
-
-        this.mountAll();
-        this.refreshTiles();
-
-        // Keep both streams playing across the swap when they were already live.
-        // Auto-pause only happens on full page reload (restoreSlots).
-        if (centerWasPlaying && center.player.channel && !center.player.playing) {
-            center.player.posterDataUrl = null;
-            center.player.toggle().catch(() => {});
-        } else if (center.player.playing) {
-            center.player.posterDataUrl = null;
-        }
-
-        if (sideWasPlaying && side.player.channel && !side.player.playing) {
-            side.player.posterDataUrl = null;
-            side.player.toggle().catch(() => {});
-        } else if (side.player.playing) {
-            side.player.posterDataUrl = null;
-        }
-
-        center.player.emitState();
-        this.persistSlots();
-        this.refreshTiles();
-        window.dispatchEvent(new CustomEvent('tv:multiview_changed', {
-            detail: { primary: 'center', swapped: sideId }
-        }));
-    },
-
-    async animateSwapWipe(sideId, mode) {
-        const centerTile = el('player-tile-center');
-        const sideTile = el(`player-tile-${sideId}`);
-        if (!centerTile || !sideTile) {
-            this.commitSwap(sideId);
-            return;
-        }
-        this.swapBusy = true;
-        try {
-            // Grain/dissolve only the two tiles in the swap — leave the rest of the mosaic alone.
-            await runWipeTransition(mode, () => this.commitSwap(sideId), {
-                scope: 'tiles',
-                fadeTargets: [centerTile, sideTile],
-                grainHosts: [centerTile, sideTile]
-            });
-        } finally {
-            this.swapBusy = false;
-        }
-    },
-
-    async animateSwap(sideId, mode) {
-        const centerTile = el('player-tile-center');
-        const sideTile = el(`player-tile-${sideId}`);
-        if (!centerTile || !sideTile) {
-            this.commitSwap(sideId);
-            return;
-        }
-
-        this.swapBusy = true;
-        const duration = SWAP_DURATIONS[mode] || 280;
-        const modeClass = `tv-swap--${mode}`;
-
-        try {
-            centerTile.classList.add('is-swapping', modeClass, 'tv-swap-out');
-            sideTile.classList.add('is-swapping', modeClass, 'tv-swap-out');
-            // Force style application before waiting
-            void centerTile.offsetWidth;
-            await waitMs(duration);
-
-            this.commitSwap(sideId);
-
-            clearSwapClasses(centerTile);
-            clearSwapClasses(sideTile);
-            centerTile.classList.add('is-swapping', modeClass, 'tv-swap-in');
-            sideTile.classList.add('is-swapping', modeClass, 'tv-swap-in');
-            void centerTile.offsetWidth;
-            await waitMs(duration);
-        } finally {
-            clearSwapClasses(centerTile);
-            clearSwapClasses(sideTile);
-            this.swapBusy = false;
-        }
-    },
-
     playOnPrimary(channel) {
         const primary = this.getPrimary();
         if (!primary) return Promise.reject(new Error('No primary player'));
         this.mountAll();
         return primary.playChannel(channel).finally(() => this.persistSlots());
+    },
+
+    /**
+     * Play a channel on a specific mosaic slot (enables the side if needed).
+     * @param {string} slotId
+     * @param {object} channel
+     */
+    playOnSlot(slotId, channel) {
+        const id = slotId || 'center';
+        if (CORNER_IDS.includes(id) && !this.slots[id]?.enabled) {
+            this.setSideEnabled(id, true);
+        }
+        this.mountAll();
+        const startMuted = id !== 'center';
+        const player = this.ensurePlayer(id, { startMuted });
+        if (!player) return Promise.reject(new Error(`No player for slot ${id}`));
+        const surface = el(`tv-playback-surface-${id}`);
+        if (surface) player.mountVideo(surface);
+        return player.playChannel(channel).finally(() => {
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            this.syncSettingsToggles();
+            if (id === 'center') this.getPrimary()?.emitState();
+        });
     },
 
     /**
@@ -1539,7 +632,6 @@ export const MultiView = {
         await Promise.allSettled(plays);
         this.persistSlots();
         this.syncSettingsToggles();
-        this.refreshTiles();
         this.getPrimary()?.emitState();
     },
 
@@ -1548,7 +640,6 @@ export const MultiView = {
         this.sharedVolume = clamped;
         if (clamped > 0) this.lastVolume = clamped;
         savePlayerState({ volume: clamped });
-        this.applyVolumeToAll();
         const primary = this.getPrimary();
         if (primary && clamped > 0) {
             primary.muted = false;
@@ -1557,7 +648,6 @@ export const MultiView = {
         }
         this.applyVolumeToAll();
         primary?.emitState();
-        this.refreshTiles();
         return clamped;
     },
 
@@ -1591,7 +681,7 @@ export const MultiView = {
 
             const player = slot.player;
             const rememberedKey = this.rememberedSlotKeys[id] || '';
-            const hasChannel = Boolean(player?.channel) || Boolean(rememberedKey);
+            const hasChannel = slotIsOccupied(player?.channel, rememberedKey);
             const empty = tile.querySelector('.tv-player-tile__empty');
             const mediaPlaying = player?.playing === true;
             const intentPlaying = player?.wantPlaying === true || mediaPlaying;
@@ -1652,31 +742,21 @@ export const MultiView = {
             if (id === 'center') return;
 
             const playBtn = tile.querySelector('[data-tile-action="play"]');
-            const pauseBtn = tile.querySelector('[data-tile-action="pause"]');
             const muteBtn = tile.querySelector('.tv-player-tile__hover [data-tile-action="mute"]');
             const favBtn = tile.querySelector('[data-tile-action="fav"]');
             const pipBtn = tile.querySelector('[data-tile-action="pip"]');
             const audioEl = tile.querySelector('.tv-player-tile__audio');
 
-            // One stable hit-target — icon swaps; pause button stays hidden.
+            // One stable hit-target — icon swaps on the play button.
             if (playBtn) {
                 playBtn.classList.remove('is-hidden');
                 playBtn.textContent = intentPlaying ? '⏸' : '▶';
                 playBtn.title = intentPlaying ? 'Pause' : 'Play';
                 playBtn.setAttribute('aria-label', intentPlaying ? 'Pause' : 'Play');
             }
-            if (pauseBtn) {
-                pauseBtn.classList.add('is-hidden');
-                pauseBtn.setAttribute('aria-hidden', 'true');
-            }
 
             // Solid corner speaker only while unmuted with audible volume; click mutes.
-            const showAudio = Boolean(
-                hasChannel
-                && player
-                && player.muted === false
-                && this.sharedVolume > 0
-            );
+            const showAudio = this.isSlotAudible(player);
             if (audioEl) {
                 audioEl.classList.toggle('is-hidden', !showAudio);
             }

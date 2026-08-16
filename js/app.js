@@ -13,6 +13,7 @@ import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
 import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
 import { TvClock } from './ui/tvClock.js';
+import { ChannelPickerModal } from './ui/channelPickerModal.js';
 
 import { ACTION_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
@@ -123,7 +124,7 @@ function handleSortChanged(context) {
     if (context === 'countries') {
         BrowseView.renderCountries();
     } else if (context === 'channels') {
-        BrowseView.restartChannelList();
+        BrowseView.restartChannelList(undefined, { clear: false });
     } else if (context === 'favorites') {
         ChannelGrid.renderFavorites();
     } else if (context === 'recents') {
@@ -509,6 +510,35 @@ function syncPlayFavoritesMosaicBtn() {
     btn.classList.toggle('is-hidden', appState.activeTab !== 'favorites');
 }
 
+function syncCatalogLayoutBtn() {
+    const btn = el('catalog-layout-btn');
+    if (!btn) return;
+    const onChannelTabs = appState.activeTab === 'browse'
+        || appState.activeTab === 'favorites'
+        || appState.activeTab === 'recents';
+    btn.classList.toggle('is-hidden', !onChannelTabs);
+    const layout = SettingsStore.getCatalogLayout();
+    const toList = layout !== 'list';
+    btn.innerHTML = toList ? ACTION_ICONS.list : ACTION_ICONS.tiles;
+    const label = toList ? 'List view' : 'Tiles view';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', layout === 'list' ? 'true' : 'false');
+}
+
+function bindCatalogLayout() {
+    const btn = el('catalog-layout-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+
+    btn.addEventListener('click', () => {
+        const next = SettingsStore.getCatalogLayout() === 'list' ? 'tiles' : 'list';
+        SettingsStore.setCatalogLayout(next);
+        Appearance.applyStyles();
+        syncCatalogLayoutBtn();
+    });
+}
+
 function bindPlayFavoritesMosaic() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn || btn.dataset.bound === '1') return;
@@ -829,6 +859,7 @@ function switchTab(tabName) {
         Appearance.updateStorageStats();
     }
     syncPlayFavoritesMosaicBtn();
+    syncCatalogLayoutBtn();
     updateRefreshAge();
 }
 
@@ -837,6 +868,12 @@ async function init() {
         appState,
         getRefreshKey: currentRefreshKey,
         onPlay: startPlayback
+    });
+    ChannelPickerModal.init({
+        getDefaultOnPlay: () => startPlayback,
+        leaveSettingsIfNeeded: () => {
+            if (appState.activeTab === 'settings') switchTab('browse');
+        }
     });
     BrowseView.init({
         appState,
@@ -863,7 +900,9 @@ async function init() {
     bindTabs();
     bindCatalogToggle();
     bindPlayFavoritesMosaic();
+    bindCatalogLayout();
     syncPlayFavoritesMosaicBtn();
+    syncCatalogLayoutBtn();
     bindContentSplitter();
     TvClock.init();
 

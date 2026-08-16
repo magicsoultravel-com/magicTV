@@ -101,6 +101,8 @@ export const Appearance = {
         const textValue = el('text-size-value');
         const tileSlider = el('tile-width-slider');
         const tileValue = el('tile-width-value');
+        const listSlider = el('list-width-slider');
+        const listValue = el('list-width-value');
         const themeSelect = el('theme-select');
         const fontTrigger = el('font-picker-trigger');
         const fontMenu = el('font-picker-menu');
@@ -115,6 +117,12 @@ export const Appearance = {
             if (tileSlider) tileSlider.value = String(width);
             if (tileValue) tileValue.textContent = `${width}px`;
             if (tileSlider) tileSlider.setAttribute('aria-valuetext', `${width}px`);
+        };
+
+        const syncListUi = (width) => {
+            if (listSlider) listSlider.value = String(width);
+            if (listValue) listValue.textContent = `${width}px`;
+            if (listSlider) listSlider.setAttribute('aria-valuetext', `${width}px`);
         };
 
         const syncFontUi = (fontId) => {
@@ -187,13 +195,22 @@ export const Appearance = {
             });
         }
 
+        if (listSlider) {
+            listSlider.addEventListener('input', () => {
+                const width = SettingsStore.setListWidth(Number(listSlider.value));
+                syncListUi(width);
+                this.applyStyles();
+            });
+        }
+
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
-                const { themeId, textSize, tileWidth, colors, fontId } = SettingsStore.resetAppearance();
+                const { themeId, textSize, tileWidth, listWidth, colors, fontId } = SettingsStore.resetAppearance();
                 if (themeSelect) themeSelect.value = themeId;
                 syncTextUi(textSize);
                 syncTileUi(tileWidth);
+                syncListUi(listWidth);
                 syncFontUi(fontId);
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
@@ -209,13 +226,17 @@ export const Appearance = {
         const root = document.documentElement;
         const textSize = SettingsStore.getTextSize();
         const tileWidth = SettingsStore.getTileWidth();
+        const listWidth = SettingsStore.getListWidth();
+        const catalogLayout = SettingsStore.getCatalogLayout();
         const themeId = SettingsStore.getThemeId();
         const colors = SettingsStore.getThemeColors();
         const fontId = SettingsStore.getFontId();
 
         root.style.fontSize = `${textSize}px`;
         root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
+        root.style.setProperty('--tv-list-width', `${listWidth}px`);
         root.setAttribute('data-theme', themeId);
+        root.setAttribute('data-channel-layout', catalogLayout);
         applyThemeColorsToRoot(colors, root);
         applyFontToRoot(fontId, root);
 
@@ -272,6 +293,13 @@ export const Appearance = {
         if (tileSlider) tileSlider.value = String(tileWidthPx);
         if (tileWidth) tileWidth.textContent = `${tileWidthPx}px`;
         if (tileSlider) tileSlider.setAttribute('aria-valuetext', `${tileWidthPx}px`);
+
+        const listWidthPx = SettingsStore.getListWidth();
+        const listSlider = el('list-width-slider');
+        const listWidth = el('list-width-value');
+        if (listSlider) listSlider.value = String(listWidthPx);
+        if (listWidth) listWidth.textContent = `${listWidthPx}px`;
+        if (listSlider) listSlider.setAttribute('aria-valuetext', `${listWidthPx}px`);
 
         const themeId = SettingsStore.getThemeId();
         const themeSelect = el('theme-select');

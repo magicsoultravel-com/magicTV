@@ -182,10 +182,11 @@ export const BrowseView = {
             if (results.length < PAGE_SIZE) {
                 appState.browseHasMore = false;
             }
+            const append = appState.browseOffset > 0;
             appState.browseChannels = appState.browseChannels.concat(results);
             appState.browseOffset += PAGE_SIZE;
             const grid = el('channels-container');
-            ChannelGrid.render(grid, results, { append: true });
+            ChannelGrid.render(grid, results, { append });
             if (grid && TileFrames.isLiveRefreshActive(`browse:${appState.browseCountry}`)) {
                 TileFrames.enqueueFolderFramesForRefresh(grid);
             }
@@ -203,12 +204,12 @@ export const BrowseView = {
         }
     },
 
-    /** Restart channel list when filter or sort changes. */
-    restartChannelList(query = deps.currentFilter()) {
-        this.startChannelSearch(query);
+    /** Restart channel list when filter or sort changes. Pass clear:false to keep tiles until reload. */
+    restartChannelList(query = deps.currentFilter(), { clear = true } = {}) {
+        this.startChannelSearch(query, { clear });
     },
 
-    startChannelSearch(query) {
+    startChannelSearch(query, { clear = true } = {}) {
         const appState = deps.appState;
         appState.browseGeneration += 1;
         appState.browseLoading = false;
@@ -216,11 +217,13 @@ export const BrowseView = {
         appState.browseChannels = [];
         appState.browseOffset = 0;
         appState.browseHasMore = true;
-        const container = el('channels-container');
-        if (container) {
-            container.innerHTML = query
-                ? '<div class="empty-state"><p class="empty-state__text">Filtering…</p></div>'
-                : '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
+        if (clear) {
+            const container = el('channels-container');
+            if (container) {
+                container.innerHTML = query
+                    ? '<div class="empty-state"><p class="empty-state__text">Filtering…</p></div>'
+                    : '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
+            }
         }
         this.loadMoreChannels(false);
     },

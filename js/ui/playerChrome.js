@@ -7,6 +7,7 @@ import { ChannelGrid } from './channelGrid.js';
 import { Appearance } from './appearance.js';
 import { MultiView } from '../multiView.js';
 import { channelKey } from '../tvProviders/channelShape.js';
+import { ChannelPickerModal } from './channelPickerModal.js';
 
 let deps = {
     appState: null
@@ -18,21 +19,20 @@ export const PlayerChrome = {
     },
 
     bindControls() {
+        const browseBtn = el('browse-btn');
         const playBtn = el('play-btn');
-        const pauseBtn = el('pause-btn');
         const stopBtn = el('stop-btn');
         const volume = el('volume-slider');
         const muteBtn = el('mute-btn');
         const fullscreenBtn = el('fullscreen-btn');
         const pipBtn = el('pip-btn');
 
+        if (browseBtn) {
+            browseBtn.addEventListener('click', () => ChannelPickerModal.open('center'));
+        }
         if (playBtn) {
             // Stable hit-target: never swap buttons under the cursor (drops mash clicks).
             playBtn.addEventListener('click', () => TvPlayer.toggle());
-        }
-        if (pauseBtn) {
-            pauseBtn.classList.add('is-hidden');
-            pauseBtn.setAttribute('aria-hidden', 'true');
         }
         if (stopBtn) {
             stopBtn.addEventListener('click', () => {
@@ -160,20 +160,20 @@ export const PlayerChrome = {
             }
         }
 
-        try { TvPlayer.mountVideo(); } catch { /* ignore */ }
+        // Remount only when center surface lost the video (not every state tick).
+        const surface = el('tv-playback-surface-center');
+        const video = TvPlayer.video;
+        if (surface && video && video.parentElement !== surface) {
+            try { TvPlayer.mountVideo(); } catch { /* ignore */ }
+        }
 
         const playBtn = el('play-btn');
-        const pauseBtn = el('pause-btn');
         const wantPlay = state.wantPlaying === true || state.playing === true;
         if (playBtn) {
             playBtn.classList.remove('is-hidden');
             playBtn.textContent = wantPlay ? '⏸' : '▶';
             playBtn.title = wantPlay ? 'Pause' : 'Play';
             playBtn.setAttribute('aria-label', wantPlay ? 'Pause' : 'Play');
-        }
-        if (pauseBtn) {
-            pauseBtn.classList.add('is-hidden');
-            pauseBtn.setAttribute('aria-hidden', 'true');
         }
 
         const volume = el('volume-slider');

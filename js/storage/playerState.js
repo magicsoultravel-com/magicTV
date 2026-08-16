@@ -154,6 +154,24 @@ function normalizeMosaicPlacement(raw) {
     return out;
 }
 
+/** Floating channel-picker dialog geometry (CSS px) + pin flag. */
+function normalizeChannelPicker(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const left = Number(raw.left);
+    const top = Number(raw.top);
+    const width = Number(raw.width);
+    const height = Number(raw.height);
+    if (![left, top, width, height].every(Number.isFinite)) return null;
+    if (width < 200 || height < 160) return null;
+    return {
+        left,
+        top,
+        width,
+        height,
+        pinned: raw.pinned === true
+    };
+}
+
 /** Parsed player fields from the shared blob (does not strip sibling keys). */
 export function loadPlayerState() {
     try {
@@ -179,6 +197,7 @@ export function loadPlayerState() {
                 : DEFAULT_BUFFER_SIZE,
             mosaicSlots: normalizeMosaicSlots(raw.mosaicSlots),
             mosaicPlacement: normalizeMosaicPlacement(raw.mosaicPlacement),
+            channelPicker: normalizeChannelPicker(raw.channelPicker),
             sortBy: normalizeSortBy(raw.sortBy),
             sortDir: normalizeSortDir(raw.sortDir),
             categoryFilter: normalizeCategoryFilter(raw.categoryFilter)
@@ -196,6 +215,7 @@ export function loadPlayerState() {
             bufferSize: DEFAULT_BUFFER_SIZE,
             mosaicSlots: {},
             mosaicPlacement: {},
+            channelPicker: null,
             sortBy: { ...DEFAULT_SORT_BY },
             sortDir: { ...DEFAULT_SORT_DIR },
             categoryFilter: { ...DEFAULT_CATEGORY_FILTER }
@@ -231,6 +251,7 @@ export function savePlayerState(patch) {
         bufferSize: merged.bufferSize,
         mosaicSlots: merged.mosaicSlots || {},
         mosaicPlacement: merged.mosaicPlacement || {},
+        channelPicker: normalizeChannelPicker(merged.channelPicker),
         sortBy,
         sortDir,
         categoryFilter,
@@ -239,7 +260,7 @@ export function savePlayerState(patch) {
                 k === 'favorites' || k === 'favoritesMeta' || k === 'recents'
                 || k === 'recentsMeta' || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
-                || k === 'mosaicSlots' || k === 'mosaicPlacement'
+                || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'channelPicker'
                 || k === 'sortBy' || k === 'sortDir' || k === 'categoryFilter'
             ))
         )

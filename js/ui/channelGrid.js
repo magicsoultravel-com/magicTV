@@ -183,6 +183,10 @@ export const ChannelGrid = {
         });
     },
 
+    setOnPlay(onPlay) {
+        deps.onPlay = typeof onPlay === 'function' ? onPlay : () => {};
+    },
+
     render(container, channels, { append = false } = {}) {
         if (!container) return;
         const html = channels.map(ch => tileHtml(ch)).join('');

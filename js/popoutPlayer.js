@@ -40,7 +40,6 @@ async function boot() {
 
     video.playsInline = true;
     video.muted = muted;
-    video.autoplay = true;
     video.volume = muted ? 0.85 : 0.85;
 
     const ctx = {

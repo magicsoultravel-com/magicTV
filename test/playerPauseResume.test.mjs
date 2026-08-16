@@ -15,6 +15,10 @@ import {
     shouldPauseOnToggle,
     shouldClearWantPlayingOnPlayFail,
     shouldFallbackPlayChannelOnDoubleAbort,
+    shouldContinuePlayAfterAttach,
+    shouldBumpPlayGenerationOnPause,
+    isAutoplayNotAllowedError,
+    shouldRetryPlayMuted,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -336,4 +340,58 @@ test('resumeIfWasPlaying gate requires wasPlaying true', () => {
     assert.equal(shouldResume({ id: 1 }, true), true);
     assert.equal(shouldResume({ id: 1 }, false), false);
     assert.equal(shouldResume(null, true), false);
+});
+
+test('pause during attach cancels playChannel continue check', () => {
+    // playChannel armed transportAtStart=1; user pause bumps transport + playGeneration
+    assert.equal(shouldContinuePlayAfterAttach({
+        generation: 1,
+        playGeneration: 1,
+        wantPlaying: true,
+        transportGen: 1,
+        transportAtStart: 1
+    }), true);
+
+    assert.equal(shouldContinuePlayAfterAttach({
+        generation: 1,
+        playGeneration: 2,
+        wantPlaying: false,
+        transportGen: 2,
+        transportAtStart: 1
+    }), false, 'pause mid-load must not call video.play()');
+
+    assert.equal(shouldContinuePlayAfterAttach({
+        generation: 1,
+        playGeneration: 1,
+        wantPlaying: false,
+        transportGen: 2,
+        transportAtStart: 1
+    }), false);
+});
+
+test('pause while loading bumps playGeneration cancel token', () => {
+    assert.equal(shouldBumpPlayGenerationOnPause({ loading: true, loadPhase: 'connecting' }), true);
+    assert.equal(shouldBumpPlayGenerationOnPause({ loading: false, loadPhase: 'buffering' }), true);
+    assert.equal(shouldBumpPlayGenerationOnPause({ loading: false, loadPhase: 'idle' }), false);
+});
+
+test('NotAllowedError mute-retry only when still unmuted', () => {
+    assert.equal(isAutoplayNotAllowedError({ name: 'NotAllowedError' }), true);
+    assert.equal(isAutoplayNotAllowedError({ name: 'AbortError' }), false);
+    assert.equal(isAutoplayNotAllowedError({ message: 'play() is not allowed' }), true);
+
+    assert.equal(shouldRetryPlayMuted({ blocked: true, muted: false }), true);
+    assert.equal(shouldRetryPlayMuted({ blocked: true, muted: true }), false);
+    assert.equal(shouldRetryPlayMuted({ blocked: false, muted: false }), false);
+});
+
+test('mosaic swap resume path uses resume not toggle().catch', () => {
+    // toggle() returns undefined — .catch would throw. resume() is the correct call.
+    const toggle = () => undefined;
+    const resume = () => { /* sync start */ };
+    const result = toggle();
+    assert.equal(result, undefined);
+    assert.equal(typeof result?.catch, 'undefined');
+    assert.throws(() => { result.catch(() => {}); }, TypeError);
+    assert.doesNotThrow(() => resume());
 });

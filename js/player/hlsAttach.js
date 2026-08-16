@@ -108,6 +108,8 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
             });
             ctx.hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
                 if (generation !== ctx.playGeneration || !ctx.hls) return;
+                const prevLevel = ctx.qualityLevel;
+                const prevLabel = ctx.qualityLabel;
                 if (data.level !== undefined) {
                     ctx.qualityLevel = data.level;
                     ctx.qualityLabel = formatQualityLabel(
@@ -115,10 +117,14 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
                         video.videoHeight
                     );
                 }
-                ctx.emitState();
+                if (ctx.qualityLevel !== prevLevel || ctx.qualityLabel !== prevLabel) {
+                    ctx.emitState();
+                }
             });
             ctx.hls.on(Hls.Events.FRAG_LOADED, (_, data) => {
                 if (generation !== ctx.playGeneration) return;
+                const prevBw = ctx.bandwidthEstimateBps;
+                const prevLabel = ctx.qualityLabel;
                 const bw = data?.stats?.bwEstimate ?? data?.frag?.stats?.bwEstimate;
                 if (Number.isFinite(bw) && bw > 0) {
                     ctx.bandwidthEstimateBps = bw;
@@ -126,7 +132,12 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
                 if ((ctx.qualityLabel === '—' || !ctx.qualityLabel) && video.videoHeight) {
                     ctx.qualityLabel = formatQualityLabel(null, video.videoHeight);
                 }
-                ctx.emitState();
+                if (
+                    ctx.bandwidthEstimateBps !== prevBw
+                    || ctx.qualityLabel !== prevLabel
+                ) {
+                    ctx.emitState();
+                }
             });
             ctx.hls.on(Hls.Events.ERROR, (_, data) => {
                 if (generation !== ctx.playGeneration) return;
@@ -145,6 +156,11 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
             });
             ctx.hls.on(Hls.Events.BUFFER_DEPTH_UPDATE, () => {
                 if (generation !== ctx.playGeneration) return;
+                const now = Date.now();
+                if (ctx._lastBufferDepthEmit && now - ctx._lastBufferDepthEmit < 400) {
+                    return;
+                }
+                ctx._lastBufferDepthEmit = now;
                 ctx.emitState();
             });
             ctx.hls.loadSource(url);

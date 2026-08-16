@@ -1,5 +1,5 @@
 /**
- * Appearance settings (text size / tile width / theme colors).
+ * Appearance settings (text size / tile width / list width / theme colors).
  * Persists into the shared matrix_tv_state blob alongside catalog prefs.
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';
@@ -30,11 +30,17 @@ export const CATALOG_TRANSITIONS = VIEW_TRANSITIONS;
 
 const DEFAULT_TEXT_SIZE = 16;
 const DEFAULT_TILE_WIDTH = 180;
+const DEFAULT_LIST_WIDTH = 300;
+const DEFAULT_CATALOG_LAYOUT = 'tiles';
 const TEXT_SIZE_MIN = 8;
 const TEXT_SIZE_MAX = 18;
 const TILE_WIDTH_MIN = 100;
 const TILE_WIDTH_MAX = 300;
 const TILE_WIDTH_STEP = 10;
+const LIST_WIDTH_MIN = 100;
+const LIST_WIDTH_MAX = 300;
+const LIST_WIDTH_STEP = 10;
+const CATALOG_LAYOUTS = ['tiles', 'list'];
 
 function clampTextSize(value) {
     const n = Number(value);
@@ -47,6 +53,17 @@ function clampTileWidth(value) {
     if (!Number.isFinite(n)) return DEFAULT_TILE_WIDTH;
     const rounded = Math.round(n / TILE_WIDTH_STEP) * TILE_WIDTH_STEP;
     return Math.min(TILE_WIDTH_MAX, Math.max(TILE_WIDTH_MIN, rounded));
+}
+
+function clampListWidth(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_LIST_WIDTH;
+    const rounded = Math.round(n / LIST_WIDTH_STEP) * LIST_WIDTH_STEP;
+    return Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, rounded));
+}
+
+function normalizeCatalogLayout(value) {
+    return CATALOG_LAYOUTS.includes(value) ? value : DEFAULT_CATALOG_LAYOUT;
 }
 
 function normalizeThemeId(value) {
@@ -101,6 +118,35 @@ export const SettingsStore = {
             { length: (TILE_WIDTH_MAX - TILE_WIDTH_MIN) / TILE_WIDTH_STEP + 1 },
             (_, i) => TILE_WIDTH_MIN + i * TILE_WIDTH_STEP
         );
+    },
+
+    getListWidth() {
+        const raw = readPersistedState();
+        return raw.listWidth != null ? clampListWidth(raw.listWidth) : DEFAULT_LIST_WIDTH;
+    },
+
+    setListWidth(value) {
+        const clampedValue = clampListWidth(value);
+        patchPersistedState({ listWidth: clampedValue });
+        return clampedValue;
+    },
+
+    getListWidthOptions() {
+        return Array.from(
+            { length: (LIST_WIDTH_MAX - LIST_WIDTH_MIN) / LIST_WIDTH_STEP + 1 },
+            (_, i) => LIST_WIDTH_MIN + i * LIST_WIDTH_STEP
+        );
+    },
+
+    getCatalogLayout() {
+        const raw = readPersistedState();
+        return normalizeCatalogLayout(raw.catalogLayout);
+    },
+
+    setCatalogLayout(value) {
+        const next = normalizeCatalogLayout(value);
+        patchPersistedState({ catalogLayout: next });
+        return next;
     },
 
     getThemeId() {
@@ -161,9 +207,11 @@ export const SettingsStore = {
         const themeId = this.getThemeId();
         const textSize = this.setTextSize(DEFAULT_TEXT_SIZE);
         const tileWidth = this.setTileWidth(DEFAULT_TILE_WIDTH);
+        const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
+        const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
         const colors = this.setThemeColors(getPresetColors(themeId));
         const fontId = this.setFontId(getPresetFontId(themeId));
-        return { themeId, textSize, tileWidth, colors, fontId };
+        return { themeId, textSize, tileWidth, listWidth, catalogLayout, colors, fontId };
     },
 
     getScreenTopLeft() {
