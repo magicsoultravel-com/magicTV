@@ -1662,7 +1662,8 @@ body.has-channel-picker .tv-tab {
     gap: 0.2rem;
     padding: 0.25rem 0.35rem;
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.72);
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
     z-index: 3;
     opacity: 0;
     pointer-events: none;
@@ -1721,8 +1722,8 @@ body.has-channel-picker .tv-tab {
     justify-content: center;
     padding: var(--tv-spacing-sm) var(--tv-spacing-md);
     gap: var(--tv-spacing-lg);
-    background: rgba(0, 0, 0, 0.8);
-    border-top: 1px solid var(--tv-border);
+    background: transparent;
+    border-top: none;
     flex-wrap: wrap;
     flex-shrink: 0;
 }
@@ -1731,6 +1732,10 @@ body.has-channel-picker .tv-tab {
     display: flex;
     align-items: center;
     gap: var(--tv-spacing-sm);
+    padding: 0.25rem 0.4rem;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
 }
 
 .tv-controls__btn {
@@ -1740,10 +1745,10 @@ body.has-channel-picker .tv-tab {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--tv-main-1) 15%, transparent);
-    border: 1px solid var(--tv-main-1);
+    background: transparent;
+    border: 1px solid transparent;
     color: var(--tv-main-1);
-    border-radius: 50%;
+    border-radius: 0;
     font-size: 1rem;
     transition: var(--tv-transition), transform 0.15s ease;
     cursor: pointer;
@@ -1752,90 +1757,90 @@ body.has-channel-picker .tv-tab {
 
 .tv-controls__btn:hover {
     background: color-mix(in srgb, var(--tv-main-1) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1) 40%, transparent);
+    border-radius: 50%;
     transform: scale(1.05);
 }
 
 .tv-controls__btn--main-1 {
-    background: color-mix(in srgb, var(--tv-main-1) 15%, transparent);
-    border-color: var(--tv-main-1);
+    background: transparent;
+    border-color: transparent;
     color: var(--tv-main-1);
 }
 
 .tv-controls__btn--main-1:hover {
     background: color-mix(in srgb, var(--tv-main-1) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1) 40%, transparent);
+    border-radius: 50%;
     color: var(--tv-main-1);
     transform: scale(1.05);
 }
 
 .tv-controls__btn--main-1.is-active,
 .tv-controls__btn--main-1.is-muted {
-    background: color-mix(in srgb, var(--tv-main-1-flip) 15%, transparent);
-    border-color: var(--tv-main-1-flip);
+    background: transparent;
+    border-color: transparent;
     color: var(--tv-main-1-flip);
 }
 
 .tv-controls__btn--main-1.is-active:hover,
 .tv-controls__btn--main-1.is-muted:hover {
     background: color-mix(in srgb, var(--tv-main-1-flip) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-1-flip) 40%, transparent);
+    border-radius: 50%;
     color: var(--tv-main-1-flip);
     transform: scale(1.05);
 }
 
 .tv-controls__btn--main-2 {
-    background: color-mix(in srgb, var(--tv-main-2) 15%, transparent);
-    border-color: var(--tv-main-2);
+    background: transparent;
+    border-color: transparent;
     color: var(--tv-main-2);
 }
 
 .tv-controls__btn--main-2:hover {
     background: color-mix(in srgb, var(--tv-main-2) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-2) 40%, transparent);
+    border-radius: 50%;
     color: var(--tv-main-2);
     transform: scale(1.05);
 }
 
 .tv-controls__btn--main-2.is-active,
 .tv-controls__btn--main-2.is-muted {
-    background: color-mix(in srgb, var(--tv-main-2-flip) 15%, transparent);
-    border-color: var(--tv-main-2-flip);
+    background: transparent;
+    border-color: transparent;
     color: var(--tv-main-2-flip);
 }
 
 .tv-controls__btn--main-2.is-active:hover,
 .tv-controls__btn--main-2.is-muted:hover {
     background: color-mix(in srgb, var(--tv-main-2-flip) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-2-flip) 40%, transparent);
+    border-radius: 50%;
     color: var(--tv-main-2-flip);
     transform: scale(1.05);
 }
 
 .tv-controls__btn--main-3 {
-    background: color-mix(in srgb, var(--tv-main-3) 15%, transparent);
-    border-color: var(--tv-main-3);
+    background: transparent;
+    border-color: transparent;
     color: var(--tv-main-3);
 }
 
 .tv-controls__btn--main-3:hover {
     background: color-mix(in srgb, var(--tv-main-3) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-3) 40%, transparent);
+    border-radius: 50%;
     color: var(--tv-main-3);
     transform: scale(1.05);
 }
 
 .tv-controls__btn--main-3.is-active,
 .tv-controls__btn--main-3.is-muted {
-    background: color-mix(in srgb, var(--tv-main-3-flip) 15%, transparent);
-    border-color: var(--tv-main-3-flip);
+    background: transparent;
+    border-color: transparent;
     color: var(--tv-main-3-flip);
 }
 
 .tv-controls__btn--main-3.is-active:hover,
 .tv-controls__btn--main-3.is-muted:hover {
     background: color-mix(in srgb, var(--tv-main-3-flip) 30%, transparent);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-main-3-flip) 40%, transparent);
+    border-radius: 50%;
     color: var(--tv-main-3-flip);
     transform: scale(1.05);
 }
