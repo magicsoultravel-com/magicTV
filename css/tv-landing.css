@@ -698,12 +698,8 @@ body.has-channel-picker .tv-tab .ui-icon {
     background: var(--tv-bg-secondary);
     color: var(--tv-text-primary);
 }
-
-.tv-tab--sort-dir {
-    line-height: 1;
-}
-
-.tv-tab--sort.is-hidden,
+ 
+ .tv-tab--sort.is-hidden,
 .tv-tab--sort-dir.is-hidden,
 .tv-tab--sort-btn.is-hidden,
 .tv-tab--category.is-hidden,

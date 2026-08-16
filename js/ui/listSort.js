@@ -1,4 +1,5 @@
 import { el, escapeHtml } from '../tvUtils.js';
+import { ACTION_ICONS } from './icons.js';
 import {
     savePlayerState,
     DEFAULT_SORT_BY,
@@ -268,7 +269,7 @@ export const ListSort = {
         else if (options[0]) select.value = options[0].value;
 
         const desc = sortDir === 'desc';
-        dirBtn.textContent = desc ? '↓' : '↑';
+        dirBtn.innerHTML = desc ? ACTION_ICONS.sortDown : ACTION_ICONS.sortUp;
         dirBtn.title = desc ? 'Descending — click for ascending' : 'Ascending — click for descending';
         dirBtn.setAttribute('aria-label', desc ? 'Sort descending' : 'Sort ascending');
 

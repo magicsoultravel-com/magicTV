@@ -42,6 +42,10 @@ export const ACTION_ICONS = {
     fullscreenExit: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" vector-effect="non-scaling-stroke"><path d="M4.2 4.2H2.8M4.2 4.2V2.8M7.8 4.2h1.4M7.8 4.2V2.8M4.2 7.8H2.8M4.2 7.8v1.4M7.8 7.8h1.4M7.8 7.8v1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     /** Circular arrows — manual catalog refresh. */
     refresh: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M9.4 4.2A3.5 3.5 0 1 0 9.1 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M9.4 2.2v2.4H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Up arrow icon for ascending sort direction */
+    sortUp: '<svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,4.2 3.2,8 8.8,8" fill="currentColor"/></svg>',
+    /** Down arrow icon for descending sort direction */
+    sortDown: '<svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,7.8 3.2,4 8.8,4" fill="currentColor"/></svg>',
 };
 
 /** Monochrome nav / settings glyphs (currentColor stroke). */
