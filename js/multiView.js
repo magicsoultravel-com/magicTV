@@ -1190,7 +1190,10 @@ export const MultiView = {
         SLOT_IDS.forEach((id) => {
             const slot = this.slots[id];
             // Keep prior memory for disabled corners; only rewrite enabled slots.
-            if (!slot?.enabled) return;
+            if (!slot?.enabled) {
+                delete mosaicSlots[id];
+                return;
+            }
 
             if (!slot.player?.channel) {
                 // Before hydrate, empty players must not wipe saved satellites.

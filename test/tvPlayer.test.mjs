@@ -30,6 +30,8 @@ before(() => {
 });
 
 let TvPlayer;
+import { MultiView } from '../js/multiView.js';
+
 let Registry;
 let SettingsStore;
 
@@ -278,3 +280,30 @@ test('screen toggles persist and retrieve correctly', () => {
     SettingsStore.setScreenBottomRight(true);
     assert.equal(SettingsStore.getScreenBottomRight(), true);
 });
+
+test('dismissing or disabling a screen clears it from mosaicSlots and settings', () => {
+    globalThis.document = {
+        getElementById: () => ({ style: {}, dataset: {}, classList: { toggle() {}, remove() {} }, setAttribute() {}, querySelector: () => null, querySelectorAll: () => [] }),
+        querySelector: () => null,
+        body: { classList: { toggle() {} } }
+    };
+    SettingsStore.setScreenTopLeft(true);
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topLeft.player = { channel: { providerId: 'iptv-org', channelId: 'Test', name: 'Test' }, muted: true, stop: async () => {} };
+    MultiView.slotsHydrated = true;
+
+    MultiView.persistSlots();
+    let state = JSON.parse(store.get('matrix_tv_state'));
+    assert.ok(state.mosaicSlots.topLeft);
+
+    MultiView.setSideEnabled('topLeft', false);
+    assert.equal(SettingsStore.getScreenTopLeft(), false);
+    state = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(state.screenTopLeft, false);
+    assert.equal(state.screenLeft, false);
+    assert.equal(state.mosaicSlots.topLeft, undefined);
+    globalThis.document = undefined;
+});
+
+
+
