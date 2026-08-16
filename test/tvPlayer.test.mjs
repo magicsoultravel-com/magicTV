@@ -259,3 +259,22 @@ test('textSizeOptions and tileWidthOptions return valid arrays', () => {
     assert.ok(Array.isArray(tileOptions));
     assert.ok(tileOptions.includes(180));
 });
+test('screen toggles persist and retrieve correctly', () => {
+    assert.equal(SettingsStore.getScreenTopLeft(), false, 'defaults to false');
+    SettingsStore.setScreenTopLeft(true);
+    assert.equal(SettingsStore.getScreenTopLeft(), true);
+    let raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.screenTopLeft, true);
+
+    assert.equal(SettingsStore.getScreenTopRight(), false);
+    SettingsStore.setScreenTopRight(true);
+    assert.equal(SettingsStore.getScreenTopRight(), true);
+
+    assert.equal(SettingsStore.getScreenBottomLeft(), false);
+    SettingsStore.setScreenBottomLeft(true);
+    assert.equal(SettingsStore.getScreenBottomLeft(), true);
+
+    assert.equal(SettingsStore.getScreenBottomRight(), false);
+    SettingsStore.setScreenBottomRight(true);
+    assert.equal(SettingsStore.getScreenBottomRight(), true);
+});

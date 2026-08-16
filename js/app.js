@@ -546,7 +546,7 @@ const CONTENT_SPLIT_COLLAPSE_AT = 92;
 const CONTENT_SPLIT_CLICK_SLOP = 5;
 
 function bindContentSplitter() {
-    const content = document.querySelector('.tv-content');
+    const content = document.querySelector ? document.querySelector('.tv-content') : null;
     const splitter = el('content-splitter');
     if (!content || !splitter || splitter.dataset.bound === '1') return;
     splitter.dataset.bound = '1';
