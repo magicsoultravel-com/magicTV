@@ -79,6 +79,10 @@ export const TvProviderRegistry = {
         return this.getActiveProvider().getLastRefreshed?.() || 0;
     },
 
+    getCategoryNameMap() {
+        return this.getActiveProvider().getCategoryNameMap?.() || new Map();
+    },
+
     async getChannel(ref, opts = {}) {
         const providerId = ref?.providerId || loadSettings().catalogProvider;
         const channelId = ref?.channelId || ref;

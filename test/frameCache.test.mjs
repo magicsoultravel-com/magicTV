@@ -89,3 +89,45 @@ test('removeFrames batch-deletes many keys in one write', async () => {
     assert.equal(await FrameCache.getFrame(b), null);
     assert.equal(await FrameCache.getFrame(c), 'data:image/jpeg;base64,c');
 });
+
+test('setFrames writes the same data URL under stream URL and channel key', async () => {
+    await FrameCache.clearFrames();
+    const url = 'https://example.test/dual.m3u8';
+    const chKey = 'iptv-org:dual.channel';
+    const dataUrl = 'data:image/jpeg;base64,dual';
+
+    assert.equal(await FrameCache.setFrames([url, chKey], dataUrl), true);
+    assert.equal(await FrameCache.getFrame(url), dataUrl);
+    assert.equal(await FrameCache.getFrame(chKey), dataUrl);
+
+    const map = await FrameCache.getFrames([url, chKey, 'iptv-org:miss']);
+    assert.equal(map.size, 2);
+    assert.equal(map.get(chKey), dataUrl);
+});
+
+test('dual-key entries stay independent after removing one key', async () => {
+    await FrameCache.clearFrames();
+    const url = 'https://example.test/clone.m3u8';
+    const chKey = 'iptv-org:clone.channel';
+    await FrameCache.setFrames([url, chKey], 'data:image/jpeg;base64,clone');
+    await FrameCache.removeFrame(url);
+    assert.equal(await FrameCache.getFrame(url), null);
+    assert.equal(await FrameCache.getFrame(chKey), 'data:image/jpeg;base64,clone');
+});
+
+test('concurrent first writes after clear all survive (hydrate + writeChain)', async () => {
+    await FrameCache.clearFrames();
+    const a = 'https://example.test/race-a.m3u8';
+    const b = 'https://example.test/race-b.m3u8';
+    const results = await Promise.all([
+        FrameCache.setFrame(a, 'data:image/jpeg;base64,a'),
+        FrameCache.setFrame(b, 'data:image/jpeg;base64,b'),
+        FrameCache.getFrame(a),
+        FrameCache.getFrame(b)
+    ]);
+    assert.equal(results[0], true);
+    assert.equal(results[1], true);
+    // After concurrent settle, both keys must be present.
+    assert.equal(await FrameCache.getFrame(a), 'data:image/jpeg;base64,a');
+    assert.equal(await FrameCache.getFrame(b), 'data:image/jpeg;base64,b');
+});

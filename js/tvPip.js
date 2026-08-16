@@ -1,15 +1,15 @@
 /**
- * Native browser Picture-in-Picture control for the TV player.
- * "Pop out" moves the live <video> into an OS-level always-on-top window
- * (draggable / resizable by the browser). "Pop in" returns it to the app.
- * Works in Chrome and Firefox on desktop; buttons are hidden where unsupported.
+ * Native browser Picture-in-Picture + window popout fallback for multi-stream.
+ * First free detach uses OS PiP; additional streams open same-origin windows.
  */
 import { TvPlayer } from './tvPlayer.js';
 import { showAppToast } from './ui/toast.js';
 import { ACTION_ICONS } from './ui/icons.js';
+import { TvPopoutWindows } from './tvPopoutWindows.js';
 
 const POP_OUT_LABEL = 'Pop out';
 const POP_IN_LABEL = 'Pop in';
+const CENTER_SLOT = 'center';
 
 export const TvPip = {
     buttons: new Set(),
@@ -27,29 +27,20 @@ export const TvPip = {
         if (this.initialized) return;
         this.initialized = true;
 
-        if (!this.supported()) {
-            this.syncButtons();
-            return;
-        }
-
-        const video = TvPlayer.video;
-        if (video) {
-            video.addEventListener('enterpictureinpicture', () => this.syncButtons());
-            video.addEventListener('leavepictureinpicture', () => {
-                this.stripPipSizing();
-                // Re-mount the video into whichever container is current now that
-                // the floating window is gone (also refreshes sidebar transport UI).
-                TvPlayer.emitState();
-                this.syncButtons();
-            });
-        }
-
         window.addEventListener('tv:state_changed', () => this.syncButtons());
+        window.addEventListener('tv:pip_changed', () => {
+            this.stripPipSizing();
+            this.syncButtons();
+        });
+        window.addEventListener('tv:multiview_changed', () => this.syncButtons());
+        window.addEventListener('tv:popout_changed', () => this.syncButtons());
         this.syncButtons();
     },
 
     isActive() {
-        return typeof document !== 'undefined' && Boolean(document.pictureInPictureElement);
+        const native = typeof document !== 'undefined'
+            && document.pictureInPictureElement === TvPlayer.video;
+        return native || TvPopoutWindows.isOpen(CENTER_SLOT);
     },
 
     registerButton(btn) {
@@ -63,72 +54,51 @@ export const TvPip = {
     },
 
     syncButtons() {
-        const supported = this.supported();
-        const active = supported && this.isActive();
+        const active = this.isActive();
         const label = active ? POP_IN_LABEL : POP_OUT_LABEL;
-        const icon = supported
-            ? (active ? ACTION_ICONS.pictureInPictureExit : ACTION_ICONS.pictureInPicture)
-            : null;
+        const icon = active
+            ? ACTION_ICONS.pictureInPictureExit
+            : ACTION_ICONS.pictureInPicture;
 
         this.buttons.forEach((btn) => {
             if (!btn.isConnected) {
                 this.buttons.delete(btn);
                 return;
             }
-            if (!supported) {
-                btn.classList.add('is-hidden');
-                btn.disabled = true;
-                return;
-            }
+            // Window popout works without native PiP support
             btn.disabled = false;
+            btn.classList.remove('is-hidden');
             btn.classList.toggle('is-active', active);
             btn.setAttribute('aria-pressed', active ? 'true' : 'false');
             btn.setAttribute('title', label);
             btn.setAttribute('aria-label', label);
-            if (icon) btn.innerHTML = icon;
+            btn.innerHTML = icon;
         });
     },
 
     async toggle() {
-        if (!this.supported()) {
-            showAppToast('Pop out isn’t supported in this browser.');
-            return;
-        }
-
         const video = TvPlayer.video;
-        if (!video) {
+        const channel = TvPlayer.channel;
+        const url = channel?.url_resolved || channel?.url || '';
+
+        if (!url && !video) {
             showAppToast('Nothing is playing yet.');
             return;
         }
 
-        if (this.isActive()) {
-            try {
-                await document.exitPictureInPicture();
-            } catch {
-                showAppToast('Couldn’t pop the video back in.');
-            }
-            return;
-        }
-
-        try {
-            await video.requestPictureInPicture();
-        } catch (e) {
-            let msg = 'Couldn’t pop the video out.';
-            if (!TvPlayer.channel) {
-                msg = 'Nothing is playing yet.';
-            } else if (e?.name === 'InvalidStateError') {
-                msg = 'The stream isn’t ready to pop out yet — try again in a moment.';
-            } else if (e?.name === 'NotSupportedError' || e?.name === 'NotFoundError') {
-                msg = 'Pop out isn’t supported for this stream or browser.';
-            }
-            showAppToast(msg);
-        }
+        await TvPopoutWindows.detach({
+            slotId: CENTER_SLOT,
+            video,
+            url,
+            name: channel?.name || 'magicTV',
+            muted: TvPlayer.muted !== false,
+            pipSupported: this.supported()
+        });
+        this.syncButtons();
     },
 
-    // The browser leaves explicit width/height on the video element while it is
-    // in the PiP window; clear it so the in-app CSS sizing wins after pop-in.
     stripPipSizing() {
-        const video = TvPlayer.video;
+        const video = document.pictureInPictureElement || TvPlayer.video;
         if (!video) return;
         video.removeAttribute('width');
         video.removeAttribute('height');
@@ -137,7 +107,10 @@ export const TvPip = {
     },
 
     exitIfActive() {
-        if (!this.isActive()) return;
+        if (TvPopoutWindows.isOpen(CENTER_SLOT)) {
+            TvPopoutWindows.close(CENTER_SLOT);
+        }
+        if (typeof document === 'undefined' || !document.pictureInPictureElement) return;
         if (typeof document.exitPictureInPicture !== 'function') return;
         try {
             document.exitPictureInPicture().catch(() => {});

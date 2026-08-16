@@ -1,7 +1,9 @@
 /**
  * FrameCache - Persistent storage for captured channel thumbnail frames.
  *
- * Uses IndexedDB to store frame data URLs, keyed by channel URL.
+ * Uses IndexedDB to store frame data URLs. Keys are stream URLs and/or
+ * channel keys (`providerId:channelId`) so favorites/recents skeletons can
+ * restore a prior play frame before `url_resolved` hydrates.
  * An in-memory Map mirrors the IDB blob so N tile lookups do not each
  * reload the entire cache entry.
  */
@@ -17,6 +19,9 @@ let writeChain = Promise.resolve();
 /** @type {Map<string, { cachedAt: number, dataUrl: string }>|null} */
 let memoryEntries = null;
 
+/** Shared hydrate so concurrent first readers do not overwrite each other's Map. */
+let hydratePromise = null;
+
 function enqueueWrite(fn) {
     const next = writeChain.then(fn, fn);
     // Keep the chain alive even if a write fails.
@@ -28,16 +33,34 @@ function isFresh(entry) {
     return !!(entry?.dataUrl && Date.now() - entry.cachedAt <= FRAME_CACHE_TTL);
 }
 
+function normalizeKeys(keys) {
+    return [...new Set((keys || []).map((k) => (k || '').trim()).filter(Boolean))];
+}
+
 async function ensureMemory() {
     if (memoryEntries) return memoryEntries;
-    const cache = await IndexedDBStore.get(FRAME_CACHE_KEY);
-    memoryEntries = new Map();
-    if (cache?.entries) {
-        for (const [url, entry] of Object.entries(cache.entries)) {
-            if (entry?.dataUrl) memoryEntries.set(url, entry);
-        }
+    if (!hydratePromise) {
+        hydratePromise = (async () => {
+            const cache = await IndexedDBStore.get(FRAME_CACHE_KEY);
+            const mem = new Map();
+            if (cache?.entries) {
+                for (const [url, entry] of Object.entries(cache.entries)) {
+                    if (entry?.dataUrl) {
+                        mem.set(url, {
+                            cachedAt: entry.cachedAt,
+                            dataUrl: entry.dataUrl
+                        });
+                    }
+                }
+            }
+            memoryEntries = mem;
+            return mem;
+        })().catch((err) => {
+            hydratePromise = null;
+            throw err;
+        });
     }
-    return memoryEntries;
+    return hydratePromise;
 }
 
 async function persistMemoryToStore() {
@@ -50,17 +73,17 @@ async function persistMemoryToStore() {
 
 /**
  * Get a cached frame data URL.
- * @param {string} url - The channel/stream URL to look up.
+ * @param {string} key - Stream URL or channel key (`providerId:channelId`).
  * @returns {Promise<string|null>} The cached data URL or null.
  */
-async function getFrame(url) {
-    if (!url) return null;
+async function getFrame(key) {
+    if (!key) return null;
     try {
         const mem = await ensureMemory();
-        const entry = mem.get(url);
+        const entry = mem.get(key);
         if (!entry?.dataUrl) return null;
         if (!isFresh(entry)) {
-            await removeFrame(url);
+            await removeFrame(key);
             return null;
         }
         return entry.dataUrl;
@@ -71,27 +94,27 @@ async function getFrame(url) {
 
 /**
  * Batch-lookup cached frames (single IDB hydrate via the memory mirror).
- * @param {string[]} urls
- * @returns {Promise<Map<string, string>>} url → dataUrl for hits only
+ * @param {string[]} keys — stream URLs and/or channel keys
+ * @returns {Promise<Map<string, string>>} key → dataUrl for hits only
  */
-async function getFrames(urls) {
+async function getFrames(keys) {
     const out = new Map();
-    if (!urls?.length) return out;
+    if (!keys?.length) return out;
     try {
         const mem = await ensureMemory();
         const expired = [];
-        for (const url of urls) {
-            if (!url) continue;
-            const entry = mem.get(url);
+        for (const key of keys) {
+            if (!key) continue;
+            const entry = mem.get(key);
             if (!entry?.dataUrl) continue;
             if (!isFresh(entry)) {
-                expired.push(url);
+                expired.push(key);
                 continue;
             }
-            out.set(url, entry.dataUrl);
+            out.set(key, entry.dataUrl);
         }
-        for (const url of expired) {
-            await removeFrame(url);
+        for (const key of expired) {
+            await removeFrame(key);
         }
     } catch {
         /* ignore */
@@ -100,17 +123,21 @@ async function getFrames(urls) {
 }
 
 /**
- * Store a captured frame in the cache.
- * @param {string} url - The channel/stream URL.
+ * Store a captured frame under one or more keys (stream URL and/or channel key).
+ * @param {string|string[]} keys
  * @param {string} dataUrl - The data URL (base64 image).
  * @returns {Promise<boolean>} True if stored successfully.
  */
-async function setFrame(url, dataUrl) {
-    if (!url || !dataUrl) return false;
+async function setFrames(keys, dataUrl) {
+    const list = normalizeKeys(Array.isArray(keys) ? keys : [keys]);
+    if (!list.length || !dataUrl) return false;
     return enqueueWrite(async () => {
         try {
             const mem = await ensureMemory();
-            mem.set(url, { cachedAt: Date.now(), dataUrl });
+            const cachedAt = Date.now();
+            for (const key of list) {
+                mem.set(key, { cachedAt, dataUrl });
+            }
             await persistMemoryToStore();
             return true;
         } catch {
@@ -120,30 +147,40 @@ async function setFrame(url, dataUrl) {
 }
 
 /**
+ * Store a captured frame in the cache.
+ * @param {string} key - Stream URL or channel key.
+ * @param {string} dataUrl - The data URL (base64 image).
+ * @returns {Promise<boolean>} True if stored successfully.
+ */
+async function setFrame(key, dataUrl) {
+    return setFrames(key, dataUrl);
+}
+
+/**
  * Remove a frame from the cache.
- * @param {string} url - The channel/stream URL.
+ * @param {string} key
  * @returns {Promise<void>}
  */
-async function removeFrame(url) {
-    if (!url) return;
-    return removeFrames([url]);
+async function removeFrame(key) {
+    if (!key) return;
+    return removeFrames([key]);
 }
 
 /**
  * Remove many frames in one write (avoids N full IndexedDB persists).
- * @param {string[]} urls
+ * @param {string[]} keys
  * @returns {Promise<void>}
  */
-async function removeFrames(urls) {
-    const list = [...new Set((urls || []).filter(Boolean))];
+async function removeFrames(keys) {
+    const list = normalizeKeys(keys);
     if (!list.length) return;
     return enqueueWrite(async () => {
         try {
             const mem = await ensureMemory();
             let changed = false;
-            for (const url of list) {
-                if (!mem.has(url)) continue;
-                mem.delete(url);
+            for (const key of list) {
+                if (!mem.has(key)) continue;
+                mem.delete(key);
                 changed = true;
             }
             if (changed) await persistMemoryToStore();
@@ -161,6 +198,7 @@ async function clearFrames() {
     return enqueueWrite(async () => {
         try {
             memoryEntries = new Map();
+            hydratePromise = Promise.resolve(memoryEntries);
             await IndexedDBStore.remove(FRAME_CACHE_KEY);
         } catch {
             // Ignore errors
@@ -172,6 +210,7 @@ export const FrameCache = {
     getFrame,
     getFrames,
     setFrame,
+    setFrames,
     removeFrame,
     removeFrames,
     clearFrames

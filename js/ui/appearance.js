@@ -2,9 +2,59 @@ import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { showAppToast } from './toast.js';
+import {
+    THEME_COLOR_KEYS,
+    applyFontToRoot,
+    applyThemeColorsToRoot,
+    ensureAllFontsLoaded,
+    getFontEntry,
+    listFonts,
+    listThemes
+} from './themes.js';
 
 function formatTextSizeLabel(size) {
     return `${Math.round((size / 16) * 100)}%`;
+}
+
+function setFontPickerOpen(open) {
+    const trigger = el('font-picker-trigger');
+    const menu = el('font-picker-menu');
+    if (!trigger || !menu) return;
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menu.classList.toggle('is-hidden', !open);
+}
+
+function syncFontPickerUi(fontId) {
+    const entry = getFontEntry(fontId);
+    const current = el('font-picker-current');
+    const trigger = el('font-picker-trigger');
+    const menu = el('font-picker-menu');
+
+    if (current) {
+        current.textContent = entry.label;
+        current.style.fontFamily = entry.stack;
+    }
+    if (trigger) trigger.style.fontFamily = entry.stack;
+
+    if (menu) {
+        menu.querySelectorAll('.settings-font-picker__option').forEach((btn) => {
+            const selected = btn.getAttribute('data-font-id') === entry.id;
+            btn.classList.toggle('is-selected', selected);
+            btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+    }
+}
+
+function buildFontPickerMenu() {
+    const menu = el('font-picker-menu');
+    if (!menu || menu.dataset.ready === '1') return;
+    ensureAllFontsLoaded();
+    menu.innerHTML = listFonts().map((f) => {
+        const entry = getFontEntry(f.id);
+        const safeStack = entry.stack.replace(/"/g, '&quot;');
+        return `<button type="button" class="settings-font-picker__option" role="option" data-font-id="${entry.id}" style="font-family: ${safeStack}" aria-selected="false">${entry.label}</button>`;
+    }).join('');
+    menu.dataset.ready = '1';
 }
 
 // Detect each tile's name overflow and toggle the "narrow" class.
@@ -38,12 +88,22 @@ function measureTileMarquee(tile) {
     }
 }
 
+function syncColorInputs(colors) {
+    for (const key of THEME_COLOR_KEYS) {
+        const input = el(`theme-color-${key}`);
+        if (input) input.value = colors[key];
+    }
+}
+
 export const Appearance = {
     bind() {
         const textSlider = el('text-size-slider');
         const textValue = el('text-size-value');
         const tileSlider = el('tile-width-slider');
         const tileValue = el('tile-width-value');
+        const themeSelect = el('theme-select');
+        const fontTrigger = el('font-picker-trigger');
+        const fontMenu = el('font-picker-menu');
 
         const syncTextUi = (size) => {
             if (textSlider) textSlider.value = String(size);
@@ -56,6 +116,60 @@ export const Appearance = {
             if (tileValue) tileValue.textContent = `${width}px`;
             if (tileSlider) tileSlider.setAttribute('aria-valuetext', `${width}px`);
         };
+
+        const syncFontUi = (fontId) => {
+            syncFontPickerUi(fontId);
+        };
+
+        if (themeSelect) {
+            themeSelect.innerHTML = listThemes()
+                .map((t) => `<option value="${t.id}">${t.label}</option>`)
+                .join('');
+            themeSelect.addEventListener('change', () => {
+                const id = SettingsStore.setThemeId(themeSelect.value, { resetColors: true });
+                const colors = SettingsStore.getThemeColors();
+                syncColorInputs(colors);
+                syncFontUi(SettingsStore.getFontId());
+                document.documentElement.setAttribute('data-theme', id);
+                this.applyStyles();
+                showAppToast(`Theme: ${listThemes().find((t) => t.id === id)?.label || id}`);
+            });
+        }
+
+        buildFontPickerMenu();
+        if (fontTrigger && fontMenu) {
+            fontTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const open = fontTrigger.getAttribute('aria-expanded') !== 'true';
+                setFontPickerOpen(open);
+            });
+            fontMenu.addEventListener('click', (e) => {
+                const btn = e.target.closest('.settings-font-picker__option');
+                if (!btn) return;
+                const id = SettingsStore.setFontId(btn.getAttribute('data-font-id'));
+                syncFontUi(id);
+                setFontPickerOpen(false);
+                this.applyStyles();
+                showAppToast(`Font: ${getFontEntry(id).label}`);
+            });
+            document.addEventListener('click', (e) => {
+                const picker = el('font-picker');
+                if (!picker || picker.contains(e.target)) return;
+                setFontPickerOpen(false);
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') setFontPickerOpen(false);
+            });
+        }
+
+        for (const key of THEME_COLOR_KEYS) {
+            const input = el(`theme-color-${key}`);
+            if (!input) continue;
+            input.addEventListener('input', () => {
+                SettingsStore.setThemeColor(key, input.value);
+                this.applyStyles();
+            });
+        }
 
         if (textSlider) {
             textSlider.addEventListener('input', () => {
@@ -76,10 +190,13 @@ export const Appearance = {
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
-                const size = SettingsStore.setTextSize(16);
-                const width = SettingsStore.setTileWidth(180);
-                syncTextUi(size);
-                syncTileUi(width);
+                const { themeId, textSize, tileWidth, colors, fontId } = SettingsStore.resetAppearance();
+                if (themeSelect) themeSelect.value = themeId;
+                syncTextUi(textSize);
+                syncTileUi(tileWidth);
+                syncFontUi(fontId);
+                syncColorInputs(colors);
+                document.documentElement.setAttribute('data-theme', themeId);
                 this.applyStyles();
                 showAppToast('Appearance reset to defaults');
             });
@@ -92,9 +209,15 @@ export const Appearance = {
         const root = document.documentElement;
         const textSize = SettingsStore.getTextSize();
         const tileWidth = SettingsStore.getTileWidth();
+        const themeId = SettingsStore.getThemeId();
+        const colors = SettingsStore.getThemeColors();
+        const fontId = SettingsStore.getFontId();
 
         root.style.fontSize = `${textSize}px`;
         root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
+        root.setAttribute('data-theme', themeId);
+        applyThemeColorsToRoot(colors, root);
+        applyFontToRoot(fontId, root);
 
         this.updatePreviewTile();
 
@@ -150,6 +273,22 @@ export const Appearance = {
         if (tileWidth) tileWidth.textContent = `${tileWidthPx}px`;
         if (tileSlider) tileSlider.setAttribute('aria-valuetext', `${tileWidthPx}px`);
 
+        const themeId = SettingsStore.getThemeId();
+        const themeSelect = el('theme-select');
+        if (themeSelect) {
+            if (!themeSelect.options.length) {
+                themeSelect.innerHTML = listThemes()
+                    .map((t) => `<option value="${t.id}">${t.label}</option>`)
+                    .join('');
+            }
+            themeSelect.value = themeId;
+        }
+
+        const fontId = SettingsStore.getFontId();
+        buildFontPickerMenu();
+        syncFontPickerUi(fontId);
+
+        syncColorInputs(SettingsStore.getThemeColors());
         this.applyStyles();
     },
 

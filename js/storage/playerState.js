@@ -10,6 +10,64 @@ export const DEFAULT_BUFFER_SIZE = 15;
 export const MAX_BUFFER_SIZE = 120;
 export const MIN_BUFFER_SIZE = 5;
 
+export const DEFAULT_SORT_BY = Object.freeze({
+    countries: 'stations',
+    channels: 'name',
+    favorites: 'custom',
+    recents: 'recent'
+});
+
+export const DEFAULT_SORT_DIR = Object.freeze({
+    countries: 'desc',
+    channels: 'asc',
+    favorites: 'asc',
+    recents: 'desc'
+});
+
+export const DEFAULT_CATEGORY_FILTER = Object.freeze({
+    channels: '',
+    favorites: '',
+    recents: ''
+});
+
+const SORT_BY_ALLOWED = {
+    countries: new Set(['name', 'stations']),
+    channels: new Set(['name', 'category']),
+    favorites: new Set(['custom', 'name', 'country', 'category']),
+    recents: new Set(['recent', 'name', 'country', 'category'])
+};
+
+const CATEGORY_FILTER_KEYS = ['channels', 'favorites', 'recents'];
+
+function normalizeSortBy(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = { ...DEFAULT_SORT_BY };
+    for (const ctx of Object.keys(SORT_BY_ALLOWED)) {
+        const value = src[ctx];
+        if (SORT_BY_ALLOWED[ctx].has(value)) out[ctx] = value;
+    }
+    return out;
+}
+
+function normalizeSortDir(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = { ...DEFAULT_SORT_DIR };
+    for (const ctx of Object.keys(out)) {
+        if (src[ctx] === 'asc' || src[ctx] === 'desc') out[ctx] = src[ctx];
+    }
+    return out;
+}
+
+function normalizeCategoryFilter(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = { ...DEFAULT_CATEGORY_FILTER };
+    for (const key of CATEGORY_FILTER_KEYS) {
+        const value = src[key];
+        if (typeof value === 'string') out[key] = value;
+    }
+    return out;
+}
+
 function migrateRecentsMeta(raw) {
     if (Array.isArray(raw.recentsMeta) && raw.recentsMeta.length) {
         return raw.recentsMeta.map((entry) => {
@@ -50,6 +108,52 @@ function normalizeFavoritesMeta(favorites, favoritesMeta) {
         .filter((e) => e.key && favKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
+const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+
+function normalizeMosaicSlots(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    const out = {};
+    MOSAIC_SLOT_IDS.forEach((id) => {
+        const entry = raw[id];
+        if (!entry) return;
+        const key = migrateFavoriteRef(typeof entry === 'string' ? entry : entry.key);
+        if (!key) return;
+        out[id] = {
+            key,
+            name: (typeof entry === 'object' && entry.name) || '',
+            muted: typeof entry === 'object' ? entry.muted !== false : true,
+            url: (typeof entry === 'object' && (entry.url || entry.url_resolved)) || ''
+        };
+    });
+    return out;
+}
+
+function clamp01(n) {
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(1, Math.max(0, n));
+}
+
+/** Free-drag geometry per slot (fractions of mosaic size + z-order). */
+function normalizeMosaicPlacement(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    const out = {};
+    MOSAIC_SLOT_IDS.forEach((id) => {
+        const entry = raw[id];
+        if (!entry || typeof entry !== 'object') return;
+        const w = clamp01(Number(entry.w));
+        const h = clamp01(Number(entry.h));
+        if (w < 0.04 || h < 0.04) return;
+        out[id] = {
+            x: clamp01(Number(entry.x)),
+            y: clamp01(Number(entry.y)),
+            w,
+            h,
+            z: Number.isFinite(entry.z) ? Math.max(1, Math.round(entry.z)) : 1
+        };
+    });
+    return out;
+}
+
 /** Parsed player fields from the shared blob (does not strip sibling keys). */
 export function loadPlayerState() {
     try {
@@ -72,7 +176,12 @@ export function loadPlayerState() {
             wasPlaying: raw.wasPlaying === true,
             bufferSize: Number.isFinite(raw.bufferSize)
                 ? Math.min(MAX_BUFFER_SIZE, Math.max(MIN_BUFFER_SIZE, raw.bufferSize))
-                : DEFAULT_BUFFER_SIZE
+                : DEFAULT_BUFFER_SIZE,
+            mosaicSlots: normalizeMosaicSlots(raw.mosaicSlots),
+            mosaicPlacement: normalizeMosaicPlacement(raw.mosaicPlacement),
+            sortBy: normalizeSortBy(raw.sortBy),
+            sortDir: normalizeSortDir(raw.sortDir),
+            categoryFilter: normalizeCategoryFilter(raw.categoryFilter)
         };
     } catch {
         return {
@@ -84,7 +193,12 @@ export function loadPlayerState() {
             lastChannelKey: null,
             lastChannelName: '',
             wasPlaying: false,
-            bufferSize: DEFAULT_BUFFER_SIZE
+            bufferSize: DEFAULT_BUFFER_SIZE,
+            mosaicSlots: {},
+            mosaicPlacement: {},
+            sortBy: { ...DEFAULT_SORT_BY },
+            sortDir: { ...DEFAULT_SORT_DIR },
+            categoryFilter: { ...DEFAULT_CATEGORY_FILTER }
         };
     }
 }
@@ -102,6 +216,9 @@ export function savePlayerState(patch) {
     if (merged.favorites) {
         merged.favoritesMeta = normalizeFavoritesMeta(merged.favorites, merged.favoritesMeta);
     }
+    const sortBy = normalizeSortBy(merged.sortBy);
+    const sortDir = normalizeSortDir(merged.sortDir);
+    const categoryFilter = normalizeCategoryFilter(merged.categoryFilter);
     return patchPersistedState({
         favorites: merged.favorites,
         favoritesMeta: merged.favoritesMeta,
@@ -112,11 +229,18 @@ export function savePlayerState(patch) {
         lastChannelName: merged.lastChannelName,
         wasPlaying: merged.wasPlaying,
         bufferSize: merged.bufferSize,
+        mosaicSlots: merged.mosaicSlots || {},
+        mosaicPlacement: merged.mosaicPlacement || {},
+        sortBy,
+        sortDir,
+        categoryFilter,
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
                 k === 'favorites' || k === 'favoritesMeta' || k === 'recents'
                 || k === 'recentsMeta' || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
+                || k === 'mosaicSlots' || k === 'mosaicPlacement'
+                || k === 'sortBy' || k === 'sortDir' || k === 'categoryFilter'
             ))
         )
     });

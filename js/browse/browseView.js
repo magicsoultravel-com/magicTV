@@ -1,9 +1,9 @@
 import { TvProviderRegistry } from '../tvProviders/registry.js';
 import { countryFlagEmoji, escapeHtml, debounce, el, els } from '../tvUtils.js';
 import { showAppToast } from '../ui/toast.js';
-import { TileFrames } from '../tileFrames.js';
 import { Appearance } from '../ui/appearance.js';
 import { ChannelGrid } from '../ui/channelGrid.js';
+import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap } from '../ui/listSort.js';
 
 const PAGE_SIZE = 60;
 
@@ -89,12 +89,14 @@ export const BrowseView = {
         const appState = deps.appState;
         try {
             appState.countries = await TvProviderRegistry.getCountries();
+            setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
             deps.stampRefreshView('browseCountries', TvProviderRegistry.getLastRefreshed());
         } catch (err) {
             console.error('Failed to load countries:', err);
             showAppToast('Countries unavailable — check your connection');
         }
         deps.updateRefreshAge();
+        ListSort.syncCategoryFilterControls();
         this.renderCountries();
     },
 
@@ -102,9 +104,11 @@ export const BrowseView = {
         const appState = deps.appState;
         const container = el('countries-container');
         if (!container) return;
-        const list = (appState.countries || []).filter(c =>
-            c && c.name && c.name.toLowerCase().includes(appState.countryFilter)
-        );
+        const { sortBy, sortDir } = getSortPrefs(appState);
+        const list = (appState.countries || [])
+            .filter(c => c && c.name && c.name.toLowerCase().includes(appState.countryFilter))
+            .slice()
+            .sort((a, b) => compareCountries(a, b, sortBy || 'stations', sortDir || 'desc'));
         container.innerHTML = list.map(c => `
         <div class="country-tile" data-country="${escapeHtml(c.iso_3166_1 || '')}" role="button" tabindex="0">
             <div class="country-tile__icon">${countryFlagEmoji(c.iso_3166_1)}</div>
@@ -130,7 +134,6 @@ export const BrowseView = {
         appState.browseGeneration += 1;
         appState.browseLoading = false;
         appState.browseCountry = countryCode;
-        TileFrames.clearLiveRefresh();
         appState.browseChannels = [];
         appState.browseOffset = 0;
         appState.browseHasMore = true;
@@ -150,6 +153,7 @@ export const BrowseView = {
         }
         if (channels) channels.innerHTML = '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
         deps.updateRefreshAge();
+        ListSort.syncSortControls();
 
         await this.loadMoreChannels();
         setupScrollLoading();
@@ -160,13 +164,16 @@ export const BrowseView = {
         if (appState.browseLoading || !appState.browseHasMore) return;
         const generation = appState.browseGeneration;
         appState.browseLoading = true;
+        const { sortBy, sortDir } = getSortPrefs(appState);
         try {
             const results = await TvProviderRegistry.searchChannels({
                 countrycode: appState.browseCountry,
                 query: appState.browseQuery,
+                category: getCategoryFilterValue(appState),
                 offset: appState.browseOffset,
                 limit: PAGE_SIZE,
-                order: 'name',
+                order: sortBy === 'category' ? 'category' : 'name',
+                reverse: sortDir === 'desc',
                 refresh: forceRefresh
             });
             if (generation !== appState.browseGeneration) return;
@@ -176,6 +183,8 @@ export const BrowseView = {
             appState.browseChannels = appState.browseChannels.concat(results);
             appState.browseOffset += PAGE_SIZE;
             ChannelGrid.render(el('channels-container'), results, { append: true });
+            setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
+            ListSort.syncCategoryFilterControls();
         } catch (err) {
             if (generation !== appState.browseGeneration) return;
             console.error('Failed to load channels:', err);
@@ -186,6 +195,11 @@ export const BrowseView = {
                 scheduleBrowseFillCheck();
             }
         }
+    },
+
+    /** Restart channel list when filter or sort changes. */
+    restartChannelList(query = deps.currentFilter()) {
+        this.startChannelSearch(query);
     },
 
     startChannelSearch(query) {
@@ -222,7 +236,6 @@ export const BrowseView = {
     showCountriesView() {
         const appState = deps.appState;
         appState.browseCountry = null;
-        TileFrames.clearLiveRefresh();
         appState.countryFilter = deps.currentFilter();
         const countries = el('countries-container');
         const channels = el('channels-container');
@@ -234,6 +247,7 @@ export const BrowseView = {
             backBtn.classList.remove('is-active', 'is-pink-active');
         }
         els('.tv-tab[data-tab="browse"]').forEach(tab => tab.classList.add('is-active'));
+        ListSort.syncSortControls();
         this.renderCountries();
         deps.updateRefreshAge();
     }

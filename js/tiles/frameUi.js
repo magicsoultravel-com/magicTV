@@ -1,8 +1,7 @@
 /**
- * Frame tile UI state machine (waiting → loading → captured | offline).
- * Does not own TileFrames scheduler state — callers pass currentEpoch.
+ * Frame tile UI state (waiting → captured | offline).
+ * Loading/offline remain for chrome; frames are no longer filled by offscreen HLS.
  */
-import { FrameCache } from '../storage/frameCache.js';
 
 /**
  * @param {HTMLElement} frame
@@ -102,36 +101,4 @@ export function setFrameState(frame, next, src) {
         }
         frame.dataset.captured = '1';
     }
-}
-
-/**
- * Apply the final UI state after a grab settles. Never leaves `loading`.
- * Skips both cache write and UI when epoch is stale (manual refresh aborted
- * the grab). Disconnected frames still cache on a live epoch.
- *
- * @param {HTMLElement} frame
- * @param {string|null} dataUrl
- * @param {string} url
- * @param {number} epoch — epoch when capture started
- * @param {'hls-lib'|'timeout'|'media'|'black'|null} [failReason]
- * @param {number} currentEpoch — live scheduler epoch (stale if !== epoch)
- */
-export function settleFrameCapture(frame, dataUrl, url, epoch, failReason = null, currentEpoch = epoch) {
-    if (epoch !== currentEpoch) return;
-    if (dataUrl && url) {
-        FrameCache.setFrame(url, dataUrl).catch(() => {});
-    }
-    if (!frame?.isConnected) return;
-    if (dataUrl) {
-        delete frame.dataset.frameFail;
-        setFrameState(frame, 'captured', dataUrl);
-        return;
-    }
-    if (failReason) {
-        frame.dataset.frameFail = failReason;
-        try { console.debug('[TileFrames] capture fail', failReason, url); } catch { /* ignore */ }
-    } else {
-        delete frame.dataset.frameFail;
-    }
-    setFrameState(frame, 'offline');
 }

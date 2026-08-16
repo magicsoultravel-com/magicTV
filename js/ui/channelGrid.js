@@ -6,6 +6,8 @@ import { showAppToast } from './toast.js';
 import { CARD_ICONS } from './icons.js';
 import { TileFrames } from '../tileFrames.js';
 import { Appearance } from './appearance.js';
+import { FavoritesReorder } from './favoritesReorder.js';
+import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
 
 const wiredTiles = new WeakSet();
 
@@ -69,7 +71,9 @@ function metaChannels(metaEntries) {
             name: e.name || '',
             logo: e.logo || '',
             countrycode: e.countrycode || '',
-            url_resolved: ''
+            url_resolved: '',
+            categories: [],
+            at: Number.isFinite(e.at) ? e.at : 0
         };
     });
 }
@@ -84,7 +88,9 @@ function skeletonChannels(keys) {
             name: parsed?.channelId || k,
             logo: '',
             countrycode: '',
-            url_resolved: ''
+            url_resolved: '',
+            categories: [],
+            at: 0
         };
     });
 }
@@ -93,7 +99,23 @@ function matchesFilter(ch, q) {
     if (!q) return true;
     const name = (ch?.name || '').toLowerCase();
     const id = (ch?.channelId || '').toLowerCase();
-    return name.includes(q) || id.includes(q);
+    if (name.includes(q) || id.includes(q)) return true;
+    return matchesCategoryFilter(ch, q);
+}
+
+function mergeRecentAt(channels, metaEntries) {
+    const atByKey = new Map((metaEntries || []).map((e) => [e.key, e.at || 0]));
+    return (channels || []).map((ch) => {
+        const key = channelKey(ch);
+        const at = atByKey.get(key);
+        return at != null ? { ...ch, at } : ch;
+    });
+}
+
+function syncFavoritesReorder(enabled) {
+    const grid = el('favorites-grid');
+    if (!grid) return;
+    grid.classList.toggle('is-sort-locked', !enabled);
 }
 
 function wireTiles(container, channels) {
@@ -132,11 +154,18 @@ function renderTabGrid(tab) {
     if (!source || source.length === 0) {
         grid.innerHTML = '';
         empty.classList.remove('is-hidden');
+        syncFavoritesReorder(false);
         return;
     }
     empty.classList.add('is-hidden');
     const filter = isFav ? appState.favFilter : appState.recentsFilter;
-    const list = source.filter(ch => matchesFilter(ch, filter));
+    const { sortBy, sortDir } = getSortPrefs(appState);
+    const categoryId = isFav
+        ? (appState.categoryFilter?.favorites || '')
+        : (appState.categoryFilter?.recents || '');
+    let list = source.filter(ch => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
+    list = sortChannelList(list, sortBy, sortDir);
+    if (isFav) syncFavoritesReorder(sortBy === 'custom');
     if (!list.length) {
         grid.innerHTML = '<div class="empty-state"><p class="empty-state__text">No channels match</p></div>';
         return;
@@ -147,6 +176,11 @@ function renderTabGrid(tab) {
 export const ChannelGrid = {
     init({ appState, getRefreshKey, onPlay }) {
         deps = { appState, getRefreshKey, onPlay };
+        FavoritesReorder.init({
+            getAppState: () => deps.appState,
+            isReorderEnabled: () => getSortPrefs(deps.appState).sortBy === 'custom',
+            onReordered: () => ChannelGrid.renderFavorites()
+        });
     },
 
     render(container, channels, { append = false } = {}) {
@@ -158,7 +192,7 @@ export const ChannelGrid = {
             container.innerHTML = html;
         }
         wireTiles(container, channels);
-        TileFrames.observe(container, { viewKey: deps.getRefreshKey() });
+        TileFrames.observe(container);
         Appearance.applyToTiles(container);
     },
 
@@ -194,6 +228,7 @@ export const ChannelGrid = {
             appState.favoritesList = [];
             grid.innerHTML = '';
             empty.classList.remove('is-hidden');
+            syncFavoritesReorder(false);
             return;
         }
         empty.classList.add('is-hidden');
@@ -208,6 +243,8 @@ export const ChannelGrid = {
             const channels = await TvProviderRegistry.getChannelsByRefs(favorites, { refresh: forceRefresh });
             if (channels.length) {
                 appState.favoritesList = channels;
+                setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
+                ListSort.syncCategoryFilterControls();
                 this.renderFavorites();
             }
         } catch (err) {
@@ -235,7 +272,9 @@ export const ChannelGrid = {
         try {
             const channels = await TvProviderRegistry.getChannelsByRefs(recents.map(r => r.key), { refresh: forceRefresh });
             if (channels.length) {
-                appState.recentsList = channels;
+                appState.recentsList = mergeRecentAt(channels, recents);
+                setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
+                ListSort.syncCategoryFilterControls();
                 this.renderRecents();
             }
         } catch (err) {

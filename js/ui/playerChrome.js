@@ -5,6 +5,8 @@ import { TvPip } from '../tvPip.js';
 import { TileFrames } from '../tileFrames.js';
 import { ChannelGrid } from './channelGrid.js';
 import { Appearance } from './appearance.js';
+import { MultiView } from '../multiView.js';
+import { channelKey } from '../tvProviders/channelShape.js';
 
 let deps = {
     appState: null
@@ -24,8 +26,14 @@ export const PlayerChrome = {
         const fullscreenBtn = el('fullscreen-btn');
         const pipBtn = el('pip-btn');
 
-        if (playBtn) playBtn.addEventListener('click', () => TvPlayer.toggle());
-        if (pauseBtn) pauseBtn.addEventListener('click', () => TvPlayer.pause());
+        if (playBtn) {
+            // Stable hit-target: never swap buttons under the cursor (drops mash clicks).
+            playBtn.addEventListener('click', () => TvPlayer.toggle());
+        }
+        if (pauseBtn) {
+            pauseBtn.classList.add('is-hidden');
+            pauseBtn.setAttribute('aria-hidden', 'true');
+        }
         if (stopBtn) {
             stopBtn.addEventListener('click', () => {
                 TvPlayer.stop();
@@ -40,6 +48,17 @@ export const PlayerChrome = {
                 }
                 video.requestFullscreen().catch(() => showAppToast('Fullscreen blocked'));
             });
+            const syncFullscreenActive = () => {
+                const active = !!document.fullscreenElement;
+                fullscreenBtn.classList.toggle('is-active', active);
+                fullscreenBtn.setAttribute('aria-pressed', String(active));
+                document.querySelectorAll('[data-tile-action="fullscreen"]').forEach((btn) => {
+                    btn.classList.toggle('is-active', active);
+                    btn.setAttribute('aria-pressed', String(active));
+                });
+            };
+            document.addEventListener('fullscreenchange', syncFullscreenActive);
+            syncFullscreenActive();
         }
         if (pipBtn) TvPip.registerButton(pipBtn);
         if (volume) {
@@ -52,7 +71,10 @@ export const PlayerChrome = {
             const updateMuteIcon = () => {
                 const isMuted = TvPlayer.muted || TvPlayer.volume === 0;
                 const wave = muteBtn.querySelector('#mute-wave');
+                const slash = muteBtn.querySelector('#mute-slash');
                 if (wave) wave.style.opacity = isMuted ? '0' : '1';
+                if (slash) slash.style.opacity = isMuted ? '1' : '0';
+                muteBtn.classList.toggle('is-muted', isMuted);
                 muteBtn.setAttribute('aria-pressed', String(isMuted));
                 muteBtn.title = isMuted ? 'Unmute' : 'Mute';
             };
@@ -88,6 +110,7 @@ export const PlayerChrome = {
             });
         }
         Appearance.bind();
+        MultiView.bindSettings();
     },
 
     syncSettingsFromState() {
@@ -96,6 +119,7 @@ export const PlayerChrome = {
         const volume = el('volume-slider');
         if (volume) volume.value = String(Math.round((TvPlayer.volume || 0.85) * 100));
         Appearance.syncFromState();
+        MultiView.syncSettingsToggles();
     },
 
     updateNowPlayingHeader() {
@@ -122,22 +146,29 @@ export const PlayerChrome = {
     onPlayerStateChanged(e) {
         const state = e.detail || {};
 
-        TileFrames.setPlaybackBusy(
-            state.playing === true
-            || (state.loading === true && state.pausePhase === 'idle')
-        );
-
-        if (state.playing === true) {
+        if (state.wantPlaying === true || state.playing === true) {
             const url = state.channel?.url_resolved || state.channel?.url || '';
-            if (url) TileFrames.notePlayingVideo(url, TvPlayer.video);
+            if (url) {
+                // Gated inside TileFrames — no-op once noted; safe under mash.
+                TileFrames.notePlayingVideo(url, TvPlayer.video, channelKey(state.channel));
+            }
         }
 
-        try { TvPlayer.mountVideo(el('tv-playback-surface')); } catch { /* ignore */ }
+        try { TvPlayer.mountVideo(); } catch { /* ignore */ }
 
         const playBtn = el('play-btn');
         const pauseBtn = el('pause-btn');
-        if (playBtn) playBtn.classList.toggle('is-hidden', state.playing === true);
-        if (pauseBtn) pauseBtn.classList.toggle('is-hidden', state.playing !== true);
+        const wantPlay = state.wantPlaying === true || state.playing === true;
+        if (playBtn) {
+            playBtn.classList.remove('is-hidden');
+            playBtn.textContent = wantPlay ? '⏸' : '▶';
+            playBtn.title = wantPlay ? 'Pause' : 'Play';
+            playBtn.setAttribute('aria-label', wantPlay ? 'Pause' : 'Play');
+        }
+        if (pauseBtn) {
+            pauseBtn.classList.add('is-hidden');
+            pauseBtn.setAttribute('aria-hidden', 'true');
+        }
 
         const volume = el('volume-slider');
         if (volume && typeof state.volume === 'number') {
@@ -155,7 +186,19 @@ export const PlayerChrome = {
         }
         const qualityInfo = el('quality-info');
         if (qualityInfo) {
-            qualityInfo.textContent = state.channel ? `Quality: ${TvPlayer.qualityLabel || 'Auto'}` : 'Quality: —';
+            let label = TvPlayer.qualityLabel;
+            if (state.channel && (!label || label === '—')) {
+                const h = TvPlayer.video?.videoHeight;
+                if (h > 0) label = `${h}p`;
+            }
+            qualityInfo.textContent = state.channel
+                ? `Quality: ${label || '—'}`
+                : 'Quality: —';
+        }
+        const bandwidthInfo = el('bandwidth-info');
+        if (bandwidthInfo) {
+            const kbps = state.channel ? TvPlayer.getBandwidthKbps() : null;
+            bandwidthInfo.textContent = kbps != null ? `b/w: ${kbps} kbps` : 'b/w: —';
         }
 
         if (state.resumeBlocked) {

@@ -27,117 +27,466 @@
 
         <div class="tv-content">            
             <div id="player-slot" class="tv-player-slot">
-                <div id="tv-playback-surface" class="tv-playback-surface"></div>
+                <div id="player-mosaic" class="tv-player-mosaic">
+                    <div class="mosaic-chrome">
+                        <button type="button" id="mosaic-mute-all-btn" class="mosaic-mute-all-btn" title="Mute all" aria-label="Mute all" aria-pressed="false">
+                            <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0"/></svg>
+                        </button>
+                        <button type="button" id="mosaic-reset-btn" class="mosaic-reset-btn" title="Reset multi-TV layout" aria-label="Reset multi-TV layout">
+                            <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.2 6a3.8 3.8 0 0 1 6.5-2.6M9.8 6a3.8 3.8 0 0 1-6.5 2.6" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round"/><path d="M8.2 1.8v2.2H10.4M3.8 10.2V8H1.6" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div id="player-tile-topLeft" class="tv-player-tile is-hidden" data-slot="topLeft" role="button" tabindex="0" aria-label="Top left screen" aria-hidden="true">
+                        <div id="tv-playback-surface-topLeft" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-player-tile__audio is-hidden" data-tile-action="mute" title="Mute" aria-label="Mute">
+                                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="tv-player-tile__hover" aria-hidden="true">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 is-hidden" data-tile-action="pause" title="Pause" aria-label="Pause">⏸</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Mute or unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+                    <div id="player-tile-center" class="tv-player-tile is-primary" data-slot="center" aria-label="Main screen">
+                        <div id="tv-playback-surface-center" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__empty is-hidden">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+                    <div id="player-tile-topRight" class="tv-player-tile is-hidden" data-slot="topRight" role="button" tabindex="0" aria-label="Top right screen" aria-hidden="true">
+                        <div id="tv-playback-surface-topRight" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-player-tile__audio is-hidden" data-tile-action="mute" title="Mute" aria-label="Mute">
+                                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="tv-player-tile__hover" aria-hidden="true">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 is-hidden" data-tile-action="pause" title="Pause" aria-label="Pause">⏸</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Mute or unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+                    <div id="player-tile-bottomLeft" class="tv-player-tile is-hidden" data-slot="bottomLeft" role="button" tabindex="0" aria-label="Bottom left screen" aria-hidden="true">
+                        <div id="tv-playback-surface-bottomLeft" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-player-tile__audio is-hidden" data-tile-action="mute" title="Mute" aria-label="Mute">
+                                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="tv-player-tile__hover" aria-hidden="true">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 is-hidden" data-tile-action="pause" title="Pause" aria-label="Pause">⏸</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Mute or unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+                    <div id="player-tile-bottomRight" class="tv-player-tile is-hidden" data-slot="bottomRight" role="button" tabindex="0" aria-label="Bottom right screen" aria-hidden="true">
+                        <div id="tv-playback-surface-bottomRight" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-player-tile__audio is-hidden" data-tile-action="mute" title="Mute" aria-label="Mute">
+                                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="tv-player-tile__hover" aria-hidden="true">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 is-hidden" data-tile-action="pause" title="Pause" aria-label="Pause">⏸</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Mute or unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+                </div>
                 <div class="tv-player-controls">
                     <div class="tv-controls__playback">
-                        <button class="tv-controls__btn" id="play-btn">▶</button>
-                        <button class="tv-controls__btn" id="pause-btn">⏸</button>
-                        <button class="tv-controls__btn" id="stop-btn">⏹</button>
-                        <button class="tv-controls__btn" id="pip-btn">⬆</button>
-                        <button class="tv-controls__action-btn" id="fullscreen-btn">⛶</button>
-                        <button class="tv-controls__btn tv-controls__fav-btn" id="fav-btn" title="Favorite" aria-label="Toggle favorite">☆</button>
+                        <button class="tv-controls__btn tv-controls__btn--main-1" id="play-btn" title="Play" aria-label="Play">▶</button>
+                        <button class="tv-controls__btn tv-controls__btn--main-1 is-hidden" id="pause-btn" title="Pause" aria-label="Pause">⏸</button>
+                        <button class="tv-controls__btn tv-controls__btn--main-1" id="stop-btn" title="Stop" aria-label="Stop">⏹</button>
+                        <button class="tv-controls__btn tv-controls__btn--main-2" id="pip-btn" title="Pop out" aria-label="Pop out">⬆</button>
+                        <button class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" id="fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                        <button class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" id="fav-btn" title="Favorite" aria-label="Toggle favorite">☆</button>
+                        <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn" id="mute-btn" title="Mute or unmute" aria-label="Mute or unmute">
+                            <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" id="mute-icon"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path id="mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line id="mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="opacity:0;"/></svg>
+                        </button>
                     </div>
                     <div class="tv-controls__volume">
-                        <button type="button" class="tv-controls__volume-btn" id="mute-btn" title="Mute or unmute" aria-label="Mute or unmute">
-                            <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" id="mute-icon"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path id="mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>
-                        </button>
                         <span class="tv-controls__volume-pct" id="volume-pct">85%</span>
                         <input type="range" class="tv-controls__volume-slider" id="volume-slider" min="0" max="100" value="85">
                     </div>
                     <div class="tv-controls__info">
-                        <span id="buffer-info">Buffer: -</span>
-                        <span id="quality-info">Quality: -</span>
+                        <span id="buffer-info">Buffer: —</span>
+                        <span id="quality-info">Quality: —</span>
+                        <span id="bandwidth-info">b/w: —</span>
                     </div>
                 </div>
             </div>
 
-            <div id="browse-panel" class="tv-panel is-active">
-                <div id="countries-container" class="country-grid"></div>
-                <div id="channels-container" class="channel-grid is-hidden"></div>
-            </div>
+            <div
+                id="content-splitter"
+                class="tv-content-splitter"
+                role="separator"
+                aria-orientation="horizontal"
+                aria-controls="player-slot tv-catalog"
+                aria-valuemin="15"
+                aria-valuemax="85"
+                aria-valuenow="50"
+                aria-label="Resize player and browse"
+                tabindex="0"
+            ></div>
 
-            <div id="favorites-panel" class="tv-panel">
-                <div id="favorites-grid" class="channel-grid"></div>
-                <div id="favorites-empty" class="empty-state"><div class="empty-state__icon">❤️</div><p class="empty-state__text">No favorites!</p></div>
-            </div>
-
-            <div id="recents-panel" class="tv-panel">
-                <div id="recents-grid" class="channel-grid"></div>
-                <div id="recents-empty" class="empty-state"><div class="empty-state__icon">📺</div><p class="empty-state__text">No recents!</p></div>
-            </div>
-
-            <div id="settings-panel" class="tv-panel">
-                <div class="settings-panel">
-                    <div class="settings-section">
-                        <h3 class="settings-section__title">🎬 Playback</h3>
-                        <div class="settings-section__item">
-                            <label class="settings-section__label">Buffer Size</label>
-                            <select id="buffer-size-select">
-                                <option value="5">5s (Fast)</option>
-                                <option value="15" selected>15s (Stable)</option>
-                                <option value="30">30s (Very Stable)</option>
-                            </select>
-                        </div>
+            <div id="tv-catalog" class="tv-catalog" data-catalog-transition="instant">
+                <div class="tv-catalog__actions">
+                    <button type="button" id="catalog-toggle-btn" class="tv-catalog__toggle" aria-expanded="true" aria-controls="tv-catalog-body" title="Collapse catalog" aria-label="Collapse catalog">
+                        <svg viewBox="0 0 12 12" width="11" height="11" focusable="false" aria-hidden="true"><path d="M3 7l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button type="button" id="play-favorites-mosaic-btn" class="tv-catalog__action is-hidden" title="Play favorites on multiple TVs" aria-label="Play favorites on multiple TVs"></button>
+                </div>
+                <div class="tv-catalog__clip">
+                <div id="tv-catalog-body" class="tv-catalog__body">
+                    <div id="browse-panel" class="tv-panel is-active">
+                        <div id="countries-container" class="country-grid"></div>
+                        <div id="channels-container" class="channel-grid is-hidden"></div>
                     </div>
-                    <div class="settings-section">
-                        <div class="settings-section__header">
-                            <h3 class="settings-section__title">🎨 Appearance</h3>
-                            <button type="button" id="reset-appearance-btn" class="settings-reset-btn" aria-label="Reset to defaults" title="Reset to defaults">↺</button>
-                        </div>
-                        <div class="settings-section__item">
-                            <label class="settings-section__label" for="text-size-slider">Text Size</label>
-                            <div class="settings-section__control">
-                                <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="16" aria-valuetext="100%">
-                                <span class="settings-value" id="text-size-value">100%</span>
+
+                    <div id="favorites-panel" class="tv-panel">
+                        <div id="favorites-grid" class="channel-grid"></div>
+                        <div id="favorites-empty" class="empty-state"><div class="empty-state__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 12 12" width="36" height="36" focusable="false"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg></div><p class="empty-state__text">No favorites!</p></div>
+                    </div>
+
+                    <div id="recents-panel" class="tv-panel">
+                        <div id="recents-grid" class="channel-grid"></div>
+                        <div id="recents-empty" class="empty-state"><div class="empty-state__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 12 12" width="36" height="36" focusable="false"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></div><p class="empty-state__text">No recents!</p></div>
+                    </div>
+
+                    <div id="settings-panel" class="tv-panel">
+                        <div class="settings-panel">
+                            <div class="settings-section">
+                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 2.6v6.8L9.4 6 4.2 2.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg> Playback</h3>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label">Buffer Size</label>
+                                    <select id="buffer-size-select">
+                                        <option value="5">5s (Fast)</option>
+                                        <option value="15" selected>15s (Stable)</option>
+                                        <option value="30">30s (Very Stable)</option>
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                        <div class="settings-section__item">
-                            <label class="settings-section__label" for="tile-width-slider">Tile Width</label>
-                            <div class="settings-section__control">
-                                <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="180" aria-valuetext="180px">
-                                <span class="settings-value" id="tile-width-value">180px</span>
+                            <div class="settings-section">
+                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Screens</h3>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="screen-top-left-toggle">Add screen top left</label>
+                                    <button type="button" id="screen-top-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top left" title="Add screen top left"></button>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="screen-top-right-toggle">Add screen top right</label>
+                                    <button type="button" id="screen-top-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top right" title="Add screen top right"></button>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="screen-bottom-left-toggle">Add screen bottom left</label>
+                                    <button type="button" id="screen-bottom-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom left" title="Add screen bottom left"></button>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="screen-bottom-right-toggle">Add screen bottom right</label>
+                                    <button type="button" id="screen-bottom-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom right" title="Add screen bottom right"></button>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="swap-transition-select">Channel switch</label>
+                                    <select id="swap-transition-select" aria-label="Channel switch transition"></select>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="catalog-transition-select">View transition</label>
+                                    <select id="catalog-transition-select" aria-label="View transition"></select>
+                                </div>
                             </div>
-                        </div>
-                        <div class="settings-preview">
-                            <div class="settings-preview__label">Preview</div>
-                            <div id="appearance-preview-tile" class="channel-tile" role="presentation">
-                                <div class="channel-tile__icon">
-                                    <div class="channel-tile__capture-frame">
-                                        <div class="channel-tile__letter-avatar" id="preview-avatar">P</div>
+                            <div class="settings-section">
+                                <div class="settings-section__header">
+                                    <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.8a4.2 4.2 0 1 0 0 8.4c.7 0 1-.4 1-1 0-.4-.2-.7-.2-1.1 0-.8.7-1.5 1.5-1.5H9a2.2 2.2 0 0 0 0-4.4 4.1 4.1 0 0 0-3 0z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="4.2" cy="5" r="0.7" fill="currentColor"/><circle cx="6" cy="3.8" r="0.7" fill="currentColor"/><circle cx="7.8" cy="5" r="0.7" fill="currentColor"/></svg> Appearance</h3>
+                                    <button type="button" id="reset-appearance-btn" class="settings-reset-btn" aria-label="Reset to defaults" title="Reset to defaults">↺</button>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="theme-select">Theme</label>
+                                    <div class="settings-section__control">
+                                        <select id="theme-select" aria-label="Theme"></select>
                                     </div>
                                 </div>
-                                <div class="channel-tile__body">
-                                    <h3 class="channel-tile__name" id="preview-name">Now Playing</h3>
-                                    <span class="channel-tile__flag" id="preview-flag"></span>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" id="font-picker-label" for="font-picker-trigger">Font</label>
+                                    <div class="settings-section__control">
+                                        <div class="settings-font-picker" id="font-picker">
+                                            <button type="button" class="settings-font-picker__trigger" id="font-picker-trigger" aria-labelledby="font-picker-label" aria-haspopup="listbox" aria-expanded="false" aria-controls="font-picker-menu">
+                                                <span class="settings-font-picker__current" id="font-picker-current">System</span>
+                                            </button>
+                                            <div class="settings-font-picker__menu is-hidden" id="font-picker-menu" role="listbox" aria-labelledby="font-picker-label"></div>
+                                        </div>
+                                    </div>
                                 </div>
+                                <div class="settings-color-group">
+                                    <div class="settings-color-group__title">Accents</div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-main-1">Main 1</label>
+                                        <input type="color" class="settings-color" id="theme-color-main-1" value="#00FFFF">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-main-1-flip">Main 1 flip</label>
+                                        <input type="color" class="settings-color" id="theme-color-main-1-flip" value="#FF00FF">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-main-2">Main 2</label>
+                                        <input type="color" class="settings-color" id="theme-color-main-2" value="#00FF88">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-main-2-flip">Main 2 flip</label>
+                                        <input type="color" class="settings-color" id="theme-color-main-2-flip" value="#FF00FF">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-main-3">Main 3</label>
+                                        <input type="color" class="settings-color" id="theme-color-main-3" value="#FF00FF">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-main-3-flip">Main 3 flip</label>
+                                        <input type="color" class="settings-color" id="theme-color-main-3-flip" value="#00FFFF">
+                                    </div>
+                                </div>
+                                <div class="settings-color-group">
+                                    <div class="settings-color-group__title">Backgrounds</div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-bg">Background</label>
+                                        <input type="color" class="settings-color" id="theme-color-bg" value="#0A0E27">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-bg-secondary">Background secondary</label>
+                                        <input type="color" class="settings-color" id="theme-color-bg-secondary" value="#141829">
+                                    </div>
+                                </div>
+                                <div class="settings-color-group">
+                                    <div class="settings-color-group__title">Borders</div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-border">Border</label>
+                                        <input type="color" class="settings-color" id="theme-color-border" value="#2A2E3A">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-border-light">Border light</label>
+                                        <input type="color" class="settings-color" id="theme-color-border-light" value="#3A3E4A">
+                                    </div>
+                                </div>
+                                <div class="settings-color-group">
+                                    <div class="settings-color-group__title">Text</div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-text-primary">Text primary</label>
+                                        <input type="color" class="settings-color" id="theme-color-text-primary" value="#FFFFFF">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-text-secondary">Text secondary</label>
+                                        <input type="color" class="settings-color" id="theme-color-text-secondary" value="#B3B3B3">
+                                    </div>
+                                    <div class="settings-section__item">
+                                        <label class="settings-section__label" for="theme-color-text-muted">Text muted</label>
+                                        <input type="color" class="settings-color" id="theme-color-text-muted" value="#737373">
+                                    </div>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="text-size-slider">Text Size</label>
+                                    <div class="settings-section__control">
+                                        <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="16" aria-valuetext="100%">
+                                        <span class="settings-value" id="text-size-value">100%</span>
+                                    </div>
+                                </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="tile-width-slider">Tile Width</label>
+                                    <div class="settings-section__control">
+                                        <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="180" aria-valuetext="180px">
+                                        <span class="settings-value" id="tile-width-value">180px</span>
+                                    </div>
+                                </div>
+                                <div class="settings-preview">
+                                    <div class="settings-preview__label">Preview</div>
+                                    <div id="appearance-preview-tile" class="channel-tile" role="presentation">
+                                        <div class="channel-tile__icon">
+                                            <div class="channel-tile__capture-frame">
+                                                <div class="channel-tile__letter-avatar" id="preview-avatar">P</div>
+                                            </div>
+                                        </div>
+                                        <div class="channel-tile__body">
+                                            <h3 class="channel-tile__name" id="preview-name">Now Playing</h3>
+                                            <span class="channel-tile__flag" id="preview-flag"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-section">
+                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><ellipse cx="6" cy="3" rx="3.6" ry="1.3" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.4 3v6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3V3M2.4 6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3" fill="none" stroke="currentColor" stroke-width="1"/></svg> Storage</h3>
+                                <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">
+                                    <span>Favorites: —</span>
+                                    <span>Recents: —</span>
+                                    <span>localStorage: —</span>
+                                    <span>Cache: —</span>
+                                </div>
+                            </div>
+                            <div class="settings-section">
+                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 5.2v3.2M6 3.6h.01" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> About</h3>
+                                <p style="font-size: 0.875rem; margin: 0; color: var(--tv-text-secondary);">magicTV v1.0</p>
                             </div>
                         </div>
                     </div>
-                    <div class="settings-section">
-                        <h3 class="settings-section__title">📊 Storage</h3>
-                        <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">
-                            <span>Favorites: —</span>
-                            <span>Recents: —</span>
-                            <span>localStorage: —</span>
-                            <span>Cache: —</span>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3 class="settings-section__title">ℹ️ About</h3>
-                        <p style="font-size: 0.875rem; margin: 0; color: var(--tv-text-secondary);">magicTV v1.0</p>
+
+                    <div class="tv-tabs" role="tablist">
+                        <button id="back-btn" class="tv-tab is-hidden" data-tab="back-to-countries" title="Back to countries">&lt;</button>
+                        <button class="tv-tab is-active" data-tab="browse"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 1.8v8.4M1.8 6h8.4M2.6 3.6c1.2.9 2.3 1.2 3.4 1.2s2.2-.3 3.4-1.2M2.6 8.4c1.2-.9 2.3-1.2 3.4-1.2s2.2.3 3.4 1.2" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/></svg> Browse</button>
+                        <button class="tv-tab" data-tab="favorites"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg> Favorites</button>
+                        <button class="tv-tab" data-tab="recents"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Recents</button>
+                        <button class="tv-tab" data-tab="settings"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 1.6v1.2M6 9.2v1.2M1.6 6h1.2M9.2 6h1.2M2.9 2.9l.85.85M8.25 8.25l.85.85M9.1 2.9l-.85.85M3.75 8.25l-.85.85" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Settings</button>
+                        <input type="search" id="search-countries" class="search-input tv-tab--filter" placeholder="Filter" autocomplete="off" aria-label="Filter current list">
+                        <select id="category-filter" class="tv-tab--category is-hidden" aria-label="Filter by category">
+                            <option value="">All categories</option>
+                        </select>
+                        <select id="sort-select" class="tv-tab--sort" aria-label="Sort current list"></select>
+                        <button id="sort-dir-btn" class="tv-tab tv-tab--sort-dir" type="button" title="Toggle ascending/descending" aria-label="Toggle sort direction">↓</button>
+                        <span id="refresh-age" class="tv-refresh-age"></span>
+                        <button id="refresh-btn" class="tv-tab tv-tab--refresh" data-tab="refresh" title="Refresh this tab" aria-label="Refresh this tab">↻</button>
                     </div>
                 </div>
-            </div>
-
-            <div class="tv-tabs" role="tablist">
-                <button id="back-btn" class="tv-tab is-hidden" data-tab="back-to-countries" title="Back to countries">&lt;</button>
-                <button class="tv-tab is-active" data-tab="browse">🌍 Browse</button>
-                <button class="tv-tab" data-tab="favorites">❤️ Favorites</button>
-                <button class="tv-tab" data-tab="recents">📺 Recents</button>
-                <button class="tv-tab" data-tab="settings">⚙️ Settings</button>
-                <input type="search" id="search-countries" class="search-input tv-tab--filter" placeholder="Filter" autocomplete="off" aria-label="Filter current list">
-                <span id="refresh-age" class="tv-refresh-age"></span>
-                <button id="refresh-btn" class="tv-tab tv-tab--refresh" data-tab="refresh" title="Refresh this tab" aria-label="Refresh this tab">↻</button>
+                </div>
             </div>
         </div>
     </div>

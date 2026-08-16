@@ -11,18 +11,26 @@ import assert from 'node:assert/strict';
 
 const KNOWN_IDS = [
     'tv-settings-btn', 'back-btn', 'search-countries', 'refresh-btn', 'refresh-age',
-    'player-slot', 'tv-playback-surface', 'play-btn', 'pause-btn', 'stop-btn',
+    'player-slot', 'player-mosaic', 'content-splitter',
+    'player-tile-topLeft', 'player-tile-center', 'player-tile-topRight',
+    'player-tile-bottomLeft', 'player-tile-bottomRight',
+    'tv-playback-surface-topLeft', 'tv-playback-surface-center', 'tv-playback-surface-topRight',
+    'tv-playback-surface-bottomLeft', 'tv-playback-surface-bottomRight',
+    'play-btn', 'pause-btn', 'stop-btn',
     'volume-slider', 'buffer-info', 'quality-info', 'pip-btn', 'fullscreen-btn',
     'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select',
+    'swap-transition-select',
+    'screen-top-left-toggle', 'screen-top-right-toggle',
+    'screen-bottom-left-toggle', 'screen-bottom-right-toggle',
     'text-size-slider', 'text-size-value',
     'tile-width-slider', 'tile-width-value',
     'reset-appearance-btn', 'appearance-preview-tile',
+    'mosaic-reset-btn', 'mosaic-mute-all-btn',
     'preview-avatar', 'preview-name', 'preview-flag',
-    'fav-btn', 'mute-icon', 'mute-wave', 'volume-pct'
+    'fav-btn', 'mute-btn', 'mute-icon', 'mute-wave', 'mute-slash', 'volume-pct'
 ];
-
 function makeEl(id = '') {
     const el = {
         id,

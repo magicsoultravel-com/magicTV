@@ -4,6 +4,24 @@ export const HLS_MAX_BUFFER_BYTES = 20 * 1024 * 1024;
 export const HLS_MAX_BITRATE = 5_000_000;
 /** Segments to sync to the live edge (fixed; no longer a user preference). */
 export const LIVE_SYNC_DURATION_COUNT = 3;
+/** Max latency (in segments) before hls.js seeks to the live edge. */
+export const LIVE_MAX_LATENCY_DURATION_COUNT = 10;
+
+export function formatQualityLabel(level, videoHeight = 0) {
+    if (level?.height) return `${level.height}p`;
+    if (videoHeight > 0) return `${videoHeight}p`;
+    if (level?.bitrate) return `${Math.round(level.bitrate / 1000)}k`;
+    return '—';
+}
+
+function resolveLevelIndex(hls) {
+    if (!hls) return -1;
+    if (hls.currentLevel >= 0) return hls.currentLevel;
+    if (hls.loadLevel >= 0) return hls.loadLevel;
+    if (hls.nextLoadLevel >= 0) return hls.nextLoadLevel;
+    if (hls.firstLevel >= 0) return hls.firstLevel;
+    return -1;
+}
 
 export function applyHlsBufferConfig(hls, bufferSize) {
     if (!hls) return;
@@ -23,7 +41,7 @@ export function buildHlsConfig(Hls, bufferSize) {
         abrController: Hls.AbrController,
         capLevelToPlayerImpl: true,
         liveSyncDurationCount: LIVE_SYNC_DURATION_COUNT,
-        liveMaxLatencyDurationCount: 10
+        liveMaxLatencyDurationCount: LIVE_MAX_LATENCY_DURATION_COUNT
     };
 }
 
@@ -32,6 +50,7 @@ export async function destroyHls(ctx) {
         ctx.hls.destroy();
         ctx.hls = null;
     }
+    ctx.bandwidthEstimateBps = null;
 }
 
 /**
@@ -43,6 +62,9 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
     if (generation !== ctx.playGeneration) return;
     const video = ctx.video;
     ctx.connection = 'connecting';
+    ctx.qualityLevel = -1;
+    ctx.qualityLabel = '—';
+    ctx.bandwidthEstimateBps = null;
     video.removeAttribute('src');
     video.load();
 
@@ -70,15 +92,39 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
                     return;
                 }
                 ctx.connection = 'connected';
-                ctx.qualityLevel = 0;
-                ctx.qualityLabel = 'auto';
+                const levelIdx = resolveLevelIndex(ctx.hls);
+                if (levelIdx >= 0 && ctx.hls.levels?.[levelIdx]) {
+                    ctx.qualityLevel = levelIdx;
+                    ctx.qualityLabel = formatQualityLabel(
+                        ctx.hls.levels[levelIdx],
+                        video.videoHeight
+                    );
+                } else {
+                    ctx.qualityLevel = -1;
+                    ctx.qualityLabel = formatQualityLabel(null, video.videoHeight);
+                }
                 ctx.emitState();
                 resolve();
             });
             ctx.hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
                 if (generation !== ctx.playGeneration || !ctx.hls) return;
-                if (data.level !== undefined && ctx.hls.levels?.[data.level]?.height) {
-                    ctx.qualityLabel = `${ctx.hls.levels[data.level].height}p`;
+                if (data.level !== undefined) {
+                    ctx.qualityLevel = data.level;
+                    ctx.qualityLabel = formatQualityLabel(
+                        ctx.hls.levels?.[data.level],
+                        video.videoHeight
+                    );
+                }
+                ctx.emitState();
+            });
+            ctx.hls.on(Hls.Events.FRAG_LOADED, (_, data) => {
+                if (generation !== ctx.playGeneration) return;
+                const bw = data?.stats?.bwEstimate ?? data?.frag?.stats?.bwEstimate;
+                if (Number.isFinite(bw) && bw > 0) {
+                    ctx.bandwidthEstimateBps = bw;
+                }
+                if ((ctx.qualityLabel === '—' || !ctx.qualityLabel) && video.videoHeight) {
+                    ctx.qualityLabel = formatQualityLabel(null, video.videoHeight);
                 }
                 ctx.emitState();
             });

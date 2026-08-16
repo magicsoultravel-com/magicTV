@@ -4,6 +4,7 @@ import { IndexedDBStore } from '../storage/indexedDbStore.js';
 const IPTV_CHANNELS_URL = 'https://iptv-org.github.io/api/channels.json';
 const IPTV_STREAMS_URL = 'https://iptv-org.github.io/api/streams.json';
 const IPTV_COUNTRIES_URL = 'https://iptv-org.github.io/api/countries.json';
+const IPTV_CATEGORIES_URL = 'https://iptv-org.github.io/api/categories.json';
 const IPTV_BLOCKLIST_URL = 'https://iptv-org.github.io/api/blocklist.json';
 const CACHE_KEY = 'matrix_tv_iptv_cache';
 
@@ -14,6 +15,9 @@ let catalogMemory = null;
 let lastRefreshedAt = 0;
 /** Shared in-flight network load so overlapping refresh/boot calls do not race. */
 let catalogNetworkPromise = null;
+/** id → display name from categories.json */
+let categoryNameMap = new Map();
+let categoryMapPromise = null;
 
 // Cache-first forever: the app boots straight from history (even when the
 // cached catalog is stale) and only talks to the network when the user taps
@@ -45,8 +49,75 @@ function isValidCachedData(data) {
         && Array.isArray(data.countryList);
 }
 
+function applyCategoryNames(entries) {
+    const map = new Map();
+    (Array.isArray(entries) ? entries : []).forEach((c) => {
+        if (c?.id) map.set(c.id, c.name || c.id);
+    });
+    categoryNameMap = map;
+    return map;
+}
+
+async function ensureCategoryNameMap() {
+    if (categoryNameMap.size) return categoryNameMap;
+    if (categoryMapPromise) return categoryMapPromise;
+    categoryMapPromise = (async () => {
+        try {
+            const res = await fetch(IPTV_CATEGORIES_URL);
+            if (res.ok) applyCategoryNames(await res.json());
+        } catch {
+            /* keep empty map */
+        }
+        return categoryNameMap;
+    })().finally(() => {
+        categoryMapPromise = null;
+    });
+    return categoryMapPromise;
+}
+
+function channelMatchesQuery(s, q) {
+    if ((s.name || '').toLowerCase().includes(q)) return true;
+    if ((s.id || '').toLowerCase().includes(q)) return true;
+    const cats = Array.isArray(s.categories) ? s.categories : [];
+    for (const id of cats) {
+        const sid = String(id || '').toLowerCase();
+        if (sid.includes(q)) return true;
+        const label = (categoryNameMap.get(id) || '').toLowerCase();
+        if (label && label.includes(q)) return true;
+    }
+    return false;
+}
+
+function primaryCategoryId(s) {
+    const cats = s?.categories;
+    return Array.isArray(cats) && cats.length ? String(cats[0] || '') : '';
+}
+
+function sortChannelsList(list, order, reverse) {
+    if (order === 'category') {
+        list.sort((a, b) => {
+            const ca = primaryCategoryId(a);
+            const cb = primaryCategoryId(b);
+            if (!ca && cb) return 1;
+            if (ca && !cb) return -1;
+            const la = (categoryNameMap.get(ca) || ca).toLowerCase();
+            const lb = (categoryNameMap.get(cb) || cb).toLowerCase();
+            const c = la.localeCompare(lb);
+            if (c) return c;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+    } else {
+        list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    if (reverse) list.reverse();
+}
+
 function hydrateCatalog(data) {
     if (!isValidCachedData(data)) return null;
+
+    if (data.categoryNames && typeof data.categoryNames === 'object') {
+        categoryNameMap = new Map(Object.entries(data.categoryNames));
+    }
 
     const channels = data.channels;
     const byId = new Map(channels.map((s) => [s.id, s]));
@@ -78,10 +149,11 @@ async function readCachedCatalog(refresh) {
 }
 
 async function fetchCatalogFromNetwork() {
-    const [channelsRes, streamsRes, countriesRes, blocklistRes] = await Promise.all([
+    const [channelsRes, streamsRes, countriesRes, categoriesRes, blocklistRes] = await Promise.all([
         fetch(IPTV_CHANNELS_URL),
         fetch(IPTV_STREAMS_URL),
         fetch(IPTV_COUNTRIES_URL),
+        fetch(IPTV_CATEGORIES_URL),
         fetch(IPTV_BLOCKLIST_URL)
     ]);
 
@@ -92,7 +164,10 @@ async function fetchCatalogFromNetwork() {
     const channels = await channelsRes.json();
     const streams = await streamsRes.json();
     const countries = countriesRes.ok ? await countriesRes.json() : [];
+    const categories = categoriesRes.ok ? await categoriesRes.json() : [];
     const blocklistRaw = blocklistRes.ok ? await blocklistRes.json() : [];
+
+    applyCategoryNames(categories);
 
     const blocklist = new Set();
     (Array.isArray(blocklistRaw) ? blocklistRaw : []).forEach((entry) => {
@@ -150,19 +225,24 @@ async function fetchCatalogFromNetwork() {
         }))
         .sort((a, b) => b.stationcount - a.stationcount);
 
-    const catalog = hydrateCatalog({ channels: channelsOut, countryList });
-    await saveCachePayload(catalog);
+    const categoryNames = Object.fromEntries(categoryNameMap);
+    const catalog = hydrateCatalog({ channels: channelsOut, countryList, categoryNames });
+    await saveCachePayload({ channels: channelsOut, countryList, categoryNames });
     catalogMemory = catalog;
     lastRefreshedAt = Date.now();
     return catalog;
 }
 
 async function loadCatalog(refresh = false) {
-    if (!refresh && catalogMemory) return catalogMemory;
+    if (!refresh && catalogMemory) {
+        if (!categoryNameMap.size) ensureCategoryNameMap();
+        return catalogMemory;
+    }
 
     const cached = await readCachedCatalog(refresh);
     if (cached) {
         catalogMemory = cached;
+        if (!categoryNameMap.size) ensureCategoryNameMap();
         return cached;
     }
 
@@ -178,14 +258,19 @@ export const IptvOrgTvProvider = {
     id: PROVIDER_IPTV_ORG,
     label: 'iptv-org',
 
+    getCategoryNameMap() {
+        return categoryNameMap;
+    },
+
     async getCountries({ refresh = false } = {}) {
         const catalog = await loadCatalog(refresh);
         return catalog.countryList;
     },
 
-    async searchChannels({
+        async searchChannels({
         countrycode = '',
         query = '',
+        category = '',
         limit = 100,
         offset = 0,
         order = 'name',
@@ -203,15 +288,20 @@ export const IptvOrgTvProvider = {
         // Channels without a resolved URL are dropped by normalizeChannel.
         const q = String(query || '').trim().toLowerCase();
         if (q) {
+            if (!categoryNameMap.size) await ensureCategoryNameMap();
+            list = list.filter((s) => channelMatchesQuery(s, q));
+        }
+
+        const cat = String(category || '').trim();
+        if (cat) {
             list = list.filter((s) =>
-                (s.name || '').toLowerCase().includes(q)
-                || (s.id || '').toLowerCase().includes(q)
+                (s.categories || []).some((c) => String(c) === cat)
             );
         }
 
-        if (order === 'name') {
-            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            if (reverse) list.reverse();
+        if (order === 'name' || order === 'category') {
+            if (order === 'category' && !categoryNameMap.size) await ensureCategoryNameMap();
+            sortChannelsList(list, order, reverse);
         }
 
         return list

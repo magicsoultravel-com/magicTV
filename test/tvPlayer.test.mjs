@@ -86,6 +86,52 @@ test('favorites work with bare channel ids (migration path)', () => {
     assert.equal(TvPlayer.isFavorite('BBC.uk'), true, 'legacy unprefixed ref resolves');
 });
 
+test('reorderFavorites persists key and meta order', () => {
+    const a = { id: 'A.us', name: 'Alpha', logo: 'a.png', url_resolved: 'x' };
+    const b = { id: 'B.us', name: 'Beta', logo: 'b.png', url_resolved: 'x' };
+    const c = { id: 'C.us', name: 'Gamma', logo: 'c.png', url_resolved: 'x' };
+    TvPlayer.toggleFavorite(a);
+    TvPlayer.toggleFavorite(b);
+    TvPlayer.toggleFavorite(c);
+    // Newest-first: C, B, A
+    assert.deepEqual(TvPlayer.getFavorites(), ['iptv-org:C.us', 'iptv-org:B.us', 'iptv-org:A.us']);
+
+    assert.equal(
+        TvPlayer.reorderFavorites(['iptv-org:A.us', 'iptv-org:C.us', 'iptv-org:B.us']),
+        true
+    );
+    assert.deepEqual(TvPlayer.getFavorites(), ['iptv-org:A.us', 'iptv-org:C.us', 'iptv-org:B.us']);
+    assert.deepEqual(
+        TvPlayer.getFavoritesMeta().map((e) => e.key),
+        ['iptv-org:A.us', 'iptv-org:C.us', 'iptv-org:B.us']
+    );
+    assert.equal(TvPlayer.getFavoritesMeta()[0].name, 'Alpha');
+
+    assert.equal(
+        TvPlayer.reorderFavorites(['iptv-org:A.us', 'iptv-org:C.us', 'iptv-org:B.us']),
+        false,
+        'unchanged order is a no-op'
+    );
+    assert.equal(
+        TvPlayer.reorderFavorites(['iptv-org:A.us', 'iptv-org:Z.us']),
+        false,
+        'rejects incomplete / unknown sets'
+    );
+});
+
+test('mergeVisibleFavoriteOrder keeps non-visible slots', async () => {
+    const { mergeVisibleFavoriteOrder } = await import('../js/storage/favoritesRecents.js');
+    const full = ['A', 'B', 'C', 'D', 'E'];
+    const visible = ['E', 'B', 'D'];
+    // Visible slots (B,D,E) filled in new order; A and C stay put.
+    assert.deepEqual(mergeVisibleFavoriteOrder(full, visible), ['A', 'E', 'C', 'B', 'D']);
+    assert.deepEqual(
+        mergeVisibleFavoriteOrder(full, ['B', 'C', 'D', 'E', 'A']),
+        ['B', 'C', 'D', 'E', 'A'],
+        'full visible reorder replaces entire list'
+    );
+});
+
 // ----- Recents -----
 
 test('recents are recorded newest-first', () => {
