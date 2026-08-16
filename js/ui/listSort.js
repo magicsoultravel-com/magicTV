@@ -284,7 +284,11 @@ export const ListSort = {
         if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx)) {
             catSelect.classList.add('is-hidden');
             catSelect.classList.remove('is-visible');
-            if (catBtn) catBtn.classList.add('is-hidden');
+            if (catBtn) {
+                catBtn.classList.add('is-hidden');
+                catBtn.classList.remove('is-active');
+                catBtn.setAttribute('aria-pressed', 'false');
+            }
             if (catPopup) catPopup.classList.add('is-hidden');
             return;
         }
@@ -301,6 +305,12 @@ export const ListSort = {
         } else {
             catSelect.value = '';
             if (value && deps.appState) deps.appState.categoryFilter[ctx] = '';
+        }
+
+        const pressed = Boolean(catSelect.value);
+        if (catBtn) {
+            catBtn.classList.toggle('is-active', pressed);
+            catBtn.setAttribute('aria-pressed', String(pressed));
         }
     }
 };
