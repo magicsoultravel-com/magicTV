@@ -55,27 +55,45 @@ export function shouldAcceptPauseEvent(wantPlaying) {
 
 /**
  * Tile overlay classes from player intent (not residual idle).
+ * Loading wins over pause/stop so only one status icon shows.
+ * Between play click and first paint: wantPlaying without playing → loading.
  */
 export function classifyTilePlayback({
     hasChannel = false,
     playing = false,
     posterDataUrl = null,
     pausePhase = 'idle',
-    stopped = false
+    stopped = false,
+    loading = false,
+    loadPhase = 'idle',
+    wantPlaying = false
 } = {}) {
     const uiPlaying = playing === true;
+    const awaitingFirstPaint = wantPlaying === true && !uiPlaying;
+    const uiLoading = Boolean(
+        hasChannel
+        && !uiPlaying
+        && (
+            loading === true
+            || loadPhase === 'connecting'
+            || loadPhase === 'buffering'
+            || awaitingFirstPaint
+        )
+    );
     const uiPaused = Boolean(
         hasChannel
         && !uiPlaying
+        && !uiLoading
         && (posterDataUrl || (pausePhase && pausePhase !== 'idle'))
     );
     const uiStopped = Boolean(
         hasChannel
         && !uiPlaying
+        && !uiLoading
         && !uiPaused
         && stopped === true
     );
-    return { uiPlaying, uiPaused, uiStopped };
+    return { uiPlaying, uiLoading, uiPaused, uiStopped };
 }
 
 /**
@@ -96,4 +114,26 @@ export function resolveRestorePlayMute(savedMuted) {
  */
 export function shouldClearWasPlayingOnAutoplayBlock() {
     return false;
+}
+
+/**
+ * Toggle pauses only when media is actually playing with play intent.
+ * Stuck resume (wantPlaying && !playing) must retry play, not pause.
+ */
+export function shouldPauseOnToggle(wantPlaying, playing) {
+    return wantPlaying === true && playing === true;
+}
+
+/**
+ * playChannel / transport failure must clear wantPlaying so the next ▶ resumes.
+ */
+export function shouldClearWantPlayingOnPlayFail() {
+    return true;
+}
+
+/**
+ * Second AbortError while still wanting play must recover (playChannel), not no-op.
+ */
+export function shouldFallbackPlayChannelOnDoubleAbort() {
+    return true;
 }

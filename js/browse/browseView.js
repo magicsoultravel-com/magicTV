@@ -3,6 +3,7 @@ import { countryFlagEmoji, escapeHtml, debounce, el, els } from '../tvUtils.js';
 import { showAppToast } from '../ui/toast.js';
 import { Appearance } from '../ui/appearance.js';
 import { ChannelGrid } from '../ui/channelGrid.js';
+import { TileFrames } from '../tileFrames.js';
 import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap } from '../ui/listSort.js';
 
 const PAGE_SIZE = 60;
@@ -134,6 +135,7 @@ export const BrowseView = {
         appState.browseGeneration += 1;
         appState.browseLoading = false;
         appState.browseCountry = countryCode;
+        TileFrames.clearLiveRefresh();
         appState.browseChannels = [];
         appState.browseOffset = 0;
         appState.browseHasMore = true;
@@ -182,7 +184,11 @@ export const BrowseView = {
             }
             appState.browseChannels = appState.browseChannels.concat(results);
             appState.browseOffset += PAGE_SIZE;
-            ChannelGrid.render(el('channels-container'), results, { append: true });
+            const grid = el('channels-container');
+            ChannelGrid.render(grid, results, { append: true });
+            if (grid && TileFrames.isLiveRefreshActive(`browse:${appState.browseCountry}`)) {
+                TileFrames.enqueueFolderFramesForRefresh(grid);
+            }
             setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
             ListSort.syncCategoryFilterControls();
         } catch (err) {
@@ -236,6 +242,7 @@ export const BrowseView = {
     showCountriesView() {
         const appState = deps.appState;
         appState.browseCountry = null;
+        TileFrames.clearLiveRefresh();
         appState.countryFilter = deps.currentFilter();
         const countries = el('countries-container');
         const channels = el('channels-container');

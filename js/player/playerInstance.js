@@ -22,7 +22,10 @@ import {
     computeResumeSeekTime,
     shouldAcceptPlayingEvent,
     shouldAcceptPauseEvent,
-    shouldClearWasPlayingOnAutoplayBlock
+    shouldClearWasPlayingOnAutoplayBlock,
+    shouldPauseOnToggle,
+    shouldClearWantPlayingOnPlayFail,
+    shouldFallbackPlayChannelOnDoubleAbort
 } from './pauseBuffer.js';
 
 /**
@@ -164,6 +167,7 @@ export function createPlayerInstance(options) {
                 this.emitState();
             });
             this.video.addEventListener('waiting', () => {
+                if (this.wantPlaying !== true) return;
                 this.loading = true;
                 this.loadPhase = 'buffering';
                 if (this.pausePhase !== 'idle') {
@@ -172,6 +176,7 @@ export function createPlayerInstance(options) {
                 this.emitState();
             });
             this.video.addEventListener('stalled', () => {
+                if (this.wantPlaying !== true) return;
                 if (this.playing || this.loading) {
                     this.loadPhase = 'buffering';
                     if (this.pausePhase !== 'idle') {
@@ -369,10 +374,11 @@ export function createPlayerInstance(options) {
         /**
          * Clamp into buffered range if needed; never seek to tip/live.
          * Resume plays from the parked position so headroom stays intact.
+         * @returns {boolean} true if currentTime was changed (caller should await seeked)
          */
         prepareResumePosition() {
             const video = this.video;
-            if (!video?.buffered?.length) return;
+            if (!video?.buffered?.length) return false;
             const bufferedStart = video.buffered.start(0);
             const bufferedEnd = video.buffered.end(video.buffered.length - 1);
             const desired = computeResumeSeekTime(
@@ -380,7 +386,9 @@ export function createPlayerInstance(options) {
                 bufferedStart,
                 bufferedEnd
             );
-            if (desired != null) video.currentTime = desired;
+            if (desired == null) return false;
+            video.currentTime = desired;
+            return true;
         },
 
         async destroyHls() {
@@ -405,10 +413,10 @@ export function createPlayerInstance(options) {
         },
 
         /**
-         * Flip play/pause intent. Always honors the latest mash — no drop-lock.
+         * Flip play/pause intent. Stuck resume (want && !playing) retries play.
          */
         toggle() {
-            if (this.wantPlaying) {
+            if (shouldPauseOnToggle(this.wantPlaying, this.playing)) {
                 this.pause();
                 return;
             }
@@ -416,7 +424,7 @@ export function createPlayerInstance(options) {
         },
 
         /**
-         * Kick video.play(); ignore AbortError (mash interrupts); retry once if still wanted.
+         * Kick video.play(); AbortError retries once, then falls back to playChannel.
          */
         _runPlay(gen) {
             const video = this.video;
@@ -431,12 +439,23 @@ export function createPlayerInstance(options) {
                 }).catch((err) => {
                     if (gen !== this.transportGen || !this.wantPlaying) return;
                     const name = err?.name || '';
-                    // Interrupted by pause/seek during mash — retry once, never mark blocked.
+                    // Interrupted by pause/seek during mash — retry once.
                     if (name === 'AbortError') {
                         const retry = video.play();
                         retry?.catch((err2) => {
                             if (gen !== this.transportGen || !this.wantPlaying) return;
-                            if (err2?.name === 'AbortError') return;
+                            if (err2?.name === 'AbortError') {
+                                // Never leave wantPlaying stuck — same recovery as STOP.
+                                if (
+                                    shouldFallbackPlayChannelOnDoubleAbort()
+                                    && this.channel?.url_resolved
+                                ) {
+                                    void this.playChannel(this.channel);
+                                } else {
+                                    this._failResume(gen);
+                                }
+                                return;
+                            }
                             this._failResume(gen);
                         });
                         return;
@@ -451,6 +470,8 @@ export function createPlayerInstance(options) {
             if (gen !== this.transportGen || !this.wantPlaying) return;
             this.playing = false;
             this.wantPlaying = false;
+            this.loading = false;
+            this.loadPhase = 'idle';
             this.pausePhase = this.posterDataUrl ? 'ready' : 'idle';
             this.error = 'Playback blocked';
             this.resumeBlocked = true;
@@ -463,7 +484,8 @@ export function createPlayerInstance(options) {
 
         /**
          * Resume attached media from the parked pause-buffer position.
-         * Sync UI immediately; video.play() is fire-and-forget with gen guard.
+         * Keep loading until the native playing event — avoids a black gap after play click.
+         * If resume seeks, wait for seeked before play() to avoid AbortError races.
          */
         resume() {
             this.resumeBlocked = false;
@@ -475,13 +497,31 @@ export function createPlayerInstance(options) {
             }
 
             const gen = this.beginTransport(true);
-            this.prepareResumePosition();
+            const didSeek = this.prepareResumePosition();
             // Keep liveMaxLatency Infinity from pause-buffer — do not yank to live.
             this.pausePhase = 'idle';
-            this.playing = true;
-            this.loading = false;
+            this.playing = false;
+            this.loading = true;
+            this.loadPhase = 'buffering';
             this.emitState();
-            this._runPlay(gen);
+
+            if (!didSeek || !this.video) {
+                this._runPlay(gen);
+                return;
+            }
+
+            let started = false;
+            let timer = 0;
+            const start = () => {
+                if (started) return;
+                started = true;
+                this.video?.removeEventListener('seeked', start);
+                clearTimeout(timer);
+                if (gen !== this.transportGen || !this.wantPlaying) return;
+                this._runPlay(gen);
+            };
+            this.video.addEventListener('seeked', start);
+            timer = setTimeout(start, 400);
         },
 
         /**
@@ -521,6 +561,7 @@ export function createPlayerInstance(options) {
             this.video?.pause();
             this.playing = false;
             this.loading = false;
+            this.loadPhase = 'idle';
             if (shouldRecordRecents()) savePlayerState({ wasPlaying: false });
             this.emitState();
 
@@ -627,6 +668,9 @@ export function createPlayerInstance(options) {
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.playing = false;
+                if (shouldClearWantPlayingOnPlayFail()) {
+                    this.wantPlaying = false;
+                }
                 const blocked = e?.name === 'NotAllowedError'
                     || String(e?.message || '').toLowerCase().includes('not allowed');
                 if (blocked) {

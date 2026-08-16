@@ -146,6 +146,12 @@ export const PlayerChrome = {
     onPlayerStateChanged(e) {
         const state = e.detail || {};
 
+        TileFrames.setPlaybackBusy(
+            state.wantPlaying === true
+            || state.playing === true
+            || (state.loading === true && state.pausePhase === 'idle')
+        );
+
         if (state.wantPlaying === true || state.playing === true) {
             const url = state.channel?.url_resolved || state.channel?.url || '';
             if (url) {

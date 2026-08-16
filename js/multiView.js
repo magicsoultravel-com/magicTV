@@ -1329,7 +1329,10 @@ export const MultiView = {
                         await player.playChannel(channel);
                     } catch { /* autoplay may block */ }
                     // Keep last poster until live video paints; do not force-clear.
-                    player.muted = mutePlan.afterPlay;
+                    // Only unmute when playback actually started.
+                    if (player.playing === true && !player.resumeBlocked) {
+                        player.muted = mutePlan.afterPlay;
+                    }
                 } else {
                     await player.loadChannelPaused(channel);
                     player.muted = desiredMuted;
@@ -1587,17 +1590,22 @@ export const MultiView = {
             const rememberedKey = this.rememberedSlotKeys[id] || '';
             const hasChannel = Boolean(player?.channel) || Boolean(rememberedKey);
             const empty = tile.querySelector('.tv-player-tile__empty');
-            const intentPlaying = player?.wantPlaying === true || player?.playing === true;
-            const { uiPlaying, uiPaused, uiStopped } = classifyTilePlayback({
+            const mediaPlaying = player?.playing === true;
+            const intentPlaying = player?.wantPlaying === true || mediaPlaying;
+            const { uiPlaying, uiLoading, uiPaused, uiStopped } = classifyTilePlayback({
                 hasChannel,
-                playing: intentPlaying,
+                playing: mediaPlaying,
                 posterDataUrl: player?.posterDataUrl,
                 pausePhase: player?.pausePhase,
-                stopped: player?.stopped === true
+                stopped: player?.stopped === true,
+                loading: player?.loading === true,
+                loadPhase: player?.loadPhase || 'idle',
+                wantPlaying: player?.wantPlaying === true
             });
 
             tile.classList.toggle('is-empty', !hasChannel);
             tile.classList.toggle('is-playing', uiPlaying);
+            tile.classList.toggle('is-loading', uiLoading);
             tile.classList.toggle('is-paused', uiPaused);
             tile.classList.toggle('is-stopped', uiStopped);
             // Never show “Pick a channel” for a remembered/saved assignment.
@@ -1616,15 +1624,15 @@ export const MultiView = {
             }
 
             const posterEl = tile.querySelector('.tv-player-tile__poster');
-            // Poster covers stubs/reload before the <video> has a decoded frame.
-            // Once paused with a real frame, leave the video visible (native freeze).
+            // Cover black gaps: keep poster while loading/awaiting first paint, or when
+            // the <video> has no decoded frame yet.
             const videoHasFrame = Boolean(player?.video?.videoWidth > 0);
             const showPoster = Boolean(
                 hasChannel
                 && player
                 && player.posterDataUrl
                 && !uiPlaying
-                && !videoHasFrame
+                && (uiLoading || !videoHasFrame)
             );
             tile.classList.toggle('has-poster', showPoster);
             if (posterEl) {
@@ -1650,9 +1658,9 @@ export const MultiView = {
             // One stable hit-target — icon swaps; pause button stays hidden.
             if (playBtn) {
                 playBtn.classList.remove('is-hidden');
-                playBtn.textContent = uiPlaying ? '⏸' : '▶';
-                playBtn.title = uiPlaying ? 'Pause' : 'Play';
-                playBtn.setAttribute('aria-label', uiPlaying ? 'Pause' : 'Play');
+                playBtn.textContent = intentPlaying ? '⏸' : '▶';
+                playBtn.title = intentPlaying ? 'Pause' : 'Play';
+                playBtn.setAttribute('aria-label', intentPlaying ? 'Pause' : 'Play');
             }
             if (pauseBtn) {
                 pauseBtn.classList.add('is-hidden');

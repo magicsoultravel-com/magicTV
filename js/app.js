@@ -87,11 +87,13 @@ function activeChannelGrid() {
 }
 
 function startPlayback(channel) {
+    TileFrames.setPlaybackBusy(true);
     try { TvPlayer.mountVideo(); } catch { /* ignore */ }
     TvPlayer.playChannel(channel).catch((e) => {
         const blocked = e?.name === 'NotAllowedError'
             || String(e?.message || '').toLowerCase().includes('not allowed');
         if (!blocked) showAppToast('Stream unavailable');
+        if (!TvPlayer.playing) TileFrames.setPlaybackBusy(false);
     });
 }
 
@@ -752,6 +754,7 @@ async function handleManualRefresh() {
         const viewKey = currentRefreshKey();
         if (tab === 'browse') {
             if (appState.browseCountry === null) {
+                TileFrames.clearLiveRefresh();
                 appState.countries = await TvProviderRegistry.refreshCatalog();
                 BrowseView.renderCountries();
                 stampRefreshView('browseCountries', TvProviderRegistry.getLastRefreshed());
@@ -759,19 +762,20 @@ async function handleManualRefresh() {
                 await BrowseView.refreshBrowseCountry();
                 stampRefreshView(viewKey);
                 const grid = activeChannelGrid();
-                if (grid) await TileFrames.refresh(grid);
+                if (grid) await TileFrames.refresh(grid, { viewKey });
             }
         } else if (tab === 'favorites') {
             await ChannelGrid.refreshFavorites(true);
             stampRefreshView('favorites');
             const grid = activeChannelGrid();
-            if (grid) await TileFrames.refresh(grid);
+            if (grid) await TileFrames.refresh(grid, { viewKey: 'favorites' });
         } else if (tab === 'recents') {
             await ChannelGrid.refreshRecents(true);
             stampRefreshView('recents');
             const grid = activeChannelGrid();
-            if (grid) await TileFrames.refresh(grid);
+            if (grid) await TileFrames.refresh(grid, { viewKey: 'recents' });
         } else {
+            TileFrames.clearLiveRefresh();
             Appearance.updateStorageStats();
             stampRefreshView('settings');
         }
@@ -808,6 +812,7 @@ function switchTab(tabName) {
     }
 
     appState.activeTab = tabName;
+    TileFrames.syncLiveRefresh(currentRefreshKey());
     ListSort.syncSortControls();
     if (tabName === 'favorites') {
         appState.favFilter = currentFilter();
@@ -842,6 +847,7 @@ async function init() {
     TvPlayer.init();
     TvPip.init();
     TvPlayer.mountVideo();
+    TileFrames.warmup();
     MultiView.bindSettings();
 
     loadLocalState();

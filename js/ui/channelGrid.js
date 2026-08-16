@@ -192,7 +192,7 @@ export const ChannelGrid = {
             container.innerHTML = html;
         }
         wireTiles(container, channels);
-        TileFrames.observe(container);
+        TileFrames.observe(container, { viewKey: deps.getRefreshKey?.() || null });
         Appearance.applyToTiles(container);
     },
 

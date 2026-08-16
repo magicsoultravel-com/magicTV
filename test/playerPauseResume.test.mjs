@@ -12,6 +12,9 @@ import {
     shouldAcceptPauseEvent,
     resolveRestorePlayMute,
     shouldClearWasPlayingOnAutoplayBlock,
+    shouldPauseOnToggle,
+    shouldClearWantPlayingOnPlayFail,
+    shouldFallbackPlayChannelOnDoubleAbort,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -113,6 +116,89 @@ test('playing hides pause/stop overlays', () => {
     assert.equal(state.uiPlaying, true);
     assert.equal(state.uiPaused, false);
     assert.equal(state.uiStopped, false);
+    assert.equal(state.uiLoading, false);
+});
+
+test('connecting or buffering shows loading, not pause/stop', () => {
+    const connecting = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        loading: true,
+        loadPhase: 'connecting',
+        pausePhase: 'pausing',
+        posterDataUrl: 'data:image/jpeg;base64,x',
+        stopped: false
+    });
+    assert.equal(connecting.uiLoading, true);
+    assert.equal(connecting.uiPaused, false);
+    assert.equal(connecting.uiStopped, false);
+
+    const buffering = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        loading: false,
+        loadPhase: 'buffering',
+        pausePhase: 'buffering',
+        stopped: true
+    });
+    assert.equal(buffering.uiLoading, true);
+    assert.equal(buffering.uiPaused, false);
+    assert.equal(buffering.uiStopped, false);
+});
+
+test('play click awaiting first paint shows loading (not black/playing)', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        wantPlaying: true,
+        loading: false,
+        loadPhase: 'idle',
+        pausePhase: 'idle',
+        posterDataUrl: 'data:image/jpeg;base64,x'
+    });
+    assert.equal(state.uiLoading, true);
+    assert.equal(state.uiPlaying, false);
+    assert.equal(state.uiPaused, false);
+});
+
+test('playing suppresses loading overlay', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: true,
+        loading: true,
+        loadPhase: 'buffering'
+    });
+    assert.equal(state.uiPlaying, true);
+    assert.equal(state.uiLoading, false);
+});
+
+test('paused ready without loading shows pause, not loading', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        loading: false,
+        loadPhase: 'idle',
+        pausePhase: 'ready',
+        posterDataUrl: 'data:image/jpeg;base64,x'
+    });
+    assert.equal(state.uiLoading, false);
+    assert.equal(state.uiPaused, true);
+    assert.equal(state.uiStopped, false);
+});
+
+test('stopped without loading shows stop, not loading', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        loading: false,
+        loadPhase: 'idle',
+        pausePhase: 'idle',
+        stopped: true,
+        posterDataUrl: null
+    });
+    assert.equal(state.uiLoading, false);
+    assert.equal(state.uiPaused, false);
+    assert.equal(state.uiStopped, true);
 });
 
 // ----- Instant contract (documented invariants) -----
@@ -205,19 +291,25 @@ test('rapid successive toggle/mash resets pausePhase on resume intent', () => {
     assert.equal(gen2, 2);
 });
 
-test('toggle intent follows wantPlaying only (not stale playing flag)', () => {
-    // After pause, wantPlaying=false even if a stale playing flag lingered
-    let wantPlaying = true;
-    const shouldPause = () => wantPlaying === true;
-    assert.equal(shouldPause(), true);
-    wantPlaying = false;
-    assert.equal(shouldPause(), false);
+test('toggle pauses only when wantPlaying and playing; stuck resume retries play', () => {
+    assert.equal(shouldPauseOnToggle(true, true), true);
+    assert.equal(shouldPauseOnToggle(true, false), false, 'stuck resume must not pause');
+    assert.equal(shouldPauseOnToggle(false, false), false);
+    assert.equal(shouldPauseOnToggle(false, true), false);
 });
 
 test('AbortError must not count as playback blocked', () => {
     const isHardFail = (name) => name !== 'AbortError';
     assert.equal(isHardFail('AbortError'), false);
     assert.equal(isHardFail('NotAllowedError'), true);
+});
+
+test('double AbortError must fall back to playChannel (not leave wantPlaying stuck)', () => {
+    assert.equal(shouldFallbackPlayChannelOnDoubleAbort(), true);
+});
+
+test('playChannel failure must clear wantPlaying', () => {
+    assert.equal(shouldClearWantPlayingOnPlayFail(), true);
 });
 
 test('resolveRestorePlayMute forces muted during play then restores saved unmute', () => {

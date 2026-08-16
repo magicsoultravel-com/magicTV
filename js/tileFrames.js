@@ -1,23 +1,58 @@
 /**
- * TileFrames — paint channel-tile thumbs from IndexedDB + live player snaps.
+ * TileFrames — fast lazy thumbs for channel tiles.
  *
- * No offscreen HLS. Cache hits show immediately; missing frames keep letter avatars
- * until the user actually plays that channel (notePlayingVideo).
+ * Dual-tier drain (aef5-style): cheap (cache/logo) + heavy (offscreen HLS).
+ * Hot = on-screen; warm = below-fold / prefetch. Both drain.
+ * Live player snaps (notePlayingVideo) still short-circuit matching tiles.
  */
 
 import { FrameCache } from './storage/frameCache.js';
-import { setFrameState } from './tiles/frameUi.js';
+import { PosterCache } from './storage/posterCache.js';
+import { loadHlsLibrary } from './tvHls.js';
 import {
+    setFrameState,
+    settleFrameCapture as settleFrameCaptureUi
+} from './tiles/frameUi.js';
+import {
+    captureStreamFrame,
+    abortAllCaptures,
     waitAndSnapshotTileFrame,
     snapshotVideoPoster,
+    isMostlyBlackImageData,
     LIVE_TILE_SNAP_BUDGET_MS,
-    isMostlyBlackImageData
+    CAPTURE_BUDGET_MS,
+    CAPTURE_BUDGET_BUSY_MS,
+    MEDIA_READY_TIMEOUT,
+    MEDIA_READY_BUSY_MS
 } from './tiles/streamCapture.js';
-import { PosterCache } from './storage/posterCache.js';
+
+const MAX_TOTAL = 8;
+const MAX_CHEAP = 6;
+const MAX_HEAVY = 4;
+/** When playback is busy, still allow some heavy grabs but fewer. */
+const MAX_HEAVY_BUSY = 2;
+const LOGO_TIMEOUT_MS = 3500;
+const DEFAULT_HOT_BUDGET = 24;
 
 const state = {
-    refreshEpoch: 0
+    observer: null,
+    observerRoot: null,
+    hot: [],
+    warm: [],
+    pending: new Set(),
+    forceHeavy: new WeakSet(),
+    running: 0,
+    heavyRunning: 0,
+    playbackBusy: false,
+    refreshEpoch: 0,
+    liveRefreshKey: null,
+    activeGrid: null
 };
+
+/** Facade: injects live refreshEpoch for stale-capture UI skips. */
+export function settleFrameCapture(frame, dataUrl, url, epoch, failReason = null, channelKey = '') {
+    settleFrameCaptureUi(frame, dataUrl, url, epoch, failReason, state.refreshEpoch, channelKey);
+}
 
 export { setFrameState, isMostlyBlackImageData };
 
@@ -29,75 +64,600 @@ function tileChannelKey(frame) {
     return (frame.closest('.channel-tile')?.dataset?.channel || '').trim();
 }
 
-async function primeFromCache(container) {
+function tileLogo(frame) {
+    return (frame.closest('.channel-tile')?.dataset?.logo || '').trim();
+}
+
+function isLiveRefreshActive(viewKey) {
+    return !!state.liveRefreshKey && state.liveRefreshKey === viewKey;
+}
+
+function hotBudget(container) {
+    const panel = container?.closest?.('.tv-panel') || container;
+    const panelH = panel?.clientHeight || 0;
+    const panelW = panel?.clientWidth || 0;
+    if (!panelH || !panelW) return DEFAULT_HOT_BUDGET;
+    const tileW = 180;
+    const tileH = 72;
+    const cols = Math.max(1, Math.floor(panelW / Math.max(60, tileW)));
+    const rows = Math.max(3, Math.ceil(panelH / tileH) + 1);
+    return Math.max(DEFAULT_HOT_BUDGET, cols * rows);
+}
+
+function isNearViewport(frame, margin = 200) {
+    if (!frame?.getBoundingClientRect) return false;
+    const r = frame.getBoundingClientRect();
+    if (!r) return false;
+    const panel = frame.closest?.('.tv-panel');
+    if (panel?.getBoundingClientRect) {
+        const pr = panel.getBoundingClientRect();
+        return r.bottom > pr.top - margin
+            && r.top < pr.bottom + margin
+            && r.right > pr.left
+            && r.left < pr.right;
+    }
+    const h = globalThis.innerHeight || 0;
+    return r.bottom > -margin && r.top < h + margin;
+}
+
+function isInViewport(frame) {
+    return isNearViewport(frame, 0);
+}
+
+function applyProvisional(frame, src) {
+    if (!frame || !src || frame.dataset.captured) return;
+    setFrameState(frame, 'provisional', src);
+}
+
+function paintProvisionalLogos(container) {
     if (!container) return;
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (frame.dataset.captured || frame.dataset.provisional) return;
+        const logo = tileLogo(frame);
+        if (logo) applyProvisional(frame, logo);
+    });
+}
+
+function pruneQueues() {
+    for (const queue of [state.hot, state.warm]) {
+        for (let i = queue.length - 1; i >= 0; i--) {
+            if (!queue[i].isConnected) {
+                state.pending.delete(queue[i]);
+                queue.splice(i, 1);
+            }
+        }
+    }
+}
+
+function markWaiting(frame) {
+    if (!frame || frame.dataset.captured) return;
+    if (frame.dataset.provisional) {
+        setFrameState(frame, 'provisional', frame.querySelector('.channel-tile__logo-img')?.getAttribute('src') || '');
+        return;
+    }
+    setFrameState(frame, 'waiting');
+}
+
+function enqueue(frame, hot = true) {
+    if (!frame || frame.dataset.captured || state.pending.has(frame)) return false;
+    const url = streamUrl(frame);
+    const logo = tileLogo(frame);
+    const chKey = tileChannelKey(frame);
+    if (!url) {
+        if (logo) {
+            setFrameState(frame, 'captured', logo);
+            return false;
+        }
+        // Channel-key-only skeletons stay waiting for cache prime — not offline.
+        if (chKey) {
+            setFrameState(frame, 'waiting');
+            return false;
+        }
+        setFrameState(frame, 'offline');
+        return false;
+    }
+    if (logo && !frame.dataset.provisional) applyProvisional(frame, logo);
+    state.pending.add(frame);
+    markWaiting(frame);
+    if (hot) state.hot.push(frame);
+    else state.warm.push(frame);
+    return true;
+}
+
+function promoteHot(frame) {
+    if (!frame || frame.dataset.captured || !state.pending.has(frame)) return;
+    if (frame.dataset.frameState === 'loading') return;
+    const wi = state.warm.indexOf(frame);
+    if (wi >= 0) state.warm.splice(wi, 1);
+    const hi = state.hot.indexOf(frame);
+    if (hi >= 0) state.hot.splice(hi, 1);
+    state.hot.unshift(frame);
+}
+
+/**
+ * Leave viewport: demote waiting (not loading) frames out of hot into warm
+ * so they stay in the cheap/heavy backlog without blocking slots.
+ */
+function demoteCold(frame) {
+    if (!frame || frame.dataset.captured) return;
+    if (frame.dataset.frameState === 'loading') return;
+    if (!state.pending.has(frame)) return;
+    const i = state.hot.indexOf(frame);
+    if (i >= 0) {
+        state.hot.splice(i, 1);
+        if (!state.warm.includes(frame)) state.warm.push(frame);
+    }
+}
+
+/** @internal viewport callback — exported for tests */
+function onFrameVisibility(frame, isIntersecting) {
+    if (!frame || frame.dataset.captured) return;
+    if (isIntersecting) {
+        if (state.pending.has(frame)) promoteHot(frame);
+        else enqueue(frame, true);
+    } else {
+        demoteCold(frame);
+    }
+}
+
+function captureTier(frame) {
+    if (state.forceHeavy.has(frame)) return 'heavy';
+    const logo = tileLogo(frame);
+    // Cache/logo path is cheap; pure URL without logo starts heavy.
+    return logo ? 'cheap' : 'heavy';
+}
+
+function heavyLimit() {
+    return state.playbackBusy ? MAX_HEAVY_BUSY : MAX_HEAVY;
+}
+
+function canStartTier(tier) {
+    if (state.running >= MAX_TOTAL) return false;
+    if (tier === 'heavy') {
+        if (state.playbackBusy && state.heavyRunning >= MAX_HEAVY_BUSY) return false;
+        return state.heavyRunning < heavyLimit();
+    }
+    return (state.running - state.heavyRunning) < MAX_CHEAP;
+}
+
+function pickNext() {
+    pruneQueues();
+    for (const queue of [state.hot, state.warm]) {
+        for (let i = 0; i < queue.length; i++) {
+            const frame = queue[i];
+            if (!frame.isConnected) {
+                state.pending.delete(frame);
+                queue.splice(i, 1);
+                i--;
+                continue;
+            }
+            if (frame.dataset.captured) {
+                state.pending.delete(frame);
+                queue.splice(i, 1);
+                i--;
+                continue;
+            }
+            const tier = captureTier(frame);
+            if (canStartTier(tier)) {
+                queue.splice(i, 1);
+                return { frame, tier };
+            }
+        }
+    }
+    return null;
+}
+
+function imageLoad(src, timeout) {
+    return new Promise((resolve) => {
+        if (typeof Image === 'undefined' || !src) {
+            resolve(false);
+            return;
+        }
+        const img = new Image();
+        let done = false;
+        const finish = (ok) => {
+            if (done) return;
+            done = true;
+            clearTimeout(t);
+            img.onload = img.onerror = null;
+            resolve(ok);
+        };
+        const t = setTimeout(() => finish(false), timeout);
+        img.onload = () => finish(true);
+        img.onerror = () => finish(false);
+        img.src = src;
+    });
+}
+
+async function isMostlyBlackDataUrl(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return false;
+    if (typeof Image === 'undefined' || typeof document === 'undefined') return false;
+    try {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = 56;
+        canvas.height = 56;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return false;
+        ctx.drawImage(img, 0, 0, 56, 56);
+        return isMostlyBlackImageData(ctx.getImageData(0, 0, 56, 56).data);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Cheap → heavy capture path for one frame.
+ * @returns {Promise<'requeue-heavy'|void>}
+ */
+async function captureFrame(frame, tier, epoch) {
+    const stale = () => epoch !== state.refreshEpoch || !frame.isConnected;
+    const url = streamUrl(frame);
+    const chKey = tileChannelKey(frame);
+    const logo = tileLogo(frame);
+    const alreadyHeavy = state.forceHeavy.has(frame);
+    const skipCache = !!state.liveRefreshKey;
+
+    if (!alreadyHeavy && !skipCache) {
+        const keys = [url, chKey, logo].filter(Boolean);
+        for (const key of keys) {
+            const cached = await FrameCache.getFrame(key).catch(() => null);
+            if (stale()) return;
+            if (!cached) continue;
+            if (await isMostlyBlackDataUrl(cached)) {
+                FrameCache.removeFrame(key).catch(() => {});
+                continue;
+            }
+            settleFrameCapture(frame, cached, url || key, epoch, null, chKey);
+            return;
+        }
+    }
+
+    if (logo && !alreadyHeavy) {
+        if (await imageLoad(logo, LOGO_TIMEOUT_MS)) {
+            if (stale()) return;
+            // Fast grid fill — does not set captured so heavy can still upgrade.
+            applyProvisional(frame, logo);
+            if (url) return 'requeue-heavy';
+            settleFrameCapture(frame, logo, logo, epoch, null, chKey);
+            return;
+        }
+        if (stale()) return;
+    }
+
+    if (!url) {
+        if (!stale()) settleFrameCapture(frame, null, '', epoch, 'media', chKey);
+        return;
+    }
+    if (tier === 'cheap') return 'requeue-heavy';
+
+    const result = await captureStreamFrame(url, { playbackBusy: state.playbackBusy });
+    if (stale()) return;
+    settleFrameCapture(
+        frame,
+        result?.dataUrl || null,
+        url,
+        epoch,
+        result?.fail || null,
+        chKey
+    );
+}
+
+let folderFramePumpQueued = false;
+function scheduleFolderFramePump() {
+    if (folderFramePumpQueued) return;
+    folderFramePumpQueued = true;
+    const run = () => {
+        folderFramePumpQueued = false;
+        if (state.running > 0) return;
+        if (!state.liveRefreshKey) return;
+        promoteUncapturedFolderFrames(state.activeGrid);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else setTimeout(run, 0);
+}
+
+function drain() {
+    pruneQueues();
+    let next;
+    while ((next = pickNext())) {
+        const { frame, tier } = next;
+        const epoch = state.refreshEpoch;
+        state.running++;
+        if (tier === 'heavy') state.heavyRunning++;
+        setFrameState(frame, 'loading');
+        let requeued = false;
+        captureFrame(frame, tier, epoch)
+            .then((result) => {
+                if (result !== 'requeue-heavy') return;
+                requeued = true;
+                state.forceHeavy.add(frame);
+                state.pending.add(frame);
+                (isInViewport(frame) ? state.hot : state.warm).unshift(frame);
+                markWaiting(frame);
+            })
+            .finally(() => {
+                state.running = Math.max(0, state.running - 1);
+                if (tier === 'heavy') state.heavyRunning = Math.max(0, state.heavyRunning - 1);
+                if (!requeued && epoch === state.refreshEpoch) {
+                    state.pending.delete(frame);
+                    state.forceHeavy.delete(frame);
+                }
+                drain();
+                if (state.running === 0 && state.hot.length === 0 && state.warm.length === 0) {
+                    scheduleFolderFramePump();
+                }
+            });
+    }
+}
+
+function softenPendingWhileBusy() {
+    for (const frame of state.pending) {
+        if (!frame?.isConnected || frame.dataset.captured) continue;
+        const logo = tileLogo(frame);
+        if (logo) applyProvisional(frame, logo);
+    }
+    if (state.activeGrid) paintProvisionalLogos(state.activeGrid);
+}
+
+function ensureObserver(container) {
+    if (typeof IntersectionObserver === 'undefined') return null;
+    const panel = container?.closest?.('.tv-panel') || null;
+    if (state.observer && state.observerRoot !== panel) {
+        state.observer.disconnect();
+        state.observer = null;
+        state.observerRoot = null;
+    }
+    if (!state.observer) {
+        state.observerRoot = panel;
+        state.observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                onFrameVisibility(entry.target, entry.isIntersecting);
+            }
+            drain();
+        }, {
+            root: panel,
+            rootMargin: '200px 0px 200px 0px',
+            threshold: 0
+        });
+    }
+    return state.observer;
+}
+
+/**
+ * Queue frames: first hotBudget → hot, rest → warm (both drain).
+ */
+function queueContainer(container, { reobserve = false } = {}) {
+    if (!container) return;
+    state.activeGrid = container;
+    const observer = ensureObserver(container);
+    const frames = Array.from(container.querySelectorAll('.channel-tile__capture-frame'));
+    const budget = hotBudget(container);
+    let hotCount = 0;
+
+    for (const frame of frames) {
+        if (frame.dataset.captured) continue;
+        const url = streamUrl(frame);
+        const logo = tileLogo(frame);
+        const chKey = tileChannelKey(frame);
+        if (!url) {
+            if (logo) {
+                setFrameState(frame, 'captured', logo);
+            } else if (chKey) {
+                setFrameState(frame, 'waiting');
+            } else {
+                setFrameState(frame, 'offline');
+            }
+            if (observer) {
+                if (reobserve) observer.unobserve(frame);
+                observer.observe(frame);
+            }
+            continue;
+        }
+        if (hotCount < budget) {
+            if (enqueue(frame, true)) hotCount++;
+        } else {
+            enqueue(frame, false);
+        }
+        if (observer) {
+            if (reobserve) observer.unobserve(frame);
+            observer.observe(frame);
+        }
+    }
+    drain();
+}
+
+async function primeFromCache(container, { skipCache = false } = {}) {
+    if (!container || skipCache) return;
     const frames = [];
     const keys = [];
     container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
         if (frame.dataset.captured) return;
         const url = streamUrl(frame);
         const chKey = tileChannelKey(frame);
-        if (!url && !chKey) {
+        const logo = tileLogo(frame);
+        if (!url && !chKey && !logo) {
             setFrameState(frame, 'waiting');
             return;
         }
-        frames.push({ frame, url, chKey });
+        frames.push({ frame, url, chKey, logo });
         if (url) keys.push(url);
         if (chKey) keys.push(chKey);
+        if (logo) keys.push(logo);
     });
     if (!frames.length) return;
 
     const cached = await FrameCache.getFrames([...new Set(keys)]).catch(() => new Map());
-    for (const { frame, url, chKey } of frames) {
+    for (const { frame, url, chKey, logo } of frames) {
         if (!frame.isConnected || frame.dataset.captured) continue;
-        const dataUrl = (url && cached.get(url)) || (chKey && cached.get(chKey)) || null;
+        if (frame.dataset.frameState === 'loading') continue;
+        const dataUrl = (url && cached.get(url))
+            || (chKey && cached.get(chKey))
+            || (logo && cached.get(logo))
+            || null;
         if (dataUrl) setFrameState(frame, 'captured', dataUrl);
-        else setFrameState(frame, 'waiting');
     }
-}
-
-function markWaiting(container) {
-    if (!container) return;
-    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
-        if (frame.dataset.captured) return;
-        setFrameState(frame, 'waiting');
-    });
 }
 
 // ===== PUBLIC API =====
 
-function observe(container) {
+function observe(container, opts = {}) {
     if (!container) return;
-    markWaiting(container);
-    primeFromCache(container).catch(() => {});
+    const viewKey = opts.viewKey || null;
+    const skipCache = isLiveRefreshActive(viewKey);
+    state.activeGrid = container;
+
+    paintProvisionalLogos(container);
+    queueContainer(container);
+    primeFromCache(container, { skipCache }).catch(() => {});
+
+    if (state.liveRefreshKey) {
+        enqueueFolderFramesForRefresh(container);
+    }
 }
 
 /**
- * Clear cached thumbs for tiles in this container and reset to letter avatars.
- * New frames only appear after the user plays those channels again.
+ * Wipe cache for this grid and requeue hot+warm live grabs.
+ * @param {HTMLElement} container
+ * @param {{ viewKey?: string }} [opts]
  */
-async function refresh(container) {
+async function refresh(container, opts = {}) {
     if (!container) return;
+    const viewKey = opts.viewKey || null;
+    if (viewKey && viewKey !== 'browseCountries' && viewKey !== 'settings') {
+        state.liveRefreshKey = viewKey;
+    } else {
+        state.liveRefreshKey = null;
+    }
 
+    abortAllCaptures();
     state.refreshEpoch++;
+    state.activeGrid = container;
 
     const frames = Array.from(container.querySelectorAll('.channel-tile__capture-frame'));
+    const frameSet = new Set(frames);
+    for (const queue of [state.hot, state.warm]) {
+        for (let i = queue.length - 1; i >= 0; i--) {
+            if (frameSet.has(queue[i])) queue.splice(i, 1);
+        }
+    }
+
     const keys = [];
     for (const frame of frames) {
+        state.pending.delete(frame);
+        state.forceHeavy.delete(frame);
         const url = streamUrl(frame);
         const chKey = tileChannelKey(frame);
+        const logo = tileLogo(frame);
         if (url) keys.push(url);
         if (chKey) keys.push(chKey);
+        if (logo) keys.push(logo);
         delete frame.dataset.captured;
-        setFrameState(frame, 'waiting');
+        delete frame.dataset.provisional;
+        if (logo) applyProvisional(frame, logo);
+        else if (url) setFrameState(frame, 'waiting');
+        else setFrameState(frame, 'offline');
     }
 
     if (keys.length) await FrameCache.removeFrames(keys).catch(() => {});
+    await Promise.resolve();
+
+    queueContainer(container, { reobserve: true });
+}
+
+function enqueueFolderFramesForRefresh(container) {
+    if (!container || !state.liveRefreshKey) return;
+    paintProvisionalLogos(container);
+    const keys = [];
+    const hot = [];
+    const warm = [];
+    const budget = Math.max(0, hotBudget(container) - state.hot.length);
+    let added = false;
+
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (frame.dataset.captured || state.pending.has(frame)) return;
+        const url = streamUrl(frame);
+        const chKey = tileChannelKey(frame);
+        const logo = tileLogo(frame);
+        if (url) keys.push(url);
+        if (chKey) keys.push(chKey);
+        if (logo) keys.push(logo);
+        if (!url) return;
+        if (logo && !frame.dataset.provisional) applyProvisional(frame, logo);
+        state.pending.add(frame);
+        markWaiting(frame);
+        if (hot.length < budget) hot.push(frame);
+        else warm.push(frame);
+        added = true;
+    });
+
+    state.hot.push(...hot);
+    state.warm.push(...warm);
+    if (keys.length) FrameCache.removeFrames(keys).catch(() => {});
+    if (added) drain();
+}
+
+function promoteUncapturedFolderFrames(container) {
+    if (!container || !state.liveRefreshKey) return;
+    paintProvisionalLogos(container);
+    const keys = [];
+    const hot = [];
+    const warm = [];
+    const budget = hotBudget(container);
+    let added = false;
+
+    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+        if (frame.dataset.captured || state.pending.has(frame)) return;
+        const url = streamUrl(frame);
+        if (!url) return;
+        if (!isNearViewport(frame)) return;
+        const logo = tileLogo(frame);
+        const chKey = tileChannelKey(frame);
+        if (logo) applyProvisional(frame, logo);
+        if (url) keys.push(url);
+        if (chKey) keys.push(chKey);
+        if (logo) keys.push(logo);
+        state.pending.add(frame);
+        markWaiting(frame);
+        if (hot.length < budget) hot.push(frame);
+        else warm.push(frame);
+        added = true;
+    });
+    if (!added) return;
+    state.hot.unshift(...hot);
+    state.warm.push(...warm);
+    if (keys.length) FrameCache.removeFrames(keys).catch(() => {});
+    drain();
+}
+
+function clearLiveRefresh() {
+    state.liveRefreshKey = null;
+}
+
+function syncLiveRefresh(viewKey) {
+    if (!isLiveRefreshActive(viewKey)) clearLiveRefresh();
+}
+
+function setPlaybackBusy(busy) {
+    const next = !!busy;
+    if (state.playbackBusy === next) return;
+    state.playbackBusy = next;
+    if (next) softenPendingWhileBusy();
+    else drain();
+}
+
+function warmup() {
+    loadHlsLibrary().catch(() => {});
 }
 
 /** @type {Map<string, { noted: boolean, inFlight: boolean, gen: number }>} */
 const liveSnapByUrl = new Map();
-/** @internal test seam — swap to stub live snaps without canvas/video. */
+/** @internal test seam */
 let liveTileSnap = waitAndSnapshotTileFrame;
 
 function snapGate(stream) {
@@ -109,11 +669,6 @@ function snapGate(stream) {
     return gate;
 }
 
-/**
- * Arm a fresh live-tile snap for this stream URL.
- * Does not cancel in-flight snaps for other URLs.
- * @param {string} [url]
- */
 function armLiveSnap(url) {
     const stream = (url || '').trim();
     if (!stream) return;
@@ -123,12 +678,6 @@ function armLiveSnap(url) {
     gate.gen += 1;
 }
 
-/**
- * Paint channel tiles matching stream URL and/or channel key.
- * @param {string} stream
- * @param {string} dataUrl
- * @param {string} [chKey]
- */
 function paintPlayingFrame(stream, dataUrl, chKey = '') {
     try {
         document.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
@@ -140,18 +689,18 @@ function paintPlayingFrame(stream, dataUrl, chKey = '') {
             if (!matchUrl && !matchKey) return;
             delete frame.dataset.frameFail;
             setFrameState(frame, 'captured', dataUrl);
+            state.pending.delete(frame);
+            state.forceHeavy.delete(frame);
+            for (const queue of [state.hot, state.warm]) {
+                const i = queue.indexOf(frame);
+                if (i >= 0) queue.splice(i, 1);
+            }
         });
     } catch { /* ignore */ }
 }
 
 /**
- * When a player is playing a channel, wait for a usable frame from that
- * <video>, cache it, and paint matching tiles.
- *
- * @param {string} url
- * @param {HTMLVideoElement} video
- * @param {string} [channelKey] — optional `providerId:channelId` for reload priming
- * @returns {boolean|Promise<boolean>} false sync on hard gates; Promise once wait starts
+ * Snap from a real playing <video>, cache, and paint matching tiles.
  */
 function notePlayingVideo(url, video, channelKey = '') {
     const stream = (url || '').trim();
@@ -181,7 +730,6 @@ function notePlayingVideo(url, video, channelKey = '') {
             FrameCache.setFrames(keys, snap.dataUrl).catch(() => {});
             paintPlayingFrame(stream, snap.dataUrl, chKey);
 
-            // Best-effort mosaic poster from the same live frame (already decoded).
             if (chKey) {
                 try {
                     const poster = snapshotVideoPoster(video, { rejectBlack: true })
@@ -200,9 +748,23 @@ function notePlayingVideo(url, video, channelKey = '') {
 }
 
 function _resetForTests() {
+    state.hot.length = 0;
+    state.warm.length = 0;
+    state.pending.clear();
+    state.forceHeavy = new WeakSet();
+    state.running = 0;
+    state.heavyRunning = 0;
+    state.playbackBusy = false;
     state.refreshEpoch++;
+    state.liveRefreshKey = null;
+    state.activeGrid = null;
     liveSnapByUrl.clear();
     liveTileSnap = waitAndSnapshotTileFrame;
+    if (state.observer) {
+        state.observer.disconnect();
+        state.observer = null;
+        state.observerRoot = null;
+    }
 }
 
 function _setLiveTileSnapForTests(fn) {
@@ -212,14 +774,33 @@ function _setLiveTileSnapForTests(fn) {
 export const TileFrames = {
     observe,
     refresh,
+    clearLiveRefresh,
+    syncLiveRefresh,
+    isLiveRefreshActive,
+    setPlaybackBusy,
+    warmup,
+    enqueueFolderFramesForRefresh,
+    promoteUncapturedFolderFrames,
     armLiveSnap,
     notePlayingVideo,
     paintPlayingFrame,
     setFrameState,
+    settleFrameCapture,
     isMostlyBlackImageData,
     _resetForTests,
     _setLiveTileSnapForTests,
     /** @internal */
+    _onFrameVisibility: onFrameVisibility,
+    /** @internal */
     _state: state,
+    MAX_TOTAL,
+    MAX_CHEAP,
+    MAX_HEAVY,
+    MAX_HEAVY_BUSY,
+    CAPTURE_BUDGET_MS,
+    CAPTURE_BUDGET_BUSY_MS,
+    MEDIA_READY_TIMEOUT,
+    MEDIA_READY_BUSY_MS,
+    DEFAULT_HOT_BUDGET,
     LIVE_TILE_SNAP_BUDGET_MS
 };

@@ -1299,8 +1299,13 @@
 }
 
 .tv-player-tile.is-paused .tv-player-tile__state-icon--pause,
-.tv-player-tile.is-stopped .tv-player-tile__state-icon--stop {
+.tv-player-tile.is-stopped .tv-player-tile__state-icon--stop,
+.tv-player-tile.is-loading .tv-player-tile__state-icon--loading {
     display: block;
+}
+
+.tv-player-tile.is-loading .tv-player-tile__state-icon--loading {
+    animation: spin 0.8s linear infinite;
 }
 
 .tv-player-tile.is-playing .tv-player-tile__playback-state,
