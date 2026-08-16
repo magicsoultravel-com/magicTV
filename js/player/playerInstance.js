@@ -12,7 +12,15 @@ import {
     MIN_BUFFER_SIZE
 } from '../storage/playerState.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
-import { attachStream, destroyHls, applyHlsBufferConfig, LIVE_MAX_LATENCY_DURATION_COUNT } from './hlsAttach.js';
+import {
+    attachStream,
+    destroyHls,
+    applyHlsBufferConfig,
+    applyQualityMode,
+    listQualityLevels,
+    formatQualityLabel,
+    LIVE_MAX_LATENCY_DURATION_COUNT
+} from './hlsAttach.js';
 import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.js';
 import { TileFrames } from '../tileFrames.js';
 import { PosterCache } from '../storage/posterCache.js';
@@ -76,6 +84,8 @@ export function createPlayerInstance(options) {
         bufferSize: loadPlayerState().bufferSize || DEFAULT_BUFFER_SIZE,
 
         connection: 'idle',
+        /** 'auto' or locked level index */
+        qualityMode: 'auto',
         qualityLevel: -1,
         qualityLabel: '—',
         bandwidthEstimateBps: null,
@@ -297,6 +307,24 @@ export function createPlayerInstance(options) {
             }
             if (!Number.isFinite(estimate) || estimate <= 0) return null;
             return Math.round(estimate / 1000);
+        },
+
+        getQualityLevels() {
+            return listQualityLevels(this.hls, this.video?.videoHeight || 0);
+        },
+
+        setQualityMode(mode) {
+            const next = mode === 'auto' || mode == null ? 'auto' : Number(mode);
+            this.qualityMode = applyQualityMode(this.hls, next);
+            if (this.hls && this.qualityMode !== 'auto') {
+                const level = this.hls.levels?.[this.qualityMode];
+                if (level) {
+                    this.qualityLevel = this.qualityMode;
+                    this.qualityLabel = formatQualityLabel(level, this.video?.videoHeight || 0);
+                }
+            }
+            this.emitState();
+            return this.qualityMode;
         },
 
         getSeekInfo() {
@@ -877,6 +905,7 @@ export function createPlayerInstance(options) {
             this.pausePhase = 'idle';
             this.stopped = true;
             this.posterDataUrl = null;
+            this.qualityMode = 'auto';
             this.qualityLevel = -1;
             this.qualityLabel = '—';
             this.bandwidthEstimateBps = null;

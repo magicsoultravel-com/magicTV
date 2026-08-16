@@ -23,6 +23,33 @@ function resolveLevelIndex(hls) {
     return -1;
 }
 
+/** Apply Auto or locked level to an hls.js instance. Returns the mode actually applied. */
+export function applyQualityMode(hls, mode) {
+    if (!hls) return 'auto';
+    if (mode === 'auto' || mode == null) {
+        hls.autoLevelEnabled = true;
+        hls.currentLevel = -1;
+        return 'auto';
+    }
+    const index = Number(mode);
+    if (!Number.isInteger(index) || index < 0 || !hls.levels?.[index]) {
+        hls.autoLevelEnabled = true;
+        hls.currentLevel = -1;
+        return 'auto';
+    }
+    hls.autoLevelEnabled = false;
+    hls.currentLevel = index;
+    return index;
+}
+
+export function listQualityLevels(hls, videoHeight = 0) {
+    if (!hls?.levels?.length) return [];
+    return hls.levels.map((level, index) => ({
+        index,
+        label: formatQualityLabel(level, videoHeight)
+    }));
+}
+
 export function applyHlsBufferConfig(hls, bufferSize) {
     if (!hls) return;
     hls.config.maxBufferLength = bufferSize;
@@ -62,6 +89,7 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
     if (generation !== ctx.playGeneration) return;
     const video = ctx.video;
     ctx.connection = 'connecting';
+    ctx.qualityMode = 'auto';
     ctx.qualityLevel = -1;
     ctx.qualityLabel = '—';
     ctx.bandwidthEstimateBps = null;
@@ -92,6 +120,7 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
                     return;
                 }
                 ctx.connection = 'connected';
+                ctx.qualityMode = applyQualityMode(ctx.hls, ctx.qualityMode);
                 const levelIdx = resolveLevelIndex(ctx.hls);
                 if (levelIdx >= 0 && ctx.hls.levels?.[levelIdx]) {
                     ctx.qualityLevel = levelIdx;

@@ -197,9 +197,15 @@ export const PlayerChrome = {
                 const h = TvPlayer.video?.videoHeight;
                 if (h > 0) label = `${h}p`;
             }
-            qualityInfo.textContent = state.channel
-                ? `Quality: ${label || '—'}`
-                : 'Quality: —';
+            if (!state.channel) {
+                qualityInfo.textContent = 'Quality: —';
+            } else if (TvPlayer.qualityMode === 'auto') {
+                qualityInfo.textContent = label && label !== '—'
+                    ? `Quality: Auto (${label})`
+                    : 'Quality: Auto';
+            } else {
+                qualityInfo.textContent = `Quality: ${label || '—'}`;
+            }
         }
         const bandwidthInfo = el('bandwidth-info');
         if (bandwidthInfo) {

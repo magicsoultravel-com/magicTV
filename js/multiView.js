@@ -235,6 +235,42 @@ export const MultiView = {
         mosaic.addEventListener('pointerdown', (e) => this.onTilePointerDown(e));
 
         mosaic.addEventListener('click', (e) => {
+            const qualityOpt = e.target.closest?.('[data-quality-mode]');
+            if (qualityOpt) {
+                e.stopPropagation();
+                e.preventDefault();
+                const tile = qualityOpt.closest?.('.tv-player-tile');
+                const slotId = tile?.getAttribute('data-slot');
+                const modeAttr = qualityOpt.getAttribute('data-quality-mode');
+                if (!slotId || modeAttr == null) return;
+                const mode = modeAttr === 'auto' ? 'auto' : Number(modeAttr);
+                this.slots[slotId]?.player?.setQualityMode?.(mode);
+                const wrap = qualityOpt.closest?.('[data-quality-wrap]');
+                wrap?.classList.remove('is-open');
+                wrap?.querySelector?.('[data-tile-action="quality"]')
+                    ?.setAttribute('aria-expanded', 'false');
+                return;
+            }
+
+            const qualityBtn = e.target.closest?.('[data-tile-action="quality"]');
+            if (qualityBtn) {
+                e.stopPropagation();
+                e.preventDefault();
+                const wrap = qualityBtn.closest?.('[data-quality-wrap]');
+                if (!wrap) return;
+                const open = !wrap.classList.contains('is-open');
+                mosaic.querySelectorAll('[data-quality-wrap].is-open').forEach((el) => {
+                    if (el !== wrap) {
+                        el.classList.remove('is-open');
+                        el.querySelector('[data-tile-action="quality"]')
+                            ?.setAttribute('aria-expanded', 'false');
+                    }
+                });
+                wrap.classList.toggle('is-open', open);
+                qualityBtn.setAttribute('aria-expanded', String(open));
+                return;
+            }
+
             const actionBtn = e.target.closest?.('[data-tile-action]');
             if (actionBtn) {
                 e.stopPropagation();
@@ -247,6 +283,18 @@ export const MultiView = {
             }
             // Tile focus (z-raise / pinned picker retarget) is handled on pointerup when the gesture was a click.
         });
+
+        if (!this._qualityOutsideBound) {
+            this._qualityOutsideBound = true;
+            document.addEventListener('pointerdown', (e) => {
+                if (e.target.closest?.('[data-quality-wrap]')) return;
+                mosaic.querySelectorAll('[data-quality-wrap].is-open').forEach((wrap) => {
+                    wrap.classList.remove('is-open');
+                    wrap.querySelector('[data-tile-action="quality"]')
+                        ?.setAttribute('aria-expanded', 'false');
+                });
+            });
+        }
 
         mosaic.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -754,6 +802,8 @@ export const MultiView = {
                 }
             }
 
+            this.syncTileQualityMenu(tile, player);
+
             if (id === 'center') return;
 
             const playBtn = tile.querySelector('[data-tile-action="play"]');
@@ -813,6 +863,51 @@ export const MultiView = {
             }
         });
         this.syncMosaicChrome();
+    },
+
+    syncTileQualityMenu(tile, player) {
+        const popup = tile?.querySelector?.('.tv-player-tile__quality-popup');
+        const btn = tile?.querySelector?.('[data-tile-action="quality"]');
+        if (!popup || !btn) return;
+
+        const levels = player?.getQualityLevels?.() || [];
+        const mode = player?.qualityMode ?? 'auto';
+        const modeKey = mode === 'auto' ? 'auto' : String(mode);
+        const fingerprint = `${modeKey}:${levels.map((l) => `${l.index}:${l.label}`).join(',')}`;
+
+        if (popup.dataset.qualityFingerprint !== fingerprint) {
+            popup.dataset.qualityFingerprint = fingerprint;
+            const ordered = [...levels].sort((a, b) => b.index - a.index);
+            const parts = [
+                `<button type="button" class="tv-player-tile__quality-option${mode === 'auto' ? ' is-selected' : ''}" role="menuitemradio" aria-checked="${mode === 'auto'}" data-quality-mode="auto">Auto</button>`
+            ];
+            for (const level of ordered) {
+                const selected = mode !== 'auto' && Number(mode) === level.index;
+                parts.push(
+                    `<button type="button" class="tv-player-tile__quality-option${selected ? ' is-selected' : ''}" role="menuitemradio" aria-checked="${selected}" data-quality-mode="${level.index}">${level.label}</button>`
+                );
+            }
+            popup.innerHTML = parts.join('');
+        } else {
+            popup.querySelectorAll('[data-quality-mode]').forEach((opt) => {
+                const selected = opt.getAttribute('data-quality-mode') === modeKey;
+                opt.classList.toggle('is-selected', selected);
+                opt.setAttribute('aria-checked', String(selected));
+            });
+        }
+
+        const hasStream = Boolean(player?.channel);
+        btn.disabled = !hasStream;
+        if (!hasStream) {
+            btn.title = 'Quality';
+        } else if (mode === 'auto') {
+            const live = player.qualityLabel && player.qualityLabel !== '—'
+                ? ` (${player.qualityLabel})`
+                : '';
+            btn.title = `Quality: Auto${live}`;
+        } else {
+            btn.title = `Quality: ${player.qualityLabel || '—'}`;
+        }
     },
 
     syncSettingsToggles() {

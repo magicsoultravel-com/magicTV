@@ -37,6 +37,15 @@ export const TvPlayer = {
         const level = MultiView.getPrimary()?.qualityLevel;
         return Number.isFinite(level) ? level : -1;
     },
+    get qualityMode() {
+        return MultiView.getPrimary()?.qualityMode ?? 'auto';
+    },
+    getQualityLevels() {
+        return MultiView.getPrimary()?.getQualityLevels?.() || [];
+    },
+    setQualityMode(mode) {
+        return MultiView.getPrimary()?.setQualityMode?.(mode);
+    },
     get connection() { return MultiView.getPrimary()?.connection || 'idle'; },
     get muted() {
         const p = MultiView.getPrimary();
