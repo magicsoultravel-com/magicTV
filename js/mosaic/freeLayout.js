@@ -238,9 +238,12 @@ export const freeLayoutMethods = {
 
         // Click (no drag): raise that tile to the top of the z-stack (no swap).
         const { slotId } = session;
-        if (slotId && SLOT_IDS.includes(slotId) && this.slots[slotId]?.enabled && this.hasCustomPlacement()) {
-            this.raiseTileInStack(slotId);
-            this.persistPlacement();
+        if (slotId && SLOT_IDS.includes(slotId) && this.slots[slotId]?.enabled) {
+            if (this.hasCustomPlacement()) {
+                this.raiseTileInStack(slotId);
+                this.persistPlacement();
+            }
+            this.maybeRetargetChannelPicker(slotId);
         }
     },
 

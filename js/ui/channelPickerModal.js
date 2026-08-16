@@ -5,14 +5,15 @@ import { MultiView } from '../multiView.js';
 import { TileFrames } from '../tileFrames.js';
 import { showAppToast } from './toast.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
+import { SettingsStore } from '../storage/settingsStore.js';
+import { ACTION_ICONS } from './icons.js';
 
 const MIN_W = 360;
 const MIN_H = 280;
 const VIEW_PAD = 8;
 
 let deps = {
-    getDefaultOnPlay: () => () => {},
-    leaveSettingsIfNeeded: () => {}
+    getDefaultOnPlay: () => () => {}
 };
 
 let targetSlotId = null;
@@ -107,12 +108,30 @@ function applyGeometry(geom, { pinned: pinFlag } = {}) {
     if (typeof pinFlag === 'boolean') setPinned(pinFlag, { persist: false });
 }
 
-function persistGeometry() {
-    const geom = readDialogGeometry();
+function persistState(overrides = {}) {
+    const wasOpen = ChannelPickerModal.isOpen();
+    const prev = loadPlayerState().channelPicker;
+    const geom = wasOpen
+        ? readDialogGeometry()
+        : (prev
+            ? {
+                left: prev.left,
+                top: prev.top,
+                width: prev.width,
+                height: prev.height
+            }
+            : defaultGeometry());
+    const nextOpen = overrides.open != null ? overrides.open === true : wasOpen;
+    const nextPinned = overrides.pinned != null ? overrides.pinned === true : pinned;
+    let nextTarget = overrides.targetSlotId != null ? overrides.targetSlotId : targetSlotId;
+    if (!nextTarget) nextTarget = prev?.targetSlotId || 'center';
+
     savePlayerState({
         channelPicker: {
             ...geom,
-            pinned
+            pinned: nextPinned,
+            open: nextOpen,
+            targetSlotId: nextTarget
         }
     });
 }
@@ -130,15 +149,53 @@ function setPinned(next, { persist = true } = {}) {
     }
     const dialog = dialogEl();
     if (dialog) dialog.setAttribute('aria-modal', pinned ? 'false' : 'true');
-    if (persist) persistGeometry();
+    if (persist) persistState({ pinned, open: ChannelPickerModal.isOpen() });
 }
 
-function syncTitle() {
-    const title = el('channel-picker-title');
-    if (!title) return;
-    title.textContent = targetSlotId === 'center'
-        ? 'Pick a channel — main'
-        : 'Pick a channel';
+function clearTargetHighlight() {
+    if (typeof document === 'undefined') return;
+    document.querySelectorAll('.tv-player-tile.is-channel-picker-target').forEach((tile) => {
+        tile.classList.remove('is-channel-picker-target');
+    });
+}
+
+function syncTargetHighlight() {
+    clearTargetHighlight();
+    if (!ChannelPickerModal.isOpen() || !targetSlotId) return;
+    const mosaic = el('player-mosaic');
+    if (!mosaic?.classList.contains('has-corners')) return;
+    const tile = el(`player-tile-${targetSlotId}`);
+    if (!tile || tile.classList.contains('is-hidden')) return;
+    tile.classList.add('is-channel-picker-target');
+}
+
+function setBrowseButtonState(btn, active) {
+    if (!btn) return;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', String(active));
+    btn.innerHTML = active ? ACTION_ICONS.browseFilled : ACTION_ICONS.browse;
+    const label = active ? 'Hide channel picker' : 'Pick channel';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+}
+
+function syncBrowseButtons() {
+    if (typeof document === 'undefined') return;
+    const open = ChannelPickerModal.isOpen();
+    const target = targetSlotId;
+
+    setBrowseButtonState(el('browse-btn'), open && target === 'center');
+
+    document.querySelectorAll('[data-tile-action="browse"]').forEach((btn) => {
+        const slotId = btn.closest?.('.tv-player-tile')?.getAttribute('data-slot');
+        setBrowseButtonState(btn, open && Boolean(slotId) && target === slotId);
+    });
+}
+
+function applyOpacity() {
+    if (typeof document === 'undefined') return;
+    const pct = SettingsStore.getChannelPickerOpacity();
+    document.documentElement.style.setProperty('--channel-picker-opacity', String(pct / 100));
 }
 
 function playIntoTarget(channel) {
@@ -169,7 +226,7 @@ function endGesture() {
     const header = modalEl()?.querySelector('[data-channel-picker-drag]');
     header?.classList.remove('is-dragging');
     gesture = null;
-    persistGeometry();
+    persistState({ open: true });
 }
 
 function onPointerMove(e) {
@@ -288,6 +345,9 @@ function bindOnce() {
         if (!ChannelPickerModal.isOpen()) return;
         applyGeometry(readDialogGeometry());
     });
+    window.addEventListener('pagehide', () => {
+        if (ChannelPickerModal.isOpen()) persistState({ open: true });
+    });
 }
 
 function restoreFromState() {
@@ -300,10 +360,11 @@ function restoreFromState() {
 }
 
 export const ChannelPickerModal = {
-    init({ getDefaultOnPlay, leaveSettingsIfNeeded } = {}) {
+    init({ getDefaultOnPlay } = {}) {
         if (typeof getDefaultOnPlay === 'function') deps.getDefaultOnPlay = getDefaultOnPlay;
-        if (typeof leaveSettingsIfNeeded === 'function') deps.leaveSettingsIfNeeded = leaveSettingsIfNeeded;
         bindOnce();
+        syncBrowseButtons();
+        applyOpacity();
     },
 
     isOpen() {
@@ -315,7 +376,21 @@ export const ChannelPickerModal = {
         return pinned;
     },
 
-    open(slotId = 'center') {
+    getTargetSlotId() {
+        return targetSlotId;
+    },
+
+    /** Open for slot, or close if already open for that same slot. */
+    toggle(slotId = 'center') {
+        const id = slotId || 'center';
+        if (this.isOpen() && targetSlotId === id) {
+            this.close();
+            return;
+        }
+        this.open(id);
+    },
+
+    open(slotId = 'center', { focusClose = true } = {}) {
         bindOnce();
         const modal = modalEl();
         const host = hostEl();
@@ -323,8 +398,6 @@ export const ChannelPickerModal = {
         if (!modal || !host || !body) return;
 
         targetSlotId = slotId || 'center';
-        deps.leaveSettingsIfNeeded();
-        syncTitle();
 
         if (!this.isOpen()) {
             const endActions = catalogEndActions();
@@ -343,11 +416,31 @@ export const ChannelPickerModal = {
             modal.setAttribute('aria-hidden', 'false');
             ChannelGrid.setOnPlay(playIntoTarget);
             restoreFromState();
-            queueMicrotask(() => {
-                el('channel-picker-close')?.focus();
-            });
+            applyOpacity();
+            if (focusClose) {
+                queueMicrotask(() => {
+                    el('channel-picker-close')?.focus();
+                });
+            }
         }
+        persistState({ open: true, targetSlotId });
+        syncTargetHighlight();
+        syncBrowseButtons();
     },
+
+    /** Re-open after reload when last session left the picker docked open. */
+    restoreOpenIfNeeded() {
+        const saved = loadPlayerState().channelPicker;
+        if (!saved?.open) {
+            syncBrowseButtons();
+            return;
+        }
+        this.open(saved.targetSlotId || 'center', { focusClose: false });
+    },
+
+    syncTargetHighlight,
+    syncBrowseButtons,
+    applyOpacity,
 
     close() {
         const modal = modalEl();
@@ -355,7 +448,7 @@ export const ChannelPickerModal = {
         const endActions = catalogEndActions();
         if (!modal) return;
 
-        if (this.isOpen()) persistGeometry();
+        if (this.isOpen()) persistState({ open: false });
 
         if (body && dockParent) {
             if (nextSibling && nextSibling.parentElement === dockParent) {
@@ -377,6 +470,7 @@ export const ChannelPickerModal = {
         endActionsDockParent = null;
         endActionsNextSibling = null;
         targetSlotId = null;
+        clearTargetHighlight();
 
         catalogRoot()?.classList.remove('is-catalog-teleported');
         document.body.classList.remove('has-channel-picker');
@@ -385,5 +479,6 @@ export const ChannelPickerModal = {
         modal.setAttribute('aria-hidden', 'true');
         modal.classList.remove('is-pinned');
         ChannelGrid.setOnPlay(deps.getDefaultOnPlay());
+        syncBrowseButtons();
     }
 };

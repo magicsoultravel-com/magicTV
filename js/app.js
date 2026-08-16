@@ -22,7 +22,9 @@ import {
     VIEW_MOTION,
     fillViewTransitionSelect,
     resolveViewTransition,
-    runWipeTransition
+    runWipeTransition,
+    primeBootGrain,
+    revealBootWithGrain
 } from './ui/viewTransitions.js';
 
 const DEFAULT_FIRST_CHANNEL_URL = 'https://channels.trace.plus/Traceprod/CARIBBEAN_hd/index.m3u8';
@@ -36,6 +38,7 @@ let appState = {
     browseHasMore: false,
     browseLoading: false,
     browseGeneration: 0,
+    browseSortDirty: false,
     activeTab: 'browse',
     countryFilter: '',
     browseQuery: '',
@@ -120,11 +123,11 @@ function loadLocalState() {
     }
 }
 
-function handleSortChanged(context) {
+function handleSortChanged(context, opts = {}) {
     if (context === 'countries') {
         BrowseView.renderCountries();
     } else if (context === 'channels') {
-        BrowseView.restartChannelList(undefined, { clear: false });
+        BrowseView.renderBrowseChannels(opts);
     } else if (context === 'favorites') {
         ChannelGrid.renderFavorites();
     } else if (context === 'recents') {
@@ -170,6 +173,9 @@ function bindTabs() {
     els('.tv-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabName = tab.dataset.tab;
+            // Controls styled with `.tv-tab` that are not actual tabs (e.g. the
+            // ASC/DESC arrow) have no data-tab. Do not treat them as a tab switch.
+            if (!tabName) return;
             if (tabName === 'refresh') {
                 handleManualRefresh();
                 return;
@@ -864,90 +870,113 @@ function switchTab(tabName) {
 }
 
 async function init() {
-    ChannelGrid.init({
-        appState,
-        getRefreshKey: currentRefreshKey,
-        onPlay: startPlayback
-    });
-    ChannelPickerModal.init({
-        getDefaultOnPlay: () => startPlayback,
-        leaveSettingsIfNeeded: () => {
-            if (appState.activeTab === 'settings') switchTab('browse');
+    let revealed = false;
+    const reveal = async () => {
+        if (revealed) return;
+        revealed = true;
+        try {
+            await revealBootWithGrain();
+        } catch {
+            document.documentElement.classList.remove('is-booting');
+            el('boot-screen')?.remove();
         }
-    });
-    BrowseView.init({
-        appState,
-        stampRefreshView,
-        updateRefreshAge,
-        currentFilter
-    });
-    PlayerChrome.init({ appState });
+    };
 
-    TvPlayer.init();
-    TvPip.init();
-    TvPlayer.mountVideo();
-    TileFrames.warmup();
-    MultiView.bindSettings();
+    try {
+        showAppToast('Loading theme…');
+        primeBootGrain();
+        Appearance.applyStyles();
 
-    loadLocalState();
-    ListSort.init({
-        appState,
-        onSortChanged: handleSortChanged,
-        onCategoryFilterChanged: handleCategoryFilterChanged
-    });
-    PlayerChrome.updateNowPlayingHeader();
+        showAppToast('Preparing screens…');
+        ChannelGrid.init({
+            appState,
+            getRefreshKey: currentRefreshKey,
+            onPlay: startPlayback
+        });
+        ChannelPickerModal.init({
+            getDefaultOnPlay: () => startPlayback
+        });
+        BrowseView.init({
+            appState,
+            stampRefreshView,
+            updateRefreshAge,
+            currentFilter
+        });
+        PlayerChrome.init({ appState });
 
-    bindTabs();
-    bindCatalogToggle();
-    bindPlayFavoritesMosaic();
-    bindCatalogLayout();
-    syncPlayFavoritesMosaicBtn();
-    syncCatalogLayoutBtn();
-    bindContentSplitter();
-    TvClock.init();
+        TvPlayer.init();
+        TvPip.init();
+        TvPlayer.mountVideo();
+        TileFrames.warmup();
+        MultiView.bindSettings();
 
-    PlayerChrome.bindControls();
-    PlayerChrome.bindSettings();
-    BrowseView.bind();
-    ListSort.bind();
-    ListSort.syncSortControls();
-    bindBackButton();
-
-    PlayerChrome.syncSettingsFromState();
-
-    window.addEventListener('tv:state_changed', (e) => PlayerChrome.onPlayerStateChanged(e));
-
-    await restoreLastChannelMeta();
-
-    // Mosaic stubs already painted in MultiView.init; attach streams in parallel with catalog.
-    const restorePromise = MultiView.restoreSlots().catch(() => false);
-
-    await BrowseView.refreshCountries();
-    updateRefreshAge();
-    const refreshAgeTimer = setInterval(updateRefreshAge, 60 * 1000);
-    if (refreshAgeTimer?.unref) refreshAgeTimer.unref();
-
-    const restored = await restorePromise;
-    if (restored) {
-        if (TvPlayer.channel) {
-            appState.lastKey = channelKey(TvPlayer.channel);
-            appState.lastName = TvPlayer.channel.name || appState.lastName;
-            appState.lastCountry = TvPlayer.channel.countrycode || '';
-        }
+        loadLocalState();
+        ListSort.init({
+            appState,
+            onSortChanged: handleSortChanged,
+            onCategoryFilterChanged: handleCategoryFilterChanged
+        });
         PlayerChrome.updateNowPlayingHeader();
-    } else if (!TvPlayer.channel && !appState.lastKey) {
-        const firstChannel = {
-            name: DEFAULT_FIRST_CHANNEL_NAME,
-            url_resolved: DEFAULT_FIRST_CHANNEL_URL,
-            channelId: 'trace-CARIBBEAN_hd',
-            providerId: 'trace',
-            countrycode: '',
-            lastcheckok: 1
-        };
-        TvPlayer.channel = firstChannel;
-        startPlayback(firstChannel);
-    } else if (TvPlayer.channel) {
-        TvPlayer.resumeIfWasPlaying().catch(() => {});
+
+        bindTabs();
+        bindCatalogToggle();
+        bindPlayFavoritesMosaic();
+        bindCatalogLayout();
+        syncPlayFavoritesMosaicBtn();
+        syncCatalogLayoutBtn();
+        bindContentSplitter();
+        TvClock.init();
+
+        PlayerChrome.bindControls();
+        PlayerChrome.bindSettings();
+        BrowseView.bind();
+        ListSort.bind();
+        ListSort.syncSortControls();
+        bindBackButton();
+
+        PlayerChrome.syncSettingsFromState();
+
+        showAppToast('Ready');
+        await reveal();
+
+        window.addEventListener('tv:state_changed', (e) => PlayerChrome.onPlayerStateChanged(e));
+
+        await restoreLastChannelMeta();
+
+        // Mosaic stubs already painted in MultiView.init; attach streams in parallel with catalog.
+        const restorePromise = MultiView.restoreSlots().catch(() => false);
+
+        await BrowseView.refreshCountries();
+        updateRefreshAge();
+        const refreshAgeTimer = setInterval(updateRefreshAge, 60 * 1000);
+        if (refreshAgeTimer?.unref) refreshAgeTimer.unref();
+
+        const restored = await restorePromise;
+        if (restored) {
+            if (TvPlayer.channel) {
+                appState.lastKey = channelKey(TvPlayer.channel);
+                appState.lastName = TvPlayer.channel.name || appState.lastName;
+                appState.lastCountry = TvPlayer.channel.countrycode || '';
+            }
+            PlayerChrome.updateNowPlayingHeader();
+        } else if (!TvPlayer.channel && !appState.lastKey) {
+            const firstChannel = {
+                name: DEFAULT_FIRST_CHANNEL_NAME,
+                url_resolved: DEFAULT_FIRST_CHANNEL_URL,
+                channelId: 'trace-CARIBBEAN_hd',
+                providerId: 'trace',
+                countrycode: '',
+                lastcheckok: 1
+            };
+            TvPlayer.channel = firstChannel;
+            startPlayback(firstChannel);
+        } else if (TvPlayer.channel) {
+            TvPlayer.resumeIfWasPlaying().catch(() => {});
+        }
+
+        ChannelPickerModal.restoreOpenIfNeeded();
+    } finally {
+        await reveal();
     }
 }
 

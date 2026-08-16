@@ -103,6 +103,8 @@ export const Appearance = {
         const tileValue = el('tile-width-value');
         const listSlider = el('list-width-slider');
         const listValue = el('list-width-value');
+        const pickerOpacitySlider = el('channel-picker-opacity-slider');
+        const pickerOpacityValue = el('channel-picker-opacity-value');
         const themeSelect = el('theme-select');
         const fontTrigger = el('font-picker-trigger');
         const fontMenu = el('font-picker-menu');
@@ -123,6 +125,12 @@ export const Appearance = {
             if (listSlider) listSlider.value = String(width);
             if (listValue) listValue.textContent = `${width}px`;
             if (listSlider) listSlider.setAttribute('aria-valuetext', `${width}px`);
+        };
+
+        const syncPickerOpacityUi = (pct) => {
+            if (pickerOpacitySlider) pickerOpacitySlider.value = String(pct);
+            if (pickerOpacityValue) pickerOpacityValue.textContent = `${pct}%`;
+            if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pct}%`);
         };
 
         const syncFontUi = (fontId) => {
@@ -203,14 +211,31 @@ export const Appearance = {
             });
         }
 
+        if (pickerOpacitySlider) {
+            pickerOpacitySlider.addEventListener('input', () => {
+                const pct = SettingsStore.setChannelPickerOpacity(Number(pickerOpacitySlider.value));
+                syncPickerOpacityUi(pct);
+                this.applyStyles();
+            });
+        }
+
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
-                const { themeId, textSize, tileWidth, listWidth, colors, fontId } = SettingsStore.resetAppearance();
+                const {
+                    themeId,
+                    textSize,
+                    tileWidth,
+                    listWidth,
+                    channelPickerOpacity,
+                    colors,
+                    fontId
+                } = SettingsStore.resetAppearance();
                 if (themeSelect) themeSelect.value = themeId;
                 syncTextUi(textSize);
                 syncTileUi(tileWidth);
                 syncListUi(listWidth);
+                syncPickerOpacityUi(channelPickerOpacity);
                 syncFontUi(fontId);
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
@@ -227,6 +252,7 @@ export const Appearance = {
         const textSize = SettingsStore.getTextSize();
         const tileWidth = SettingsStore.getTileWidth();
         const listWidth = SettingsStore.getListWidth();
+        const channelPickerOpacity = SettingsStore.getChannelPickerOpacity();
         const catalogLayout = SettingsStore.getCatalogLayout();
         const themeId = SettingsStore.getThemeId();
         const colors = SettingsStore.getThemeColors();
@@ -235,6 +261,7 @@ export const Appearance = {
         root.style.fontSize = `${textSize}px`;
         root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
         root.style.setProperty('--tv-list-width', `${listWidth}px`);
+        root.style.setProperty('--channel-picker-opacity', String(channelPickerOpacity / 100));
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
         applyThemeColorsToRoot(colors, root);
@@ -300,6 +327,13 @@ export const Appearance = {
         if (listSlider) listSlider.value = String(listWidthPx);
         if (listWidth) listWidth.textContent = `${listWidthPx}px`;
         if (listSlider) listSlider.setAttribute('aria-valuetext', `${listWidthPx}px`);
+
+        const pickerOpacity = SettingsStore.getChannelPickerOpacity();
+        const pickerOpacitySlider = el('channel-picker-opacity-slider');
+        const pickerOpacityValue = el('channel-picker-opacity-value');
+        if (pickerOpacitySlider) pickerOpacitySlider.value = String(pickerOpacity);
+        if (pickerOpacityValue) pickerOpacityValue.textContent = `${pickerOpacity}%`;
+        if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pickerOpacity}%`);
 
         const themeId = SettingsStore.getThemeId();
         const themeSelect = el('theme-select');

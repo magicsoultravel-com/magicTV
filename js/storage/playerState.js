@@ -154,7 +154,7 @@ function normalizeMosaicPlacement(raw) {
     return out;
 }
 
-/** Floating channel-picker dialog geometry (CSS px) + pin flag. */
+/** Floating channel-picker dialog geometry (CSS px) + pin / open / target. */
 function normalizeChannelPicker(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const left = Number(raw.left);
@@ -163,12 +163,17 @@ function normalizeChannelPicker(raw) {
     const height = Number(raw.height);
     if (![left, top, width, height].every(Number.isFinite)) return null;
     if (width < 200 || height < 160) return null;
+    const target = typeof raw.targetSlotId === 'string' && MOSAIC_SLOT_IDS.includes(raw.targetSlotId)
+        ? raw.targetSlotId
+        : 'center';
     return {
         left,
         top,
         width,
         height,
-        pinned: raw.pinned === true
+        pinned: raw.pinned === true,
+        open: raw.open === true,
+        targetSlotId: target
     };
 }
 

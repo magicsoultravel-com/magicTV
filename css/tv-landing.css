@@ -1,5 +1,83 @@
 /** @css {"owns":"magicTV landing page layout, header, tabs, channel grid, refresh arrow"} */
 
+/* First-paint boot cover: hide shell until theme is applied, then grain-reveal. */
+html.is-booting #app-container {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.boot-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    overflow: hidden;
+    background: #000;
+    pointer-events: none;
+}
+
+.boot-screen__veil {
+    position: absolute;
+    inset: 0;
+    background: #000;
+}
+
+.boot-screen__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0.7;
+    mix-blend-mode: screen;
+    image-rendering: pixelated;
+}
+
+html.is-booting .app-toast-host,
+html.is-booting #app-toast-host,
+html.is-booting #toast-container {
+    z-index: 100001;
+}
+
+/* Existing toast host — bottom-right, theme tokens (used during boot and runtime). */
+.app-toast-host {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--tv-spacing-sm);
+    pointer-events: none;
+}
+
+.app-toast {
+    max-width: min(22rem, calc(100vw - 2rem));
+    padding: var(--tv-spacing-sm) var(--tv-spacing-md);
+    border-radius: var(--tv-radius-sm);
+    border: 1px solid var(--tv-border);
+    background: var(--tv-bg-secondary);
+    color: var(--tv-text-primary);
+    box-shadow: var(--tv-shadow-sm);
+    font-size: 0.875rem;
+    line-height: 1.35;
+    opacity: 0;
+    transform: translateY(0.35rem);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.app-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .boot-screen__canvas {
+        opacity: 0.35;
+    }
+
+    .app-toast {
+        transition: none;
+        transform: none;
+    }
+}
+
 #app-container {
     display: flex;
     flex-direction: column;
@@ -994,6 +1072,14 @@
 .tv-player-tile:focus-within {
     border-color: var(--tv-primary);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+}
+
+/* Channel browser target (multi-screen only; see ChannelPickerModal.syncTargetHighlight). */
+.tv-player-tile.is-channel-picker-target {
+    border-color: var(--tv-primary);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
+        0 6px 22px color-mix(in srgb, var(--tv-primary) 28%, transparent);
 }
 
 .tv-player-tile.is-hidden {
@@ -2330,12 +2416,13 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
     overflow: hidden;
     pointer-events: auto;
+    opacity: var(--channel-picker-opacity, 1);
 }
 
 .channel-picker-modal__header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 0.75rem;
     flex-shrink: 0;
     padding: 0.65rem 0.85rem;
@@ -2348,14 +2435,6 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
 
 .channel-picker-modal__header.is-dragging {
     cursor: grabbing;
-}
-
-.channel-picker-modal__title {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--tv-text-primary, #fff);
-    pointer-events: none;
 }
 
 .channel-picker-modal__header-actions {
@@ -2458,12 +2537,6 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
     bottom: 0;
     right: 0;
     cursor: nwse-resize;
-}
-
-/* Channel-focused: hide Settings while catalog lives in the modal */
-.channel-picker-modal .tv-tab[data-tab="settings"],
-body.has-channel-picker .tv-tab[data-tab="settings"] {
-    display: none !important;
 }
 
 /* Docked catalog shell while body is teleported */

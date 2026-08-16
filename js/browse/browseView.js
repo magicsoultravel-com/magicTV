@@ -4,7 +4,7 @@ import { showAppToast } from '../ui/toast.js';
 import { Appearance } from '../ui/appearance.js';
 import { ChannelGrid } from '../ui/channelGrid.js';
 import { TileFrames } from '../tileFrames.js';
-import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap } from '../ui/listSort.js';
+import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap, sortChannelList } from '../ui/listSort.js';
 
 const PAGE_SIZE = 60;
 
@@ -139,6 +139,7 @@ export const BrowseView = {
         appState.browseChannels = [];
         appState.browseOffset = 0;
         appState.browseHasMore = true;
+        appState.browseSortDirty = false;
         appState.browseQuery = deps.currentFilter();
 
         const countries = el('countries-container');
@@ -167,26 +168,38 @@ export const BrowseView = {
         const generation = appState.browseGeneration;
         appState.browseLoading = true;
         const { sortBy, sortDir } = getSortPrefs(appState);
+        const dirty = !!appState.browseSortDirty;
+        if (dirty) appState.browseSortDirty = false;
+        const limit = dirty
+            ? Math.max(appState.browseChannels.length, PAGE_SIZE) + PAGE_SIZE
+            : PAGE_SIZE;
+        const offset = dirty ? 0 : appState.browseOffset;
         try {
             const results = await TvProviderRegistry.searchChannels({
                 countrycode: appState.browseCountry,
                 query: appState.browseQuery,
                 category: getCategoryFilterValue(appState),
-                offset: appState.browseOffset,
-                limit: PAGE_SIZE,
+                offset,
+                limit,
                 order: sortBy === 'category' ? 'category' : 'name',
                 reverse: sortDir === 'desc',
                 refresh: forceRefresh
             });
             if (generation !== appState.browseGeneration) return;
-            if (results.length < PAGE_SIZE) {
+            if (results.length < limit) {
                 appState.browseHasMore = false;
             }
-            const append = appState.browseOffset > 0;
-            appState.browseChannels = appState.browseChannels.concat(results);
-            appState.browseOffset += PAGE_SIZE;
             const grid = el('channels-container');
-            ChannelGrid.render(grid, results, { append });
+            if (dirty) {
+                appState.browseChannels = results;
+                appState.browseOffset = results.length;
+                ChannelGrid.render(grid, results, { append: false });
+            } else {
+                const append = appState.browseOffset > 0;
+                appState.browseChannels = appState.browseChannels.concat(results);
+                appState.browseOffset += PAGE_SIZE;
+                ChannelGrid.render(grid, results, { append });
+            }
             if (grid && TileFrames.isLiveRefreshActive(`browse:${appState.browseCountry}`)) {
                 TileFrames.enqueueFolderFramesForRefresh(grid);
             }
@@ -194,6 +207,7 @@ export const BrowseView = {
             ListSort.syncCategoryFilterControls();
         } catch (err) {
             if (generation !== appState.browseGeneration) return;
+            if (dirty) appState.browseSortDirty = true;
             console.error('Failed to load channels:', err);
             showAppToast('Failed to load channels');
         } finally {
@@ -204,12 +218,27 @@ export const BrowseView = {
         }
     },
 
-    /** Restart channel list when filter or sort changes. Pass clear:false to keep tiles until reload. */
-    restartChannelList(query = deps.currentFilter(), { clear = true } = {}) {
-        this.startChannelSearch(query, { clear });
+    /** Restart channel list when filter changes (hard clear + loading state). */
+    restartChannelList(query = deps.currentFilter()) {
+        this.startChannelSearch(query);
     },
 
-    startChannelSearch(query, { clear = true } = {}) {
+    /**
+     * Instant client-side re-sort of the currently loaded browse window (no refetch / morph).
+     * A direction flip (asc<->desc) preserves the loaded window as a valid leading slice, so it
+     * must NOT schedule the dirty refetch that clears and re-paints the grid. Only a sort-field
+     * change (name<->category) changes the leading slice and needs a pagination resync.
+     */
+    renderBrowseChannels({ dirOnly = false } = {}) {
+        const appState = deps.appState;
+        if (appState.browseCountry == null) return;
+        const { sortBy, sortDir } = getSortPrefs(appState);
+        appState.browseChannels = sortChannelList(appState.browseChannels, sortBy, sortDir);
+        if (!dirOnly) appState.browseSortDirty = true;
+        ChannelGrid.reorder(el('channels-container'), appState.browseChannels);
+    },
+
+    startChannelSearch(query) {
         const appState = deps.appState;
         appState.browseGeneration += 1;
         appState.browseLoading = false;
@@ -217,13 +246,12 @@ export const BrowseView = {
         appState.browseChannels = [];
         appState.browseOffset = 0;
         appState.browseHasMore = true;
-        if (clear) {
-            const container = el('channels-container');
-            if (container) {
-                container.innerHTML = query
-                    ? '<div class="empty-state"><p class="empty-state__text">Filtering…</p></div>'
-                    : '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
-            }
+        appState.browseSortDirty = false;
+        const container = el('channels-container');
+        if (container) {
+            container.innerHTML = query
+                ? '<div class="empty-state"><p class="empty-state__text">Filtering…</p></div>'
+                : '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
         }
         this.loadMoreChannels(false);
     },
@@ -235,6 +263,7 @@ export const BrowseView = {
         appState.browseChannels = [];
         appState.browseOffset = 0;
         appState.browseHasMore = true;
+        appState.browseSortDirty = false;
         const container = el('channels-container');
         if (container) {
             container.innerHTML = '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';

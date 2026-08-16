@@ -326,3 +326,93 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
         });
     }
 }
+
+function prefersReducedMotion() {
+    return typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** Start film-grain paint on the first-paint boot cover (no-op if missing / reduced motion). */
+export function primeBootGrain(bootEl) {
+    const boot = bootEl || el('boot-screen');
+    if (!boot || prefersReducedMotion()) return;
+    const canvas = boot.querySelector('canvas');
+    if (!canvas) return;
+    stopAllGrainPaint();
+    grainPaintStops.push(startGrainPaint(canvas, boot));
+}
+
+/**
+ * Reveal the themed GUI from the first-paint boot cover using Grain timing.
+ * Boot is already covering; this is reveal-only (no cover half).
+ * @param {HTMLElement} [bootEl]
+ * @param {HTMLElement} [appEl]
+ */
+export async function revealBootWithGrain(bootEl, appEl) {
+    const boot = bootEl || el('boot-screen');
+    const app = appEl || el('app-container');
+    const root = document.documentElement;
+
+    const finish = () => {
+        root.classList.remove('is-booting');
+        if (app) {
+            app.style.opacity = '';
+            app.style.visibility = '';
+            app.style.filter = '';
+        }
+        if (boot) {
+            stopAllGrainPaint();
+            boot.remove();
+        }
+    };
+
+    if (!boot || !app) {
+        finish();
+        return;
+    }
+
+    if (prefersReducedMotion()) {
+        finish();
+        return;
+    }
+
+    const cfg = VIEW_MOTION.grain;
+    const half = {
+        duration: cfg.duration,
+        easing: cfg.easing,
+        fill: 'forwards'
+    };
+
+    const canvas = boot.querySelector('canvas');
+    stopAllGrainPaint();
+    grainPaintStops.push(startGrainPaint(canvas, boot));
+
+    app.style.visibility = 'visible';
+    app.style.opacity = '0';
+    boot.style.opacity = '1';
+
+    try {
+        const clearAnim = boot.animate(
+            [
+                { opacity: 1 },
+                { opacity: 0.7, offset: 0.4 },
+                { opacity: 0 }
+            ],
+            half
+        );
+        const showAnim = app.animate(
+            [{ opacity: 0 }, { opacity: 1 }],
+            half
+        );
+        await Promise.all([clearAnim.finished, showAnim.finished]);
+        try {
+            clearAnim.cancel();
+            showAnim.cancel();
+        } catch { /* ignore */ }
+    } catch {
+        /* fall through to finish */
+    } finally {
+        finish();
+    }
+}

@@ -211,7 +211,7 @@ export const ListSort = {
                 deps.appState.sortBy[context] = select.value;
                 persistListPrefs();
                 this.syncSortControls();
-                deps.onSortChanged(context);
+                deps.onSortChanged(context, { dirOnly: false });
             });
         }
         if (dirBtn) {
@@ -221,7 +221,7 @@ export const ListSort = {
                 deps.appState.sortDir[context] = sortDir === 'asc' ? 'desc' : 'asc';
                 persistListPrefs();
                 this.syncSortControls();
-                deps.onSortChanged(context);
+                deps.onSortChanged(context, { dirOnly: true });
             });
         }
         if (catSelect) {

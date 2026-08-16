@@ -200,6 +200,35 @@ export const ChannelGrid = {
         Appearance.applyToTiles(container);
     },
 
+    /**
+     * Move existing tiles into `channels` order without destroying DOM nodes
+     * (preserves frame captures). Falls back to render if any tile is missing.
+     */
+    reorder(container, channels) {
+        if (!container) return;
+        const list = channels || [];
+        if (!list.length) {
+            this.render(container, list);
+            return;
+        }
+        const byKey = new Map();
+        container.querySelectorAll('.channel-tile').forEach((tile) => {
+            const key = tile.dataset.channel;
+            if (key) byKey.set(key, tile);
+        });
+        for (const ch of list) {
+            if (!byKey.has(channelKey(ch))) {
+                this.render(container, list);
+                return;
+            }
+        }
+        const frag = document.createDocumentFragment();
+        for (const ch of list) {
+            frag.appendChild(byKey.get(channelKey(ch)));
+        }
+        container.appendChild(frag);
+    },
+
     syncFavButtons() {
         document.querySelectorAll('.channel-tile__fav-btn').forEach((btn) => {
             const key = btn.closest('.channel-tile')?.dataset.channel;

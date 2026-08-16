@@ -28,7 +28,7 @@ export const PlayerChrome = {
         const pipBtn = el('pip-btn');
 
         if (browseBtn) {
-            browseBtn.addEventListener('click', () => ChannelPickerModal.open('center'));
+            browseBtn.addEventListener('click', () => ChannelPickerModal.toggle('center'));
         }
         if (playBtn) {
             // Stable hit-target: never swap buttons under the cursor (drops mash clicks).

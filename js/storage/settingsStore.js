@@ -32,6 +32,7 @@ const DEFAULT_TEXT_SIZE = 16;
 const DEFAULT_TILE_WIDTH = 180;
 const DEFAULT_LIST_WIDTH = 300;
 const DEFAULT_CATALOG_LAYOUT = 'tiles';
+const DEFAULT_CHANNEL_PICKER_OPACITY = 100;
 const TEXT_SIZE_MIN = 8;
 const TEXT_SIZE_MAX = 18;
 const TILE_WIDTH_MIN = 100;
@@ -40,6 +41,8 @@ const TILE_WIDTH_STEP = 10;
 const LIST_WIDTH_MIN = 100;
 const LIST_WIDTH_MAX = 300;
 const LIST_WIDTH_STEP = 10;
+const CHANNEL_PICKER_OPACITY_MIN = 33;
+const CHANNEL_PICKER_OPACITY_MAX = 100;
 const CATALOG_LAYOUTS = ['tiles', 'list'];
 
 function clampTextSize(value) {
@@ -60,6 +63,15 @@ function clampListWidth(value) {
     if (!Number.isFinite(n)) return DEFAULT_LIST_WIDTH;
     const rounded = Math.round(n / LIST_WIDTH_STEP) * LIST_WIDTH_STEP;
     return Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, rounded));
+}
+
+function clampChannelPickerOpacity(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_CHANNEL_PICKER_OPACITY;
+    return Math.min(
+        CHANNEL_PICKER_OPACITY_MAX,
+        Math.max(CHANNEL_PICKER_OPACITY_MIN, Math.round(n))
+    );
 }
 
 function normalizeCatalogLayout(value) {
@@ -138,6 +150,19 @@ export const SettingsStore = {
         );
     },
 
+    getChannelPickerOpacity() {
+        const raw = readPersistedState();
+        return raw.channelPickerOpacity != null
+            ? clampChannelPickerOpacity(raw.channelPickerOpacity)
+            : DEFAULT_CHANNEL_PICKER_OPACITY;
+    },
+
+    setChannelPickerOpacity(value) {
+        const clampedValue = clampChannelPickerOpacity(value);
+        patchPersistedState({ channelPickerOpacity: clampedValue });
+        return clampedValue;
+    },
+
     getCatalogLayout() {
         const raw = readPersistedState();
         return normalizeCatalogLayout(raw.catalogLayout);
@@ -208,10 +233,20 @@ export const SettingsStore = {
         const textSize = this.setTextSize(DEFAULT_TEXT_SIZE);
         const tileWidth = this.setTileWidth(DEFAULT_TILE_WIDTH);
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
+        const channelPickerOpacity = this.setChannelPickerOpacity(DEFAULT_CHANNEL_PICKER_OPACITY);
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
         const colors = this.setThemeColors(getPresetColors(themeId));
         const fontId = this.setFontId(getPresetFontId(themeId));
-        return { themeId, textSize, tileWidth, listWidth, catalogLayout, colors, fontId };
+        return {
+            themeId,
+            textSize,
+            tileWidth,
+            listWidth,
+            channelPickerOpacity,
+            catalogLayout,
+            colors,
+            fontId
+        };
     },
 
     getScreenTopLeft() {

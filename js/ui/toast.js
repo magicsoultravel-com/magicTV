@@ -9,7 +9,10 @@ export function showAppToast(message, { duration = 2200 } = {}) {
         toastHost.className = 'app-toast-host';
         toastHost.setAttribute('aria-live', 'polite');
         toastHost.setAttribute('aria-atomic', 'true');
-        document.body.appendChild(toastHost);
+        const container = typeof document !== 'undefined'
+            ? document.getElementById('toast-container')
+            : null;
+        (container || document.body).appendChild(toastHost);
     }
 
     const toast = document.createElement('div');

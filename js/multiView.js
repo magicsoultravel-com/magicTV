@@ -245,7 +245,7 @@ export const MultiView = {
                 if (slotId && action) this.handleTileAction(slotId, action);
                 return;
             }
-            // Tile focus (z-raise) is handled on pointerup when the gesture was a click.
+            // Tile focus (z-raise / pinned picker retarget) is handled on pointerup when the gesture was a click.
         });
 
         mosaic.addEventListener('keydown', (e) => {
@@ -260,6 +260,7 @@ export const MultiView = {
                 this.raiseTileInStack(slotId);
                 this.persistPlacement();
             }
+            this.maybeRetargetChannelPicker(slotId);
         });
 
         if (!this._resizeBound) {
@@ -384,6 +385,17 @@ export const MultiView = {
         if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
     },
 
+    async maybeRetargetChannelPicker(slotId) {
+        if (!slotId || !this.slots[slotId]?.enabled) return;
+        try {
+            const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
+            if (!ChannelPickerModal.isOpen() || !ChannelPickerModal.isPinned()) return;
+            ChannelPickerModal.open(slotId);
+        } catch {
+            /* ignore */
+        }
+    },
+
     async handleTileAction(slotId, action) {
         if (slotId === 'center') return;
 
@@ -394,7 +406,7 @@ export const MultiView = {
 
         if (action === 'browse') {
             const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
-            ChannelPickerModal.open(slotId);
+            ChannelPickerModal.toggle(slotId);
             return;
         }
 
@@ -498,6 +510,9 @@ export const MultiView = {
             this.clearFreeLayoutStyles();
         }
         this.syncPlacementChrome();
+        import('./ui/channelPickerModal.js')
+            .then(({ ChannelPickerModal }) => ChannelPickerModal.syncTargetHighlight?.())
+            .catch(() => {});
     },
 
     mountAll() {
