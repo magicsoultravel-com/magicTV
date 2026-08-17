@@ -11,6 +11,7 @@ import { loadPlayerState } from './storage/playerState.js';
 export const TvPlayer = {
     init() {
         MultiView.init();
+        FavoritesRecents.reconcileVisitedChannels();
         const primary = MultiView.getPrimary();
         const saved = loadPlayerState();
         if (primary && saved.lastChannelKey && !primary.channel) {
@@ -88,6 +89,20 @@ export const TvPlayer = {
 
     isFavorite(channelOrKey) {
         return FavoritesRecents.isFavorite(channelOrKey);
+    },
+
+    markVisited(channelOrKey) {
+        const changed = FavoritesRecents.markVisited(channelOrKey);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    isVisited(channelOrKey) {
+        return FavoritesRecents.isVisited(channelOrKey);
+    },
+
+    getVisitedKeys() {
+        return FavoritesRecents.getVisitedKeys();
     },
 
     toggleFavorite(channel) {

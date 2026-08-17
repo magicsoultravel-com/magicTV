@@ -31,7 +31,9 @@ const KNOWN_IDS = [
     'mosaic-reset-btn', 'mosaic-mute-all-btn',
     'preview-avatar', 'preview-name', 'preview-flag',
     'volume-pct',
-    'active-tile-select'
+    'active-tile-select',
+    'visited-style-select',
+    'recents-cap-input'
 ];
 function makeEl(id = '') {
     const el = {

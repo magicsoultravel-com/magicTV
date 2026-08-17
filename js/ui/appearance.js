@@ -229,6 +229,29 @@ export const Appearance = {
             });
         }
 
+        const visitedStyleSelect = el('visited-style-select');
+        if (visitedStyleSelect && visitedStyleSelect.dataset.bound !== '1') {
+            visitedStyleSelect.dataset.bound = '1';
+            visitedStyleSelect.addEventListener('change', () => {
+                const style = SettingsStore.setVisitedStyle(visitedStyleSelect.value);
+                this.applyStyles();
+                showAppToast(`Visited accent: ${visitedStyleSelect.options[visitedStyleSelect.selectedIndex].text}`);
+            });
+        }
+
+        const recentsCapInput = el('recents-cap-input');
+        if (recentsCapInput && recentsCapInput.dataset.bound !== '1') {
+            recentsCapInput.dataset.bound = '1';
+            recentsCapInput.addEventListener('change', () => {
+                const cap = SettingsStore.setRecentsCap(Number(recentsCapInput.value));
+                recentsCapInput.value = String(cap);
+                showAppToast(`Recent channels: ${cap}`);
+            });
+            recentsCapInput.addEventListener('blur', () => {
+                recentsCapInput.value = String(SettingsStore.getRecentsCap());
+            });
+        }
+
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
@@ -239,6 +262,7 @@ export const Appearance = {
                     listWidth,
                     channelPickerOpacity,
                     activeTileStyle,
+                    visitedStyle,
                     colors,
                     fontId
                 } = SettingsStore.resetAppearance();
@@ -248,6 +272,7 @@ export const Appearance = {
                 syncListUi(listWidth);
                 syncPickerOpacityUi(channelPickerOpacity);
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
+                if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
                 syncFontUi(fontId);
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
@@ -277,6 +302,7 @@ export const Appearance = {
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
         root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
+        root.setAttribute('data-visited-style', SettingsStore.getVisitedStyle());
         applyThemeColorsToRoot(colors, root);
         applyFontToRoot(fontId, root);
 
@@ -313,6 +339,9 @@ export const Appearance = {
         const countryCode = channel?.countrycode || '';
         const initial = (nameText[0] || 'P').toUpperCase();
         const safeName = escapeHtml(nameText);
+
+        // When a visited accent is selected, the preview tile demonstrates it.
+        preview.classList.toggle('is-visited', SettingsStore.getVisitedStyle() !== 'undistinguished');
 
         if (name) name.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span></span>`;
         if (flag) flag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
@@ -365,6 +394,18 @@ export const Appearance = {
             activeTileSelect.value = activeTileStyle;
         }
 
+        const visitedStyle = SettingsStore.getVisitedStyle();
+        const visitedStyleSelect = el('visited-style-select');
+        if (visitedStyleSelect) {
+            visitedStyleSelect.value = visitedStyle;
+        }
+
+        const recentsCap = SettingsStore.getRecentsCap();
+        const recentsCapInput = el('recents-cap-input');
+        if (recentsCapInput) {
+            recentsCapInput.value = String(recentsCap);
+        }
+
         const fontId = SettingsStore.getFontId();
         buildFontPickerMenu();
         syncFontPickerUi(fontId);
@@ -377,14 +418,16 @@ export const Appearance = {
         const stats = el('storage-stats');
         if (!stats) return;
         const spans = stats.querySelectorAll('span');
-        if (spans.length < 5) return;
+        if (spans.length < 6) return;
 
         const favs = TvPlayer.getFavorites?.() || [];
         const recents = TvPlayer.getRecentsMeta?.() || [];
         const hidden = TvPlayer.getHiddenMeta?.() || [];
+        const visited = TvPlayer.getVisitedKeys?.() || [];
         spans[0].textContent = `Favorites: ${favs.length}`;
         spans[1].textContent = `Recents: ${recents.length}`;
         spans[2].textContent = `Hidden: ${hidden.length}`;
+        spans[3].textContent = `Visited: ${visited.length}`;
 
         let localBytes = 0;
         try {
@@ -394,15 +437,15 @@ export const Appearance = {
                 localBytes += (key?.length || 0) + (val?.length || 0);
             }
         } catch { /* ignore */ }
-        spans[3].textContent = `localStorage: ${localBytes < 1024 ? localBytes + ' B' : (localBytes / 1024).toFixed(1) + ' KB'}`;
+        spans[4].textContent = `localStorage: ${localBytes < 1024 ? localBytes + ' B' : (localBytes / 1024).toFixed(1) + ' KB'}`;
 
         if (navigator?.storage?.estimate) {
             navigator.storage.estimate().then((est) => {
                 const used = est.usage || 0;
-                spans[4].textContent = `Cache: ${used < 1024 ? used + ' B' : used < 1048576 ? (used / 1024).toFixed(1) + ' KB' : (used / 1048576).toFixed(1) + ' MB'}`;
-            }).catch(() => { spans[4].textContent = 'Cache: —'; });
+                spans[5].textContent = `Cache: ${used < 1024 ? used + ' B' : used < 1048576 ? (used / 1024).toFixed(1) + ' KB' : (used / 1048576).toFixed(1) + ' MB'}`;
+            }).catch(() => { spans[5].textContent = 'Cache: —'; });
         } else {
-            spans[4].textContent = 'Cache: —';
+            spans[5].textContent = 'Cache: —';
         }
     }
 };

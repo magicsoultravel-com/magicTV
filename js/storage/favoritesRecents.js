@@ -1,6 +1,11 @@
 import { channelKey, migrateFavoriteRef, parseChannelKey } from '../tvProviders/channelShape.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
-import { loadPlayerState, savePlayerState, RECENTS_CAP } from './playerState.js';
+import {
+    loadPlayerState,
+    savePlayerState,
+    getRecentsCap
+} from './playerState.js';
+import { readPersistedState } from './persistedState.js';
 
 /**
  * Splice a reordered visible subset back into the full favorites list.
@@ -40,6 +45,7 @@ export const FavoritesRecents = {
 
     pushRecent(key, channel = null) {
         if (!key) return;
+        const cap = getRecentsCap();
         const meta = loadPlayerState().recentsMeta.filter((e) => e.key !== key);
         meta.unshift({
             key,
@@ -48,7 +54,56 @@ export const FavoritesRecents = {
             countrycode: channel?.countrycode || '',
             at: Date.now()
         });
-        savePlayerState({ recentsMeta: meta.slice(0, RECENTS_CAP) });
+        savePlayerState({ recentsMeta: meta.slice(0, cap) });
+    },
+
+    /**
+     * Seed visitedChannels from legacy state (recents / favorites / last channel)
+     * exactly once, so long-time users keep their history visibly "visited".
+     */
+    reconcileVisitedChannels() {
+        const raw = readPersistedState();
+        if (raw.visitedChannelsReconciled === true) return;
+        const state = loadPlayerState();
+        const visited = new Set(state.visitedChannels);
+        for (const e of state.recentsMeta) {
+            if (e.key) visited.add(e.key);
+        }
+        for (const k of state.favorites) {
+            visited.add(k);
+        }
+        if (state.lastChannelKey) {
+            visited.add(migrateFavoriteRef(state.lastChannelKey));
+        }
+        savePlayerState({
+            visitedChannels: [...visited],
+            visitedChannelsReconciled: true
+        });
+    },
+
+    markVisited(channelOrKey) {
+        const key = typeof channelOrKey === 'string'
+            ? migrateFavoriteRef(channelOrKey)
+            : channelKey(channelOrKey);
+        if (!key) return false;
+        this.reconcileVisitedChannels();
+        const state = loadPlayerState();
+        if (state.visitedChannels.includes(key)) return false;
+        state.visitedChannels.push(key);
+        savePlayerState({ visitedChannels: state.visitedChannels });
+        return true;
+    },
+
+    isVisited(channelOrKey) {
+        const key = typeof channelOrKey === 'string'
+            ? migrateFavoriteRef(channelOrKey)
+            : channelKey(channelOrKey);
+        if (!key) return false;
+        return loadPlayerState().visitedChannels.includes(key);
+    },
+
+    getVisitedKeys() {
+        return [...loadPlayerState().visitedChannels];
     },
 
     isFavorite(channelOrKey) {

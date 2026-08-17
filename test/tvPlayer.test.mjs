@@ -34,11 +34,13 @@ import { MultiView } from '../js/multiView.js';
 
 let Registry;
 let SettingsStore;
+let FavoritesRecents;
 
 before(async () => {
     TvPlayer = (await import('../js/tvPlayer.js')).TvPlayer;
     Registry = (await import('../js/tvProviders/registry.js')).TvProviderRegistry;
     SettingsStore = (await import('../js/storage/settingsStore.js')).SettingsStore;
+    FavoritesRecents = (await import('../js/storage/favoritesRecents.js')).FavoritesRecents;
 });
 
 beforeEach(() => store.clear());
@@ -159,6 +161,113 @@ test('clearRecents empties the history', () => {
     TvPlayer.pushRecent('iptv-org:X');
     TvPlayer.clearRecents();
     assert.deepEqual(TvPlayer.getRecents(), []);
+});
+
+// ----- Visited channels -----
+
+test('markVisited records a channel and isVisited resolves it', () => {
+    assert.equal(TvPlayer.isVisited('iptv-org:CNN.us'), false);
+    assert.equal(TvPlayer.markVisited(CHANNEL), true);
+    assert.equal(TvPlayer.isVisited(CHANNEL), true, 'object form resolves');
+    assert.equal(TvPlayer.isVisited('iptv-org:CNN.us'), true, 'prefixed key resolves');
+    assert.equal(TvPlayer.isVisited('CNN.us'), true, 'bare key resolves through migration');
+});
+
+test('markVisited is idempotent and persists without duplicates', () => {
+    assert.equal(FavoritesRecents.markVisited('iptv-org:CNN.us'), true);
+    assert.equal(FavoritesRecents.markVisited('CNN.us'), false, 'bare ref maps to same key');
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.visitedChannels.filter((k) => k === 'iptv-org:CNN.us').length, 1);
+    assert.equal(FavoritesRecents.isVisited('iptv-org:CNN.us'), true);
+});
+
+test('reconciliation seeds visited from recents, favorites and last channel exactly once', () => {
+    store.set('matrix_tv_state', JSON.stringify({
+        favorites: ['iptv-org:CNN.us'],
+        recentsMeta: [{ key: 'iptv-org:BBC.uk', name: 'BBC', at: 1 }],
+        lastChannelKey: 'bbc-world' // legacy bare id → resolves to iptv-org:bbc-world
+    }));
+
+    FavoritesRecents.reconcileVisitedChannels();
+    assert.equal(FavoritesRecents.isVisited('iptv-org:CNN.us'), true, 'favorite seeded');
+    assert.equal(FavoritesRecents.isVisited('iptv-org:BBC.uk'), true, 'recent seeded');
+    assert.equal(FavoritesRecents.isVisited('bbc-world'), true, 'lastChannelKey seeded with migration');
+
+    let raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.visitedChannelsReconciled, true, 'reconcile flag persisted');
+    assert.ok(raw.visitedChannels.includes('iptv-org:bbc-world'));
+
+    // Second run must not re-add anything (flag short-circuits).
+    FavoritesRecents.markVisited('iptv-org:NOW.us');
+    raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.visitedChannels.includes('iptv-org:bbc-world'), true);
+});
+
+test('visited channels persist alongside recents after playback-record path', () => {
+    TvPlayer.pushRecent('iptv-org:CNN.us', CHANNEL);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    // pushRecent alone does not mark visited; the player calls markVisited explicitly.
+    assert.equal(raw.visitedChannels.length, 0);
+    TvPlayer.markVisited('iptv-org:CNN.us');
+    assert.equal(TvPlayer.isVisited('iptv-org:CNN.us'), true);
+});
+
+// ----- Recents cap -----
+
+test('recents cap defaults to 20 entries', () => {
+    assert.equal(SettingsStore.getRecentsCap(), 20);
+});
+
+test('recents cap clamps to the 1..100 range', () => {
+    assert.equal(SettingsStore.setRecentsCap(0), 1, 'below min clamps to 1');
+    assert.equal(SettingsStore.setRecentsCap(500), 100, 'above max clamps to 100');
+    assert.equal(SettingsStore.setRecentsCap(42), 42);
+    assert.equal(SettingsStore.setRecentsCap('nope'), 20, 'non-number falls back to default');
+});
+
+test('pushRecent honors a custom cap', () => {
+    SettingsStore.setRecentsCap(3);
+    for (let i = 0; i < 6; i += 1) {
+        TvPlayer.pushRecent(`iptv-org:cap-${i}`);
+    }
+    const recents = TvPlayer.getRecents();
+    assert.equal(recents.length, 3);
+    assert.equal(recents[0], 'iptv-org:cap-5', 'newest first');
+});
+
+test('lowering the recents cap trims existing history', () => {
+    for (let i = 0; i < 8; i += 1) {
+        TvPlayer.pushRecent(`iptv-org:t-${i}`);
+    }
+    SettingsStore.setRecentsCap(3);
+    const meta = TvPlayer.getRecentsMeta();
+    assert.equal(meta.length, 3);
+    assert.equal(meta[0].key, 'iptv-org:t-7');
+});
+
+test('recents cap persists in localStorage', () => {
+    SettingsStore.setRecentsCap(5);
+    assert.equal(JSON.parse(store.get('matrix_tv_state')).recentsCap, 5);
+});
+
+// ----- Visited style setting -----
+
+test('visited style defaults to undistinguished', () => {
+    assert.equal(SettingsStore.getVisitedStyle(), 'undistinguished');
+});
+
+test('visited style accepts the accent options and falls back', () => {
+    SettingsStore.setVisitedStyle('accent-2');
+    assert.equal(SettingsStore.getVisitedStyle(), 'accent-2');
+    SettingsStore.setVisitedStyle('accent-1');
+    assert.equal(SettingsStore.getVisitedStyle(), 'accent-1');
+    SettingsStore.setVisitedStyle('bogus');
+    assert.equal(SettingsStore.getVisitedStyle(), 'undistinguished', 'invalid falls back to default');
+});
+
+test('visited style persists in localStorage', () => {
+    SettingsStore.setVisitedStyle('accent-3');
+    assert.equal(JSON.parse(store.get('matrix_tv_state')).visitedStyle, 'accent-3');
 });
 
 // ----- Buffer -----

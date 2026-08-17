@@ -5,7 +5,16 @@
 import { readPersistedState, patchPersistedState } from './persistedState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
-export const RECENTS_CAP = 20;
+export const DEFAULT_RECENTS_CAP = 20;
+export const RECENTS_CAP_MIN = 1;
+export const RECENTS_CAP_MAX = 100;
+
+/** @deprecated Use DEFAULT_RECENTS_CAP / getRecentsCap() — kept for older imports. */
+export const RECENTS_CAP = DEFAULT_RECENTS_CAP;
+
+export const DEFAULT_VISITED_STYLE = 'undistinguished';
+export const VISITED_STYLES = ['undistinguished', 'accent-1', 'accent-2', 'accent-3'];
+
 export const DEFAULT_BUFFER_SIZE = 15;
 export const MAX_BUFFER_SIZE = 120;
 export const MIN_BUFFER_SIZE = 5;
@@ -190,6 +199,33 @@ function normalizeChannelPicker(raw) {
     };
 }
 
+export function normalizeVisitedStyle(value) {
+    return VISITED_STYLES.includes(value) ? value : DEFAULT_VISITED_STYLE;
+}
+
+/** Recents history cap, clamped to the 1..100 range enforced in settings. */
+export function getRecentsCap() {
+    const raw = readPersistedState().recentsCap;
+    if (raw == null || raw === '') return DEFAULT_RECENTS_CAP;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return DEFAULT_RECENTS_CAP;
+    return Math.min(RECENTS_CAP_MAX, Math.max(RECENTS_CAP_MIN, Math.round(n)));
+}
+
+function normalizeVisitedChannels(raw) {
+    if (!Array.isArray(raw.visitedChannels)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const key of raw.visitedChannels) {
+        const migrated = migrateFavoriteRef(key);
+        if (migrated && !seen.has(migrated)) {
+            seen.add(migrated);
+            out.push(migrated);
+        }
+    }
+    return out;
+}
+
 /** Parsed player fields from the shared blob (does not strip sibling keys). */
 export function loadPlayerState() {
     try {
@@ -200,6 +236,7 @@ export function loadPlayerState() {
         const favoritesMeta = normalizeFavoritesMeta(favorites, raw.favoritesMeta);
         const recentsMeta = migrateRecentsMeta(raw);
         const recents = recentsMeta.map((e) => e.key);
+        const visitedChannels = normalizeVisitedChannels(raw);
         const hiddenChannels = Array.isArray(raw.hiddenChannels)
             ? raw.hiddenChannels.map(migrateFavoriteRef)
             : [];
@@ -210,6 +247,7 @@ export function loadPlayerState() {
             favoritesMeta,
             recents,
             recentsMeta,
+            visitedChannels,
             hiddenChannels,
             hiddenChannelsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
@@ -232,6 +270,7 @@ export function loadPlayerState() {
             favoritesMeta: [],
             recents: [],
             recentsMeta: [],
+            visitedChannels: [],
             hiddenChannels: [],
             hiddenChannelsMeta: [],
             volume: 0.85,
@@ -265,6 +304,9 @@ export function savePlayerState(patch) {
     if (merged.hiddenChannels) {
         merged.hiddenChannelsMeta = normalizeHiddenMeta(merged.hiddenChannels, merged.hiddenChannelsMeta);
     }
+    if (merged.visitedChannels) {
+        merged.visitedChannels = normalizeVisitedChannels({ visitedChannels: merged.visitedChannels });
+    }
     const sortBy = normalizeSortBy(merged.sortBy);
     const sortDir = normalizeSortDir(merged.sortDir);
     const categoryFilter = normalizeCategoryFilter(merged.categoryFilter);
@@ -273,6 +315,7 @@ export function savePlayerState(patch) {
         favoritesMeta: merged.favoritesMeta,
         recents: merged.recents,
         recentsMeta: merged.recentsMeta,
+        visitedChannels: merged.visitedChannels,
         hiddenChannels: merged.hiddenChannels,
         hiddenChannelsMeta: merged.hiddenChannelsMeta,
         volume: merged.volume,
@@ -289,7 +332,8 @@ export function savePlayerState(patch) {
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
                 k === 'favorites' || k === 'favoritesMeta' || k === 'recents'
-                || k === 'recentsMeta' || k === 'hiddenChannels' || k === 'hiddenChannelsMeta'
+                || k === 'recentsMeta' || k === 'visitedChannels'
+                || k === 'hiddenChannels' || k === 'hiddenChannelsMeta'
                 || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
                 || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'channelPicker'

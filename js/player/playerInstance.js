@@ -155,6 +155,7 @@ export function createPlayerInstance(options) {
                 if (shouldRecordRecents() && key && this.recentRecordedForKey !== key) {
                     this.recentRecordedForKey = key;
                     FavoritesRecents.pushRecent(key, this.channel);
+                    FavoritesRecents.markVisited(key);
                 }
                 this.emitState();
             });

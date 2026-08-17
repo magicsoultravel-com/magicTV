@@ -757,6 +757,31 @@ body.has-channel-picker .tv-tab .ui-icon {
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
 }
 
+/* ===== VISITED CHANNEL ACCENT =====
+   Gated via html[data-visited-style] (set by Appearance). Tiles marked
+   .is-visited pick up the selected main accent; "undistinguished" (default)
+   keeps visited tiles identical to unvisited ones. */
+html[data-visited-style="accent-1"] .channel-tile.is-visited { --tv-visited-accent: var(--tv-main-1); }
+html[data-visited-style="accent-2"] .channel-tile.is-visited { --tv-visited-accent: var(--tv-main-2); }
+html[data-visited-style="accent-3"] .channel-tile.is-visited { --tv-visited-accent: var(--tv-main-3); }
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited {
+    border-color: color-mix(in srgb, var(--tv-visited-accent) 45%, var(--tv-border));
+    box-shadow: inset 3px 0 0 0 var(--tv-visited-accent);
+}
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited .channel-tile__icon {
+    border-color: color-mix(in srgb, var(--tv-visited-accent) 45%, var(--tv-border-light));
+}
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited .channel-tile__letter-avatar {
+    color: var(--tv-visited-accent);
+}
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited .channel-tile__flag {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tv-visited-accent) 30%, transparent);
+}
+
 /* Favorites tab: drag-to-reorder */
 #favorites-grid .channel-tile {
     cursor: grab;

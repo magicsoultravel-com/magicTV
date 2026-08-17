@@ -49,8 +49,9 @@ function groupByCountry(meta) {
 function hiddenSettingsTileHtml(ch) {
     const initial = (ch.name || '?')[0].toUpperCase();
     const unhideLabel = 'Show channel';
+    const isVisited = TvPlayer.isVisited(ch);
     return `
-        <div class="channel-tile" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0">
+        <div class="channel-tile${isVisited ? ' is-visited' : ''}" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0">
             <button type="button" class="channel-tile__unhide-btn" title="${unhideLabel}" aria-label="${unhideLabel}">${CARD_ICONS.tileEye}</button>
             <div class="channel-tile__icon">
                 <div class="channel-tile__capture-frame" data-frame-state="idle">

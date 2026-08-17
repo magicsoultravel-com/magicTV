@@ -431,6 +431,12 @@
                                         <option value="30">30s (Very Stable)</option>
                                     </select>
                                 </div>
+                                <div class="settings-section__item">
+                                    <label class="settings-section__label" for="recents-cap-input">Max recents</label>
+                                    <div class="settings-section__control">
+                                        <input type="number" id="recents-cap-input" min="1" max="100" step="1" value="20" aria-label="Recent channels limit">
+                                    </div>
+                                </div>
                             </div>
                             <div class="settings-section">
                                 <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Screens</h3>
@@ -569,6 +575,15 @@
                                     </select>
                                 </div>
                                 <div class="settings-section__item">
+                                    <label class="settings-section__label" for="visited-style-select">Visited accent</label>
+                                    <select id="visited-style-select" aria-label="Visited channel accent style">
+                                        <option value="undistinguished">Undistinguished</option>
+                                        <option value="accent-1">Accent 1</option>
+                                        <option value="accent-2">Accent 2</option>
+                                        <option value="accent-3">Accent 3</option>
+                                    </select>
+                                </div>
+                                <div class="settings-section__item">
                                     <label class="settings-section__label" for="list-width-slider">List Width</label>
                                     <div class="settings-section__control">
                                         <input type="range" class="settings-slider" id="list-width-slider" min="100" max="300" step="10" value="300" aria-valuetext="300px">
@@ -614,6 +629,7 @@
                                     <span>Favorites: —</span>
                                     <span>Recents: —</span>
                                     <span>Hidden: —</span>
+                                    <span>Visited: —</span>
                                     <span>localStorage: —</span>
                                     <span>Cache: —</span>
                                 </div>

@@ -22,10 +22,11 @@ let deps = {
 function tileHtml(ch) {
     const initial = (ch.name || '?')[0].toUpperCase();
     const isFav = TvPlayer.isFavorite(ch);
+    const isVisited = TvPlayer.isVisited(ch);
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
     const hideLabel = 'Hide channel';
     return `
-        <div class="channel-tile" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
+        <div class="channel-tile${isVisited ? ' is-visited' : ''}" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
             <button type="button" class="channel-tile__hide-btn" title="${hideLabel}" aria-label="${hideLabel}">${CARD_ICONS.tileEye}</button>
             <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
             <div class="channel-tile__icon">
@@ -218,6 +219,7 @@ export const ChannelGrid = {
         TileFrames.observe(container, { viewKey: deps.getRefreshKey?.() || null });
         Appearance.applyToTiles(container);
         this.syncPlayingTiles();
+        this.syncVisitedTiles();
     },
 
     /**
@@ -378,6 +380,16 @@ export const ChannelGrid = {
         document.querySelectorAll('.channel-tile').forEach((tile) => {
             const key = tile.dataset.channel;
             if (key) tile.classList.toggle('is-playing', playingKeys.has(key));
+        });
+    },
+
+    /** Sync is-visited class on catalog tiles (single read of the visited set). */
+    syncVisitedTiles() {
+        if (typeof document === 'undefined') return;
+        const visitedKeys = new Set(TvPlayer.getVisitedKeys());
+        document.querySelectorAll('.channel-tile').forEach((tile) => {
+            const key = tile.dataset.channel;
+            if (key) tile.classList.toggle('is-visited', visitedKeys.has(key));
         });
     }
 };
