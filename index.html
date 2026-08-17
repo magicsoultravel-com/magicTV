@@ -387,6 +387,12 @@
                 <div class="tv-catalog__actions tv-catalog__actions--end">
                     <button type="button" id="catalog-layout-btn" class="tv-catalog__action is-hidden" title="List view" aria-label="List view"></button>
                     <button type="button" id="refresh-btn" class="tv-catalog__action" title="Refresh this tab" aria-label="Refresh this tab"></button>
+                    <button type="button" id="channel-picker-pin" class="tv-catalog__action channel-picker-modal__pin" title="Pin window" aria-label="Pin window" aria-pressed="false">
+                        <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 1.8h3.6l.6 3.2 1.6.8v1.2H6.6V10l-.6.8-.6-.8V7H2V5.8l1.6-.8.6-3.2z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button type="button" id="channel-picker-close" class="tv-catalog__action channel-picker-modal__close" title="Close" aria-label="Close">
+                        <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </button>
                 </div>
                 <div class="tv-catalog__clip">
                 <div id="tv-catalog-body" class="tv-catalog__body">
@@ -554,6 +560,15 @@
                                     </div>
                                 </div>
                                 <div class="settings-section__item">
+                                    <label class="settings-section__label" for="active-tile-select">Active Tile</label>
+                                    <select id="active-tile-select" aria-label="Active tile indicator style">
+                                        <option value="none">None</option>
+                                        <option value="wave">Scrolling wave</option>
+                                        <option value="pulse">Pulse</option>
+                                        <option value="visualizer">Visualizer</option>
+                                    </select>
+                                </div>
+                                <div class="settings-section__item">
                                     <label class="settings-section__label" for="list-width-slider">List Width</label>
                                     <div class="settings-section__control">
                                         <input type="range" class="settings-slider" id="list-width-slider" min="100" max="300" step="10" value="300" aria-valuetext="300px">
@@ -647,16 +662,7 @@
             aria-label="Channel browser"
             tabindex="-1"
         >
-            <div class="channel-picker-modal__header" data-channel-picker-drag>
-                <div class="channel-picker-modal__header-actions">
-                    <button type="button" id="channel-picker-pin" class="channel-picker-modal__pin" title="Pin window" aria-label="Pin window" aria-pressed="false">
-                        <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 1.8h3.6l.6 3.2 1.6.8v1.2H6.6V10l-.6.8-.6-.8V7H2V5.8l1.6-.8.6-3.2z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button type="button" id="channel-picker-close" class="channel-picker-modal__close" title="Close" aria-label="Close">
-                        <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    </button>
-                </div>
-            </div>
+            <div class="channel-picker-modal__header" data-channel-picker-drag></div>
             <div id="channel-picker-host" class="channel-picker-modal__host"></div>
             <span class="channel-picker-modal__resize" data-picker-resize="nw" aria-hidden="true"></span>
             <span class="channel-picker-modal__resize" data-picker-resize="ne" aria-hidden="true"></span>

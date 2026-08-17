@@ -1,4 +1,5 @@
 import { TvPlayer } from '../tvPlayer.js';
+import { MultiView } from '../multiView.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
 import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
 import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
@@ -216,6 +217,7 @@ export const ChannelGrid = {
         wireTiles(container, channels);
         TileFrames.observe(container, { viewKey: deps.getRefreshKey?.() || null });
         Appearance.applyToTiles(container);
+        this.syncPlayingTiles();
     },
 
     /**
@@ -360,5 +362,22 @@ export const ChannelGrid = {
     },
 
     renderFavorites() { renderTabGrid('favorites'); },
-    renderRecents() { renderTabGrid('recents'); }
+    renderRecents() { renderTabGrid('recents'); },
+
+    /** Sync is-playing class on catalog tiles for all playing slots. */
+    syncPlayingTiles() {
+        if (typeof document === 'undefined') return;
+        const playingKeys = new Set();
+        const slots = MultiView.slots;
+        for (const id of Object.keys(slots)) {
+            const slot = slots[id];
+            if (slot.enabled && slot.player?.playing === true && slot.player.channel) {
+                playingKeys.add(channelKey(slot.player.channel));
+            }
+        }
+        document.querySelectorAll('.channel-tile').forEach((tile) => {
+            const key = tile.dataset.channel;
+            if (key) tile.classList.toggle('is-playing', playingKeys.has(key));
+        });
+    }
 };

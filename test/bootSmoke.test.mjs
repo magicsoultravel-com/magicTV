@@ -30,7 +30,8 @@ const KNOWN_IDS = [
     'reset-appearance-btn', 'appearance-preview-tile',
     'mosaic-reset-btn', 'mosaic-mute-all-btn',
     'preview-avatar', 'preview-name', 'preview-flag',
-    'volume-pct'
+    'volume-pct',
+    'active-tile-select'
 ];
 function makeEl(id = '') {
     const el = {

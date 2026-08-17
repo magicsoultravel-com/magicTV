@@ -44,6 +44,8 @@ const LIST_WIDTH_STEP = 10;
 const CHANNEL_PICKER_OPACITY_MIN = 33;
 const CHANNEL_PICKER_OPACITY_MAX = 100;
 const CATALOG_LAYOUTS = ['tiles', 'list'];
+const DEFAULT_ACTIVE_TILE_STYLE = 'none';
+const ACTIVE_TILE_STYLES = ['none', 'wave', 'pulse', 'visualizer'];
 
 function clampTextSize(value) {
     const n = Number(value);
@@ -76,6 +78,10 @@ function clampChannelPickerOpacity(value) {
 
 function normalizeCatalogLayout(value) {
     return CATALOG_LAYOUTS.includes(value) ? value : DEFAULT_CATALOG_LAYOUT;
+}
+
+function normalizeActiveTileStyle(value) {
+    return ACTIVE_TILE_STYLES.includes(value) ? value : DEFAULT_ACTIVE_TILE_STYLE;
 }
 
 function normalizeThemeId(value) {
@@ -235,6 +241,7 @@ export const SettingsStore = {
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
         const channelPickerOpacity = this.setChannelPickerOpacity(DEFAULT_CHANNEL_PICKER_OPACITY);
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
+        const activeTileStyle = this.setActiveTileStyle(DEFAULT_ACTIVE_TILE_STYLE);
         const colors = this.setThemeColors(getPresetColors(themeId));
         const fontId = this.setFontId(getPresetFontId(themeId));
         return {
@@ -244,6 +251,7 @@ export const SettingsStore = {
             listWidth,
             channelPickerOpacity,
             catalogLayout,
+            activeTileStyle,
             colors,
             fontId
         };
@@ -341,6 +349,16 @@ export const SettingsStore = {
 
     getCatalogTransitionOptions() {
         return VIEW_TRANSITIONS.slice();
+    },
+
+    getActiveTileStyle() {
+        return normalizeActiveTileStyle(readPersistedState().activeTileStyle);
+    },
+
+    setActiveTileStyle(value) {
+        const next = normalizeActiveTileStyle(value);
+        patchPersistedState({ activeTileStyle: next });
+        return next;
     },
 
     /** Last-channel fields used by the shell header / resume path. */

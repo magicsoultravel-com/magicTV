@@ -510,7 +510,9 @@ body.has-channel-picker .tv-tab .ui-icon {
 @media (hover: hover) {
     .tv-catalog:not(.is-collapsed) .tv-catalog__toggle,
     .tv-catalog:not(.is-collapsed) #catalog-layout-btn,
-    .tv-catalog:not(.is-collapsed) #refresh-btn {
+    .tv-catalog:not(.is-collapsed) #refresh-btn,
+    .tv-catalog:not(.is-collapsed) #channel-picker-pin,
+    .tv-catalog:not(.is-collapsed) #channel-picker-close {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.15s ease, color var(--tv-transition);
@@ -521,7 +523,11 @@ body.has-channel-picker .tv-tab .ui-icon {
     .tv-catalog:not(.is-collapsed):hover #catalog-layout-btn,
     .tv-catalog:not(.is-collapsed):focus-within #catalog-layout-btn,
     .tv-catalog:not(.is-collapsed):hover #refresh-btn,
-    .tv-catalog:not(.is-collapsed):focus-within #refresh-btn {
+    .tv-catalog:not(.is-collapsed):focus-within #refresh-btn,
+    .tv-catalog:not(.is-collapsed):hover #channel-picker-pin,
+    .tv-catalog:not(.is-collapsed):focus-within #channel-picker-pin,
+    .tv-catalog:not(.is-collapsed):hover #channel-picker-close,
+    .tv-catalog:not(.is-collapsed):focus-within #channel-picker-close {
         opacity: 0.4;
         pointer-events: auto;
     }
@@ -531,7 +537,11 @@ body.has-channel-picker .tv-tab .ui-icon {
     .tv-catalog:not(.is-collapsed) #catalog-layout-btn:hover,
     .tv-catalog:not(.is-collapsed) #catalog-layout-btn:focus-visible,
     .tv-catalog:not(.is-collapsed) #refresh-btn:hover,
-    .tv-catalog:not(.is-collapsed) #refresh-btn:focus-visible {
+    .tv-catalog:not(.is-collapsed) #refresh-btn:focus-visible,
+    .tv-catalog:not(.is-collapsed) #channel-picker-pin:hover,
+    .tv-catalog:not(.is-collapsed) #channel-picker-pin:focus-visible,
+    .tv-catalog:not(.is-collapsed) #channel-picker-close:hover,
+    .tv-catalog:not(.is-collapsed) #channel-picker-close:focus-visible {
         opacity: 1;
         color: var(--tv-primary);
     }
@@ -1119,6 +1129,157 @@ body.has-channel-picker .tv-tab .ui-icon {
     display: block;
     width: 22px;
     height: 22px;
+}
+
+/* ===== ACTIVE TILE INDICATORS =====
+   Scrolling sinusoid wave (wave) and breathing pulse (pulse).
+   Gated via data-active-tile-style on <html> so no perf cost when disabled. */
+
+/* --- Scrolling sinusoid wave --- */
+@keyframes active-tile-wave {
+    0% { background-position: 0 0; }
+    100% { background-position: -30px 0; }
+}
+
+html[data-active-tile-style="wave"] .channel-tile.is-playing::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 5;
+    background-image:
+        radial-gradient(circle, var(--tv-primary) 1.25px, transparent 1.25px),
+        radial-gradient(circle, var(--tv-secondary) 1.25px, transparent 1.25px);
+    background-size: 30px 12px, 30px 12px;
+    background-position: 0 3px, 15px 9px;
+    background-repeat: repeat-x, repeat-x;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+html[data-active-tile-style="wave"] .channel-tile.is-playing::before {
+    opacity: 0.65;
+    animation: active-tile-wave 2s linear infinite;
+}
+
+html[data-active-tile-style="wave"] .channel-tile.is-playing .channel-tile__body {
+    position: relative;
+    z-index: 6;
+}
+
+/* --- Pulse (dotted ellipse in center) --- */
+@keyframes active-tile-pulse {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(0.85);
+        opacity: 0.35;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.05);
+        opacity: 0.7;
+    }
+}
+
+html[data-active-tile-style="pulse"] .channel-tile.is-playing::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 28px;
+    height: 18px;
+    border: 1.5px dotted var(--tv-primary);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 5;
+    transform: translate(-50%, -50%) scale(0.85);
+    opacity: 0.35;
+    animation: active-tile-pulse 2s ease-in-out infinite;
+}
+
+html[data-active-tile-style="pulse"] .channel-tile.is-playing .channel-tile__body {
+    position: relative;
+    z-index: 6;
+}
+
+/* List-layout: smaller ellipse */
+html[data-active-tile-style="pulse"][data-channel-layout="list"] .channel-tile.is-playing::before {
+    width: 20px;
+    height: 12px;
+}
+
+/* List-layout adjustments */
+html[data-active-tile-style="wave"][data-channel-layout="list"] .channel-tile.is-playing::before {
+    background-size: 24px 10px, 24px 10px;
+    background-position: 0 2px, 12px 7px;
+}
+
+html[data-active-tile-style="pulse"][data-channel-layout="list"] .channel-tile.is-playing .channel-tile__icon {
+    animation-duration: 2.4s;
+}
+
+/* --- Visualizer (audio equalizer bars) --- */
+@keyframes active-tile-viz {
+    0%   { background-size: 20% 55%, 20% 90%, 20% 40%, 20% 75%, 20% 60%; }
+    15%  { background-size: 20% 95%, 20% 55%, 20% 75%, 20% 45%, 20% 85%; }
+    30%  { background-size: 20% 45%, 20% 80%, 20% 95%, 20% 60%, 20% 40%; }
+    45%  { background-size: 20% 80%, 20% 40%, 20% 60%, 20% 95%, 20% 70%; }
+    60%  { background-size: 20% 60%, 20% 70%, 20% 50%, 20% 55%, 20% 95%; }
+    75%  { background-size: 20% 90%, 20% 60%, 20% 85%, 20% 40%, 20% 55%; }
+    90%  { background-size: 20% 50%, 20% 95%, 20% 65%, 20% 80%, 20% 45%; }
+    100% { background-size: 20% 55%, 20% 90%, 20% 40%, 20% 75%, 20% 60%; }
+}
+
+html[data-active-tile-style="visualizer"] .channel-tile.is-playing::after {
+    content: '';
+    position: absolute;
+    inset: auto 6px 4px 6px;
+    height: 14px;
+    pointer-events: none;
+    z-index: 6;
+    background:
+        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 0% 100% / 20% 100% no-repeat,
+        linear-gradient(to top, var(--tv-secondary), var(--tv-secondary)) 20% 100% / 20% 100% no-repeat,
+        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 40% 100% / 20% 100% no-repeat,
+        linear-gradient(to top, var(--tv-secondary), var(--tv-secondary)) 60% 100% / 20% 100% no-repeat,
+        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 80% 100% / 20% 100% no-repeat;
+    background-repeat: no-repeat;
+    background-position: 0% 100%, 20% 100%, 40% 100%, 60% 100%, 80% 100%;
+    opacity: 0.7;
+    border-radius: 1px;
+    animation: active-tile-viz 1.6s ease-in-out infinite;
+}
+
+html[data-active-tile-style="visualizer"] .channel-tile.is-playing .channel-tile__body {
+    position: relative;
+    z-index: 7;
+}
+
+/* List-layout: smaller bars */
+html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-tile.is-playing::after {
+    height: 10px;
+    inset: auto 4px 3px 4px;
+}
+
+/* Reduced-motion: static bars at random-ish heights */
+@media (prefers-reduced-motion: reduce) {
+    html[data-active-tile-style="wave"] .channel-tile.is-playing::before {
+        animation: none;
+        opacity: 0.4;
+        background-image: radial-gradient(circle, var(--tv-primary) 1.25px, transparent 1.25px);
+        background-size: 8px 8px;
+        background-position: 0 100%;
+        background-repeat: repeat-x;
+    }
+    html[data-active-tile-style="pulse"] .channel-tile.is-playing::before {
+        animation: none;
+        opacity: 0.4;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    html[data-active-tile-style="visualizer"] .channel-tile.is-playing::after {
+        animation: none;
+        opacity: 0.5;
+        background-size: 20% 65%, 20% 85%, 20% 50%, 20% 70%, 20% 55%;
+    }
 }
 
 /* Body — name on row 1, flag on row 2 (name gets full width) */
@@ -2780,10 +2941,8 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg {
 .channel-picker-modal__header {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
     flex-shrink: 0;
-    padding: 0.65rem 0.85rem;
+    padding: 0.3rem 0.85rem;
     border-bottom: 1px solid var(--tv-border, #2A2E3A);
     background: rgba(0, 0, 0, 0.25);
     cursor: grab;
@@ -2795,43 +2954,24 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg {
     cursor: grabbing;
 }
 
-.channel-picker-modal__header-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex-shrink: 0;
+/* Pin/close inside tv-catalog__actions--end inherit .tv-catalog__action base styles.
+   Only the active/pinned state of the pin needs an override. */
+
+/* Hide pin/close in docked catalog — they are modal-only controls */
+#channel-picker-pin,
+#channel-picker-close {
+    display: none;
 }
 
-.channel-picker-modal__pin,
-.channel-picker-modal__close {
-    width: 32px;
-    height: 32px;
-    margin: 0;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid transparent;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--tv-text-secondary, #B3B3B3);
-    cursor: pointer;
-}
-
-.channel-picker-modal__pin:hover,
-.channel-picker-modal__pin:focus-visible,
-.channel-picker-modal__close:hover,
-.channel-picker-modal__close:focus-visible {
-    color: var(--tv-main-3, #FF00FF);
-    border-color: color-mix(in srgb, var(--tv-main-3, #FF00FF) 45%, transparent);
-    outline: none;
+/* Show them when teleported into the modal host */
+.channel-picker-modal__host #channel-picker-pin,
+.channel-picker-modal__host #channel-picker-close {
+    display: flex;
 }
 
 .channel-picker-modal__pin.is-active,
 .channel-picker-modal__pin[aria-pressed="true"] {
     color: var(--tv-main-3, #FF00FF);
-    border-color: color-mix(in srgb, var(--tv-main-3, #FF00FF) 55%, transparent);
-    background: color-mix(in srgb, var(--tv-main-3, #FF00FF) 12%, transparent);
 }
 
 .channel-picker-modal__host {

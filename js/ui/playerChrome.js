@@ -24,7 +24,7 @@ export const PlayerChrome = {
                 TvPlayer.setVolume(parseFloat(e.target.value) / 100);
             });
         }
-        window.addEventListener('tv:state_changed', () => ChannelGrid.syncFavButtons());
+        window.addEventListener('tv:state_changed', () => { ChannelGrid.syncFavButtons(); ChannelGrid.syncPlayingTiles(); });
         const volPct = el('volume-pct');
         if (volPct) {
             const updateVolPct = () => {

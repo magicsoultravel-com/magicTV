@@ -219,6 +219,16 @@ export const Appearance = {
             });
         }
 
+        const activeTileSelect = el('active-tile-select');
+        if (activeTileSelect && activeTileSelect.dataset.bound !== '1') {
+            activeTileSelect.dataset.bound = '1';
+            activeTileSelect.addEventListener('change', () => {
+                const style = SettingsStore.setActiveTileStyle(activeTileSelect.value);
+                this.applyStyles();
+                showAppToast(`Active tile: ${activeTileSelect.options[activeTileSelect.selectedIndex].text}`);
+            });
+        }
+
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
@@ -228,6 +238,7 @@ export const Appearance = {
                     tileWidth,
                     listWidth,
                     channelPickerOpacity,
+                    activeTileStyle,
                     colors,
                     fontId
                 } = SettingsStore.resetAppearance();
@@ -236,6 +247,7 @@ export const Appearance = {
                 syncTileUi(tileWidth);
                 syncListUi(listWidth);
                 syncPickerOpacityUi(channelPickerOpacity);
+                if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 syncFontUi(fontId);
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
@@ -264,6 +276,7 @@ export const Appearance = {
         root.style.setProperty('--channel-picker-opacity', String(channelPickerOpacity / 100));
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
+        root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
         applyThemeColorsToRoot(colors, root);
         applyFontToRoot(fontId, root);
 
@@ -344,6 +357,12 @@ export const Appearance = {
                     .join('');
             }
             themeSelect.value = themeId;
+        }
+
+        const activeTileStyle = SettingsStore.getActiveTileStyle();
+        const activeTileSelect = el('active-tile-select');
+        if (activeTileSelect) {
+            activeTileSelect.value = activeTileStyle;
         }
 
         const fontId = SettingsStore.getFontId();
