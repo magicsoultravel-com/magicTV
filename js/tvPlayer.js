@@ -1,5 +1,6 @@
 import { MultiView } from './multiView.js';
 import { FavoritesRecents } from './storage/favoritesRecents.js';
+import { HiddenChannels } from './storage/hiddenChannels.js';
 import { parseChannelKey } from './tvProviders/channelShape.js';
 import { loadPlayerState } from './storage/playerState.js';
 
@@ -99,6 +100,26 @@ export const TvPlayer = {
         const changed = FavoritesRecents.reorderFavorites(orderedKeys);
         if (changed) this.emitState();
         return changed;
+    },
+
+    isHidden(channelOrKey) {
+        return HiddenChannels.isHidden(channelOrKey);
+    },
+
+    hideChannel(channel) {
+        const hidden = HiddenChannels.hideChannel(channel);
+        if (hidden) this.emitState();
+        return hidden;
+    },
+
+    unhideChannel(channelOrKey) {
+        const visible = HiddenChannels.unhideChannel(channelOrKey);
+        if (visible) this.emitState();
+        return visible;
+    },
+
+    getHiddenMeta() {
+        return HiddenChannels.getHiddenMeta();
     },
 
     setVolume(value) {

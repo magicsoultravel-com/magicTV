@@ -358,12 +358,14 @@ export const Appearance = {
         const stats = el('storage-stats');
         if (!stats) return;
         const spans = stats.querySelectorAll('span');
-        if (spans.length < 4) return;
+        if (spans.length < 5) return;
 
         const favs = TvPlayer.getFavorites?.() || [];
         const recents = TvPlayer.getRecentsMeta?.() || [];
+        const hidden = TvPlayer.getHiddenMeta?.() || [];
         spans[0].textContent = `Favorites: ${favs.length}`;
         spans[1].textContent = `Recents: ${recents.length}`;
+        spans[2].textContent = `Hidden: ${hidden.length}`;
 
         let localBytes = 0;
         try {
@@ -373,15 +375,15 @@ export const Appearance = {
                 localBytes += (key?.length || 0) + (val?.length || 0);
             }
         } catch { /* ignore */ }
-        spans[2].textContent = `localStorage: ${localBytes < 1024 ? localBytes + ' B' : (localBytes / 1024).toFixed(1) + ' KB'}`;
+        spans[3].textContent = `localStorage: ${localBytes < 1024 ? localBytes + ' B' : (localBytes / 1024).toFixed(1) + ' KB'}`;
 
         if (navigator?.storage?.estimate) {
             navigator.storage.estimate().then((est) => {
                 const used = est.usage || 0;
-                spans[3].textContent = `Cache: ${used < 1024 ? used + ' B' : used < 1048576 ? (used / 1024).toFixed(1) + ' KB' : (used / 1048576).toFixed(1) + ' MB'}`;
-            }).catch(() => { spans[3].textContent = 'Cache: —'; });
+                spans[4].textContent = `Cache: ${used < 1024 ? used + ' B' : used < 1048576 ? (used / 1024).toFixed(1) + ' KB' : (used / 1048576).toFixed(1) + ' MB'}`;
+            }).catch(() => { spans[4].textContent = 'Cache: —'; });
         } else {
-            spans[3].textContent = 'Cache: —';
+            spans[4].textContent = 'Cache: —';
         }
     }
 };

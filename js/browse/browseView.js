@@ -4,6 +4,7 @@ import { showAppToast } from '../ui/toast.js';
 import { Appearance } from '../ui/appearance.js';
 import { ChannelGrid } from '../ui/channelGrid.js';
 import { TileFrames } from '../tileFrames.js';
+import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap, sortChannelList } from '../ui/listSort.js';
 
 const PAGE_SIZE = 60;
@@ -189,19 +190,20 @@ export const BrowseView = {
                 refresh: forceRefresh
             });
             if (generation !== appState.browseGeneration) return;
+            const visible = HiddenChannels.filterVisible(results);
             if (results.length < limit) {
                 appState.browseHasMore = false;
             }
             const grid = el('channels-container');
             if (dirty) {
-                appState.browseChannels = results;
-                appState.browseOffset = results.length;
-                ChannelGrid.render(grid, results, { append: false });
+                appState.browseChannels = visible;
+                appState.browseOffset = visible.length;
+                ChannelGrid.render(grid, visible, { append: false });
             } else {
                 const append = appState.browseOffset > 0;
-                appState.browseChannels = appState.browseChannels.concat(results);
+                appState.browseChannels = appState.browseChannels.concat(visible);
                 appState.browseOffset += PAGE_SIZE;
-                ChannelGrid.render(grid, results, { append });
+                ChannelGrid.render(grid, visible, { append });
             }
             if (grid && TileFrames.isLiveRefreshActive(`browse:${appState.browseCountry}`)) {
                 TileFrames.enqueueFolderFramesForRefresh(grid);

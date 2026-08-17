@@ -7,6 +7,7 @@ import { CARD_ICONS } from './icons.js';
 import { TileFrames } from '../tileFrames.js';
 import { Appearance } from './appearance.js';
 import { FavoritesReorder } from './favoritesReorder.js';
+import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
 
 const wiredTiles = new WeakSet();
@@ -21,8 +22,10 @@ function tileHtml(ch) {
     const initial = (ch.name || '?')[0].toUpperCase();
     const isFav = TvPlayer.isFavorite(ch);
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
+    const hideLabel = 'Hide channel';
     return `
         <div class="channel-tile" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
+            <button type="button" class="channel-tile__hide-btn" title="${hideLabel}" aria-label="${hideLabel}">${CARD_ICONS.tileEye}</button>
             <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
             <div class="channel-tile__icon">
                 <div class="channel-tile__capture-frame" data-frame="${escapeHtml(channelKey(ch))}" data-frame-state="waiting">
@@ -113,6 +116,10 @@ function mergeRecentAt(channels, metaEntries) {
     });
 }
 
+function filterVisibleChannels(channels) {
+    return HiddenChannels.filterVisible(channels);
+}
+
 function syncFavoritesReorder(enabled) {
     const grid = el('favorites-grid');
     if (!grid) return;
@@ -133,6 +140,15 @@ function wireTiles(container, channels) {
         tile.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); }
         });
+        const hideBtn = tile.querySelector('.channel-tile__hide-btn');
+        if (hideBtn && ch) {
+            hideBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                ChannelGrid.hideChannel(ch);
+            });
+            hideBtn.addEventListener('keydown', (e) => e.stopPropagation());
+        }
         const favBtn = tile.querySelector('.channel-tile__fav-btn');
         if (favBtn && ch) {
             favBtn.addEventListener('click', (e) => {
@@ -165,6 +181,7 @@ function renderTabGrid(tab) {
         ? (appState.categoryFilter?.favorites || '')
         : (appState.categoryFilter?.recents || '');
     let list = source.filter(ch => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
+    list = filterVisibleChannels(list);
     list = sortChannelList(list, sortBy, sortDir);
     if (isFav) syncFavoritesReorder(sortBy === 'custom');
     if (!list.length) {
@@ -237,6 +254,32 @@ export const ChannelGrid = {
             syncTileFavBtn(btn, TvPlayer.isFavorite(key));
         });
         syncControlFavBtn();
+    },
+
+    /** Re-render the active catalog tab after hide/unhide. */
+    refreshVisibleCatalog() {
+        const appState = deps.appState;
+        if (!appState) return;
+        if (appState.activeTab === 'favorites') {
+            this.renderFavorites();
+        } else if (appState.activeTab === 'recents') {
+            this.renderRecents();
+        } else if (appState.activeTab === 'browse' && appState.browseCountry) {
+            const grid = el('channels-container');
+            if (grid) {
+                const visible = filterVisibleChannels(appState.browseChannels);
+                this.render(grid, visible);
+            }
+        }
+    },
+
+    hideChannel(ch) {
+        if (!ch) return false;
+        const hidden = TvPlayer.hideChannel(ch);
+        if (!hidden) return false;
+        showAppToast('Channel hidden');
+        this.refreshVisibleCatalog();
+        return true;
     },
 
     /** Shared fav toggle for tile stars and the control-bar ★. */

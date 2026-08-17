@@ -108,6 +108,19 @@ function normalizeFavoritesMeta(favorites, favoritesMeta) {
         .filter((e) => e.key && favKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
+function normalizeHiddenMeta(hiddenChannels, hiddenChannelsMeta) {
+    const hiddenKeys = new Set(hiddenChannels);
+    const seen = new Set();
+    return (Array.isArray(hiddenChannelsMeta) ? hiddenChannelsMeta : [])
+        .map((e) => ({
+            key: migrateFavoriteRef(typeof e === 'string' ? e : e?.key),
+            name: (e && e.name) || '',
+            logo: (e && e.logo) || '',
+            countrycode: (e && e.countrycode) || ''
+        }))
+        .filter((e) => e.key && hiddenKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
+}
+
 const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
 function normalizeMosaicSlots(raw) {
@@ -187,12 +200,18 @@ export function loadPlayerState() {
         const favoritesMeta = normalizeFavoritesMeta(favorites, raw.favoritesMeta);
         const recentsMeta = migrateRecentsMeta(raw);
         const recents = recentsMeta.map((e) => e.key);
+        const hiddenChannels = Array.isArray(raw.hiddenChannels)
+            ? raw.hiddenChannels.map(migrateFavoriteRef)
+            : [];
+        const hiddenChannelsMeta = normalizeHiddenMeta(hiddenChannels, raw.hiddenChannelsMeta);
 
         return {
             favorites,
             favoritesMeta,
             recents,
             recentsMeta,
+            hiddenChannels,
+            hiddenChannelsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
             lastChannelKey: raw.lastChannelKey || null,
             lastChannelName: raw.lastChannelName || '',
@@ -213,6 +232,8 @@ export function loadPlayerState() {
             favoritesMeta: [],
             recents: [],
             recentsMeta: [],
+            hiddenChannels: [],
+            hiddenChannelsMeta: [],
             volume: 0.85,
             lastChannelKey: null,
             lastChannelName: '',
@@ -241,6 +262,9 @@ export function savePlayerState(patch) {
     if (merged.favorites) {
         merged.favoritesMeta = normalizeFavoritesMeta(merged.favorites, merged.favoritesMeta);
     }
+    if (merged.hiddenChannels) {
+        merged.hiddenChannelsMeta = normalizeHiddenMeta(merged.hiddenChannels, merged.hiddenChannelsMeta);
+    }
     const sortBy = normalizeSortBy(merged.sortBy);
     const sortDir = normalizeSortDir(merged.sortDir);
     const categoryFilter = normalizeCategoryFilter(merged.categoryFilter);
@@ -249,6 +273,8 @@ export function savePlayerState(patch) {
         favoritesMeta: merged.favoritesMeta,
         recents: merged.recents,
         recentsMeta: merged.recentsMeta,
+        hiddenChannels: merged.hiddenChannels,
+        hiddenChannelsMeta: merged.hiddenChannelsMeta,
         volume: merged.volume,
         lastChannelKey: merged.lastChannelKey,
         lastChannelName: merged.lastChannelName,
@@ -263,7 +289,8 @@ export function savePlayerState(patch) {
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
                 k === 'favorites' || k === 'favoritesMeta' || k === 'recents'
-                || k === 'recentsMeta' || k === 'volume' || k === 'lastChannelKey'
+                || k === 'recentsMeta' || k === 'hiddenChannels' || k === 'hiddenChannelsMeta'
+                || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
                 || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'channelPicker'
                 || k === 'sortBy' || k === 'sortDir' || k === 'categoryFilter'

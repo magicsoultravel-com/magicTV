@@ -6,6 +6,10 @@ export const CARD_ICONS = {
     /** Large tile hover fav — thin outline so it stays light at 20px. */
     tileStar: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/></svg>',
     tileStarFilled: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="currentColor" stroke="none"/></svg>',
+    /** Large tile hover hide — open eye. */
+    tileEye: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4S10.8 6 10.8 6s-1.6 3.4-4.8 3.4S1.2 6 1.2 6z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.4" fill="none" stroke="currentColor" stroke-width="0.45"/></svg>',
+    /** Large tile unhide — eye with slash. */
+    tileEyeOff: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4c1.1 0 2 .3 2.7.7M10.8 6s-1.6 3.4-4.8 3.4c-1.1 0-2-.3-2.7-.7M2.2 2.2l7.6 7.6" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round"/></svg>',
     close: '<svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
     chevronRight: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M4.8 3.2 7.6 6 4.8 8.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     chevronDown: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',

@@ -819,7 +819,37 @@ body.has-channel-picker .tv-tab .ui-icon {
     transition: opacity 0.15s ease, color 0.15s ease;
 }
 
+.channel-tile__hide-btn {
+    position: absolute;
+    top: 0;
+    right: 20px;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
 .channel-tile__fav-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.channel-tile__hide-btn svg {
     display: block;
     width: 20px;
     height: 20px;
@@ -827,7 +857,11 @@ body.has-channel-picker .tv-tab .ui-icon {
 
 .channel-tile:hover .channel-tile__fav-btn,
 .channel-tile:focus-within .channel-tile__fav-btn,
-.channel-tile__fav-btn.is-active {
+.channel-tile__fav-btn.is-active,
+.channel-tile:hover .channel-tile__hide-btn,
+.channel-tile:focus-within .channel-tile__hide-btn,
+.channel-tile:hover .channel-tile__unhide-btn,
+.channel-tile:focus-within .channel-tile__unhide-btn {
     opacity: 1;
     pointer-events: auto;
 }
@@ -838,8 +872,46 @@ body.has-channel-picker .tv-tab .ui-icon {
     outline: none;
 }
 
+.channel-tile__hide-btn:hover,
+.channel-tile__hide-btn:focus-visible,
+.channel-tile__unhide-btn:hover,
+.channel-tile__unhide-btn:focus-visible {
+    color: var(--tv-text-secondary);
+    outline: none;
+}
+
 .channel-tile__fav-btn.is-active {
     color: var(--tv-secondary);
+}
+
+.channel-tile__unhide-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.channel-tile__unhide-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
 }
 
 /* Icon area — 40×40 square */
@@ -2065,6 +2137,72 @@ body.has-channel-picker .tv-tab .ui-icon {
     gap: var(--tv-spacing-sm);
 }
 
+.settings-section--collapsible > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--tv-spacing-sm);
+}
+
+.settings-section--collapsible > summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-section--collapsible > summary .settings-section__title {
+    margin: 0;
+}
+
+.settings-section__count {
+    color: var(--tv-text-muted);
+    font-weight: 400;
+    text-transform: none;
+}
+
+.settings-section__chevron {
+    color: var(--tv-text-muted);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.settings-section--collapsible[open] .settings-section__chevron {
+    transform: rotate(180deg);
+}
+
+.settings-hidden-browser {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-sm);
+    padding-top: var(--tv-spacing-xs);
+}
+
+.settings-hidden-back-btn {
+    align-self: flex-start;
+    padding: var(--tv-spacing-xs) var(--tv-spacing-sm);
+    background: color-mix(in srgb, var(--tv-secondary) 12%, transparent);
+    color: var(--tv-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.settings-hidden-back-btn:hover {
+    background: color-mix(in srgb, var(--tv-secondary) 20%, transparent);
+}
+
+.settings-hidden-grid {
+    margin-bottom: 0;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr));
+}
+
+.settings-hidden-grid .channel-tile,
+.settings-hidden-grid .country-tile {
+    min-width: 0;
+    max-width: none;
+}
+
 .settings-color-group {
     display: flex;
     flex-direction: column;
@@ -2313,7 +2451,20 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn {
     height: 14px;
 }
 
+html[data-channel-layout="list"] .channel-grid .channel-tile__hide-btn,
+html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn {
+    width: 14px;
+    height: 14px;
+    right: 14px;
+}
+
 html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__hide-btn svg,
+html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg {
     width: 14px;
     height: 14px;
 }
