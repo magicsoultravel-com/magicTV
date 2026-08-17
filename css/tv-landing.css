@@ -876,7 +876,7 @@ body.has-channel-picker .tv-tab .ui-icon {
 .channel-tile__hide-btn:focus-visible,
 .channel-tile__unhide-btn:hover,
 .channel-tile__unhide-btn:focus-visible {
-    color: var(--tv-text-secondary);
+    color: var(--tv-secondary);
     outline: none;
 }
 
