@@ -49,6 +49,7 @@ const CHANNEL = {
     id: 'CNN.us',
     name: 'CNN',
     country: 'US',
+    countrycode: 'US',
     logo: 'https://example.com/cnn.png',
     url_resolved: 'https://example.com/cnn.m3u8',
     categories: ['news']
@@ -212,6 +213,37 @@ test('visited channels persist alongside recents after playback-record path', ()
     assert.equal(TvPlayer.isVisited('iptv-org:CNN.us'), true);
 });
 
+test('markVisited with channel object stores metadata for the settings browser', () => {
+    TvPlayer.markVisited(CHANNEL);
+    const meta = TvPlayer.getVisitedMeta();
+    assert.equal(meta.length, 1);
+    assert.equal(meta[0].key, 'iptv-org:CNN.us');
+    assert.equal(meta[0].name, 'CNN');
+    assert.equal(meta[0].logo, 'https://example.com/cnn.png');
+    assert.equal(meta[0].countrycode, 'US');
+});
+
+test('unvisitChannel removes the channel from visited keys and meta', () => {
+    TvPlayer.markVisited(CHANNEL);
+    assert.equal(TvPlayer.isVisited(CHANNEL), true);
+    assert.equal(TvPlayer.getVisitedMeta().length, 1);
+    assert.equal(TvPlayer.unvisitChannel(CHANNEL), true, 'unvisit returns true');
+    assert.equal(TvPlayer.isVisited(CHANNEL), false, 'no longer visited');
+    assert.equal(TvPlayer.getVisitedMeta().length, 0, 'meta cleared');
+    assert.equal(TvPlayer.unvisitChannel(CHANNEL), false, 'second call returns false');
+});
+
+test('reconciliation seeds visitedChannelsMeta alongside keys', () => {
+    store.set('matrix_tv_state', JSON.stringify({
+        favorites: [],
+        recentsMeta: [{ key: 'iptv-org:BBC.uk', name: 'BBC', logo: '', countrycode: 'GB', at: 1 }],
+        lastChannelKey: null
+    }));
+    FavoritesRecents.reconcileVisitedChannels();
+    const meta = FavoritesRecents.getVisitedMeta();
+    assert.ok(meta.some((m) => m.key === 'iptv-org:BBC.uk' && m.name === 'BBC'), 'meta seeded from recents');
+});
+
 // ----- Recents cap -----
 
 test('recents cap defaults to 20 entries', () => {
@@ -268,6 +300,26 @@ test('visited style accepts the accent options and falls back', () => {
 test('visited style persists in localStorage', () => {
     SettingsStore.setVisitedStyle('accent-3');
     assert.equal(JSON.parse(store.get('matrix_tv_state')).visitedStyle, 'accent-3');
+});
+
+// ----- Non-visited style setting -----
+
+test('non-visited style defaults to undistinguished', () => {
+    assert.equal(SettingsStore.getNonVisitedStyle(), 'undistinguished');
+});
+
+test('non-visited style accepts the accent options and falls back', () => {
+    SettingsStore.setNonVisitedStyle('accent-2');
+    assert.equal(SettingsStore.getNonVisitedStyle(), 'accent-2');
+    SettingsStore.setNonVisitedStyle('accent-1');
+    assert.equal(SettingsStore.getNonVisitedStyle(), 'accent-1');
+    SettingsStore.setNonVisitedStyle('bogus');
+    assert.equal(SettingsStore.getNonVisitedStyle(), 'undistinguished', 'invalid falls back to default');
+});
+
+test('non-visited style persists in localStorage', () => {
+    SettingsStore.setNonVisitedStyle('accent-3');
+    assert.equal(JSON.parse(store.get('matrix_tv_state')).nonVisitedStyle, 'accent-3');
 });
 
 // ----- Buffer -----

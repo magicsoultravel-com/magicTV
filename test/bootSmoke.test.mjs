@@ -33,7 +33,17 @@ const KNOWN_IDS = [
     'volume-pct',
     'active-tile-select',
     'visited-style-select',
-    'recents-cap-input'
+    'non-visited-style-select',
+    'recents-cap-input',
+    'visited-channels-section',
+    'visited-back-btn',
+    'visited-countries-container',
+    'visited-channels-container',
+    'visited-channels-summary-count',
+    'appearance-preview-list',
+    'preview-list-avatar',
+    'preview-list-name',
+    'preview-list-flag'
 ];
 function makeEl(id = '') {
     const el = {

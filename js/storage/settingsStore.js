@@ -21,6 +21,7 @@ import {
     RECENTS_CAP_MIN,
     RECENTS_CAP_MAX,
     DEFAULT_VISITED_STYLE,
+    DEFAULT_NON_VISITED_STYLE,
     VISITED_STYLES,
     normalizeVisitedStyle,
     getRecentsCap,
@@ -260,6 +261,7 @@ export const SettingsStore = {
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
         const activeTileStyle = this.setActiveTileStyle(DEFAULT_ACTIVE_TILE_STYLE);
         const visitedStyle = this.setVisitedStyle(DEFAULT_VISITED_STYLE);
+        const nonVisitedStyle = this.setNonVisitedStyle(DEFAULT_NON_VISITED_STYLE);
         const colors = this.setThemeColors(getPresetColors(themeId));
         const fontId = this.setFontId(getPresetFontId(themeId));
         return {
@@ -271,6 +273,7 @@ export const SettingsStore = {
             catalogLayout,
             activeTileStyle,
             visitedStyle,
+            nonVisitedStyle,
             colors,
             fontId
         };
@@ -410,6 +413,20 @@ export const SettingsStore = {
     },
 
     getVisitedStyleOptions() {
+        return VISITED_STYLES.slice();
+    },
+
+    getNonVisitedStyle() {
+        return normalizeVisitedStyle(readPersistedState().nonVisitedStyle);
+    },
+
+    setNonVisitedStyle(value) {
+        const next = normalizeVisitedStyle(value);
+        patchPersistedState({ nonVisitedStyle: next });
+        return next;
+    },
+
+    getNonVisitedStyleOptions() {
         return VISITED_STYLES.slice();
     },
 

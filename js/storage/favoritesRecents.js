@@ -63,34 +63,124 @@ export const FavoritesRecents = {
      */
     reconcileVisitedChannels() {
         const raw = readPersistedState();
-        if (raw.visitedChannelsReconciled === true) return;
         const state = loadPlayerState();
-        const visited = new Set(state.visitedChannels);
-        for (const e of state.recentsMeta) {
-            if (e.key) visited.add(e.key);
+
+        // Full seed exactly once (first run after the feature shipped).
+        if (raw.visitedChannelsReconciled !== true) {
+            const visited = new Set(state.visitedChannels);
+            const metaByKey = new Map(state.visitedChannelsMeta.map((e) => [e.key, e]));
+            for (const e of state.recentsMeta) {
+                if (e.key) visited.add(e.key);
+                if (e.key && !metaByKey.has(e.key)) {
+                    metaByKey.set(e.key, {
+                        key: e.key,
+                        name: e.name || '',
+                        logo: e.logo || '',
+                        countrycode: e.countrycode || ''
+                    });
+                }
+            }
+            for (const k of state.favorites) {
+                visited.add(k);
+                if (!metaByKey.has(k)) {
+                    const fav = state.favoritesMeta.find((f) => f.key === k);
+                    metaByKey.set(k, fav || { key: k, name: '', logo: '', countrycode: '' });
+                }
+            }
+            if (state.lastChannelKey) {
+                visited.add(migrateFavoriteRef(state.lastChannelKey));
+            }
+            savePlayerState({
+                visitedChannels: [...visited],
+                visitedChannelsMeta: [...metaByKey.values()].filter((m) => visited.has(m.key)),
+                visitedChannelsReconciled: true
+            });
+            return;
         }
-        for (const k of state.favorites) {
-            visited.add(k);
+
+        // Meta backfill: if any visited keys are missing display metadata, pull
+        // from recents / favorites. This catches the gap if the initial
+        // reconciliation ran before meta storage was added.
+        if (state.visitedChannels.length !== state.visitedChannelsMeta.length) {
+            const keysWithMeta = new Set(state.visitedChannelsMeta.map((e) => e.key));
+            const missing = state.visitedChannels.filter((k) => !keysWithMeta.has(k));
+            if (missing.length > 0) {
+                const metaByKey = new Map(state.visitedChannelsMeta.map((e) => [e.key, e]));
+                for (const e of state.recentsMeta) {
+                    if (missing.includes(e.key) && !metaByKey.has(e.key)) {
+                        metaByKey.set(e.key, {
+                            key: e.key,
+                            name: e.name || '',
+                            logo: e.logo || '',
+                            countrycode: e.countrycode || ''
+                        });
+                    }
+                }
+                for (const fav of state.favoritesMeta) {
+                    if (missing.includes(fav.key) && !metaByKey.has(fav.key)) {
+                        metaByKey.set(fav.key, { ...fav });
+                    }
+                }
+                const newMeta = [...metaByKey.values()].filter((m) => state.visitedChannels.includes(m.key));
+                if (newMeta.length > state.visitedChannelsMeta.length) {
+                    savePlayerState({ visitedChannelsMeta: newMeta });
+                }
+            }
         }
-        if (state.lastChannelKey) {
-            visited.add(migrateFavoriteRef(state.lastChannelKey));
-        }
-        savePlayerState({
-            visitedChannels: [...visited],
-            visitedChannelsReconciled: true
-        });
     },
 
-    markVisited(channelOrKey) {
+    markVisited(channelOrKey, channel = null) {
         const key = typeof channelOrKey === 'string'
             ? migrateFavoriteRef(channelOrKey)
             : channelKey(channelOrKey);
         if (!key) return false;
         this.reconcileVisitedChannels();
         const state = loadPlayerState();
-        if (state.visitedChannels.includes(key)) return false;
-        state.visitedChannels.push(key);
-        savePlayerState({ visitedChannels: state.visitedChannels });
+        const visitedChannels = [...state.visitedChannels];
+        const visitedChannelsMeta = state.visitedChannelsMeta.map((e) => ({ ...e }));
+        let changed = false;
+        if (!visitedChannels.includes(key)) {
+            visitedChannels.push(key);
+            changed = true;
+        }
+        // Refresh display metadata whenever a channel object is available, so
+        // the settings browser shows the freshest name / logo / country.
+        const metaIdx = visitedChannelsMeta.findIndex((e) => e.key === key);
+        const entry = {
+            key,
+            name: channel?.name || '',
+            logo: channel?.logo || '',
+            countrycode: channel?.countrycode || ''
+        };
+        if (metaIdx >= 0) {
+            if (entry.name || entry.logo || entry.countrycode) {
+                visitedChannelsMeta[metaIdx] = {
+                    ...visitedChannelsMeta[metaIdx],
+                    ...Object.fromEntries(
+                        Object.entries(entry).filter(([k, v]) => v !== '' && v != null)
+                    )
+                };
+                changed = true;
+            }
+        } else {
+            visitedChannelsMeta.push(entry);
+            changed = true;
+        }
+        if (changed) savePlayerState({ visitedChannels, visitedChannelsMeta });
+        return changed;
+    },
+
+    unvisitChannel(channelOrKey) {
+        const key = typeof channelOrKey === 'string'
+            ? migrateFavoriteRef(channelOrKey)
+            : channelKey(channelOrKey);
+        if (!key) return false;
+        const state = loadPlayerState();
+        if (!state.visitedChannels.includes(key)) return false;
+        savePlayerState({
+            visitedChannels: state.visitedChannels.filter((k) => k !== key),
+            visitedChannelsMeta: state.visitedChannelsMeta.filter((e) => e.key !== key)
+        });
         return true;
     },
 
@@ -100,6 +190,10 @@ export const FavoritesRecents = {
             : channelKey(channelOrKey);
         if (!key) return false;
         return loadPlayerState().visitedChannels.includes(key);
+    },
+
+    getVisitedMeta() {
+        return loadPlayerState().visitedChannelsMeta.map((e) => ({ ...e }));
     },
 
     getVisitedKeys() {

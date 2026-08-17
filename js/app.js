@@ -15,6 +15,7 @@ import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
 import { TvClock } from './ui/tvClock.js';
 import { ChannelPickerModal } from './ui/channelPickerModal.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
+import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
 
 import { ACTION_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
@@ -925,6 +926,7 @@ function switchTab(tabName) {
     } else if (tabName === 'settings') {
         Appearance.updateStorageStats();
         HiddenChannelsSettings.refresh();
+        VisitedChannelsSettings.refresh();
     }
     syncPlayFavoritesMosaicBtn();
     syncCatalogLayoutBtn();
@@ -966,6 +968,7 @@ async function init() {
         });
         PlayerChrome.init({ appState });
         HiddenChannelsSettings.init({ appState, onPlay: startPlayback });
+        VisitedChannelsSettings.init({ appState, onPlay: startPlayback });
 
         TvPlayer.init();
         TvPip.init();
@@ -994,6 +997,7 @@ async function init() {
         PlayerChrome.bindControls();
         PlayerChrome.bindSettings();
         HiddenChannelsSettings.bind();
+        VisitedChannelsSettings.bind();
         BrowseView.bind();
         ListSort.bind();
         ListSort.syncSortControls();

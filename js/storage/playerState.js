@@ -14,6 +14,7 @@ export const RECENTS_CAP = DEFAULT_RECENTS_CAP;
 
 export const DEFAULT_VISITED_STYLE = 'undistinguished';
 export const VISITED_STYLES = ['undistinguished', 'accent-1', 'accent-2', 'accent-3'];
+export const DEFAULT_NON_VISITED_STYLE = 'undistinguished';
 
 export const DEFAULT_BUFFER_SIZE = 15;
 export const MAX_BUFFER_SIZE = 120;
@@ -130,6 +131,19 @@ function normalizeHiddenMeta(hiddenChannels, hiddenChannelsMeta) {
         .filter((e) => e.key && hiddenKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
+function normalizeVisitedMeta(visitedChannels, visitedChannelsMeta) {
+    const visitedKeys = new Set(visitedChannels);
+    const seen = new Set();
+    return (Array.isArray(visitedChannelsMeta) ? visitedChannelsMeta : [])
+        .map((e) => ({
+            key: migrateFavoriteRef(typeof e === 'string' ? e : e?.key),
+            name: (e && e.name) || '',
+            logo: (e && e.logo) || '',
+            countrycode: (e && e.countrycode) || ''
+        }))
+        .filter((e) => e.key && visitedKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
+}
+
 const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
 function normalizeMosaicSlots(raw) {
@@ -237,6 +251,7 @@ export function loadPlayerState() {
         const recentsMeta = migrateRecentsMeta(raw);
         const recents = recentsMeta.map((e) => e.key);
         const visitedChannels = normalizeVisitedChannels(raw);
+        const visitedChannelsMeta = normalizeVisitedMeta(visitedChannels, raw.visitedChannelsMeta);
         const hiddenChannels = Array.isArray(raw.hiddenChannels)
             ? raw.hiddenChannels.map(migrateFavoriteRef)
             : [];
@@ -248,6 +263,7 @@ export function loadPlayerState() {
             recents,
             recentsMeta,
             visitedChannels,
+            visitedChannelsMeta,
             hiddenChannels,
             hiddenChannelsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
@@ -271,6 +287,7 @@ export function loadPlayerState() {
             recents: [],
             recentsMeta: [],
             visitedChannels: [],
+            visitedChannelsMeta: [],
             hiddenChannels: [],
             hiddenChannelsMeta: [],
             volume: 0.85,
@@ -306,6 +323,7 @@ export function savePlayerState(patch) {
     }
     if (merged.visitedChannels) {
         merged.visitedChannels = normalizeVisitedChannels({ visitedChannels: merged.visitedChannels });
+        merged.visitedChannelsMeta = normalizeVisitedMeta(merged.visitedChannels, merged.visitedChannelsMeta);
     }
     const sortBy = normalizeSortBy(merged.sortBy);
     const sortDir = normalizeSortDir(merged.sortDir);
@@ -316,6 +334,7 @@ export function savePlayerState(patch) {
         recents: merged.recents,
         recentsMeta: merged.recentsMeta,
         visitedChannels: merged.visitedChannels,
+        visitedChannelsMeta: merged.visitedChannelsMeta,
         hiddenChannels: merged.hiddenChannels,
         hiddenChannelsMeta: merged.hiddenChannelsMeta,
         volume: merged.volume,
@@ -332,7 +351,7 @@ export function savePlayerState(patch) {
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
                 k === 'favorites' || k === 'favoritesMeta' || k === 'recents'
-                || k === 'recentsMeta' || k === 'visitedChannels'
+                || k === 'recentsMeta' || k === 'visitedChannels' || k === 'visitedChannelsMeta'
                 || k === 'hiddenChannels' || k === 'hiddenChannelsMeta'
                 || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'

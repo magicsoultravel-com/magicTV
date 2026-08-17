@@ -91,8 +91,8 @@ export const TvPlayer = {
         return FavoritesRecents.isFavorite(channelOrKey);
     },
 
-    markVisited(channelOrKey) {
-        const changed = FavoritesRecents.markVisited(channelOrKey);
+    markVisited(channelOrKey, channel = null) {
+        const changed = FavoritesRecents.markVisited(channelOrKey, channel || (typeof channelOrKey === 'object' ? channelOrKey : null));
         if (changed) this.emitState();
         return changed;
     },
@@ -101,8 +101,19 @@ export const TvPlayer = {
         return FavoritesRecents.isVisited(channelOrKey);
     },
 
+    unvisitChannel(channelOrKey) {
+        const removed = FavoritesRecents.unvisitChannel(channelOrKey);
+        // emitState dispatches tv:state_changed → ChannelGrid.syncVisitedTiles()
+        if (removed) this.emitState();
+        return removed;
+    },
+
     getVisitedKeys() {
         return FavoritesRecents.getVisitedKeys();
+    },
+
+    getVisitedMeta() {
+        return FavoritesRecents.getVisitedMeta();
     },
 
     toggleFavorite(channel) {

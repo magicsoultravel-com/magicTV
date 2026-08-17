@@ -252,6 +252,16 @@ export const Appearance = {
             });
         }
 
+        const nonVisitedStyleSelect = el('non-visited-style-select');
+        if (nonVisitedStyleSelect && nonVisitedStyleSelect.dataset.bound !== '1') {
+            nonVisitedStyleSelect.dataset.bound = '1';
+            nonVisitedStyleSelect.addEventListener('change', () => {
+                const style = SettingsStore.setNonVisitedStyle(nonVisitedStyleSelect.value);
+                this.applyStyles();
+                showAppToast(`Non-visited accent: ${nonVisitedStyleSelect.options[nonVisitedStyleSelect.selectedIndex].text}`);
+            });
+        }
+
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
@@ -263,6 +273,7 @@ export const Appearance = {
                     channelPickerOpacity,
                     activeTileStyle,
                     visitedStyle,
+                    nonVisitedStyle,
                     colors,
                     fontId
                 } = SettingsStore.resetAppearance();
@@ -273,6 +284,7 @@ export const Appearance = {
                 syncPickerOpacityUi(channelPickerOpacity);
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
+                if (nonVisitedStyleSelect) nonVisitedStyleSelect.value = nonVisitedStyle;
                 syncFontUi(fontId);
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
@@ -303,6 +315,7 @@ export const Appearance = {
         root.setAttribute('data-channel-layout', catalogLayout);
         root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
         root.setAttribute('data-visited-style', SettingsStore.getVisitedStyle());
+        root.setAttribute('data-non-visited-style', SettingsStore.getNonVisitedStyle());
         applyThemeColorsToRoot(colors, root);
         applyFontToRoot(fontId, root);
 
@@ -328,11 +341,10 @@ export const Appearance = {
     },
 
     updatePreviewTile() {
-        const preview = el('appearance-preview-tile');
-        if (!preview) return;
-        const name = el('preview-name');
-        const flag = el('preview-flag');
-        const avatar = el('preview-avatar');
+        const shouldPlay = SettingsStore.getActiveTileStyle() !== 'none';
+
+        const previewTile = el('appearance-preview-tile');
+        const previewList = el('appearance-preview-list');
 
         const channel = TvPlayer.channel;
         const nameText = channel?.name || 'Now Playing';
@@ -340,12 +352,35 @@ export const Appearance = {
         const initial = (nameText[0] || 'P').toUpperCase();
         const safeName = escapeHtml(nameText);
 
-        // When a visited accent is selected, the preview tile demonstrates it.
-        preview.classList.toggle('is-visited', SettingsStore.getVisitedStyle() !== 'undistinguished');
+        if (previewTile) {
+            previewTile.classList.toggle('is-playing', shouldPlay);
+            // Tile variant always wears is-visited (it represents a visited channel).
+            // The visited-accent CSS is gated on data-visited-style, so when that's
+            // "undistinguished" the tile looks plain — no leak from non-visited accent.
+            previewTile.classList.add('is-visited');
+        }
+        if (previewList) {
+            previewList.classList.toggle('is-playing', shouldPlay);
+            // List variant never has is-visited (represents an unvisited channel),
+            // so the non-visited accent CSS applies when active.
+            previewList.classList.remove('is-visited');
+        }
 
+        // Update tile preview elements.
+        const name = el('preview-name');
+        const flag = el('preview-flag');
+        const avatar = el('preview-avatar');
         if (name) name.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span></span>`;
         if (flag) flag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
         if (avatar) avatar.textContent = initial;
+
+        // Update list preview elements.
+        const listName = el('preview-list-name');
+        const listFlag = el('preview-list-flag');
+        const listAvatar = el('preview-list-avatar');
+        if (listName) listName.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span></span>`;
+        if (listFlag) listFlag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
+        if (listAvatar) listAvatar.textContent = initial;
     },
 
     syncFromState() {
@@ -398,6 +433,12 @@ export const Appearance = {
         const visitedStyleSelect = el('visited-style-select');
         if (visitedStyleSelect) {
             visitedStyleSelect.value = visitedStyle;
+        }
+
+        const nonVisitedStyle = SettingsStore.getNonVisitedStyle();
+        const nonVisitedStyleSelect = el('non-visited-style-select');
+        if (nonVisitedStyleSelect) {
+            nonVisitedStyleSelect.value = nonVisitedStyle;
         }
 
         const recentsCap = SettingsStore.getRecentsCap();
