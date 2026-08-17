@@ -184,8 +184,6 @@ function syncBrowseButtons() {
     const open = ChannelPickerModal.isOpen();
     const target = targetSlotId;
 
-    setBrowseButtonState(el('browse-btn'), open && target === 'center');
-
     document.querySelectorAll('[data-tile-action="browse"]').forEach((btn) => {
         const slotId = btn.closest?.('.tv-player-tile')?.getAttribute('data-slot');
         setBrowseButtonState(btn, open && Boolean(slotId) && target === slotId);
@@ -398,6 +396,7 @@ export const ChannelPickerModal = {
         if (!modal || !host || !body) return;
 
         targetSlotId = slotId || 'center';
+        MultiView.setStatusSlot(targetSlotId);
 
         if (!this.isOpen()) {
             const endActions = catalogEndActions();

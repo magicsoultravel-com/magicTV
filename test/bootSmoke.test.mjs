@@ -16,8 +16,7 @@ const KNOWN_IDS = [
     'player-tile-bottomLeft', 'player-tile-bottomRight',
     'tv-playback-surface-topLeft', 'tv-playback-surface-center', 'tv-playback-surface-topRight',
     'tv-playback-surface-bottomLeft', 'tv-playback-surface-bottomRight',
-    'play-btn', 'stop-btn',
-    'volume-slider', 'buffer-info', 'quality-info', 'pip-btn', 'fullscreen-btn',
+    'volume-slider', 'buffer-info', 'quality-info',
     'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select',
@@ -31,7 +30,7 @@ const KNOWN_IDS = [
     'reset-appearance-btn', 'appearance-preview-tile',
     'mosaic-reset-btn', 'mosaic-mute-all-btn',
     'preview-avatar', 'preview-name', 'preview-flag',
-    'fav-btn', 'mute-btn', 'mute-icon', 'mute-wave', 'mute-slash', 'volume-pct'
+    'volume-pct'
 ];
 function makeEl(id = '') {
     const el = {

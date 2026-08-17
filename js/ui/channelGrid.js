@@ -52,13 +52,14 @@ function syncTileFavBtn(btn, isFav) {
 }
 
 function syncControlFavBtn() {
-    const favBtn = el('fav-btn');
+    const favBtn = document.querySelector?.('#player-tile-center [data-tile-action="fav"]');
     if (!favBtn) return;
     const ch = TvPlayer.channel;
     const isFav = ch ? TvPlayer.isFavorite(ch) : false;
     favBtn.classList.toggle('is-active', isFav);
-    favBtn.textContent = isFav ? '★' : '☆';
+    favBtn.innerHTML = isFav ? CARD_ICONS.starFilled : '☆';
     favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+    favBtn.setAttribute('aria-pressed', String(isFav));
 }
 
 function metaChannels(metaEntries) {

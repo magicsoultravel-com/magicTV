@@ -98,9 +98,35 @@ export const MultiView = {
     _resizeBound: false,
     _hoverBound: false,
     _refreshTilesRaf: 0,
+    /** Slot whose buffer/quality the bottom bar reflects (last targeted screen). */
+    statusSlotId: 'center',
 
     getPrimary() {
         return this.slots.center.player;
+    },
+
+    getStatusPlayer() {
+        const id = this.statusSlotId;
+        const slot = SLOT_IDS.includes(id) ? this.slots[id] : null;
+        if (slot?.enabled && slot.player) return slot.player;
+        return this.getPrimary();
+    },
+
+    /**
+     * Point the bottom Buffer/Quality readout at a mosaic slot.
+     * @param {string} slotId
+     */
+    setStatusSlot(slotId) {
+        const next = SLOT_IDS.includes(slotId) && this.slots[slotId]?.enabled
+            ? slotId
+            : 'center';
+        const changed = this.statusSlotId !== next;
+        this.statusSlotId = next;
+        if (changed) {
+            const player = this.getStatusPlayer();
+            if (player) player.emitState();
+            else this.getPrimary()?.emitState();
+        }
     },
 
     /**
@@ -339,33 +365,19 @@ export const MultiView = {
     bindPlacementChrome() {
         if (this._hoverBound || typeof document === 'undefined') return;
         this._hoverBound = true;
-        const app = el('app-container') || document.body;
-        const playerSlot = el('player-slot');
-        const resetBtn = el('mosaic-reset-btn');
-        const muteAllBtn = el('mosaic-mute-all-btn');
 
-        const setHovered = (on) => {
-            app.classList.toggle('is-player-hovered', on);
-        };
-
-        playerSlot?.addEventListener('mouseenter', () => setHovered(true));
-        playerSlot?.addEventListener('mouseleave', () => setHovered(false));
-        playerSlot?.addEventListener('focusin', () => setHovered(true));
-        playerSlot?.addEventListener('focusout', (e) => {
-            if (playerSlot.contains(e.relatedTarget)) return;
-            setHovered(false);
-        });
-
-        resetBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.resetMosaicPlacement();
-        });
-
-        muteAllBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (this.isMuteAllActive()) this.unmuteAll();
-            else this.muteAll();
-        });
+        if (!this._fullscreenSyncBound) {
+            this._fullscreenSyncBound = true;
+            const syncFullscreenActive = () => {
+                const active = !!document.fullscreenElement;
+                document.querySelectorAll('[data-tile-action="fullscreen"]').forEach((btn) => {
+                    btn.classList.toggle('is-active', active);
+                    btn.setAttribute('aria-pressed', String(active));
+                });
+            };
+            document.addEventListener('fullscreenchange', syncFullscreenActive);
+            syncFullscreenActive();
+        }
 
         this.syncMosaicChrome();
     },
@@ -435,6 +447,7 @@ export const MultiView = {
 
     async maybeRetargetChannelPicker(slotId) {
         if (!slotId || !this.slots[slotId]?.enabled) return;
+        this.setStatusSlot(slotId);
         try {
             const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
             if (!ChannelPickerModal.isOpen() || !ChannelPickerModal.isPinned()) return;
@@ -445,11 +458,27 @@ export const MultiView = {
     },
 
     async handleTileAction(slotId, action) {
-        if (slotId === 'center') return;
+        if (action === 'reset') {
+            this.resetMosaicPlacement();
+            return;
+        }
+
+        if (action === 'mute-all') {
+            if (this.isMuteAllActive()) this.unmuteAll();
+            else this.muteAll();
+            return;
+        }
+
+        if (slotId === 'center' && (action === 'dismiss' || action === 'swap')) return;
 
         if (action === 'dismiss') {
+            if (this.statusSlotId === slotId) this.setStatusSlot('center');
             this.setSideEnabled(slotId, false);
             return;
+        }
+
+        if (SLOT_IDS.includes(slotId) && this.slots[slotId]?.enabled) {
+            this.setStatusSlot(slotId);
         }
 
         if (action === 'browse') {
@@ -497,6 +526,11 @@ export const MultiView = {
                 break;
             }
             case 'pip': {
+                if (slotId === 'center') {
+                    const { TvPip } = await import('./tvPip.js');
+                    await TvPip.toggle();
+                    break;
+                }
                 const video = player.video;
                 const url = player.channel?.url_resolved || player.channel?.url || '';
                 await TvPopoutWindows.detach({
@@ -605,6 +639,7 @@ export const MultiView = {
                 delete this.mosaicPlacement[sideId];
                 this.persistPlacement();
             }
+            if (this.statusSlotId === sideId) this.setStatusSlot('center');
         }
 
         SCREEN_SETTERS[sideId]?.(next);
@@ -803,8 +838,6 @@ export const MultiView = {
             }
 
             this.syncTileQualityMenu(tile, player);
-
-            if (id === 'center') return;
 
             const playBtn = tile.querySelector('[data-tile-action="play"]');
             const muteBtn = tile.querySelector('.tv-player-tile__hover [data-tile-action="mute"]');

@@ -1,13 +1,11 @@
 import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, el, els } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
-import { TvPip } from '../tvPip.js';
 import { TileFrames } from '../tileFrames.js';
 import { ChannelGrid } from './channelGrid.js';
 import { Appearance } from './appearance.js';
 import { MultiView } from '../multiView.js';
 import { channelKey } from '../tvProviders/channelShape.js';
-import { ChannelPickerModal } from './channelPickerModal.js';
 
 let deps = {
     appState: null
@@ -19,75 +17,14 @@ export const PlayerChrome = {
     },
 
     bindControls() {
-        const browseBtn = el('browse-btn');
-        const playBtn = el('play-btn');
-        const stopBtn = el('stop-btn');
         const volume = el('volume-slider');
-        const muteBtn = el('mute-btn');
-        const fullscreenBtn = el('fullscreen-btn');
-        const pipBtn = el('pip-btn');
 
-        if (browseBtn) {
-            browseBtn.addEventListener('click', () => ChannelPickerModal.toggle('center'));
-        }
-        if (playBtn) {
-            // Stable hit-target: never swap buttons under the cursor (drops mash clicks).
-            playBtn.addEventListener('click', () => TvPlayer.toggle());
-        }
-        if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
-                TvPlayer.stop();
-            });
-        }
-        if (fullscreenBtn) {
-            fullscreenBtn.addEventListener('click', () => {
-                const video = TvPlayer.video;
-                if (!video?.requestFullscreen) {
-                    showAppToast('Fullscreen isn’t supported here');
-                    return;
-                }
-                video.requestFullscreen().catch(() => showAppToast('Fullscreen blocked'));
-            });
-            const syncFullscreenActive = () => {
-                const active = !!document.fullscreenElement;
-                fullscreenBtn.classList.toggle('is-active', active);
-                fullscreenBtn.setAttribute('aria-pressed', String(active));
-                document.querySelectorAll('[data-tile-action="fullscreen"]').forEach((btn) => {
-                    btn.classList.toggle('is-active', active);
-                    btn.setAttribute('aria-pressed', String(active));
-                });
-            };
-            document.addEventListener('fullscreenchange', syncFullscreenActive);
-            syncFullscreenActive();
-        }
-        if (pipBtn) TvPip.registerButton(pipBtn);
         if (volume) {
             volume.addEventListener('input', (e) => {
                 TvPlayer.setVolume(parseFloat(e.target.value) / 100);
             });
         }
-        if (muteBtn) {
-            muteBtn.addEventListener('click', () => TvPlayer.toggleMute());
-            const updateMuteIcon = () => {
-                const isMuted = TvPlayer.muted || TvPlayer.volume === 0;
-                const wave = muteBtn.querySelector('#mute-wave');
-                const slash = muteBtn.querySelector('#mute-slash');
-                if (wave) wave.style.opacity = isMuted ? '0' : '1';
-                if (slash) slash.style.opacity = isMuted ? '1' : '0';
-                muteBtn.classList.toggle('is-muted', isMuted);
-                muteBtn.setAttribute('aria-pressed', String(isMuted));
-                muteBtn.title = isMuted ? 'Unmute' : 'Mute';
-            };
-            window.addEventListener('tv:state_changed', updateMuteIcon);
-            updateMuteIcon();
-        }
-        const favBtn = el('fav-btn');
-        if (favBtn) {
-            favBtn.addEventListener('click', () => {
-                ChannelGrid.toggleFavorite(TvPlayer.channel);
-            });
-            window.addEventListener('tv:state_changed', () => ChannelGrid.syncFavButtons());
-        }
+        window.addEventListener('tv:state_changed', () => ChannelGrid.syncFavButtons());
         const volPct = el('volume-pct');
         if (volPct) {
             const updateVolPct = () => {
@@ -167,51 +104,12 @@ export const PlayerChrome = {
             try { TvPlayer.mountVideo(); } catch { /* ignore */ }
         }
 
-        const playBtn = el('play-btn');
-        const wantPlay = state.wantPlaying === true || state.playing === true;
-        if (playBtn) {
-            playBtn.classList.remove('is-hidden');
-            playBtn.textContent = wantPlay ? '⏸' : '▶';
-            playBtn.title = wantPlay ? 'Pause' : 'Play';
-            playBtn.setAttribute('aria-label', wantPlay ? 'Pause' : 'Play');
-        }
-
         const volume = el('volume-slider');
         if (volume && typeof state.volume === 'number') {
             volume.value = String(Math.round(state.volume * 100));
         }
 
-        const bufferInfo = el('buffer-info');
-        if (bufferInfo) {
-            if (state.channel && state.loadPhase !== 'idle') {
-                const buf = TvPlayer.getBufferInfo();
-                bufferInfo.textContent = `Buffer: ${buf.buffered.toFixed(1)}s`;
-            } else {
-                bufferInfo.textContent = 'Buffer: —';
-            }
-        }
-        const qualityInfo = el('quality-info');
-        if (qualityInfo) {
-            let label = TvPlayer.qualityLabel;
-            if (state.channel && (!label || label === '—')) {
-                const h = TvPlayer.video?.videoHeight;
-                if (h > 0) label = `${h}p`;
-            }
-            if (!state.channel) {
-                qualityInfo.textContent = 'Quality: —';
-            } else if (TvPlayer.qualityMode === 'auto') {
-                qualityInfo.textContent = label && label !== '—'
-                    ? `Quality: Auto (${label})`
-                    : 'Quality: Auto';
-            } else {
-                qualityInfo.textContent = `Quality: ${label || '—'}`;
-            }
-        }
-        const bandwidthInfo = el('bandwidth-info');
-        if (bandwidthInfo) {
-            const kbps = state.channel ? TvPlayer.getBandwidthKbps() : null;
-            bandwidthInfo.textContent = kbps != null ? `b/w: ${kbps} kbps` : 'b/w: —';
-        }
+        this.updateBufferQuality();
 
         if (state.resumeBlocked) {
             showAppToast('Tap ▶ to start playback');
@@ -223,6 +121,40 @@ export const PlayerChrome = {
 
         if (state.channel) {
             Appearance.updatePreviewTile();
+        }
+    },
+
+    updateBufferQuality() {
+        const player = MultiView.getStatusPlayer() || MultiView.getPrimary();
+        const channel = player?.channel;
+        const loadPhase = player?.loadPhase;
+
+        const bufferInfo = el('buffer-info');
+        if (bufferInfo) {
+            if (channel && loadPhase !== 'idle') {
+                const buf = player.getBufferInfo?.() || { buffered: 0 };
+                bufferInfo.textContent = `Buffer: ${(buf.buffered || 0).toFixed(1)}s`;
+            } else {
+                bufferInfo.textContent = 'Buffer: —';
+            }
+        }
+
+        const qualityInfo = el('quality-info');
+        if (qualityInfo) {
+            let label = player?.qualityLabel || '—';
+            if (channel && (!label || label === '—')) {
+                const h = player?.video?.videoHeight;
+                if (h > 0) label = `${h}p`;
+            }
+            if (!channel) {
+                qualityInfo.textContent = 'Quality: —';
+            } else if (player?.qualityMode === 'auto') {
+                qualityInfo.textContent = label && label !== '—'
+                    ? `Quality: Auto (${label})`
+                    : 'Quality: Auto';
+            } else {
+                qualityInfo.textContent = `Quality: ${label || '—'}`;
+            }
         }
     }
 };

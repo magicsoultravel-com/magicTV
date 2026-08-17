@@ -1118,8 +1118,9 @@ body.has-channel-picker .tv-tab .ui-icon {
     flex-direction: column;
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--tv-radius-lg);
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid var(--tv-border-light);
+    position: relative;
 }
 
 .tv-player-slot.is-hidden {
@@ -1137,6 +1138,7 @@ body.has-channel-picker .tv-tab .ui-icon {
     padding: 8px;
     box-sizing: border-box;
     position: relative;
+    overflow: visible;
 }
 
 .tv-player-mosaic.is-free-layout {
@@ -1168,6 +1170,9 @@ body.has-channel-picker .tv-tab .ui-icon {
 .tv-player-tile:focus-within {
     border-color: var(--tv-primary);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    overflow: visible;
+    /* Only this tile above siblings + channel picker (8000); not the whole player slot. */
+    z-index: 9001 !important;
 }
 
 /* Channel browser target (multi-screen only; see ChannelPickerModal.syncTargetHighlight). */
@@ -1425,6 +1430,8 @@ body.has-channel-picker .tv-tab .ui-icon {
     aspect-ratio: auto;
     max-height: none;
     background: #000;
+    overflow: hidden;
+    border-radius: inherit;
 }
 
 .tv-player-tile.is-primary .tv-playback-surface,
@@ -1520,6 +1527,7 @@ body.has-channel-picker .tv-tab .ui-icon {
     background: #000;
     pointer-events: none;
     z-index: 2;
+    border-radius: inherit;
 }
 
 .tv-player-tile__poster.is-hidden {
@@ -1740,19 +1748,21 @@ body.has-channel-picker .tv-tab .ui-icon {
     align-items: center;
     justify-content: center;
     flex-wrap: nowrap;
+    width: max-content;
+    max-width: none;
     gap: 0.2rem;
     padding: 0.25rem 0.35rem;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.45);
     border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
-    z-index: 3;
+    z-index: 30;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
 }
 
-.tv-player-tile:not(.is-primary):hover .tv-player-tile__hover,
-.tv-player-tile:not(.is-primary):focus-within .tv-player-tile__hover {
+.tv-player-tile:hover .tv-player-tile__hover,
+.tv-player-tile:focus-within .tv-player-tile__hover {
     opacity: 1;
     pointer-events: auto;
 }
@@ -1764,6 +1774,11 @@ body.has-channel-picker .tv-tab .ui-icon {
     min-width: 28px;
     padding: 0;
     font-size: 0.7rem;
+}
+
+.tv-player-tile__hover #mosaic-mute-all-btn {
+    width: 34px;
+    min-width: 34px;
 }
 
 .tv-player-video {
@@ -1783,6 +1798,7 @@ body.has-channel-picker .tv-tab .ui-icon {
     max-height: none;
     background: #000;
     display: block;
+    overflow: hidden;
 }
 
 /* Keep the player window full-size whether or not the stream is playing:
@@ -1807,16 +1823,6 @@ body.has-channel-picker .tv-tab .ui-icon {
     border-top: none;
     flex-wrap: wrap;
     flex-shrink: 0;
-}
-
-.tv-controls__playback {
-    display: flex;
-    align-items: center;
-    gap: var(--tv-spacing-sm);
-    padding: 0.25rem 0.4rem;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.45);
-    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
 }
 
 .tv-controls__btn {
