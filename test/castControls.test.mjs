@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { deriveCastPlaying } from '../js/cast/chromecastManager.js';
 import { buildTileHoverHtml, hydrateTileHoverControls } from '../js/ui/tileHoverControls.js';
 
 test('buildTileHoverHtml includes cast and dual rows', () => {
@@ -55,4 +56,19 @@ test('hydrateTileHoverControls replaces hover content once', () => {
     } finally {
         globalThis.document = origDoc;
     }
+});
+
+test('deriveCastPlaying is false for idle, missing media, and paused', () => {
+    assert.equal(deriveCastPlaying(null, null), false);
+    assert.equal(deriveCastPlaying({}, null), false);
+    assert.equal(deriveCastPlaying({ playerState: 'IDLE' }, null), false);
+    assert.equal(deriveCastPlaying({ isPaused: false, playerState: 'IDLE' }, { playerState: 'IDLE' }), false);
+    assert.equal(deriveCastPlaying({ playerState: 'PAUSED' }, { playerState: 'PAUSED' }), false);
+    assert.equal(deriveCastPlaying({ playerState: 'STOPPED' }, null), false);
+});
+
+test('deriveCastPlaying is true for PLAYING and BUFFERING', () => {
+    assert.equal(deriveCastPlaying({ playerState: 'PLAYING' }, null), true);
+    assert.equal(deriveCastPlaying({ playerState: 'BUFFERING' }, { playerState: 'BUFFERING' }), true);
+    assert.equal(deriveCastPlaying(null, { playerState: 'playing' }), true);
 });

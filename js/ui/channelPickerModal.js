@@ -160,13 +160,16 @@ function clearTargetHighlight() {
 }
 
 function syncTargetHighlight() {
-    clearTargetHighlight();
-    if (!ChannelPickerModal.isOpen() || !targetSlotId) return;
-    const mosaic = el('player-mosaic');
-    if (!mosaic?.classList.contains('has-corners')) return;
-    const tile = el(`player-tile-${targetSlotId}`);
-    if (!tile || tile.classList.contains('is-hidden')) return;
-    tile.classList.add('is-channel-picker-target');
+    if (ChannelPickerModal.isOpen() && targetSlotId) {
+        clearTargetHighlight();
+        const mosaic = el('player-mosaic');
+        if (!mosaic?.classList.contains('has-corners')) return;
+        const tile = el(`player-tile-${targetSlotId}`);
+        if (!tile || tile.classList.contains('is-hidden')) return;
+        tile.classList.add('is-channel-picker-target');
+        return;
+    }
+    MultiView.syncTileStatusHighlight?.();
 }
 
 function setBrowseButtonState(btn, active) {
@@ -470,6 +473,7 @@ export const ChannelPickerModal = {
         endActionsNextSibling = null;
         targetSlotId = null;
         clearTargetHighlight();
+        MultiView.syncTileStatusHighlight?.();
 
         catalogRoot()?.classList.remove('is-catalog-teleported');
         document.body.classList.remove('has-channel-picker');

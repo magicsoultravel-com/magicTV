@@ -89,6 +89,14 @@ function emitHostToggled() {
     }));
 }
 
+/** Receiver is playing only for PLAYING/BUFFERING — IDLE/no media is not playing. */
+export function deriveCastPlaying(remote, media) {
+    const raw = remote?.playerState || media?.playerState || '';
+    const state = String(raw).toUpperCase();
+    if (!state || state === 'IDLE' || state === 'STOPPED') return false;
+    return state === 'PLAYING' || state === 'BUFFERING';
+}
+
 function getSession() {
     return castContext?.getCurrentSession?.() || null;
 }
@@ -128,12 +136,15 @@ function setupRemotePlayer() {
     remotePlayerBound = true;
 
     const syncFromRemote = () => {
-        castPlaying = remotePlayer?.isPaused === false;
+        const nextPlaying = deriveCastPlaying(remotePlayer, getMedia());
+        const playingChanged = nextPlaying !== castPlaying;
+        castPlaying = nextPlaying;
         castMuted = remotePlayer?.isMuted === true;
         castVolume = typeof remotePlayer?.volumeLevel === 'number' ? remotePlayer.volumeLevel : castVolume;
         window.dispatchEvent(new CustomEvent('tv:cast_volume_changed', {
             detail: { volume: castVolume, muted: castMuted, playing: castPlaying }
         }));
+        if (playingChanged) emitCastStateChanged();
     };
 
     remotePlayerController.addEventListener(
@@ -189,9 +200,15 @@ async function loadMediaOnSession(session, channel) {
     const request = new chrome.cast.media.LoadRequest(buildMediaInfo(channel));
     request.autoplay = true;
     await session.loadMedia(request);
-    castPlaying = true;
+    const media = getMedia();
+    castPlaying = deriveCastPlaying(remotePlayer, media);
+    if (media && !castPlaying) {
+        const state = String(remotePlayer?.playerState || media.playerState || '').toUpperCase();
+        if (state !== 'PAUSED' && state !== 'IDLE' && state !== 'STOPPED') {
+            castPlaying = true;
+        }
+    }
     if (remotePlayer) {
-        castPlaying = remotePlayer.isPaused !== true;
         castMuted = remotePlayer.isMuted === true;
         if (typeof remotePlayer.volumeLevel === 'number') {
             castVolume = remotePlayer.volumeLevel;
@@ -238,18 +255,20 @@ function applyHostPlaybackState(slotId) {
 
 function restoreLocalPlayer(slotId) {
     const player = getLocalPlayer(slotId);
-    if (!player || !localSnapshot) return;
+    if (!player) {
+        localSnapshot = null;
+        return;
+    }
 
-    if (localSnapshot.wasPlaying) {
-        player.resume?.();
-    } else if (player.playing || player.wantPlaying) {
+    const stuckLoading = player.loading === true
+        || (player.wantPlaying === true && player.playing !== true);
+    if (stuckLoading || (!hostVideoEnabled && (player.playing || player.wantPlaying))) {
         player.pause?.();
     }
 
-    if (localSnapshot.wasMuted) {
-        player.mute?.();
-    } else {
-        player.unmute?.();
+    if (localSnapshot) {
+        if (localSnapshot.wasMuted) player.mute?.();
+        else player.unmute?.();
     }
     player.applyAudioToVideo?.();
     localSnapshot = null;
