@@ -31,6 +31,8 @@ import { freeLayoutMethods } from './mosaic/freeLayout.js';
 import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
+import { hydrateTileHoverControls } from './ui/tileHoverControls.js';
+import { ChromecastManager } from './cast/chromecastManager.js';
 
 export { MAX_MOSAIC_SLOTS };
 
@@ -180,9 +182,13 @@ export const MultiView = {
             .reduce((max, p) => Math.max(max, p?.z || 1), 1);
         this.ensureCenterOnTop();
 
+        hydrateTileHoverControls();
         this.syncLayout();
         this.mountAll();
         this.bindUi();
+        ChromecastManager.init(this).catch(() => {});
+        window.addEventListener('tv:cast_state_changed', () => this.scheduleRefreshTiles());
+        window.addEventListener('tv:cast_host_toggled', () => this.scheduleRefreshTiles());
         this.bindPlacementChrome();
         this.applySavedSlotStubs();
 
@@ -297,6 +303,16 @@ export const MultiView = {
                 return;
             }
 
+            const castToggle = e.target.closest?.('[data-cast-toggle]');
+            if (castToggle) {
+                e.stopPropagation();
+                e.preventDefault();
+                const kind = castToggle.getAttribute('data-cast-toggle');
+                if (kind === 'host-video') ChromecastManager.toggleHostVideo();
+                this.scheduleRefreshTiles();
+                return;
+            }
+
             const actionBtn = e.target.closest?.('[data-tile-action]');
             if (actionBtn) {
                 e.stopPropagation();
@@ -304,7 +320,8 @@ export const MultiView = {
                 const tile = actionBtn.closest?.('.tv-player-tile');
                 const slotId = tile?.getAttribute('data-slot');
                 const action = actionBtn.getAttribute('data-tile-action');
-                if (slotId && action) this.handleTileAction(slotId, action);
+                const target = actionBtn.getAttribute('data-controls-target') || 'local';
+                if (slotId && action) this.handleTileAction(slotId, action, { target, triggerEl: actionBtn });
                 return;
             }
             // Tile focus (z-raise / pinned picker retarget) is handled on pointerup when the gesture was a click.
@@ -457,7 +474,7 @@ export const MultiView = {
         }
     },
 
-    async handleTileAction(slotId, action) {
+    async handleTileAction(slotId, action, { target = 'local' } = {}) {
         if (action === 'reset') {
             this.resetMosaicPlacement();
             return;
@@ -487,24 +504,74 @@ export const MultiView = {
             return;
         }
 
+        if (action === 'cast') {
+            const player = this.slots[slotId]?.player;
+            const channel = player?.channel;
+            const url = channel?.url_resolved || channel?.url || '';
+            if (!url) {
+                showAppToast('Pick a channel before casting');
+                return;
+            }
+            try {
+                await ChromecastManager.startCast(slotId, channel);
+            } catch (err) {
+                const msg = String(err?.message || err || '');
+                if (!msg.toLowerCase().includes('cancel')) {
+                    showAppToast('Cast failed');
+                }
+            }
+            this.scheduleRefreshTiles();
+            return;
+        }
+
         const player = this.slots[slotId]?.player;
         if (!player) return;
 
+        const castActive = ChromecastManager.getActiveSlot() === slotId;
+        const hostKeepAlive = ChromecastManager.getHostVideo();
+        const dual = castActive && ChromecastManager.isCasting() && hostKeepAlive;
+        const useCast = castActive && ChromecastManager.isCasting() && (target === 'cast' || !dual);
+
         switch (action) {
             case 'play':
-                // Stable hit-target: icon swaps on this button (no separate pause control).
-                player.toggle();
+                if (useCast) ChromecastManager.togglePlayPause();
+                else player.toggle();
                 break;
             case 'stop':
-                await player.stop();
-                this.persistSlots();
+                if (useCast) {
+                    await ChromecastManager.stopMedia();
+                } else {
+                    await player.stop();
+                    this.persistSlots();
+                }
                 break;
             case 'mute':
-                if (player.channel) player.toggleMute();
-                this.persistSlots();
+                if (useCast) {
+                    ChromecastManager.toggleCastMute();
+                } else if (player.channel) {
+                    player.toggleMute();
+                    this.persistSlots();
+                }
+                break;
+            case 'cast-vol-down':
+                if (castActive && ChromecastManager.isCasting()) {
+                    ChromecastManager.adjustVolume(-0.1);
+                }
+                break;
+            case 'cast-vol-up':
+                if (castActive && ChromecastManager.isCasting()) {
+                    ChromecastManager.adjustVolume(0.1);
+                }
                 break;
             case 'swap':
                 this.swapWithCenter(slotId);
+                if (ChromecastManager.isCasting()) {
+                    const activeSlot = ChromecastManager.getActiveSlot();
+                    const activePlayer = activeSlot ? this.slots[activeSlot]?.player : null;
+                    if (activePlayer?.channel) {
+                        ChromecastManager.loadMedia(activePlayer.channel).catch(() => {});
+                    }
+                }
                 break;
             case 'fav':
                 if (player.channel) {
@@ -679,10 +746,15 @@ export const MultiView = {
         if (!player) return Promise.reject(new Error(`No player for slot ${id}`));
         const surface = el(`tv-playback-surface-${id}`);
         if (surface) player.mountVideo(surface);
-        return player.playChannel(channel).finally(() => {
+        return player.playChannel(channel).finally(async () => {
             this.persistSlots();
             this.scheduleRefreshTiles();
             this.syncSettingsToggles();
+            if (ChromecastManager.getActiveSlot() === id && ChromecastManager.isCasting()) {
+                try {
+                    await ChromecastManager.loadMedia(channel);
+                } catch { /* ignore */ }
+            }
             if (id === 'center') this.getPrimary()?.emitState();
         });
     },
@@ -838,64 +910,126 @@ export const MultiView = {
             }
 
             this.syncTileQualityMenu(tile, player);
+            this.syncTileCastUi(tile, id, player);
 
-            const playBtn = tile.querySelector('[data-tile-action="play"]');
-            const muteBtn = tile.querySelector('.tv-player-tile__hover [data-tile-action="mute"]');
-            const favBtn = tile.querySelector('[data-tile-action="fav"]');
-            const pipBtn = tile.querySelector('[data-tile-action="pip"]');
             const audioEl = tile.querySelector('.tv-player-tile__audio');
-
-            // One stable hit-target — icon swaps on the play button.
-            if (playBtn) {
-                playBtn.classList.remove('is-hidden');
-                playBtn.textContent = intentPlaying ? '⏸' : '▶';
-                playBtn.title = intentPlaying ? 'Pause' : 'Play';
-                playBtn.setAttribute('aria-label', intentPlaying ? 'Pause' : 'Play');
-            }
-
-            // Solid corner speaker only while unmuted with audible volume; click mutes.
-            const showAudio = this.isSlotAudible(player);
-            if (audioEl) {
-                audioEl.classList.toggle('is-hidden', !showAudio);
-            }
-
-            const isMuted = !showAudio;
-            if (muteBtn) {
-                muteBtn.classList.toggle('is-muted', isMuted);
-                muteBtn.setAttribute('aria-pressed', String(isMuted));
-                muteBtn.title = isMuted ? 'Unmute' : 'Mute';
-                const wave = muteBtn.querySelector('.tile-mute-wave');
-                const slash = muteBtn.querySelector('.tile-mute-slash');
-                if (wave) wave.style.opacity = isMuted ? '0' : '1';
-                if (slash) slash.style.opacity = isMuted ? '1' : '0';
-            }
-
-            if (favBtn && player?.channel) {
-                const isFav = FavoritesRecents.isFavorite(player.channel);
-                favBtn.classList.toggle('is-active', isFav);
-                favBtn.innerHTML = isFav ? CARD_ICONS.starFilled : '☆';
-                favBtn.setAttribute('aria-pressed', String(isFav));
-            } else if (favBtn) {
-                favBtn.classList.remove('is-active');
-                favBtn.textContent = '☆';
-            }
-
-            if (pipBtn) {
-                const nativeSupported = pipSupported();
-                const windowOpen = TvPopoutWindows.isOpen(id);
-                const nativeActive = nativeSupported && document.pictureInPictureElement === player?.video;
-                const active = nativeActive || windowOpen;
-                // Always show pip — window popout works even without native PiP
-                pipBtn.classList.remove('is-hidden');
-                pipBtn.classList.toggle('is-active', active);
-                pipBtn.innerHTML = active
-                    ? ACTION_ICONS.pictureInPictureExit
-                    : ACTION_ICONS.pictureInPicture;
-                pipBtn.title = active ? 'Pop in' : 'Pop out';
-                pipBtn.setAttribute('aria-label', active ? 'Pop in' : 'Pop out');
-            }
         });
         this.syncMosaicChrome();
+    },
+
+    syncTileCastUi(tile, slotId, player) {
+        const isCasting = ChromecastManager.isCasting();
+        const isActiveCastSlot = ChromecastManager.getActiveSlot() === slotId;
+        const hostVideo = ChromecastManager.getHostVideo();
+
+        const castRow = tile.querySelector('[data-controls-row="cast"]');
+        const localRow = tile.querySelector('[data-controls-row="local"]');
+        const hover = tile.querySelector('.tv-player-tile__hover');
+        const localLabel = tile.querySelector('.tv-controls__row-label--local');
+
+        const dual = isCasting && isActiveCastSlot && hostVideo;
+
+        if (hover) {
+            hover.classList.toggle('is-casting', isCasting && isActiveCastSlot);
+            hover.classList.toggle('has-dual-rows', dual);
+        }
+
+        if (castRow) {
+            castRow.hidden = !(isCasting && isActiveCastSlot);
+        }
+        if (localRow) {
+            localRow.hidden = isCasting && isActiveCastSlot && !hostVideo;
+        }
+        if (localLabel) {
+            localLabel.classList.toggle('is-hidden', !dual);
+        }
+
+        tile.querySelectorAll('[data-tile-action="cast"]').forEach((castBtn) => {
+            const active = isCasting && isActiveCastSlot;
+            castBtn.dataset.castActive = String(active);
+            castBtn.classList.toggle('is-casting', active);
+            castBtn.setAttribute('aria-pressed', String(active));
+            castBtn.title = active ? 'Stop casting' : 'Cast';
+            castBtn.setAttribute('aria-label', active ? 'Stop casting' : 'Cast');
+        });
+
+        tile.querySelectorAll('[data-cast-toggle="host-video"]').forEach((btn) => {
+            btn.classList.toggle('is-active', hostVideo);
+            btn.setAttribute('aria-pressed', String(hostVideo));
+        });
+
+        const intentPlaying = player?.wantPlaying === true || player?.playing === true;
+        const showAudio = this.isSlotAudible(player);
+        const audioEl = tile.querySelector('.tv-player-tile__audio');
+        if (audioEl) {
+            audioEl.classList.toggle('is-hidden', !showAudio);
+        }
+
+        tile.querySelectorAll('[data-controls-row="local"] [data-tile-action]').forEach((btn) => {
+            this.syncTileControlButton(btn, player, slotId, {
+                intentPlaying,
+                isMuted: !showAudio,
+                target: 'local'
+            });
+        });
+
+        if (isCasting && isActiveCastSlot) {
+            const castPlaying = ChromecastManager.isCastPlaying();
+            const castMuted = ChromecastManager.isCastMuted();
+            tile.querySelectorAll('[data-controls-row="cast"] [data-tile-action]').forEach((btn) => {
+                this.syncTileControlButton(btn, player, slotId, {
+                    intentPlaying: castPlaying,
+                    isMuted: castMuted,
+                    target: 'cast'
+                });
+            });
+        }
+    },
+
+    syncTileControlButton(btn, player, slotId, { intentPlaying, isMuted, target }) {
+        const action = btn.getAttribute('data-tile-action');
+        if (action === 'play') {
+            btn.classList.remove('is-hidden');
+            btn.textContent = intentPlaying ? '⏸' : '▶';
+            btn.title = intentPlaying ? 'Pause' : 'Play';
+            btn.setAttribute('aria-label', intentPlaying ? 'Pause' : 'Play');
+            return;
+        }
+        if (action === 'mute') {
+            btn.classList.toggle('is-muted', isMuted);
+            btn.setAttribute('aria-pressed', String(isMuted));
+            btn.title = isMuted ? 'Unmute' : 'Mute';
+            const wave = btn.querySelector('.tile-mute-wave');
+            const slash = btn.querySelector('.tile-mute-slash');
+            if (wave) wave.style.opacity = isMuted ? '0' : '1';
+            if (slash) slash.style.opacity = isMuted ? '1' : '0';
+            return;
+        }
+        if (action === 'fav') {
+            if (player?.channel) {
+                const isFav = FavoritesRecents.isFavorite(player.channel);
+                btn.classList.toggle('is-active', isFav);
+                btn.innerHTML = isFav ? CARD_ICONS.starFilled : '☆';
+                btn.setAttribute('aria-pressed', String(isFav));
+            } else {
+                btn.classList.remove('is-active');
+                btn.textContent = '☆';
+            }
+            return;
+        }
+        if (action === 'pip') {
+            const nativeSupported = pipSupported();
+            const windowOpen = TvPopoutWindows.isOpen(slotId);
+            const nativeActive = nativeSupported && document.pictureInPictureElement === player?.video;
+            const active = nativeActive || windowOpen;
+            btn.classList.remove('is-hidden');
+            btn.classList.toggle('is-active', active);
+            btn.innerHTML = active
+                ? ACTION_ICONS.pictureInPictureExit
+                : ACTION_ICONS.pictureInPicture;
+            btn.title = active ? 'Pop in' : 'Pop out';
+            btn.setAttribute('aria-label', active ? 'Pop in' : 'Pop out');
+        }
     },
 
     syncTileQualityMenu(tile, player) {

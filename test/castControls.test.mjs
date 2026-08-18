@@ -1,0 +1,58 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildTileHoverHtml, hydrateTileHoverControls } from '../js/ui/tileHoverControls.js';
+
+test('buildTileHoverHtml includes cast and dual rows', () => {
+    const html = buildTileHoverHtml('corner');
+    assert.match(html, /data-controls-row="cast"/);
+    assert.match(html, /data-controls-row="local"/);
+    assert.match(html, />CAST</);
+    assert.match(html, /data-tile-action="cast"/);
+    assert.doesNotMatch(html, /data-cast-toggle="host-audio"/);
+    assert.match(html, /data-cast-toggle="host-video"/);
+    assert.match(html, /data-controls-target="cast"/);
+    assert.match(html, /data-controls-target="local"/);
+    assert.equal((html.match(/data-tile-action="cast"/g) || []).length, 1);
+
+    const castRow = html.slice(
+        html.indexOf('data-controls-row="cast"'),
+        html.indexOf('data-controls-row="local"')
+    );
+    assert.doesNotMatch(castRow, /data-tile-action="browse"/);
+    assert.doesNotMatch(castRow, /data-tile-action="pip"/);
+    assert.doesNotMatch(castRow, /data-tile-action="fullscreen"/);
+    assert.doesNotMatch(castRow, /data-tile-action="fav"/);
+    assert.doesNotMatch(castRow, /data-tile-action="cast"/);
+    assert.match(castRow, /data-tile-action="play"/);
+    assert.match(castRow, /data-tile-action="stop"/);
+    assert.match(castRow, /data-tile-action="mute"/);
+    assert.match(castRow, /data-tile-action="cast-vol-down"/);
+    assert.match(castRow, /data-tile-action="cast-vol-up"/);
+
+    const localRow = html.slice(html.indexOf('data-controls-row="local"'));
+    assert.doesNotMatch(localRow, /data-tile-action="cast-vol-down"/);
+    assert.doesNotMatch(localRow, /data-tile-action="cast-vol-up"/);
+});
+
+test('buildTileHoverHtml center variant includes mosaic controls', () => {
+    const html = buildTileHoverHtml('center');
+    assert.match(html, /data-tile-action="reset"/);
+    assert.match(html, /data-tile-action="mute-all"/);
+    assert.doesNotMatch(html, /data-tile-action="swap"/);
+});
+
+test('hydrateTileHoverControls replaces hover content once', () => {
+    const mosaic = { dataset: {}, querySelectorAll: () => [] };
+    const origDoc = globalThis.document;
+    globalThis.document = {
+        getElementById(id) {
+            return id === 'player-mosaic' ? mosaic : null;
+        }
+    };
+    try {
+        hydrateTileHoverControls();
+        assert.equal(mosaic.dataset.hoverHydrated, '1');
+    } finally {
+        globalThis.document = origDoc;
+    }
+});

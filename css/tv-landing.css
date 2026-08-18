@@ -2117,12 +2117,13 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
     bottom: 0.4rem;
     transform: translateX(-50%);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     flex-wrap: nowrap;
     width: max-content;
     max-width: none;
-    gap: 0.2rem;
+    gap: 0.25rem;
     padding: 0.25rem 0.35rem;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.45);
@@ -2133,10 +2134,105 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
     transition: opacity 0.15s ease;
 }
 
+.tv-controls__row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 0.2rem;
+}
+
+.tv-controls__row[hidden],
+.tv-controls__row.is-hidden {
+    display: none !important;
+}
+
+.tv-controls__row-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--tv-text) 70%, transparent);
+    margin-right: 0.15rem;
+    user-select: none;
+}
+
+.tv-controls__row-label.is-hidden {
+    display: none;
+}
+
+.tv-controls__cast-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.tv-controls__cast-wrap::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    bottom: 100%;
+    height: 14px;
+}
+
+.tv-controls__cast-btn.is-casting,
+.tv-controls__cast-btn[data-cast-active='true'] {
+    color: #7ecbff;
+    border-color: color-mix(in srgb, #7ecbff 55%, transparent);
+}
+
+.tv-controls__cast-popout {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(2px);
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.12s ease 0.18s, visibility 0.12s ease 0.18s;
+    white-space: nowrap;
+    z-index: 40;
+}
+
+.tv-controls__cast-wrap:hover .tv-controls__cast-popout,
+.tv-controls__cast-wrap:focus-within .tv-controls__cast-popout {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+}
+
+.tv-controls__cast-popout .tv-controls__btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+}
+
+.tv-player-tile__hover.has-dual-rows {
+    padding-top: 0.35rem;
+}
+
+.tv-player-tile__hover.is-casting .tv-controls__row--cast {
+    border-bottom: 1px solid color-mix(in srgb, var(--tv-border) 35%, transparent);
+    padding-bottom: 0.2rem;
+}
+
 .tv-player-tile:hover .tv-player-tile__hover,
 .tv-player-tile:focus-within .tv-player-tile__hover {
     opacity: 1;
     pointer-events: auto;
+}
+
+.tv-player-tile__hover,
+.tv-player-tile__hover * {
+    cursor: pointer;
+    touch-action: manipulation;
 }
 
 .tv-player-tile__hover .tv-controls__btn,

@@ -107,6 +107,9 @@ export const freeLayoutMethods = {
     onTilePointerDown(e) {
         if (e.button != null && e.button !== 0) return;
         if (e.target.closest?.('[data-tile-action]')) return;
+        if (e.target.closest?.('[data-cast-toggle]')) return;
+        if (e.target.closest?.('.tv-controls__cast-wrap')) return;
+        if (e.target.closest?.('.tv-player-tile__hover')) return;
         if (e.target.closest?.('[data-quality-wrap]')) return;
         if (this.swapBusy) return;
 

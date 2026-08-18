@@ -24,6 +24,9 @@ export const PlayerChrome = {
                 TvPlayer.setVolume(parseFloat(e.target.value) / 100);
             });
         }
+        window.addEventListener('tv:cast_volume_changed', () => {
+            MultiView.scheduleRefreshTiles?.();
+        });
         window.addEventListener('tv:state_changed', () => { ChannelGrid.syncFavButtons(); ChannelGrid.syncPlayingTiles(); ChannelGrid.syncVisitedTiles(); });
         const volPct = el('volume-pct');
         if (volPct) {
