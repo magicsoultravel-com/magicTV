@@ -11,6 +11,7 @@ import { RemotePanel } from './remotePanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { BrowserPopout } from './browserPopout.js';
 import { BrowserExternalPopout } from './browserExternalPopout.js';
+import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
 
 const MIN_W = 260;
 const MIN_H = 560;
@@ -27,8 +28,10 @@ let mode = 'hidden';
 let targetSlotId = null;
 let dockParent = null;
 let nextSibling = null;
-let endActionsDockParent = null;
-let endActionsNextSibling = null;
+let remoteEndActionsDockParent = null;
+let remoteEndActionsNextSibling = null;
+let browserEndActionsDockParent = null;
+let browserEndActionsNextSibling = null;
 let bound = false;
 let pinned = false;
 let sheetExpanded = false;
@@ -69,15 +72,18 @@ function catalogBody() {
 }
 
 function moduleStartActions() {
-    return stagingEl()?.querySelector('.tv-module__actions--start')
-        || document.querySelector('.remote-module__host > .tv-module__actions--start')
-        || document.querySelector('#remote-dock-host > .tv-module__actions--start');
+    return startActionsEl()
+        || stagingEl()?.querySelector('.tv-module__actions--start');
 }
 
-function moduleEndActions() {
-    return stagingEl()?.querySelector('.tv-module__actions--end')
-        || document.querySelector('.remote-module__host > .tv-module__actions--end')
-        || document.querySelector('#remote-dock-host > .tv-module__actions--end');
+function moduleRemoteEndActions() {
+    return remoteEndActionsEl()
+        || stagingEl()?.querySelector('.tv-module__actions--remote-end');
+}
+
+function moduleBrowserEndActions() {
+    return browserEndActionsEl()
+        || stagingEl()?.querySelector('.tv-module__actions--browser-end');
 }
 
 let startActionsDockParent = null;
@@ -376,7 +382,8 @@ function getActiveHost() {
 function restoreBodyToStaging() {
     const body = catalogBody();
     const staging = stagingEl();
-    const endActions = moduleEndActions();
+    const remoteEndActions = moduleRemoteEndActions();
+    const browserEndActions = moduleBrowserEndActions();
     const startActions = moduleStartActions();
     if (!body || !staging) return;
 
@@ -388,11 +395,19 @@ function restoreBodyToStaging() {
         }
     }
 
-    if (endActions && endActionsDockParent) {
-        if (endActionsNextSibling && endActionsNextSibling.parentElement === endActionsDockParent) {
-            endActionsDockParent.insertBefore(endActions, endActionsNextSibling);
+    if (remoteEndActions && remoteEndActionsDockParent) {
+        if (remoteEndActionsNextSibling && remoteEndActionsNextSibling.parentElement === remoteEndActionsDockParent) {
+            remoteEndActionsDockParent.insertBefore(remoteEndActions, remoteEndActionsNextSibling);
         } else {
-            endActionsDockParent.appendChild(endActions);
+            remoteEndActionsDockParent.appendChild(remoteEndActions);
+        }
+    }
+
+    if (browserEndActions && browserEndActionsDockParent) {
+        if (browserEndActionsNextSibling && browserEndActionsNextSibling.parentElement === browserEndActionsDockParent) {
+            browserEndActionsDockParent.insertBefore(browserEndActions, browserEndActionsNextSibling);
+        } else {
+            browserEndActionsDockParent.appendChild(browserEndActions);
         }
     }
 
@@ -409,24 +424,31 @@ function restoreBodyToStaging() {
     nextSibling = null;
     startActionsDockParent = null;
     startActionsNextSibling = null;
-    endActionsDockParent = null;
-    endActionsNextSibling = null;
+    remoteEndActionsDockParent = null;
+    remoteEndActionsNextSibling = null;
+    browserEndActionsDockParent = null;
+    browserEndActionsNextSibling = null;
 }
 
 function teleportBodyTo(host) {
     const body = catalogBody();
     if (!body || !host) return;
 
-    const endActions = moduleEndActions();
+    const remoteEndActions = moduleRemoteEndActions();
+    const browserEndActions = moduleBrowserEndActions();
     const startActions = moduleStartActions();
 
     if (!dockParent) {
         dockParent = body.parentElement;
         nextSibling = body.nextSibling;
     }
-    if (endActions && !endActionsDockParent) {
-        endActionsDockParent = endActions.parentElement;
-        endActionsNextSibling = endActions.nextSibling;
+    if (remoteEndActions && !remoteEndActionsDockParent) {
+        remoteEndActionsDockParent = remoteEndActions.parentElement;
+        remoteEndActionsNextSibling = remoteEndActions.nextSibling;
+    }
+    if (browserEndActions && !browserEndActionsDockParent) {
+        browserEndActionsDockParent = browserEndActions.parentElement;
+        browserEndActionsNextSibling = browserEndActions.nextSibling;
     }
     if (startActions && !startActionsDockParent) {
         startActionsDockParent = startActions.parentElement;
@@ -434,7 +456,8 @@ function teleportBodyTo(host) {
     }
 
     if (startActions) host.appendChild(startActions);
-    if (endActions) host.appendChild(endActions);
+    if (remoteEndActions) host.appendChild(remoteEndActions);
+    if (browserEndActions) host.appendChild(browserEndActions);
     host.appendChild(body);
 }
 
@@ -774,8 +797,10 @@ export const RemoteModule = {
 
         mode = 'hidden';
         targetSlotId = null;
-        endActionsDockParent = null;
-        endActionsNextSibling = null;
+        remoteEndActionsDockParent = null;
+        remoteEndActionsNextSibling = null;
+        browserEndActionsDockParent = null;
+        browserEndActionsNextSibling = null;
 
         clearTargetHighlight();
         MultiView.syncTileStatusHighlight?.();

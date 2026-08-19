@@ -1,11 +1,11 @@
 /** External OS window for browse / favorites / recents (icon-triggered). */
-import { el, queryAllInApp } from '../tvUtils.js';
+import { el } from '../tvUtils.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { RemoteModule } from './remoteModule.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { BrowserPopout } from './browserPopout.js';
 import { showAppToast } from './toast.js';
-import { ACTION_ICONS, CARD_ICONS } from './icons.js';
+import { CARD_ICONS } from './icons.js';
 import {
     shouldUseDocumentPipFor,
     requestPipWindow,
@@ -17,6 +17,7 @@ import {
     isPipOccupied
 } from './popoutWindows.js';
 import { registerAppDocument, unregisterAppDocument } from '../appDocuments.js';
+import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
 
 const PLACEHOLDER_ID = 'browser-external-popout-placeholder';
 const BROWSER_PANEL_IDS = ['browse-panel', 'favorites-panel', 'recents-panel'];
@@ -82,15 +83,7 @@ function detectActiveChannelTab() {
 }
 
 function footerEl() {
-    return el('tv-catalog-body')?.querySelector('.remote-module__footer') ?? null;
-}
-
-function endActionsEl() {
-    return queryAllInApp('.tv-module__actions--end')[0] ?? null;
-}
-
-function startActionsEl() {
-    return queryAllInApp('.tv-module__actions--start')[0] ?? null;
+    return catalogBody()?.querySelector('.remote-module__footer') ?? null;
 }
 
 function captureAnchor(node) {
@@ -112,7 +105,7 @@ function rememberAnchors() {
     const anchors = {
         channelBar: captureAnchor(el('remote-channel-bar')),
         catalogTools: captureAnchor(el('remote-catalog-tools')),
-        endActions: captureAnchor(endActionsEl()),
+        browserEndActions: captureAnchor(browserEndActionsEl()),
         startActions: captureAnchor(startActionsEl()),
         panels: {}
     };
@@ -244,17 +237,13 @@ export const BrowserExternalPopout = {
         const btn = el('browser-popout-btn');
         if (!btn) return;
         const popped = this.isPoppedOut();
+        btn.classList.remove('is-hidden');
+        btn.innerHTML = popped ? CARD_ICONS.popoutExit : CARD_ICONS.popout;
         btn.classList.toggle('is-active', popped);
         btn.setAttribute('aria-pressed', String(popped));
-        if (popped) {
-            btn.innerHTML = ACTION_ICONS.pictureInPictureExit;
-            btn.title = 'Pop in external browser';
-            btn.setAttribute('aria-label', 'Pop in external browser');
-        } else {
-            btn.innerHTML = BROWSER_EXTERNAL_ICON;
-            btn.title = 'Pop out browser to OS window';
-            btn.setAttribute('aria-label', 'Pop out browser to OS window');
-        }
+        const label = popped ? 'Pop in browser' : 'Pop out browser';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
     },
 
     async popOut() {
@@ -295,8 +284,8 @@ export const BrowserExternalPopout = {
 
         const channelBar = el('remote-channel-bar');
         const tools = el('remote-catalog-tools');
+        const browserActions = browserEndActionsEl();
         const startActions = startActionsEl();
-        const endActions = endActionsEl();
 
         if (channelBar && chrome) chrome.appendChild(channelBar);
         BROWSER_PANEL_IDS.forEach((id) => {
@@ -308,7 +297,7 @@ export const BrowserExternalPopout = {
             tools.classList.add('is-visible');
         }
         if (startActions) popDoc.body.appendChild(startActions);
-        if (endActions) popDoc.body.appendChild(endActions);
+        if (browserActions) popDoc.body.appendChild(browserActions);
 
         scroll.classList.add('is-browser-popout-empty');
         catalogBody()?.classList.add('is-browser-split-active');
@@ -346,8 +335,8 @@ export const BrowserExternalPopout = {
 
         const channelBar = el('remote-channel-bar');
         const tools = el('remote-catalog-tools');
+        const browserActions = browserEndActionsEl();
         const startActions = startActionsEl();
-        const endActions = endActionsEl();
         const scroll = scrollEl();
         const chromeHeader = el('tv-catalog-body')?.querySelector('.remote-module__chrome');
 
@@ -370,7 +359,7 @@ export const BrowserExternalPopout = {
         }
 
         restoreNode(startActions, anchors.startActions);
-        restoreNode(endActions, anchors.endActions);
+        restoreNode(browserActions, anchors.browserEndActions);
 
         scroll?.classList.remove('is-browser-popout-empty');
         catalogBody()?.classList.remove('is-browser-split-active');
@@ -411,4 +400,4 @@ export const BrowserExternalPopout = {
     }
 };
 
-export const BROWSER_EXTERNAL_ICON = ACTION_ICONS.pictureInPicture;
+export const BROWSER_EXTERNAL_ICON = CARD_ICONS.popout;

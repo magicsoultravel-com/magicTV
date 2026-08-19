@@ -369,9 +369,13 @@ function isBrowserExtracted() {
 function syncBrowserPopoutBtn() {
     const btn = el('browser-popout-btn');
     if (!btn) return;
+    const extracted = isBrowserExtracted();
     const onChannelTabs = CHANNEL_TABS.includes(appState.activeTab);
-    btn.classList.toggle('is-hidden', !onChannelTabs);
-    if (!btn.innerHTML.trim()) btn.innerHTML = BROWSER_EXTERNAL_ICON;
+    if (extracted) {
+        btn.classList.remove('is-hidden');
+    } else {
+        btn.classList.toggle('is-hidden', !onChannelTabs);
+    }
     BrowserExternalPopout.syncBtn();
     BrowserPopout.syncPopoutChrome();
 }
@@ -755,6 +759,12 @@ async function init() {
                 activateTabPanels(appState.activeTab);
             }
             syncRemoteTabChrome();
+            syncBrowserPopoutBtn();
+        });
+
+        window.addEventListener('remote:external_popout_changed', () => {
+            syncBrowserPopoutBtn();
+            RemoteExternalPopout.syncBtn();
         });
 
         showAppToast('Ready');

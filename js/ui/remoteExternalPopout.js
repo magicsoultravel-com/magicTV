@@ -1,9 +1,10 @@
 /** External-window popout for the live remote (Document PiP + popup fallback). */
-import { el, queryAllInApp } from '../tvUtils.js';
+import { el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { RemoteModule } from './remoteModule.js';
 import { BrowserPopout } from './browserPopout.js';
 import { CARD_ICONS } from './icons.js';
+import { browserEndActionsEl, isBrowserSeparated, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
 import {
     shouldUseDocumentPipFor,
     requestPipWindow,
@@ -28,7 +29,8 @@ const PLACEHOLDER_ID = 'remote-external-popout-placeholder';
  *   anchors: {
  *     body: { parent: Element | null, next: ChildNode | null },
  *     startActions: { parent: Element | null, next: ChildNode | null },
- *     endActions: { parent: Element | null, next: ChildNode | null },
+ *     browserEndActions: { parent: Element | null, next: ChildNode | null },
+ *     remoteEndActions: { parent: Element | null, next: ChildNode | null },
  *     host: Element | null
  *   }
  * } | null} */
@@ -38,12 +40,16 @@ function catalogBody() {
     return el('tv-catalog-body');
 }
 
-function startActionsEl() {
-    return queryAllInApp('.tv-module__actions--start')[0] ?? null;
+function startActionsElLocal() {
+    return startActionsEl();
 }
 
-function endActionsEl() {
-    return queryAllInApp('.tv-module__actions--end')[0] ?? null;
+function remoteEndActionsElLocal() {
+    return remoteEndActionsEl();
+}
+
+function browserEndActionsElLocal() {
+    return browserEndActionsEl();
 }
 
 function captureAnchor(node) {
@@ -225,15 +231,17 @@ export const RemoteExternalPopout = {
         if (BrowserPopout.isOpen()) BrowserPopout.close();
 
         const body = catalogBody();
-        const startActions = startActionsEl();
-        const endActions = endActionsEl();
+        const startActions = startActionsElLocal();
+        const remoteEndActions = remoteEndActionsElLocal();
+        const browserEndActions = browserEndActionsElLocal();
         const host = getActiveMountHost();
         if (!body || !host) return;
 
         const anchors = {
             body: captureAnchor(body),
             startActions: captureAnchor(startActions),
-            endActions: captureAnchor(endActions),
+            browserEndActions: captureAnchor(browserEndActions),
+            remoteEndActions: captureAnchor(remoteEndActions),
             host
         };
 
@@ -251,8 +259,9 @@ export const RemoteExternalPopout = {
         prepPopoutDocument(popDoc);
         registerAppDocument(popDoc);
 
-        if (startActions) popDoc.body.appendChild(startActions);
-        if (endActions) popDoc.body.appendChild(endActions);
+        if (startActions && !isBrowserSeparated()) popDoc.body.appendChild(startActions);
+        if (browserEndActions && !isBrowserSeparated()) popDoc.body.appendChild(browserEndActions);
+        if (remoteEndActions) popDoc.body.appendChild(remoteEndActions);
         popDoc.body.appendChild(body);
         body.classList.add('is-remote-popout-live');
 
@@ -304,13 +313,15 @@ export const RemoteExternalPopout = {
         if (onKey && popDoc) popDoc.removeEventListener('keydown', onKey);
 
         const body = catalogBody();
-        const startActions = startActionsEl();
-        const endActions = endActionsEl();
+        const startActions = startActionsElLocal();
+        const remoteEndActions = remoteEndActionsElLocal();
+        const browserEndActions = browserEndActionsElLocal();
 
         if (body) body.classList.remove('is-remote-popout-live');
 
         restoreNode(startActions, anchors.startActions);
-        restoreNode(endActions, anchors.endActions);
+        restoreNode(browserEndActions, anchors.browserEndActions);
+        restoreNode(remoteEndActions, anchors.remoteEndActions);
         restoreNode(body, anchors.body);
 
         const closeBtn = popDoc?.getElementById('remote-module-close');

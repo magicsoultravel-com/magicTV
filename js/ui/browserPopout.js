@@ -3,7 +3,8 @@ import { el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { showAppToast } from './toast.js';
-import { ACTION_ICONS } from './icons.js';
+import { CARD_ICONS } from './icons.js';
+import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
 
 const MIN_W = 520;
 const MIN_H = 720;
@@ -19,7 +20,7 @@ let gesture = null;
 const anchors = {
     channelBar: { parent: null, next: null },
     catalogTools: { parent: null, next: null },
-    endActions: { parent: null, next: null },
+    browserEndActions: { parent: null, next: null },
     startActions: { parent: null, next: null },
     panels: /** @type {Record<string, { parent: Element | null, next: ChildNode | null }>} */ ({})
 };
@@ -48,36 +49,29 @@ function footerEl() {
     return catalogBody()?.querySelector('.remote-module__footer') ?? null;
 }
 
-function endActionsEl() {
-    return document.querySelector('.browser-popout-module__host > .tv-module__actions--end')
-        || document.querySelector('.remote-module__host > .tv-module__actions--end')
-        || document.querySelector('.remote-dock-sheet__inner > .tv-module__actions--end')
-        || document.querySelector('#remote-module-staging > .tv-module__actions--end');
-}
-
-function startActionsEl() {
-    return document.querySelector('.browser-popout-module__host > .tv-module__actions--start')
-        || document.querySelector('.remote-module__host > .tv-module__actions--start')
-        || document.querySelector('.remote-dock-sheet__inner > .tv-module__actions--start')
-        || document.querySelector('#remote-module-staging > .tv-module__actions--start');
-}
-
 function restoreStartActionsHost() {
-    const actions = document.querySelector('.tv-module__actions--start');
+    const actions = startActionsEl();
     if (!actions) return;
     const host = document.querySelector('#remote-module-host')
         || document.querySelector('#remote-dock-host')
         || el('remote-module-staging');
-    if (host && !host.contains(actions)) host.appendChild(actions);
+    if (host && !host.contains(actions)) host.insertBefore(actions, catalogBody());
 }
 
-function restoreEndActionsHost() {
-    const actions = document.querySelector('.tv-module__actions--end');
+function restoreBrowserEndActionsHost() {
+    const actions = browserEndActionsEl();
     if (!actions) return;
     const host = document.querySelector('#remote-module-host')
         || document.querySelector('#remote-dock-host')
         || el('remote-module-staging');
-    if (host && !host.contains(actions)) host.appendChild(actions);
+    if (host && !host.contains(actions)) {
+        const body = catalogBody();
+        if (body && body.parentElement === host) {
+            host.insertBefore(actions, body);
+        } else {
+            host.appendChild(actions);
+        }
+    }
 }
 
 function viewportSize() {
@@ -217,7 +211,7 @@ function mountToPopout() {
     const channelBar = el('remote-channel-bar');
     const tools = el('remote-catalog-tools');
     const scroll = scrollEl();
-    const actions = endActionsEl();
+    const actions = browserEndActionsEl();
     const startActions = startActionsEl();
 
     if (channelBar && chrome) {
@@ -240,7 +234,7 @@ function mountToPopout() {
     }
 
     if (actions && host) {
-        rememberNode(actions, 'endActions');
+        rememberNode(actions, 'browserEndActions');
         host.appendChild(actions);
     }
 
@@ -258,7 +252,7 @@ function mountToPopout() {
 function restoreFromPopout() {
     const channelBar = el('remote-channel-bar');
     const tools = el('remote-catalog-tools');
-    const actions = endActionsEl();
+    const actions = browserEndActionsEl();
     const startActions = startActionsEl();
     const scroll = scrollEl();
     const chromeHeader = catalogBody()?.querySelector('.remote-module__chrome');
@@ -284,8 +278,8 @@ function restoreFromPopout() {
     }
 
     if (actions) {
-        restoreNode(actions, 'endActions');
-        restoreEndActionsHost();
+        restoreNode(actions, 'browserEndActions');
+        restoreBrowserEndActionsHost();
     }
 
     if (startActions) {
@@ -298,7 +292,7 @@ function restoreFromPopout() {
     Object.keys(anchors.panels).forEach((k) => delete anchors.panels[k]);
     anchors.channelBar = { parent: null, next: null };
     anchors.catalogTools = { parent: null, next: null };
-    anchors.endActions = { parent: null, next: null };
+    anchors.browserEndActions = { parent: null, next: null };
     anchors.startActions = { parent: null, next: null };
 }
 
@@ -492,4 +486,4 @@ export const BrowserPopout = {
     syncPopoutBtn
 };
 
-export const BROWSER_POPOUT_ICON = ACTION_ICONS.pictureInPicture;
+export const BROWSER_POPOUT_ICON = CARD_ICONS.popout;

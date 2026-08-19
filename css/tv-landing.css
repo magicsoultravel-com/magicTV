@@ -3878,8 +3878,8 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     width: 100%;
 }
 
-.remote-module__host > .tv-module__actions--end,
-.remote-dock-sheet__inner > .tv-module__actions--end {
+.remote-module__host > .tv-module__actions--remote-end,
+.remote-dock-sheet__inner > .tv-module__actions--remote-end {
     position: absolute;
     top: 0.35rem;
     right: var(--tv-spacing-sm, 0.5rem);
@@ -3888,6 +3888,28 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     pointer-events: auto;
     display: flex;
     gap: 0.25rem;
+}
+
+.remote-module__host > .tv-module__actions--browser-end,
+.remote-dock-sheet__inner > .tv-module__actions--browser-end {
+    position: absolute;
+    top: 0.35rem;
+    right: calc(var(--tv-spacing-sm, 0.5rem) + 5.75rem);
+    left: auto;
+    z-index: 6;
+    pointer-events: auto;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.remote-module__host > .tv-module__actions--browser-end:has(#browser-popout-btn.is-hidden):not(:has(.tv-module__action:not(.is-hidden))),
+.remote-dock-sheet__inner > .tv-module__actions--browser-end:has(#browser-popout-btn.is-hidden):not(:has(.tv-module__action:not(.is-hidden))) {
+    right: calc(var(--tv-spacing-sm, 0.5rem) + 2.5rem);
+}
+
+.remote-module__host > .tv-module__actions--remote-end:only-of-type,
+.remote-dock-sheet__inner > .tv-module__actions--remote-end:only-of-type {
+    right: var(--tv-spacing-sm, 0.5rem);
 }
 
 .remote-module__host > .tv-module__actions--start,
@@ -3926,6 +3948,29 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     color: var(--tv-main-1);
     border-color: color-mix(in srgb, currentColor 16%, transparent);
     opacity: 1;
+}
+
+.tv-module__action.tv-module__action--echo {
+    opacity: 0.5;
+    color: var(--tv-text-secondary);
+    background: transparent;
+    border-color: transparent;
+}
+
+.tv-module__action.tv-module__action--echo:hover,
+.tv-module__action.tv-module__action--echo:focus-visible {
+    opacity: 1;
+    color: var(--tv-main-1);
+    background: color-mix(in srgb, var(--tv-main-1) 10%, transparent);
+    border-color: color-mix(in srgb, var(--tv-main-1) 18%, transparent);
+}
+
+.tv-module__action.tv-module__action--echo.is-active,
+.tv-module__action.tv-module__action--echo[aria-pressed="true"]:not([aria-pressed="false"]) {
+    opacity: 0.88;
+    color: var(--tv-main-2, #00FF88);
+    background: color-mix(in srgb, var(--tv-main-2, #00FF88) 10%, transparent);
+    border-color: color-mix(in srgb, var(--tv-main-2, #00FF88) 24%, transparent);
 }
 
 .tv-module__body,
@@ -4199,7 +4244,7 @@ body.remote-docked-expanded .remote-dock-tab {
     flex-shrink: 0;
 }
 
-.browser-popout-module__host > .tv-module__actions--end {
+.browser-popout-module__host > .tv-module__actions--browser-end {
     position: absolute;
     top: 0.35rem;
     right: var(--tv-spacing-sm, 0.5rem);
@@ -4250,7 +4295,8 @@ body.remote-docked-expanded .remote-dock-tab {
 }
 
 .remote-popout-body > .tv-module__actions--start,
-.remote-popout-body > .tv-module__actions--end {
+.remote-popout-body > .tv-module__actions--remote-end,
+.remote-popout-body > .tv-module__actions--browser-end {
     position: relative;
     z-index: 4;
     flex-shrink: 0;
@@ -4261,8 +4307,9 @@ body.remote-docked-expanded .remote-dock-tab {
     padding: 0.35rem var(--tv-spacing-sm, 0.5rem) 0;
 }
 
-.remote-popout-body > .tv-module__actions--end {
-    padding: 0  var(--tv-spacing-sm, 0.5rem) 0.35rem;
+.remote-popout-body > .tv-module__actions--remote-end,
+.remote-popout-body > .tv-module__actions--browser-end {
+    padding: 0 var(--tv-spacing-sm, 0.5rem) 0.35rem;
     justify-content: flex-end;
 }
 
@@ -4489,10 +4536,14 @@ body.remote-undocked-open .remote-dock-tab {
 }
 
 .browser-popout-body > .tv-module__actions--start,
-.browser-popout-body > .tv-module__actions--end {
+.browser-popout-body > .tv-module__actions--browser-end {
     flex-shrink: 0;
     pointer-events: auto;
     padding: 0.35rem var(--tv-spacing-sm, 0.5rem);
+}
+
+.browser-popout-body > .tv-module__actions--browser-end {
+    justify-content: flex-end;
 }
 
 .browser-popout-body > .browser-popout-module__shell,

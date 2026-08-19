@@ -53,10 +53,13 @@ describe('RemoteExternalPopout state', () => {
         const body = makeEl('div', 'tv-catalog-body');
         const start = makeEl('div');
         start.className = 'tv-module__actions tv-module__actions--start';
-        const end = makeEl('div');
-        end.className = 'tv-module__actions tv-module__actions--end';
+        const remoteEnd = makeEl('div');
+        remoteEnd.className = 'tv-module__actions tv-module__actions--remote-end';
+        const browserEnd = makeEl('div');
+        browserEnd.className = 'tv-module__actions tv-module__actions--browser-end';
         host.appendChild(start);
-        host.appendChild(end);
+        host.appendChild(remoteEnd);
+        host.appendChild(browserEnd);
         host.appendChild(body);
 
         const els = new Map([
@@ -76,7 +79,8 @@ describe('RemoteExternalPopout state', () => {
             querySelector: () => null,
             querySelectorAll: (sel) => {
                 if (sel.includes('actions--start')) return [start];
-                if (sel.includes('actions--end')) return [end];
+                if (sel.includes('actions--remote-end')) return [remoteEnd];
+                if (sel.includes('actions--browser-end')) return [browserEnd];
                 return [];
             },
             createElement: (tag) => makeEl(tag),
