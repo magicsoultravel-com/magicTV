@@ -1,3 +1,5 @@
+import { getAppElementById, queryAllInApp as queryAllInAppDocs } from './appDocuments.js';
+
 export function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -35,7 +37,11 @@ export function formatRelativeTime(ts, now = Date.now()) {
 }
 
 export function el(id) {
-    return document.getElementById(id);
+    return getAppElementById(id);
+}
+
+export function queryAllInApp(selector) {
+    return queryAllInAppDocs(selector);
 }
 
 export function els(query) {

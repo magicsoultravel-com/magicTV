@@ -352,395 +352,505 @@
                         <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
                     </div>
                 </div>
-                <div class="tv-player-controls">
-                    <div class="tv-controls__volume">
-                        <span class="tv-controls__volume-pct" id="volume-pct">85%</span>
-                        <input type="range" class="tv-controls__volume-slider" id="volume-slider" min="0" max="100" value="85">
-                    </div>
+                <div class="tv-player-controls tv-player-controls--echo">
                     <div class="tv-controls__info">
                         <span id="buffer-info">Buffer: —</span>
                         <span id="quality-info">Quality: —</span>
                     </div>
-                    <div class="tv-controls__screens">
-                        <button type="button" class="tv-controls__screen-btn is-active" data-screen-slot="center" aria-label="TV 1 main screen" title="TV 1 main screen">
-                            <span class="tv-controls__screen-frame" aria-hidden="true"></span>
-                            <span class="tv-controls__screen-label" aria-hidden="true">1</span>
-                        </button>
-                        <button type="button" class="tv-controls__screen-btn" data-screen-slot="topLeft" aria-label="TV 2 top left" title="TV 2 top left" hidden>
-                            <span class="tv-controls__screen-frame" aria-hidden="true"></span>
-                            <span class="tv-controls__screen-label" aria-hidden="true">2</span>
-                            <span class="tv-controls__screen-remove" aria-label="Remove TV 2" title="Remove TV 2">×</span>
-                        </button>
-                        <button type="button" class="tv-controls__screen-btn" data-screen-slot="topRight" aria-label="TV 3 top right" title="TV 3 top right" hidden>
-                            <span class="tv-controls__screen-frame" aria-hidden="true"></span>
-                            <span class="tv-controls__screen-label" aria-hidden="true">3</span>
-                            <span class="tv-controls__screen-remove" aria-label="Remove TV 3" title="Remove TV 3">×</span>
-                        </button>
-                        <button type="button" class="tv-controls__screen-btn" data-screen-slot="bottomLeft" aria-label="TV 4 bottom left" title="TV 4 bottom left" hidden>
-                            <span class="tv-controls__screen-frame" aria-hidden="true"></span>
-                            <span class="tv-controls__screen-label" aria-hidden="true">4</span>
-                            <span class="tv-controls__screen-remove" aria-label="Remove TV 4" title="Remove TV 4">×</span>
-                        </button>
-                        <button type="button" class="tv-controls__screen-btn" data-screen-slot="bottomRight" aria-label="TV 5 bottom right" title="TV 5 bottom right" hidden>
-                            <span class="tv-controls__screen-frame" aria-hidden="true"></span>
-                            <span class="tv-controls__screen-label" aria-hidden="true">5</span>
-                            <span class="tv-controls__screen-remove" aria-label="Remove TV 5" title="Remove TV 5">×</span>
-                        </button>
-                        <button type="button" class="tv-controls__add-screen-btn" id="add-screen-btn" aria-label="Add screen" title="Add screen">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <div
-                id="content-splitter"
-                class="tv-content-splitter"
-                role="separator"
-                aria-orientation="horizontal"
-                aria-controls="player-slot tv-catalog"
-                aria-valuemin="15"
-                aria-valuemax="85"
-                aria-valuenow="50"
-                aria-label="Resize player and browse"
-                tabindex="0"
-            ></div>
-
-            <div id="tv-catalog" class="tv-catalog" data-catalog-transition="instant">
-                <div class="tv-catalog__actions">
-                    <button type="button" id="catalog-toggle-btn" class="tv-catalog__toggle" aria-expanded="true" aria-controls="tv-catalog-body" title="Collapse catalog" aria-label="Collapse catalog">
-                        <svg viewBox="0 0 12 12" width="11" height="11" focusable="false" aria-hidden="true"><path d="M3 7l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button type="button" id="play-favorites-mosaic-btn" class="tv-catalog__action is-hidden" title="Play favorites on multiple TVs" aria-label="Play favorites on multiple TVs"></button>
-                </div>
-                <div class="tv-catalog__actions tv-catalog__actions--end">
-                    <button type="button" id="catalog-layout-btn" class="tv-catalog__action is-hidden" title="List view" aria-label="List view"></button>
-                    <button type="button" id="refresh-btn" class="tv-catalog__action" title="Refresh this tab" aria-label="Refresh this tab"></button>
-                    <button type="button" id="channel-picker-pin" class="tv-catalog__action channel-picker-modal__pin" title="Pin window" aria-label="Pin window" aria-pressed="false">
-                        <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 1.8h3.6l.6 3.2 1.6.8v1.2H6.6V10l-.6.8-.6-.8V7H2V5.8l1.6-.8.6-3.2z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
-                    </button>
-                    <button type="button" id="channel-picker-close" class="tv-catalog__action channel-picker-modal__close" title="Close" aria-label="Close">
-                        <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    </button>
-                </div>
-                <div class="tv-catalog__clip">
-                <div id="tv-catalog-body" class="tv-catalog__body">
-                    <div id="browse-panel" class="tv-panel is-active">
-                        <div id="countries-container" class="country-grid"></div>
-                        <div id="channels-container" class="channel-grid is-hidden"></div>
-                    </div>
-
-                    <div id="favorites-panel" class="tv-panel">
-                        <div id="favorites-grid" class="channel-grid"></div>
-                        <div id="favorites-empty" class="empty-state"><div class="empty-state__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 12 12" width="36" height="36" focusable="false"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg></div><p class="empty-state__text">No favorites!</p></div>
-                    </div>
-
-                    <div id="recents-panel" class="tv-panel">
-                        <div id="recents-grid" class="channel-grid"></div>
-                        <div id="recents-empty" class="empty-state"><div class="empty-state__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 12 12" width="36" height="36" focusable="false"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></div><p class="empty-state__text">No recents!</p></div>
-                    </div>
-
-                    <div id="settings-panel" class="tv-panel">
-                        <div class="settings-panel">
-                            <div class="settings-section">
-                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 3.6v2.4l1.8 1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Clock</h3>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="tv-clock-style-select">Clock Style</label>
-                                    <select id="tv-clock-style-select" aria-label="Clock style"></select>
-                                </div>
-                            </div>
-
-                            <div class="settings-section">
-                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 2.6v6.8L9.4 6 4.2 2.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg> Playback</h3>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label">Buffer Size</label>
-                                    <select id="buffer-size-select">
-                                        <option value="5">5s (Fast)</option>
-                                        <option value="15" selected>15s (Stable)</option>
-                                        <option value="30">30s (Very Stable)</option>
-                                    </select>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="recents-cap-input">Max recents</label>
-                                    <div class="settings-section__control">
-                                        <input type="number" id="recents-cap-input" min="1" max="100" step="1" value="20" aria-label="Recent channels limit">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="settings-section">
-                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Screens</h3>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="screen-top-left-toggle">Add screen top left</label>
-                                    <button type="button" id="screen-top-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top left" title="Add screen top left"></button>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="screen-top-right-toggle">Add screen top right</label>
-                                    <button type="button" id="screen-top-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top right" title="Add screen top right"></button>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="screen-bottom-left-toggle">Add screen bottom left</label>
-                                    <button type="button" id="screen-bottom-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom left" title="Add screen bottom left"></button>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="screen-bottom-right-toggle">Add screen bottom right</label>
-                                    <button type="button" id="screen-bottom-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom right" title="Add screen bottom right"></button>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="swap-transition-select">Channel switch</label>
-                                    <select id="swap-transition-select" aria-label="Channel switch transition"></select>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="catalog-transition-select">View transition</label>
-                                    <select id="catalog-transition-select" aria-label="View transition"></select>
-                                </div>
-                            </div>
-                            <div class="settings-section">
-                                <div class="settings-section__header">
-                                    <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.8a4.2 4.2 0 1 0 0 8.4c.7 0 1-.4 1-1 0-.4-.2-.7-.2-1.1 0-.8.7-1.5 1.5-1.5H9a2.2 2.2 0 0 0 0-4.4 4.1 4.1 0 0 0-3 0z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="4.2" cy="5" r="0.7" fill="currentColor"/><circle cx="6" cy="3.8" r="0.7" fill="currentColor"/><circle cx="7.8" cy="5" r="0.7" fill="currentColor"/></svg> Appearance</h3>
-                                    <button type="button" id="reset-appearance-btn" class="settings-reset-btn" aria-label="Reset to defaults" title="Reset to defaults">↺</button>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="theme-select">Theme</label>
-                                    <div class="settings-section__control">
-                                        <select id="theme-select" aria-label="Theme"></select>
-                                    </div>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" id="font-picker-label" for="font-picker-trigger">Font</label>
-                                    <div class="settings-section__control">
-                                        <div class="settings-font-picker" id="font-picker">
-                                            <button type="button" class="settings-font-picker__trigger" id="font-picker-trigger" aria-labelledby="font-picker-label" aria-haspopup="listbox" aria-expanded="false" aria-controls="font-picker-menu">
-                                                <span class="settings-font-picker__current" id="font-picker-current">System</span>
-                                            </button>
-                                            <div class="settings-font-picker__menu is-hidden" id="font-picker-menu" role="listbox" aria-labelledby="font-picker-label"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="settings-color-group">
-                                    <div class="settings-color-group__title">Accents</div>
-                                    <div class="settings-section__item">
-                                        <label class="settings-section__label" for="theme-color-main-1">Main 1, 2, 3</label>
-                                        <div class="settings-section__control">
-                                            <input type="color" class="settings-color" id="theme-color-main-1" value="#00FFFF">
-                                            <input type="color" class="settings-color" id="theme-color-main-2" value="#00FF88">
-                                            <input type="color" class="settings-color" id="theme-color-main-3" value="#FF00FF">
-                                        </div>
-                                    </div>
-                                    <div class="settings-section__item">
-                                        <label class="settings-section__label" for="theme-color-main-1-flip">Flip 1, 2, 3</label>
-                                        <div class="settings-section__control">
-                                            <input type="color" class="settings-color" id="theme-color-main-1-flip" value="#FF00FF">
-                                            <input type="color" class="settings-color" id="theme-color-main-2-flip" value="#FF00FF">
-                                            <input type="color" class="settings-color" id="theme-color-main-3-flip" value="#00FFFF">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="settings-color-group">
-                                    <div class="settings-color-group__title">Backgrounds</div>
-                                    <div class="settings-section__item">
-                                        <label class="settings-section__label" for="theme-color-bg">Primary / Secondary</label>
-                                        <div class="settings-section__control">
-                                            <input type="color" class="settings-color" id="theme-color-bg" value="#0A0E27">
-                                            <input type="color" class="settings-color" id="theme-color-bg-secondary" value="#141829">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="settings-color-group">
-                                    <div class="settings-color-group__title">Borders</div>
-                                    <div class="settings-section__item">
-                                        <label class="settings-section__label" for="theme-color-border">Normal / Light</label>
-                                        <div class="settings-section__control">
-                                            <input type="color" class="settings-color" id="theme-color-border" value="#2A2E3A">
-                                            <input type="color" class="settings-color" id="theme-color-border-light" value="#3A3E4A">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="settings-color-group">
-                                    <div class="settings-color-group__title">Text</div>
-                                    <div class="settings-section__item">
-                                        <label class="settings-section__label" for="theme-color-text-primary">Primary, secondary, muted</label>
-                                        <div class="settings-section__control">
-                                            <input type="color" class="settings-color" id="theme-color-text-primary" value="#FFFFFF">
-                                            <input type="color" class="settings-color" id="theme-color-text-secondary" value="#B3B3B3">
-                                            <input type="color" class="settings-color" id="theme-color-text-muted" value="#737373">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="text-size-slider">Text Size</label>
-                                    <div class="settings-section__control">
-                                        <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="16" aria-valuetext="100%">
-                                        <span class="settings-value" id="text-size-value">100%</span>
-                                    </div>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="tile-width-slider">Tile Width</label>
-                                    <div class="settings-section__control">
-                                        <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="180" aria-valuetext="180px">
-                                        <span class="settings-value" id="tile-width-value">180px</span>
-                                    </div>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="active-tile-select">Active Tile</label>
-                                    <select id="active-tile-select" aria-label="Active tile indicator style">
-                                        <option value="none">None</option>
-                                        <option value="wave">Scrolling wave</option>
-                                        <option value="pulse">Pulse</option>
-                                        <option value="visualizer">Visualizer</option>
-                                    </select>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="visited-style-select">Visited accent</label>
-                                    <select id="visited-style-select" aria-label="Visited channel accent style">
-                                        <option value="undistinguished">Undistinguished</option>
-                                        <option value="accent-1">Accent 1</option>
-                                        <option value="accent-2">Accent 2</option>
-                                        <option value="accent-3">Accent 3</option>
-                                    </select>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="non-visited-style-select">Non-visited accent</label>
-                                    <select id="non-visited-style-select" aria-label="Non-visited channel accent style">
-                                        <option value="undistinguished">Undistinguished</option>
-                                        <option value="accent-1">Accent 1</option>
-                                        <option value="accent-2">Accent 2</option>
-                                        <option value="accent-3">Accent 3</option>
-                                    </select>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="list-width-slider">List Width</label>
-                                    <div class="settings-section__control">
-                                        <input type="range" class="settings-slider" id="list-width-slider" min="100" max="300" step="10" value="300" aria-valuetext="300px">
-                                        <span class="settings-value" id="list-width-value">300px</span>
-                                    </div>
-                                </div>
-                                <div class="settings-section__item">
-                                    <label class="settings-section__label" for="channel-picker-opacity-slider">Modal browser opacity</label>
-                                    <div class="settings-section__control">
-                                        <input type="range" class="settings-slider" id="channel-picker-opacity-slider" min="33" max="100" step="1" value="100" aria-valuetext="100%">
-                                        <span class="settings-value" id="channel-picker-opacity-value">100%</span>
-                                    </div>
-                                </div>
-                                <div class="settings-preview">
-                                    <div class="settings-preview__label">Preview</div>
-                                    <div class="settings-preview__variants">
-                                        <div class="settings-preview__variant">
-                                            <div class="settings-preview__variant-label">Tile</div>
-                                            <div class="settings-preview__tile-grid">
-                                                <div id="appearance-preview-tile" class="channel-tile" role="presentation">
-                                                    <div class="channel-tile__icon">
-                                                        <div class="channel-tile__capture-frame">
-                                                            <div class="channel-tile__letter-avatar" id="preview-avatar">P</div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="channel-tile__body">
-                                                        <h3 class="channel-tile__name" id="preview-name">Now Playing</h3>
-                                                        <span class="channel-tile__flag" id="preview-flag"></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="settings-preview__variant">
-                                            <div class="settings-preview__variant-label">List</div>
-                                            <div class="settings-preview__list-grid">
-                                                <div id="appearance-preview-list" class="channel-tile" role="presentation">
-                                                    <div class="channel-tile__icon">
-                                                        <div class="channel-tile__capture-frame">
-                                                            <div class="channel-tile__letter-avatar" id="preview-list-avatar">P</div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="channel-tile__body">
-                                                        <h3 class="channel-tile__name" id="preview-list-name">Now Playing</h3>
-                                                        <span class="channel-tile__flag" id="preview-list-flag"></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <details class="settings-section settings-section--collapsible" id="hidden-channels-section">
-                                <summary class="settings-section__summary">
-                                    <span class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4S10.8 6 10.8 6s-1.6 3.4-4.8 3.4S1.2 6 1.2 6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.4" fill="none" stroke="currentColor" stroke-width="1"/></svg> Hidden Channels <span id="hidden-channels-summary-count" class="settings-section__count"></span></span>
-                                    <span class="settings-section__chevron" aria-hidden="true"><svg viewBox="0 0 12 12" width="10" height="10" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                </summary>
-                                <div class="settings-hidden-browser">
-                                    <button type="button" id="hidden-back-btn" class="settings-hidden-back-btn is-hidden" aria-label="Back to countries">← Back</button>
-                                    <div id="hidden-countries-container" class="country-grid settings-hidden-grid"></div>
-                                    <div id="hidden-channels-container" class="channel-grid settings-hidden-grid is-hidden"></div>
-                                </div>
-                            </details>
-                            <details class="settings-section settings-section--collapsible" id="visited-channels-section">
-                                <summary class="settings-section__summary">
-                                    <span class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 2v1.5M6 8.5V10M2 6h1.5M8.5 6H10M3.2 3.2l1.1 1.1M7.7 7.7l1.1 1.1M8.8 3.2l-1.1 1.1M4.3 7.7l-1.1 1.1" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Visited Channels <span id="visited-channels-summary-count" class="settings-section__count"></span></span>
-                                    <span class="settings-section__chevron" aria-hidden="true"><svg viewBox="0 0 12 12" width="10" height="10" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                </summary>
-                                <div class="settings-hidden-browser">
-                                    <button type="button" id="visited-back-btn" class="settings-hidden-back-btn is-hidden" aria-label="Back to countries">← Back</button>
-                                    <div id="visited-countries-container" class="country-grid settings-hidden-grid"></div>
-                                    <div id="visited-channels-container" class="channel-grid settings-hidden-grid is-hidden"></div>
-                                </div>
-                            </details>
-                            <div class="settings-section">
-                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><ellipse cx="6" cy="3" rx="3.6" ry="1.3" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.4 3v6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3V3M2.4 6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3" fill="none" stroke="currentColor" stroke-width="1"/></svg> Storage</h3>
-                                <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">
-                                    <span>Favorites: —</span>
-                                    <span>Recents: —</span>
-                                    <span>Hidden: —</span>
-                                    <span>Visited: —</span>
-                                    <span>localStorage: —</span>
-                                    <span>Cache: —</span>
-                                </div>
-                            </div>
-                            <div class="settings-section">
-                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 5.2v3.2M6 3.6h.01" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> About</h3>
-                                <p style="font-size: 0.875rem; margin: 0; color: var(--tv-text-secondary);">magicTV v1.0</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tv-tabs" role="tablist">
-                        <button id="back-btn" class="tv-tab is-hidden" data-tab="back-to-countries" title="Back to countries">&lt;</button>
-                        <button class="tv-tab is-active" data-tab="browse"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 1.8v8.4M1.8 6h8.4M2.6 3.6c1.2.9 2.3 1.2 3.4 1.2s2.2-.3 3.4-1.2M2.6 8.4c1.2-.9 2.3-1.2 3.4-1.2s2.2.3 3.4 1.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="tv-tab-text">Browse</span></button>
-                        <button class="tv-tab" data-tab="favorites"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg><span class="tv-tab-text">Favorites</span></button>
-                        <button class="tv-tab" data-tab="recents"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg><span class="tv-tab-text">Recents</span></button>
-                        <button class="tv-tab" data-tab="settings"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M7.2 4.8 3.4 8.6M5.8 3.2l2.6 2.6-1.2 1.2-2.6-2.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tv-tab-text">Settings</span></button>
-                        <div class="tv-tab-popup">
-                            <button id="filter-btn" class="tv-tab tv-tab--filter-btn" title="Filter" aria-label="Filter"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M2.2 2.5h7.6L7 6.2v3.1L5 10.3V6.2L2.2 2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
-                            <input type="search" id="search-countries" class="search-input tv-tab--filter-input" placeholder="Filter" autocomplete="off" aria-label="Filter current list">
-                        </div>
-                        <div class="tv-tab-popup">
-                            <button id="category-btn" class="tv-tab tv-tab--category-btn" title="Filter by category" aria-label="Filter by category" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><rect x="2" y="2" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="2" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="7" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="7" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-                            <select id="category-filter" class="tv-tab--category" aria-label="Filter by category">
-                                <option value="">All categories</option>
-                            </select>
-                        </div>
-                        <div class="tv-tab-popup">
-                            <button id="sort-btn" class="tv-tab tv-tab--sort-btn" title="Sort" aria-label="Sort options"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M4.2 5.2 6 1.8l1.8 3.4M4.7 4.2h2.6M3.8 7h4.4M8.2 7 3.8 10.4h4.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                            <select id="sort-select" class="tv-tab--sort" aria-label="Sort current list"></select>
-                        </div>
-                        <button id="sort-dir-btn" class="tv-tab tv-tab--sort-dir" type="button" title="Toggle ascending/descending" aria-label="Toggle sort direction"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,4.2 3.2,8 8.8,8" fill="currentColor"/></svg></button>
-                    </div>
-                </div>
                 </div>
             </div>
         </div>
     </div>
-    <div id="channel-picker-modal" class="channel-picker-modal is-hidden" hidden aria-hidden="true">
-        <div class="channel-picker-modal__backdrop" data-channel-picker-dismiss tabindex="-1"></div>
+
+    <div id="remote-module-staging" class="remote-module-staging" hidden aria-hidden="true">
+        <div class="tv-module__actions tv-module__actions--start">
+            <button type="button" id="play-favorites-mosaic-btn" class="tv-module__action is-hidden" title="Play favorites on multiple TVs" aria-label="Play favorites on multiple TVs"></button>
+        </div>
+        <div class="tv-module__actions tv-module__actions--end">
+            <button type="button" id="catalog-layout-btn" class="tv-module__action ui-icon-btn is-hidden" title="List view" aria-label="List view"></button>
+            <button type="button" id="remote-external-popout-btn" class="tv-module__action ui-icon-btn is-hidden" title="Pop out remote" aria-label="Pop out remote" aria-pressed="false"></button>
+            <button type="button" id="browser-popout-btn" class="tv-module__action ui-icon-btn is-hidden" title="Pop out browser" aria-label="Pop out browser" aria-pressed="false"></button>
+            <button type="button" id="refresh-btn" class="tv-module__action ui-icon-btn" title="Refresh this tab" aria-label="Refresh this tab"></button>
+            <button type="button" id="browser-popout-close" class="tv-module__action ui-icon-btn is-hidden" title="Close browser window" aria-label="Close browser window">
+                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" id="remote-module-pin" class="tv-module__action remote-module__pin" title="Pin window" aria-label="Pin window" aria-pressed="false">
+                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 1.8h3.6l.6 3.2 1.6.8v1.2H6.6V10l-.6.8-.6-.8V7H2V5.8l1.6-.8.6-3.2z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" id="remote-module-close" class="tv-module__action remote-module__close" title="Close" aria-label="Close">
+                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </div>
+        <div id="tv-catalog-body" class="tv-module__body remote-module__shell">
+            <header class="remote-module__chrome">
+                    <h2 class="remote-module__brand">magic remote</h2>
+                    <div id="remote-channel-bar" class="remote-module__channel-bar is-hidden">
+                        <span id="remote-channel-name" class="tv-header-now-playing"></span>
+                    </div>
+                </header>
+                        <div class="remote-module__scroll">
+                            <div id="remote-panel" class="tv-panel remote-panel is-active">
+                    <div class="remote-panel__grid">
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-1" disabled aria-disabled="true" title="Channel 1" aria-label="Channel 1">1</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-1" disabled aria-disabled="true" title="Channel 2" aria-label="Channel 2">2</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-1" disabled aria-disabled="true" title="Channel 3" aria-label="Channel 3">3</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-1" disabled aria-disabled="true" title="Channel 4" aria-label="Channel 4">4</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-1" disabled aria-disabled="true" title="Channel 5" aria-label="Channel 5">5</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-2" disabled aria-disabled="true" title="Channel 6" aria-label="Channel 6">6</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-2" disabled aria-disabled="true" title="Channel 7" aria-label="Channel 7">7</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-2" disabled aria-disabled="true" title="Channel 8" aria-label="Channel 8">8</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-2" disabled aria-disabled="true" title="Channel 9" aria-label="Channel 9">9</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-2" disabled aria-disabled="true" title="Channel 0" aria-label="Channel 0">0</button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-3" disabled aria-disabled="true" title="Channel up" aria-label="Channel up"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,4.2 3.2,8 8.8,8" fill="currentColor"/></svg></button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--placeholder tv-controls__btn--main-3" disabled aria-disabled="true" title="Channel down" aria-label="Channel down"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,7.8 3.2,4 8.8,4" fill="currentColor"/></svg></button></div>
+            
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="vol-down" title="Volume down" aria-label="Volume down"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="vol-up" title="Volume up" aria-label="Volume up"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn remote-panel__btn is-muted" id="remote-mute-btn" data-remote-action="mute" title="Unmute" aria-label="Mute or unmute" aria-pressed="true"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn" id="remote-play-btn" data-remote-action="play" title="Play" aria-label="Play"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><path d="M3 2v8l6-4-6-4z" fill="currentColor"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="stop" title="Stop" aria-label="Stop"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><rect x="2" y="2" width="8" height="8" fill="currentColor"/></svg></button></div>
+            
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-2" data-remote-action="fullscreen" title="Fullscreen" aria-label="Fullscreen"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" vector-effect="non-scaling-stroke"><path d="M2.4 2.4h2.8M2.4 2.4v2.8M9.6 2.4H6.8M9.6 2.4v2.8M2.4 9.6h2.8M2.4 9.6V6.8M9.6 9.6H6.8M9.6 9.6V6.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-2" data-remote-action="pip" title="Pop out" aria-label="Pop out"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><rect x="1.5" y="3.2" width="6.3" height="4.8" rx="0.6" fill="none" stroke="currentColor" stroke-width="0.85"/><path d="M7 4 10.6 1.4M10.6 1.4H8.6M10.6 1.4V3.4" fill="none" stroke="currentColor" stroke-width="0.85" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-2" data-remote-action="cast" title="Cast" aria-label="Cast"><svg viewBox="0 0 24 24" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2 16.1V7.9c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v8.2c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 12.5a5 5 0 0 1 10 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 12.5a2 2 0 0 1 4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn remote-panel__btn" id="remote-fav-btn" data-remote-action="fav" title="Add to favorites" aria-label="Toggle favorite" aria-pressed="false"><svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linejoin="round"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn" id="remote-mute-all-btn" data-remote-action="mute-all" title="Mute all" aria-label="Mute all"><svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path d="M1 2h5L2.2 6 6 10H1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 4.2H9.8l3.2-3.2v9.8l-3.2-3.2H7.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M12.4 5.1c.55.55.55 1.7 0 2.25M13.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="6.4" y1="1.3" x2="16.2" y2="10.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn is-hidden" id="remote-reset-btn" data-remote-action="reset" title="Reset multi-TV layout" aria-label="Reset multi-TV layout"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.2 6a3.8 3.8 0 0 1 6.5-2.6M9.8 6a3.8 3.8 0 0 1-6.5 2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.2 1.8v2.2H10.4M3.8 10.2V8H1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 remote-panel__btn" id="remote-collapse-btn" data-remote-action="collapse-toggle" title="Collapse remote" aria-label="Collapse remote"><svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M3 7l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 remote-panel__btn" id="remote-dock-toggle" data-remote-action="dock-toggle" title="Undock remote" aria-label="Undock remote"><svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M3 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        </div>
+            
+                        <div class="remote-panel__cell remote-panel__cell--slider">
+                            <div class="tv-controls__volume remote-panel__volume">
+                                <span class="tv-controls__volume-pct" id="volume-pct">85%</span>
+                                <input type="range" class="tv-controls__volume-slider" id="volume-slider" min="0" max="100" value="85">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <div id="browse-panel" class="tv-panel">
+                                    <div id="countries-container" class="country-grid"></div>
+                                    <div id="channels-container" class="channel-grid is-hidden"></div>
+                                </div>
+            
+                                <div id="favorites-panel" class="tv-panel">
+                                    <div id="favorites-grid" class="channel-grid"></div>
+                                    <div id="favorites-empty" class="empty-state"><div class="empty-state__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 12 12" width="36" height="36" focusable="false"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg></div><p class="empty-state__text">No favorites!</p></div>
+                                </div>
+            
+                                <div id="recents-panel" class="tv-panel">
+                                    <div id="recents-grid" class="channel-grid"></div>
+                                    <div id="recents-empty" class="empty-state"><div class="empty-state__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 12 12" width="36" height="36" focusable="false"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></div><p class="empty-state__text">No recents!</p></div>
+                                </div>
+            
+                                <div id="settings-panel" class="tv-panel">
+                                    <div class="settings-panel">
+                                        <div class="settings-section">
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 3.6v2.4l1.8 1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Clock</h3>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="tv-clock-style-select">Clock Style</label>
+                                                <select id="tv-clock-style-select" aria-label="Clock style"></select>
+                                            </div>
+                                        </div>
+            
+                                        <div class="settings-section">
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 2.6v6.8L9.4 6 4.2 2.6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg> Playback</h3>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label">Buffer Size</label>
+                                                <select id="buffer-size-select">
+                                                    <option value="5">5s (Fast)</option>
+                                                    <option value="15" selected>15s (Stable)</option>
+                                                    <option value="30">30s (Very Stable)</option>
+                                                </select>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="recents-cap-input">Max recents</label>
+                                                <div class="settings-section__control">
+                                                    <input type="number" id="recents-cap-input" min="1" max="100" step="1" value="20" aria-label="Recent channels limit">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="settings-section">
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Screens</h3>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="screen-top-left-toggle">Add screen top left</label>
+                                                <button type="button" id="screen-top-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top left" title="Add screen top left"></button>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="screen-top-right-toggle">Add screen top right</label>
+                                                <button type="button" id="screen-top-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top right" title="Add screen top right"></button>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="screen-bottom-left-toggle">Add screen bottom left</label>
+                                                <button type="button" id="screen-bottom-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom left" title="Add screen bottom left"></button>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="screen-bottom-right-toggle">Add screen bottom right</label>
+                                                <button type="button" id="screen-bottom-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom right" title="Add screen bottom right"></button>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="swap-transition-select">Channel switch</label>
+                                                <select id="swap-transition-select" aria-label="Channel switch transition"></select>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="catalog-transition-select">View transition</label>
+                                                <select id="catalog-transition-select" aria-label="View transition"></select>
+                                            </div>
+                                        </div>
+                                        <div class="settings-section">
+                                            <div class="settings-section__header">
+                                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.8a4.2 4.2 0 1 0 0 8.4c.7 0 1-.4 1-1 0-.4-.2-.7-.2-1.1 0-.8.7-1.5 1.5-1.5H9a2.2 2.2 0 0 0 0-4.4 4.1 4.1 0 0 0-3 0z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="4.2" cy="5" r="0.7" fill="currentColor"/><circle cx="6" cy="3.8" r="0.7" fill="currentColor"/><circle cx="7.8" cy="5" r="0.7" fill="currentColor"/></svg> Appearance</h3>
+                                                <button type="button" id="reset-appearance-btn" class="settings-reset-btn" aria-label="Reset to defaults" title="Reset to defaults">↺</button>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="theme-select">Theme</label>
+                                                <div class="settings-section__control">
+                                                    <select id="theme-select" aria-label="Theme"></select>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" id="font-picker-label" for="font-picker-trigger">Font</label>
+                                                <div class="settings-section__control">
+                                                    <div class="settings-font-picker" id="font-picker">
+                                                        <button type="button" class="settings-font-picker__trigger" id="font-picker-trigger" aria-labelledby="font-picker-label" aria-haspopup="listbox" aria-expanded="false" aria-controls="font-picker-menu">
+                                                            <span class="settings-font-picker__current" id="font-picker-current">System</span>
+                                                        </button>
+                                                        <div class="settings-font-picker__menu is-hidden" id="font-picker-menu" role="listbox" aria-labelledby="font-picker-label"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="settings-color-group">
+                                                <div class="settings-color-group__title">Accents</div>
+                                                <div class="settings-section__item">
+                                                    <label class="settings-section__label" for="theme-color-main-1">Main 1, 2, 3</label>
+                                                    <div class="settings-section__control">
+                                                        <input type="color" class="settings-color" id="theme-color-main-1" value="#00FFFF">
+                                                        <input type="color" class="settings-color" id="theme-color-main-2" value="#00FF88">
+                                                        <input type="color" class="settings-color" id="theme-color-main-3" value="#FF00FF">
+                                                    </div>
+                                                </div>
+                                                <div class="settings-section__item">
+                                                    <label class="settings-section__label" for="theme-color-main-1-flip">Flip 1, 2, 3</label>
+                                                    <div class="settings-section__control">
+                                                        <input type="color" class="settings-color" id="theme-color-main-1-flip" value="#FF00FF">
+                                                        <input type="color" class="settings-color" id="theme-color-main-2-flip" value="#FF00FF">
+                                                        <input type="color" class="settings-color" id="theme-color-main-3-flip" value="#00FFFF">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="settings-color-group">
+                                                <div class="settings-color-group__title">Backgrounds</div>
+                                                <div class="settings-section__item">
+                                                    <label class="settings-section__label" for="theme-color-bg">Primary / Secondary</label>
+                                                    <div class="settings-section__control">
+                                                        <input type="color" class="settings-color" id="theme-color-bg" value="#0A0E27">
+                                                        <input type="color" class="settings-color" id="theme-color-bg-secondary" value="#141829">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="settings-color-group">
+                                                <div class="settings-color-group__title">Borders</div>
+                                                <div class="settings-section__item">
+                                                    <label class="settings-section__label" for="theme-color-border">Normal / Light</label>
+                                                    <div class="settings-section__control">
+                                                        <input type="color" class="settings-color" id="theme-color-border" value="#2A2E3A">
+                                                        <input type="color" class="settings-color" id="theme-color-border-light" value="#3A3E4A">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="settings-color-group">
+                                                <div class="settings-color-group__title">Text</div>
+                                                <div class="settings-section__item">
+                                                    <label class="settings-section__label" for="theme-color-text-primary">Primary, secondary, muted</label>
+                                                    <div class="settings-section__control">
+                                                        <input type="color" class="settings-color" id="theme-color-text-primary" value="#FFFFFF">
+                                                        <input type="color" class="settings-color" id="theme-color-text-secondary" value="#B3B3B3">
+                                                        <input type="color" class="settings-color" id="theme-color-text-muted" value="#737373">
+                                                    </div>
+                                                </div>
+                                            </div>
+            
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="text-size-slider">Text Size</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="16" aria-valuetext="100%">
+                                                    <span class="settings-value" id="text-size-value">100%</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="tile-width-slider">Tile Width</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="180" aria-valuetext="180px">
+                                                    <span class="settings-value" id="tile-width-value">180px</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="active-tile-select">Active Tile</label>
+                                                <select id="active-tile-select" aria-label="Active tile indicator style">
+                                                    <option value="none">None</option>
+                                                    <option value="wave">Scrolling wave</option>
+                                                    <option value="pulse">Pulse</option>
+                                                    <option value="visualizer">Visualizer</option>
+                                                </select>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="visited-style-select">Visited accent</label>
+                                                <select id="visited-style-select" aria-label="Visited channel accent style">
+                                                    <option value="undistinguished">Undistinguished</option>
+                                                    <option value="accent-1">Accent 1</option>
+                                                    <option value="accent-2">Accent 2</option>
+                                                    <option value="accent-3">Accent 3</option>
+                                                </select>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="non-visited-style-select">Non-visited accent</label>
+                                                <select id="non-visited-style-select" aria-label="Non-visited channel accent style">
+                                                    <option value="undistinguished">Undistinguished</option>
+                                                    <option value="accent-1">Accent 1</option>
+                                                    <option value="accent-2">Accent 2</option>
+                                                    <option value="accent-3">Accent 3</option>
+                                                </select>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="list-width-slider">List Width</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="list-width-slider" min="100" max="300" step="10" value="300" aria-valuetext="300px">
+                                                    <span class="settings-value" id="list-width-value">300px</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="channel-picker-opacity-slider">Remote module opacity</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="channel-picker-opacity-slider" min="33" max="100" step="1" value="100" aria-valuetext="100%">
+                                                    <span class="settings-value" id="channel-picker-opacity-value">100%</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="remote-idle-fade-enabled">Auto-hide remote when idle</label>
+                                                <div class="settings-section__control">
+                                                    <input type="checkbox" id="remote-idle-fade-enabled" checked aria-label="Auto-hide remote when idle">
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="remote-idle-delay-slider">Idle delay before fade</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="remote-idle-delay-slider" min="0" max="120" step="1" value="10" aria-valuetext="10s">
+                                                    <span class="settings-value" id="remote-idle-delay-value">10s</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="remote-idle-fade-slider">Idle fade duration</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="remote-idle-fade-slider" min="1" max="60" step="1" value="10" aria-valuetext="10s">
+                                                    <span class="settings-value" id="remote-idle-fade-value">10s</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="remote-texture-select">Remote texture</label>
+                                                <div class="settings-section__control">
+                                                    <select id="remote-texture-select" class="settings-select" aria-label="Remote shell texture"></select>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="browser-popout-prefer-open">Browser popout window</label>
+                                                <div class="settings-section__control">
+                                                    <button type="button" id="browser-popout-prefer-open" class="settings-toggle" aria-pressed="false" aria-label="Open browser in a separate window"></button>
+                                                </div>
+                                            </div>
+                                            <div class="settings-preview">
+                                                <div class="settings-preview__label">Preview</div>
+                                                <div class="settings-preview__variants">
+                                                    <div class="settings-preview__variant">
+                                                        <div class="settings-preview__variant-label">Tile</div>
+                                                        <div class="settings-preview__tile-grid">
+                                                            <div id="appearance-preview-tile" class="channel-tile" role="presentation">
+                                                                <div class="channel-tile__icon">
+                                                                    <div class="channel-tile__capture-frame">
+                                                                        <div class="channel-tile__letter-avatar" id="preview-avatar">P</div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="channel-tile__body">
+                                                                    <h3 class="channel-tile__name" id="preview-name">Now Playing</h3>
+                                                                    <span class="channel-tile__flag" id="preview-flag"></span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="settings-preview__variant">
+                                                        <div class="settings-preview__variant-label">List</div>
+                                                        <div class="settings-preview__list-grid">
+                                                            <div id="appearance-preview-list" class="channel-tile" role="presentation">
+                                                                <div class="channel-tile__icon">
+                                                                    <div class="channel-tile__capture-frame">
+                                                                        <div class="channel-tile__letter-avatar" id="preview-list-avatar">P</div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="channel-tile__body">
+                                                                    <h3 class="channel-tile__name" id="preview-list-name">Now Playing</h3>
+                                                                    <span class="channel-tile__flag" id="preview-list-flag"></span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <details class="settings-section settings-section--collapsible" id="hidden-channels-section">
+                                            <summary class="settings-section__summary">
+                                                <span class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4S10.8 6 10.8 6s-1.6 3.4-4.8 3.4S1.2 6 1.2 6z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.4" fill="none" stroke="currentColor" stroke-width="1"/></svg> Hidden Channels <span id="hidden-channels-summary-count" class="settings-section__count"></span></span>
+                                                <span class="settings-section__chevron" aria-hidden="true"><svg viewBox="0 0 12 12" width="10" height="10" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                            </summary>
+                                            <div class="settings-hidden-browser">
+                                                <button type="button" id="hidden-back-btn" class="settings-hidden-back-btn is-hidden" aria-label="Back to countries">← Back</button>
+                                                <div id="hidden-countries-container" class="country-grid settings-hidden-grid"></div>
+                                                <div id="hidden-channels-container" class="channel-grid settings-hidden-grid is-hidden"></div>
+                                            </div>
+                                        </details>
+                                        <details class="settings-section settings-section--collapsible" id="visited-channels-section">
+                                            <summary class="settings-section__summary">
+                                                <span class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 2v1.5M6 8.5V10M2 6h1.5M8.5 6H10M3.2 3.2l1.1 1.1M7.7 7.7l1.1 1.1M8.8 3.2l-1.1 1.1M4.3 7.7l-1.1 1.1" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Visited Channels <span id="visited-channels-summary-count" class="settings-section__count"></span></span>
+                                                <span class="settings-section__chevron" aria-hidden="true"><svg viewBox="0 0 12 12" width="10" height="10" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                            </summary>
+                                            <div class="settings-hidden-browser">
+                                                <button type="button" id="visited-back-btn" class="settings-hidden-back-btn is-hidden" aria-label="Back to countries">← Back</button>
+                                                <div id="visited-countries-container" class="country-grid settings-hidden-grid"></div>
+                                                <div id="visited-channels-container" class="channel-grid settings-hidden-grid is-hidden"></div>
+                                            </div>
+                                        </details>
+                                        <div class="settings-section">
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><ellipse cx="6" cy="3" rx="3.6" ry="1.3" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.4 3v6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3V3M2.4 6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3" fill="none" stroke="currentColor" stroke-width="1"/></svg> Storage</h3>
+                                            <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">
+                                                <span>Favorites: —</span>
+                                                <span>Recents: —</span>
+                                                <span>Hidden: —</span>
+                                                <span>Visited: —</span>
+                                                <span>localStorage: —</span>
+                                                <span>Cache: —</span>
+                                            </div>
+                                        </div>
+                                        <div class="settings-section">
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 5.2v3.2M6 3.6h.01" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> About</h3>
+                                            <p style="font-size: 0.875rem; margin: 0; color: var(--tv-text-secondary);">magicTV v1.0</p>
+                                        </div>
+                                    </div>
+                                </div>
+                        </div>
+                        <footer class="remote-module__footer">
+                            <div id="remote-catalog-tools" class="remote-module__catalog-tools tv-tabs" role="toolbar">
+                                    <button id="back-btn" class="tv-tab is-hidden" data-tab="back-to-countries" title="Back to countries">&lt;</button>
+                                    <div class="tv-tab-popup">
+                                        <button id="filter-btn" class="tv-tab tv-tab--filter-btn" title="Filter" aria-label="Filter"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M2.2 2.5h7.6L7 6.2v3.1L5 10.3V6.2L2.2 2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+                                        <input type="search" id="search-countries" class="search-input tv-tab--filter-input" placeholder="Filter" autocomplete="off" aria-label="Filter current list">
+                                    </div>
+                                    <div class="tv-tab-popup">
+                                        <button id="category-btn" class="tv-tab tv-tab--category-btn" title="Filter by category" aria-label="Filter by category" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><rect x="2" y="2" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="2" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="7" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="7" width="3" height="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                                        <select id="category-filter" class="tv-tab--category" aria-label="Filter by category">
+                                            <option value="">All categories</option>
+                                        </select>
+                                    </div>
+                                    <div class="tv-tab-popup">
+                                        <button id="sort-btn" class="tv-tab tv-tab--sort-btn" title="Sort" aria-label="Sort options"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M4.2 5.2 6 1.8l1.8 3.4M4.7 4.2h2.6M3.8 7h4.4M8.2 7 3.8 10.4h4.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                                        <select id="sort-select" class="tv-tab--sort" aria-label="Sort current list"></select>
+                                    </div>
+                                    <button id="sort-dir-btn" class="tv-tab tv-tab--sort-dir" type="button" title="Toggle ascending/descending" aria-label="Toggle sort direction"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,4.2 3.2,8 8.8,8" fill="currentColor"/></svg></button>
+                                </div>
+                            <footer id="remote-panel-footer" class="remote-module__footer-panel">
+                    <div class="remote-panel__footer-nav remote-panel__cell--nav">
+                        <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-2" data-remote-nav="remote" title="Remote" aria-label="Remote"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.5" y="2" width="9" height="7" rx="0.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="5.5" r="0.8" fill="currentColor"/><circle cx="8" cy="5.5" r="0.8" fill="currentColor"/><circle cx="6" cy="7.5" r="0.8" fill="currentColor"/></svg></button>
+                        <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-1" data-remote-nav="browse" title="Browse" aria-label="Browse"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 1.8v8.4M1.8 6h8.4M2.6 3.6c1.2.9 2.3 1.2 3.4 1.2s2.2-.3 3.4-1.2M2.6 8.4c1.2-.9 2.3-1.2 3.4-1.2s2.2.3 3.4 1.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                        <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-3" data-remote-nav="favorites" title="Favorites" aria-label="Favorites"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+                        <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-2" data-remote-nav="recents" title="Recents" aria-label="Recents"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                        <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-1" data-remote-nav="settings" title="Settings" aria-label="Settings"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M7.2 4.8 3.4 8.6M5.8 3.2l2.6 2.6-1.2 1.2-2.6-2.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    </div>
+                    <div class="remote-panel__footer-screens remote-panel__cell--screens">
+                        <div class="remote-panel__screens tv-controls__screens">
+                            <button type="button" class="tv-controls__screen-btn is-active" data-screen-slot="center" aria-label="TV 1 main screen" title="TV 1 main screen">
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">1</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="topLeft" aria-label="TV 2 top left" title="TV 2 top left" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">2</span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 2" title="Remove TV 2">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="topRight" aria-label="TV 3 top right" title="TV 3 top right" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">3</span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 3" title="Remove TV 3">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="bottomLeft" aria-label="TV 4 bottom left" title="TV 4 bottom left" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">4</span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 4" title="Remove TV 4">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="bottomRight" aria-label="TV 5 bottom right" title="TV 5 bottom right" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">5</span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 5" title="Remove TV 5">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__add-screen-btn" id="add-screen-btn" aria-label="Add screen" title="Add screen">+</button>
+                        </div>
+                    </div>
+                </footer>
+                        </footer>
+        </div>
+        </div>
+    </div>
+
+    <button type="button" id="remote-dock-tab" class="remote-dock-tab" aria-expanded="false" aria-controls="remote-dock-sheet" title="Open remote" aria-label="Open remote">
+        <span class="remote-dock-tab__brand">magic remote</span>
+    </button>
+    <div id="remote-dock-sheet" class="remote-dock-sheet is-collapsed" aria-hidden="true">
+        <div class="remote-dock-sheet__resize" data-dock-resize aria-hidden="true"></div>
+        <div id="remote-dock-host" class="remote-dock-sheet__inner"></div>
+    </div>
+
+    <div id="browser-popout-module" class="browser-popout-module is-hidden" hidden aria-hidden="true">
         <div
-            id="channel-picker-dialog"
-            class="channel-picker-modal__dialog"
+            id="browser-popout-dialog"
+            class="browser-popout-module__dialog"
             role="dialog"
-            aria-modal="true"
+            aria-modal="false"
             aria-label="Channel browser"
             tabindex="-1"
         >
-            <div class="channel-picker-modal__header" data-channel-picker-drag></div>
-            <div id="channel-picker-host" class="channel-picker-modal__host"></div>
-            <span class="channel-picker-modal__resize" data-picker-resize="nw" aria-hidden="true"></span>
-            <span class="channel-picker-modal__resize" data-picker-resize="ne" aria-hidden="true"></span>
-            <span class="channel-picker-modal__resize" data-picker-resize="sw" aria-hidden="true"></span>
-            <span class="channel-picker-modal__resize" data-picker-resize="se" aria-hidden="true"></span>
+            <div id="browser-popout-host" class="browser-popout-module__host"></div>
+            <span class="browser-popout-module__resize" data-browser-popout-resize="nw" aria-hidden="true"></span>
+            <span class="browser-popout-module__resize" data-browser-popout-resize="ne" aria-hidden="true"></span>
+            <span class="browser-popout-module__resize" data-browser-popout-resize="sw" aria-hidden="true"></span>
+            <span class="browser-popout-module__resize" data-browser-popout-resize="se" aria-hidden="true"></span>
+        </div>
+    </div>
+
+    <div id="remote-module" class="remote-module is-hidden" hidden aria-hidden="true">
+        <div class="remote-module__backdrop" data-remote-module-dismiss tabindex="-1"></div>
+        <div
+            id="remote-module-dialog"
+            class="remote-module__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Remote control"
+            tabindex="-1"
+        >
+            <div class="remote-module__header" data-remote-module-drag></div>
+            <div id="remote-module-host" class="remote-module__host"></div>
+            <span class="remote-module__resize" data-remote-resize="nw" aria-hidden="true"></span>
+            <span class="remote-module__resize" data-remote-resize="ne" aria-hidden="true"></span>
+            <span class="remote-module__resize" data-remote-resize="sw" aria-hidden="true"></span>
+            <span class="remote-module__resize" data-remote-resize="se" aria-hidden="true"></span>
         </div>
     </div>
     <div id="toast-container" style="position: fixed; bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem)); right: max(2rem, env(safe-area-inset-right, 0px)); z-index: 9999;"></div>

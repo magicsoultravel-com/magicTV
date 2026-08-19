@@ -2,6 +2,9 @@ import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { showAppToast } from './toast.js';
+import { RemoteModule } from './remoteModule.js';
+import { BrowserPopout } from './browserPopout.js';
+import { REMOTE_TEXTURES } from './remoteTextures.js';
 import {
     THEME_COLOR_KEYS,
     applyFontToRoot,
@@ -14,6 +17,29 @@ import {
 
 function formatTextSizeLabel(size) {
     return `${Math.round((size / 16) * 100)}%`;
+}
+
+function syncRemoteIdleFadeUi({ enabled, delaySec, fadeSec }) {
+    const idleFadeEnabled = el('remote-idle-fade-enabled');
+    const idleDelaySlider = el('remote-idle-delay-slider');
+    const idleDelayValue = el('remote-idle-delay-value');
+    const idleFadeSlider = el('remote-idle-fade-slider');
+    const idleFadeValue = el('remote-idle-fade-value');
+    if (idleFadeEnabled) idleFadeEnabled.checked = enabled === true;
+    if (idleDelaySlider) idleDelaySlider.value = String(delaySec);
+    if (idleDelayValue) idleDelayValue.textContent = `${delaySec}s`;
+    if (idleDelaySlider) idleDelaySlider.setAttribute('aria-valuetext', `${delaySec}s`);
+    if (idleFadeSlider) idleFadeSlider.value = String(fadeSec);
+    if (idleFadeValue) idleFadeValue.textContent = `${fadeSec}s`;
+    if (idleFadeSlider) idleFadeSlider.setAttribute('aria-valuetext', `${fadeSec}s`);
+}
+
+function syncBrowserPopoutToggleUi(enabled) {
+    const toggle = el('browser-popout-prefer-open');
+    if (!toggle) return;
+    const on = enabled === true;
+    toggle.classList.toggle('is-active', on);
+    toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
 function setFontPickerOpen(open) {
@@ -105,6 +131,11 @@ export const Appearance = {
         const listValue = el('list-width-value');
         const pickerOpacitySlider = el('channel-picker-opacity-slider');
         const pickerOpacityValue = el('channel-picker-opacity-value');
+        const idleFadeEnabled = el('remote-idle-fade-enabled');
+        const idleDelaySlider = el('remote-idle-delay-slider');
+        const idleDelayValue = el('remote-idle-delay-value');
+        const idleFadeSlider = el('remote-idle-fade-slider');
+        const idleFadeValue = el('remote-idle-fade-value');
         const themeSelect = el('theme-select');
         const fontTrigger = el('font-picker-trigger');
         const fontMenu = el('font-picker-menu');
@@ -132,6 +163,8 @@ export const Appearance = {
             if (pickerOpacityValue) pickerOpacityValue.textContent = `${pct}%`;
             if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pct}%`);
         };
+
+        const syncIdleFadeUi = syncRemoteIdleFadeUi;
 
         const syncFontUi = (fontId) => {
             syncFontPickerUi(fontId);
@@ -219,6 +252,66 @@ export const Appearance = {
             });
         }
 
+        if (idleFadeEnabled) {
+            idleFadeEnabled.addEventListener('change', () => {
+                SettingsStore.setRemoteIdleFadeEnabled(idleFadeEnabled.checked);
+                RemoteModule.resetIdleFade();
+            });
+        }
+
+        if (idleDelaySlider) {
+            idleDelaySlider.addEventListener('input', () => {
+                const delaySec = SettingsStore.setRemoteIdleDelaySec(Number(idleDelaySlider.value));
+                syncIdleFadeUi({
+                    enabled: SettingsStore.getRemoteIdleFadeEnabled(),
+                    delaySec,
+                    fadeSec: SettingsStore.getRemoteIdleFadeSec()
+                });
+                RemoteModule.resetIdleFade();
+            });
+        }
+
+        if (idleFadeSlider) {
+            idleFadeSlider.addEventListener('input', () => {
+                const fadeSec = SettingsStore.setRemoteIdleFadeSec(Number(idleFadeSlider.value));
+                syncIdleFadeUi({
+                    enabled: SettingsStore.getRemoteIdleFadeEnabled(),
+                    delaySec: SettingsStore.getRemoteIdleDelaySec(),
+                    fadeSec
+                });
+                RemoteModule.resetIdleFade();
+            });
+        }
+
+        const browserPopoutToggle = el('browser-popout-prefer-open');
+        if (browserPopoutToggle && browserPopoutToggle.dataset.bound !== '1') {
+            browserPopoutToggle.dataset.bound = '1';
+            browserPopoutToggle.addEventListener('click', () => {
+                const next = SettingsStore.setBrowserPopoutPreferOpen(
+                    browserPopoutToggle.getAttribute('aria-pressed') !== 'true'
+                );
+                syncBrowserPopoutToggleUi(next);
+                BrowserPopout.syncPopoutBtn();
+                showAppToast(next ? 'Browser opens in a separate window' : 'Browser stays in the remote');
+            });
+        }
+
+        const remoteTextureSelect = el('remote-texture-select');
+        if (remoteTextureSelect && remoteTextureSelect.dataset.bound !== '1') {
+            remoteTextureSelect.dataset.bound = '1';
+            if (!remoteTextureSelect.options?.length) {
+                remoteTextureSelect.innerHTML = REMOTE_TEXTURES
+                    .map((t) => `<option value="${t.id}">${t.label}</option>`)
+                    .join('');
+            }
+            remoteTextureSelect.addEventListener('change', () => {
+                const texture = SettingsStore.setRemoteTexture(remoteTextureSelect.value);
+                this.applyStyles();
+                const label = REMOTE_TEXTURES.find((t) => t.id === texture)?.label || texture;
+                showAppToast(`Remote texture: ${label}`);
+            });
+        }
+
         const activeTileSelect = el('active-tile-select');
         if (activeTileSelect && activeTileSelect.dataset.bound !== '1') {
             activeTileSelect.dataset.bound = '1';
@@ -271,6 +364,10 @@ export const Appearance = {
                     tileWidth,
                     listWidth,
                     channelPickerOpacity,
+                    remoteIdleFadeEnabled,
+                    remoteIdleDelaySec,
+                    remoteIdleFadeSec,
+                    browserPopoutPreferOpen,
                     activeTileStyle,
                     visitedStyle,
                     nonVisitedStyle,
@@ -282,6 +379,12 @@ export const Appearance = {
                 syncTileUi(tileWidth);
                 syncListUi(listWidth);
                 syncPickerOpacityUi(channelPickerOpacity);
+                syncIdleFadeUi({
+                    enabled: remoteIdleFadeEnabled,
+                    delaySec: remoteIdleDelaySec,
+                    fadeSec: remoteIdleFadeSec
+                });
+                syncBrowserPopoutToggleUi(browserPopoutPreferOpen);
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
                 if (nonVisitedStyleSelect) nonVisitedStyleSelect.value = nonVisitedStyle;
@@ -289,6 +392,7 @@ export const Appearance = {
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
                 this.applyStyles();
+                RemoteModule.resetIdleFade();
                 showAppToast('Appearance reset to defaults');
             });
         }
@@ -310,7 +414,9 @@ export const Appearance = {
         root.style.fontSize = `${textSize}px`;
         root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
         root.style.setProperty('--tv-list-width', `${listWidth}px`);
+        root.style.setProperty('--remote-module-opacity', String(channelPickerOpacity / 100));
         root.style.setProperty('--channel-picker-opacity', String(channelPickerOpacity / 100));
+        root.setAttribute('data-remote-texture', SettingsStore.getRemoteTexture());
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
         root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
@@ -411,6 +517,24 @@ export const Appearance = {
         if (pickerOpacitySlider) pickerOpacitySlider.value = String(pickerOpacity);
         if (pickerOpacityValue) pickerOpacityValue.textContent = `${pickerOpacity}%`;
         if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pickerOpacity}%`);
+
+        syncRemoteIdleFadeUi({
+            enabled: SettingsStore.getRemoteIdleFadeEnabled(),
+            delaySec: SettingsStore.getRemoteIdleDelaySec(),
+            fadeSec: SettingsStore.getRemoteIdleFadeSec()
+        });
+
+        syncBrowserPopoutToggleUi(SettingsStore.getBrowserPopoutPreferOpen());
+
+        const remoteTextureSelect = el('remote-texture-select');
+        if (remoteTextureSelect) {
+            if (!remoteTextureSelect.options?.length) {
+                remoteTextureSelect.innerHTML = REMOTE_TEXTURES
+                    .map((t) => `<option value="${t.id}">${t.label}</option>`)
+                    .join('');
+            }
+            remoteTextureSelect.value = SettingsStore.getRemoteTexture();
+        }
 
         const themeId = SettingsStore.getThemeId();
         const themeSelect = el('theme-select');

@@ -190,27 +190,42 @@ function normalizeMosaicPlacement(raw) {
     return out;
 }
 
-/** Floating channel-picker dialog geometry (CSS px) + pin / open / target. */
-function normalizeChannelPicker(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-    const left = Number(raw.left);
-    const top = Number(raw.top);
-    const width = Number(raw.width);
-    const height = Number(raw.height);
+/** Floating remote module geometry (CSS px) + mode / pin / open / target. */
+function normalizeRemoteModule(raw, legacyPicker) {
+    const src = raw && typeof raw === 'object' ? raw : legacyPicker;
+    if (!src || typeof src !== 'object') return null;
+    const left = Number(src.left);
+    const top = Number(src.top);
+    const width = Number(src.width);
+    const height = Number(src.height);
     if (![left, top, width, height].every(Number.isFinite)) return null;
     if (width < 200 || height < 160) return null;
-    const target = typeof raw.targetSlotId === 'string' && MOSAIC_SLOT_IDS.includes(raw.targetSlotId)
-        ? raw.targetSlotId
+    const target = typeof src.targetSlotId === 'string' && MOSAIC_SLOT_IDS.includes(src.targetSlotId)
+        ? src.targetSlotId
         : 'center';
+    let mode = src.mode;
+    if (!mode) mode = src.open === true ? 'undocked' : 'hidden';
+    if (!['hidden', 'docked', 'undocked'].includes(mode)) mode = 'hidden';
+    const sheetHeight = Number.isFinite(Number(src.sheetHeight))
+        ? Math.min(0.85, Math.max(0.25, Number(src.sheetHeight)))
+        : 0.45;
     return {
         left,
         top,
         width,
         height,
-        pinned: raw.pinned === true,
-        open: raw.open === true,
-        targetSlotId: target
+        mode,
+        pinned: src.pinned === true,
+        open: src.open === true,
+        targetSlotId: target,
+        sheetHeight,
+        sheetExpanded: src.sheetExpanded !== false
     };
+}
+
+/** @deprecated alias */
+function normalizeChannelPicker(raw) {
+    return normalizeRemoteModule(null, raw);
 }
 
 export function normalizeVisitedStyle(value) {
@@ -275,6 +290,7 @@ export function loadPlayerState() {
                 : DEFAULT_BUFFER_SIZE,
             mosaicSlots: normalizeMosaicSlots(raw.mosaicSlots),
             mosaicPlacement: normalizeMosaicPlacement(raw.mosaicPlacement),
+            remoteModule: normalizeRemoteModule(raw.remoteModule, raw.channelPicker),
             channelPicker: normalizeChannelPicker(raw.channelPicker),
             sortBy: normalizeSortBy(raw.sortBy),
             sortDir: normalizeSortDir(raw.sortDir),
@@ -297,6 +313,7 @@ export function loadPlayerState() {
             bufferSize: DEFAULT_BUFFER_SIZE,
             mosaicSlots: {},
             mosaicPlacement: {},
+            remoteModule: null,
             channelPicker: null,
             sortBy: { ...DEFAULT_SORT_BY },
             sortDir: { ...DEFAULT_SORT_DIR },
@@ -344,6 +361,7 @@ export function savePlayerState(patch) {
         bufferSize: merged.bufferSize,
         mosaicSlots: merged.mosaicSlots || {},
         mosaicPlacement: merged.mosaicPlacement || {},
+        remoteModule: normalizeRemoteModule(merged.remoteModule, merged.channelPicker),
         channelPicker: normalizeChannelPicker(merged.channelPicker),
         sortBy,
         sortDir,
@@ -355,7 +373,7 @@ export function savePlayerState(patch) {
                 || k === 'hiddenChannels' || k === 'hiddenChannelsMeta'
                 || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
-                || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'channelPicker'
+                || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'remoteModule' || k === 'channelPicker'
                 || k === 'sortBy' || k === 'sortDir' || k === 'categoryFilter'
             ))
         )

@@ -113,6 +113,12 @@ export const PlayerChrome = {
         }
 
         this.updateBufferQuality();
+        if (typeof document !== 'undefined') {
+            import('./remotePanel.js').then(({ RemotePanel, syncRemoteChannelBar }) => {
+                RemotePanel.syncRemotePanel?.();
+                syncRemoteChannelBar?.(deps.appState?.activeTab || 'remote');
+            }).catch(() => {});
+        }
 
         if (state.resumeBlocked) {
             showAppToast('Tap ▶ to start playback');

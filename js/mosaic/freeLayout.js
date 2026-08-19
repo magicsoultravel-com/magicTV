@@ -97,11 +97,11 @@ export const freeLayoutMethods = {
         const app = el('app-container') || document.body;
         const custom = this.hasCustomPlacement();
         app.classList.toggle('has-custom-mosaic-placement', custom);
-        const resetBtn = el('mosaic-reset-btn');
-        if (resetBtn) {
-            resetBtn.classList.toggle('is-hidden', !custom);
-            resetBtn.hidden = !custom;
-        }
+        const resetBtns = [...new Set([el('mosaic-reset-btn'), el('remote-reset-btn')].filter(Boolean))];
+        resetBtns.forEach((btn) => {
+            btn.classList.toggle('is-hidden', !custom);
+            btn.hidden = !custom;
+        });
     },
 
     onTilePointerDown(e) {

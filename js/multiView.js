@@ -28,6 +28,11 @@ import {
     slotIsOccupied
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
+
+function getScreenControlStrip() {
+    if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
+    return document.querySelector('#remote-panel-footer .tv-controls__screens');
+}
 import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
@@ -163,15 +168,9 @@ export const MultiView = {
      */
     addNextScreen() {
         const next = SCREEN_ADD_ORDER.find((id) => !this.slots[id].enabled);
-        if (next) {
-            this.setSideEnabled(next, true);
-            this.focusScreen(next);
-            return;
-        }
-        const last = [...SCREEN_ADD_ORDER].reverse().find((id) => this.slots[id].enabled);
-        if (last) {
-            this.setSideEnabled(last, false);
-        }
+        if (!next) return;
+        this.setSideEnabled(next, true);
+        this.focusScreen(next);
     },
 
     /**
@@ -189,11 +188,10 @@ export const MultiView = {
      */
     syncScreenControls() {
         if (typeof document === 'undefined') return;
-        const addBtn = el('add-screen-btn');
-        if (!addBtn || typeof addBtn.closest !== 'function') return;
-        const strip = addBtn.closest('.tv-controls__screens');
+        const strip = getScreenControlStrip();
         if (!strip) return;
         const buttons = strip.querySelectorAll('.tv-controls__screen-btn');
+        const addBtn = strip.querySelector('#add-screen-btn');
         buttons.forEach((btn) => {
             const slotId = btn.dataset.screenSlot;
             const enabled = slotId === 'center' || this.slots[slotId]?.enabled;
@@ -201,10 +199,11 @@ export const MultiView = {
             btn.classList.toggle('is-active', enabled && this.statusSlotId === slotId);
         });
         if (addBtn) {
-            const allEnabled = SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
-            addBtn.classList.toggle('is-limit', allEnabled);
-            addBtn.title = allEnabled ? 'Remove last screen' : 'Add screen';
-            addBtn.setAttribute('aria-label', allEnabled ? 'Remove last screen' : 'Add screen');
+            const atMax = SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
+            addBtn.hidden = atMax;
+            addBtn.classList.toggle('is-limit', atMax);
+            addBtn.title = 'Add screen';
+            addBtn.setAttribute('aria-label', 'Add screen');
         }
         this.syncTileStatusHighlight();
     },
@@ -216,7 +215,7 @@ export const MultiView = {
     syncTileStatusHighlight() {
         if (typeof document === 'undefined') return;
         if (typeof document.body?.classList?.contains === 'function'
-            && document.body.classList.contains('has-channel-picker')) {
+            && document.body.classList.contains('has-remote-module')) {
             return;
         }
         SLOT_IDS.forEach((id) => {
@@ -461,17 +460,14 @@ export const MultiView = {
                 }, 80);
             });
 
-            const catalog = typeof document !== 'undefined'
-                && typeof document.querySelector === 'function'
-                ? document.querySelector('.tv-catalog')
-                : null;
-            if (catalog && typeof MutationObserver === 'function') {
+            const observeTarget = typeof document !== 'undefined' ? document.body : null;
+            if (observeTarget && typeof MutationObserver === 'function') {
                 const obs = new MutationObserver(() => {
                     if (this.hasCustomPlacement()) {
                         requestAnimationFrame(() => this.applyFreeLayout());
                     }
                 });
-                obs.observe(catalog, { attributes: true, attributeFilter: ['class'] });
+                obs.observe(observeTarget, { attributes: true, attributeFilter: ['class'] });
             }
         }
     },
@@ -547,25 +543,29 @@ export const MultiView = {
         const muteAllActive = this.isMuteAllActive();
         app.classList.toggle('is-mute-all-active', muteAllActive);
 
-        const muteAllBtn = el('mosaic-mute-all-btn');
-        if (!muteAllBtn) return;
-        const label = muteAllActive ? 'Unmute all' : 'Mute all';
-        muteAllBtn.title = label;
-        muteAllBtn.setAttribute('aria-label', label);
-        muteAllBtn.setAttribute('aria-pressed', String(muteAllActive));
-        const wave = muteAllBtn.querySelector('.mosaic-mute-all-wave');
-        const slash = muteAllBtn.querySelector('.mosaic-mute-all-slash');
-        if (wave) wave.style.opacity = muteAllActive ? '0' : '1';
-        if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
+        const muteAllBtns = [el('mosaic-mute-all-btn'), el('remote-mute-all-btn')].filter(Boolean);
+        muteAllBtns.forEach((btn) => {
+            const label = muteAllActive ? 'Unmute all' : 'Mute all';
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+            btn.setAttribute('aria-pressed', String(muteAllActive));
+            const wave = btn.querySelector('.mosaic-mute-all-wave, .remote-mute-all-wave');
+            const slash = btn.querySelector('.mosaic-mute-all-slash, .remote-mute-all-slash');
+            if (wave) wave.style.opacity = muteAllActive ? '0' : '1';
+            if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
+        });
+        if (typeof document !== 'undefined') {
+            import('./ui/remotePanel.js').then(({ RemotePanel }) => RemotePanel.syncRemotePanel?.()).catch(() => {});
+        }
     },
 
     async maybeRetargetChannelPicker(slotId) {
         if (!slotId || !this.slots[slotId]?.enabled) return;
         this.setStatusSlot(slotId);
         try {
-            const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
-            if (!ChannelPickerModal.isOpen()) return;
-            ChannelPickerModal.open(slotId);
+            const { RemoteModule } = await import('./ui/remoteModule.js');
+            if (!RemoteModule.isOpen()) return;
+            RemoteModule.retarget(slotId);
         } catch {
             /* ignore */
         }
@@ -596,8 +596,8 @@ export const MultiView = {
         }
 
         if (action === 'browse') {
-            const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
-            ChannelPickerModal.toggle(slotId);
+            const { RemoteModule } = await import('./ui/remoteModule.js');
+            RemoteModule.toggle(slotId, { tab: 'browse' });
             return;
         }
 
@@ -755,9 +755,14 @@ export const MultiView = {
         }
         this.syncPlacementChrome();
         this.syncTileStatusHighlight();
-        import('./ui/channelPickerModal.js')
-            .then(({ ChannelPickerModal }) => ChannelPickerModal.syncTargetHighlight?.())
-            .catch(() => {});
+        if (typeof document !== 'undefined') {
+            import('./ui/remoteModule.js')
+                .then(({ RemoteModule }) => {
+                    RemoteModule.syncTargetHighlight?.();
+                    import('./ui/remotePanel.js').then(({ RemotePanel }) => RemotePanel.syncRemotePanel?.()).catch(() => {});
+                })
+                .catch(() => {});
+        }
     },
 
     mountAll() {
@@ -1192,9 +1197,7 @@ export const MultiView = {
 
     bindScreenControls() {
         if (typeof document === 'undefined') return;
-        const addBtn = el('add-screen-btn');
-        if (!addBtn || typeof addBtn.closest !== 'function') return;
-        const strip = addBtn.closest('.tv-controls__screens');
+        const strip = getScreenControlStrip();
         if (!strip || strip.dataset.bound === '1') return;
         strip.dataset.bound = '1';
 

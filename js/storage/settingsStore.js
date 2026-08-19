@@ -16,6 +16,7 @@ import {
     DEFAULT_VIEW_TRANSITION,
     normalizeViewTransition
 } from '../ui/viewTransitions.js';
+import { normalizeRemoteTexture } from '../ui/remoteTextures.js';
 import {
     DEFAULT_RECENTS_CAP,
     RECENTS_CAP_MIN,
@@ -55,6 +56,15 @@ const LIST_WIDTH_MAX = 300;
 const LIST_WIDTH_STEP = 10;
 const CHANNEL_PICKER_OPACITY_MIN = 33;
 const CHANNEL_PICKER_OPACITY_MAX = 100;
+const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
+const DEFAULT_REMOTE_IDLE_DELAY_SEC = 10;
+const DEFAULT_REMOTE_IDLE_FADE_SEC = 10;
+const REMOTE_IDLE_DELAY_MIN = 0;
+const REMOTE_IDLE_DELAY_MAX = 300;
+const REMOTE_IDLE_FADE_MIN = 1;
+const REMOTE_IDLE_FADE_MAX = 120;
+const DEFAULT_BROWSER_POPOUT_PREFER_OPEN = false;
+const DEFAULT_REMOTE_TEXTURE = 'none';
 const CATALOG_LAYOUTS = ['tiles', 'list'];
 const DEFAULT_ACTIVE_TILE_STYLE = 'none';
 const ACTIVE_TILE_STYLES = ['none', 'wave', 'pulse', 'visualizer'];
@@ -86,6 +96,18 @@ function clampChannelPickerOpacity(value) {
         CHANNEL_PICKER_OPACITY_MAX,
         Math.max(CHANNEL_PICKER_OPACITY_MIN, Math.round(n))
     );
+}
+
+function clampRemoteIdleDelaySec(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_REMOTE_IDLE_DELAY_SEC;
+    return Math.min(REMOTE_IDLE_DELAY_MAX, Math.max(REMOTE_IDLE_DELAY_MIN, Math.round(n)));
+}
+
+function clampRemoteIdleFadeSec(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_REMOTE_IDLE_FADE_SEC;
+    return Math.min(REMOTE_IDLE_FADE_MAX, Math.max(REMOTE_IDLE_FADE_MIN, Math.round(n)));
 }
 
 function normalizeCatalogLayout(value) {
@@ -187,6 +209,67 @@ export const SettingsStore = {
         return clampedValue;
     },
 
+    getRemoteIdleFadeEnabled() {
+        const raw = readPersistedState();
+        return raw.remoteIdleFadeEnabled != null
+            ? raw.remoteIdleFadeEnabled === true
+            : DEFAULT_REMOTE_IDLE_FADE_ENABLED;
+    },
+
+    setRemoteIdleFadeEnabled(value) {
+        const next = value === true;
+        patchPersistedState({ remoteIdleFadeEnabled: next });
+        return next;
+    },
+
+    getRemoteIdleDelaySec() {
+        const raw = readPersistedState();
+        return raw.remoteIdleDelaySec != null
+            ? clampRemoteIdleDelaySec(raw.remoteIdleDelaySec)
+            : DEFAULT_REMOTE_IDLE_DELAY_SEC;
+    },
+
+    setRemoteIdleDelaySec(value) {
+        const clampedValue = clampRemoteIdleDelaySec(value);
+        patchPersistedState({ remoteIdleDelaySec: clampedValue });
+        return clampedValue;
+    },
+
+    getRemoteIdleFadeSec() {
+        const raw = readPersistedState();
+        return raw.remoteIdleFadeSec != null
+            ? clampRemoteIdleFadeSec(raw.remoteIdleFadeSec)
+            : DEFAULT_REMOTE_IDLE_FADE_SEC;
+    },
+
+    setRemoteIdleFadeSec(value) {
+        const clampedValue = clampRemoteIdleFadeSec(value);
+        patchPersistedState({ remoteIdleFadeSec: clampedValue });
+        return clampedValue;
+    },
+
+    getBrowserPopoutPreferOpen() {
+        const raw = readPersistedState();
+        return raw.browserPopoutPreferOpen === true;
+    },
+
+    setBrowserPopoutPreferOpen(value) {
+        const next = value === true;
+        patchPersistedState({ browserPopoutPreferOpen: next });
+        return next;
+    },
+
+    getRemoteTexture() {
+        const raw = readPersistedState();
+        return normalizeRemoteTexture(raw.remoteTexture);
+    },
+
+    setRemoteTexture(value) {
+        const next = normalizeRemoteTexture(value);
+        patchPersistedState({ remoteTexture: next });
+        return next;
+    },
+
     getCatalogLayout() {
         const raw = readPersistedState();
         return normalizeCatalogLayout(raw.catalogLayout);
@@ -258,6 +341,11 @@ export const SettingsStore = {
         const tileWidth = this.setTileWidth(DEFAULT_TILE_WIDTH);
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
         const channelPickerOpacity = this.setChannelPickerOpacity(DEFAULT_CHANNEL_PICKER_OPACITY);
+        const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
+        const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
+        const remoteIdleFadeSec = this.setRemoteIdleFadeSec(DEFAULT_REMOTE_IDLE_FADE_SEC);
+        const browserPopoutPreferOpen = this.setBrowserPopoutPreferOpen(DEFAULT_BROWSER_POPOUT_PREFER_OPEN);
+        const remoteTexture = this.setRemoteTexture(DEFAULT_REMOTE_TEXTURE);
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
         const activeTileStyle = this.setActiveTileStyle(DEFAULT_ACTIVE_TILE_STYLE);
         const visitedStyle = this.setVisitedStyle(DEFAULT_VISITED_STYLE);
@@ -270,6 +358,11 @@ export const SettingsStore = {
             tileWidth,
             listWidth,
             channelPickerOpacity,
+            remoteIdleFadeEnabled,
+            remoteIdleDelaySec,
+            remoteIdleFadeSec,
+            browserPopoutPreferOpen,
+            remoteTexture,
             catalogLayout,
             activeTileStyle,
             visitedStyle,

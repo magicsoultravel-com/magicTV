@@ -230,7 +230,7 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
         .filter(Boolean);
     if (!grainHosts.length) {
         if (scope === 'catalog') {
-            const host = el('tv-catalog');
+            const host = el('tv-catalog-body') || el('remote-dock-sheet');
             if (host) grainHosts.push(host);
         } else if (scope === 'tiles') {
             grainHosts.push(...fadeTargets);

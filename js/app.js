@@ -13,7 +13,10 @@ import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
 import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
 import { TvClock } from './ui/tvClock.js';
-import { ChannelPickerModal } from './ui/channelPickerModal.js';
+import { RemoteModule } from './ui/remoteModule.js';
+import { RemotePanel, syncRemoteNav, syncRemoteChannelBar } from './ui/remotePanel.js';
+import { BrowserPopout, BROWSER_POPOUT_ICON } from './ui/browserPopout.js';
+import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
 import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
 
@@ -40,7 +43,7 @@ let appState = {
     browseLoading: false,
     browseGeneration: 0,
     browseSortDirty: false,
-    activeTab: 'browse',
+    activeTab: 'remote',
     countryFilter: '',
     browseQuery: '',
     favFilter: '',
@@ -243,12 +246,6 @@ function bindTabs() {
     });
 }
 
-/** Shared API so the content splitter can expand/collapse via drag. */
-const CatalogCollapse = {
-    busy: false,
-    setCollapsed: async () => {}
-};
-
 let screenWipeBusy = false;
 
 function prefersReducedCatalogMotion() {
@@ -261,7 +258,7 @@ function prefersReducedCatalogMotion() {
  * Scoped to the browse module so the player does not flash.
  */
 async function withCatalogViewTransition(mutate) {
-    if (screenWipeBusy || CatalogCollapse.busy) return false;
+    if (screenWipeBusy) return false;
     const mode = resolveViewTransition(SettingsStore.getCatalogTransition(), 'catalog');
     if (prefersReducedCatalogMotion() || mode === 'instant') {
         mutate();
@@ -348,213 +345,6 @@ async function withCatalogViewTransition(mutate) {
     return true;
 }
 
-function catalogCollapsedMinHeight(catalog) {
-    const toggle = catalog.querySelector('.tv-catalog__toggle');
-    const gap = 8;
-    if (toggle) return Math.ceil(toggle.getBoundingClientRect().height + gap * 2);
-    return 44;
-}
-
-function bindCatalogToggle() {
-    const catalog = el('tv-catalog');
-    const btn = el('catalog-toggle-btn');
-    const clip = catalog?.querySelector('.tv-catalog__clip');
-    const body = catalog?.querySelector('.tv-catalog__body');
-    if (!catalog || !btn || !clip || !body) return;
-
-    let animating = false;
-    let activeAnims = [];
-
-    const syncToggle = () => {
-        const collapsed = catalog.classList.contains('is-collapsed');
-        btn.innerHTML = collapsed ? ACTION_ICONS.expand : ACTION_ICONS.collapse;
-        btn.setAttribute('aria-expanded', String(!collapsed));
-        btn.title = collapsed ? 'Expand catalog' : 'Collapse catalog';
-        btn.setAttribute('aria-label', btn.title);
-    };
-
-    const applyTransitionAttr = (mode) => {
-        catalog.dataset.catalogTransition = mode;
-    };
-
-    const clearMotionStyles = () => {
-        catalog.style.height = '';
-        catalog.style.overflow = '';
-        body.style.opacity = '';
-        body.style.transform = '';
-        catalog.classList.remove('is-animating');
-    };
-
-    const settle = (collapsed) => {
-        activeAnims.forEach((a) => {
-            try {
-                if (typeof a.commitStyles === 'function') a.commitStyles();
-                a.cancel();
-            } catch { /* ignore */ }
-        });
-        activeAnims = [];
-        clearMotionStyles();
-        catalog.classList.toggle('is-collapsed', collapsed);
-        SettingsStore.setCatalogCollapsed(collapsed);
-        syncToggle();
-        animating = false;
-    };
-
-    const bodyKeyframes = (mode, collapsing) => {
-        if (mode === 'fade' || mode === 'crossfade') {
-            return collapsing
-                ? [{ opacity: 1 }, { opacity: 0 }]
-                : [{ opacity: 0 }, { opacity: 1 }];
-        }
-        if (mode === 'slide') {
-            return collapsing
-                ? [
-                    { opacity: 1, transform: 'translateY(0)' },
-                    { opacity: 0, transform: 'translateY(-32px)' }
-                ]
-                : [
-                    { opacity: 0, transform: 'translateY(-32px)' },
-                    { opacity: 1, transform: 'translateY(0)' }
-                ];
-        }
-        if (mode === 'spring' || mode === 'smooth') {
-            return collapsing
-                ? [
-                    { opacity: 1, transform: 'translateY(0) scale(1)' },
-                    { opacity: 0.4, transform: 'translateY(-12px) scale(0.97)', offset: 0.5 },
-                    { opacity: 0, transform: 'translateY(-8px) scale(0.93)' }
-                ]
-                : [
-                    { opacity: 0, transform: 'translateY(-8px) scale(0.93)' },
-                    { opacity: 1, transform: 'translateY(0) scale(1.03)', offset: 0.72 },
-                    { opacity: 1, transform: 'translateY(0) scale(1)' }
-                ];
-        }
-        if (mode === 'flip') {
-            return collapsing
-                ? [
-                    { opacity: 1, transform: 'rotateX(0deg)' },
-                    { opacity: 0, transform: 'rotateX(75deg)' }
-                ]
-                : [
-                    { opacity: 0, transform: 'rotateX(-75deg)' },
-                    { opacity: 1, transform: 'rotateX(0deg)' }
-                ];
-        }
-        return null;
-    };
-
-    const runHeightMotion = async (collapsed, { forceInstant = false } = {}) => {
-        if (animating) return;
-        const pref = SettingsStore.getCatalogTransition();
-        const mode = forceInstant ? 'instant' : resolveViewTransition(pref, 'catalog');
-        applyTransitionAttr(forceInstant ? 'instant' : mode);
-        const cfg = forceInstant ? VIEW_MOTION.instant : (VIEW_MOTION[mode] || VIEW_MOTION.instant);
-        const reduce = prefersReducedCatalogMotion();
-
-        if (cfg.duration <= 0 || reduce || typeof catalog.animate !== 'function') {
-            settle(collapsed);
-            applyTransitionAttr(pref);
-            return;
-        }
-
-        animating = true;
-
-        // Full-screen fade out → swap layout → fade in.
-        if (mode === 'dissolve' || mode === 'grain') {
-            screenWipeBusy = true;
-            try {
-                await runWipeTransition(mode, () => {
-                    clearMotionStyles();
-                    catalog.classList.toggle('is-collapsed', collapsed);
-                    SettingsStore.setCatalogCollapsed(collapsed);
-                    syncToggle();
-                }, { scope: 'full' });
-            } finally {
-                screenWipeBusy = false;
-                activeAnims = [];
-                animating = false;
-                applyTransitionAttr(pref);
-            }
-            return;
-        }
-
-        const minH = catalogCollapsedMinHeight(catalog);
-        const opts = { duration: cfg.duration, easing: cfg.easing, fill: 'forwards' };
-
-        let fromH;
-        let toH;
-
-        if (collapsed) {
-            fromH = catalog.getBoundingClientRect().height;
-            toH = minH;
-            catalog.classList.add('is-animating');
-            catalog.style.height = `${fromH}px`;
-            catalog.style.overflow = 'hidden';
-        } else {
-            // Measure expanded height in the same turn (before paint), then pin to minH.
-            catalog.classList.remove('is-collapsed');
-            fromH = minH;
-            toH = catalog.getBoundingClientRect().height;
-            catalog.classList.add('is-animating');
-            catalog.style.height = `${fromH}px`;
-            catalog.style.overflow = 'hidden';
-        }
-        void catalog.offsetHeight;
-
-        const heightAnim = catalog.animate(
-            [{ height: `${fromH}px` }, { height: `${toH}px` }],
-            opts
-        );
-        activeAnims = [heightAnim];
-
-        const bodyFrames = bodyKeyframes(mode, collapsed);
-        if (bodyFrames) {
-            activeAnims.push(body.animate(bodyFrames, opts));
-        }
-
-        try {
-            await Promise.all(activeAnims.map((a) => a.finished));
-        } catch {
-            applyTransitionAttr(pref);
-            return;
-        }
-        settle(collapsed);
-        applyTransitionAttr(pref);
-    };
-
-    // Restore collapsed state without animating on first paint.
-    applyTransitionAttr('instant');
-    catalog.classList.toggle('is-collapsed', SettingsStore.getCatalogCollapsed());
-    syncToggle();
-    requestAnimationFrame(() => {
-        applyTransitionAttr(SettingsStore.getCatalogTransition());
-    });
-
-    btn.addEventListener('click', () => {
-        if (animating) return;
-        runHeightMotion(!catalog.classList.contains('is-collapsed'));
-    });
-
-    CatalogCollapse.isCollapsed = () => catalog.classList.contains('is-collapsed');
-    Object.defineProperty(CatalogCollapse, 'busy', {
-        get: () => animating || screenWipeBusy,
-        configurable: true
-    });
-    CatalogCollapse.setCollapsed = (collapsed, opts) => runHeightMotion(Boolean(collapsed), opts);
-
-    const select = el('catalog-transition-select');
-    if (select && select.dataset.bound !== '1') {
-        select.dataset.bound = '1';
-        fillViewTransitionSelect(select, SettingsStore.getCatalogTransition());
-        select.addEventListener('change', () => {
-            const next = SettingsStore.setCatalogTransition(select.value);
-            select.value = next;
-            applyTransitionAttr(next);
-            showAppToast(`View transition: ${next.charAt(0).toUpperCase()}${next.slice(1)}`);
-        });
-    }
-}
 
 function matchesFavFilter(ch, q) {
     if (!q) return true;
@@ -567,6 +357,45 @@ function syncPlayFavoritesMosaicBtn() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn) return;
     btn.classList.toggle('is-hidden', appState.activeTab !== 'favorites');
+}
+
+function syncBrowserPopoutBtn() {
+    const btn = el('browser-popout-btn');
+    if (!btn) return;
+    const onChannelTabs = appState.activeTab === 'browse'
+        || appState.activeTab === 'favorites'
+        || appState.activeTab === 'recents';
+    btn.classList.toggle('is-hidden', !onChannelTabs);
+    if (!btn.innerHTML.trim()) btn.innerHTML = BROWSER_POPOUT_ICON;
+    BrowserPopout.syncPopoutBtn();
+    BrowserPopout.syncPopoutChrome();
+}
+
+function bindRemoteExternalPopoutBtn() {
+    const btn = el('remote-external-popout-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+        if (RemoteExternalPopout.isPoppedOut()) {
+            RemoteExternalPopout.popIn();
+            return;
+        }
+        if (RemoteExternalPopout.getPopoutWindow()) {
+            RemoteExternalPopout.openOrFocus();
+            return;
+        }
+        RemoteExternalPopout.popOut();
+    });
+}
+
+function bindBrowserPopoutBtn() {
+    const btn = el('browser-popout-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.innerHTML = BROWSER_POPOUT_ICON;
+    btn.addEventListener('click', () => {
+        BrowserPopout.handleIconClick();
+    });
 }
 
 function syncCatalogLayoutBtn() {
@@ -637,209 +466,6 @@ function bindPlayFavoritesMosaic() {
     });
 }
 
-const CONTENT_SPLIT_MIN = 15;
-const CONTENT_SPLIT_MAX = 85;
-const CONTENT_SPLIT_STEP = 2;
-/** Drag past this raw player-% to snap the catalog closed. */
-const CONTENT_SPLIT_COLLAPSE_AT = 92;
-/** Pointer movement (px) before a press counts as a drag instead of a click. */
-const CONTENT_SPLIT_CLICK_SLOP = 5;
-
-function bindContentSplitter() {
-    const content = document.querySelector ? document.querySelector('.tv-content') : null;
-    const splitter = el('content-splitter');
-    if (!content || !splitter || splitter.dataset.bound === '1') return;
-    splitter.dataset.bound = '1';
-
-    const clampShare = (value) => {
-        const n = Number(value);
-        if (!Number.isFinite(n)) return 50;
-        return Math.min(CONTENT_SPLIT_MAX, Math.max(CONTENT_SPLIT_MIN, Math.round(n)));
-    };
-
-    const rawShareFromClientY = (clientY) => {
-        const rect = content.getBoundingClientRect();
-        if (rect.height <= 0) return SettingsStore.getContentSplit();
-        const y = clientY - rect.top;
-        return (y / rect.height) * 100;
-    };
-
-    const applyShare = (value, { persist = false } = {}) => {
-        const share = clampShare(value);
-        content.style.setProperty('--tv-player-share', String(share));
-        splitter.setAttribute('aria-valuenow', String(share));
-        if (persist) SettingsStore.setContentSplit(share);
-        if (MultiView.hasCustomPlacement?.()) {
-            requestAnimationFrame(() => MultiView.applyFreeLayout());
-        }
-        return share;
-    };
-
-    const expandToSaved = ({ forceInstant = false } = {}) => {
-        applyShare(SettingsStore.getContentSplit());
-        return CatalogCollapse.setCollapsed?.(false, { forceInstant });
-    };
-
-    const collapseCatalog = ({ forceInstant = false } = {}) => {
-        // Keep the last saved split so expand can restore it.
-        return CatalogCollapse.setCollapsed?.(true, { forceInstant });
-    };
-
-    applyShare(SettingsStore.getContentSplit());
-
-    let dragPointerId = null;
-    let dragRaf = 0;
-    let dragCollapsed = false;
-    let dragActive = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let startedCollapsed = false;
-    /** After opening from collapsed, require leaving the snap zone before re-collapse. */
-    let collapseArmed = true;
-
-    const endDrag = (e) => {
-        if (dragPointerId == null || e.pointerId !== dragPointerId) return;
-        const wasDrag = dragActive;
-        dragPointerId = null;
-        content.classList.remove('is-splitting');
-        try {
-            splitter.releasePointerCapture(e.pointerId);
-        } catch {
-            /* already released */
-        }
-        if (dragRaf) {
-            cancelAnimationFrame(dragRaf);
-            dragRaf = 0;
-        }
-
-        // Click (no meaningful move): toggle expand/collapse to last saved split.
-        if (!wasDrag) {
-            dragCollapsed = false;
-            if (CatalogCollapse.isCollapsed?.()) {
-                expandToSaved();
-            } else {
-                collapseCatalog();
-            }
-            return;
-        }
-
-        if (dragCollapsed || CatalogCollapse.isCollapsed?.()) {
-            dragCollapsed = false;
-            return;
-        }
-        const raw = rawShareFromClientY(e.clientY);
-        if (collapseArmed && raw >= CONTENT_SPLIT_COLLAPSE_AT) {
-            collapseCatalog();
-            return;
-        }
-        applyShare(raw, { persist: true });
-    };
-
-    splitter.addEventListener('pointerdown', (e) => {
-        if (e.button != null && e.button !== 0) return;
-        if (CatalogCollapse.busy) return;
-        e.preventDefault();
-        dragPointerId = e.pointerId;
-        dragCollapsed = false;
-        dragActive = false;
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-        startedCollapsed = Boolean(CatalogCollapse.isCollapsed?.());
-        // Collapsed grabs start past the snap zone; arm only after the pointer leaves it.
-        collapseArmed = !startedCollapsed;
-        content.classList.add('is-splitting');
-        splitter.setPointerCapture(e.pointerId);
-    });
-
-    splitter.addEventListener('pointermove', (e) => {
-        if (dragPointerId == null || e.pointerId !== dragPointerId) return;
-        if (dragCollapsed) return;
-
-        const dx = e.clientX - dragStartX;
-        const dy = e.clientY - dragStartY;
-        if (!dragActive) {
-            if ((dx * dx) + (dy * dy) < CONTENT_SPLIT_CLICK_SLOP * CONTENT_SPLIT_CLICK_SLOP) {
-                return;
-            }
-            dragActive = true;
-
-            if (startedCollapsed) {
-                // Open under the pointer without bouncing back into collapse.
-                CatalogCollapse.setCollapsed?.(false, { forceInstant: true });
-                const raw = rawShareFromClientY(e.clientY);
-                if (raw >= CONTENT_SPLIT_COLLAPSE_AT) {
-                    applyShare(CONTENT_SPLIT_MAX);
-                    collapseArmed = false;
-                } else {
-                    applyShare(raw);
-                    collapseArmed = true;
-                }
-                return;
-            }
-        }
-
-        if (CatalogCollapse.isCollapsed?.()) return;
-
-        const y = e.clientY;
-        if (dragRaf) cancelAnimationFrame(dragRaf);
-        dragRaf = requestAnimationFrame(() => {
-            dragRaf = 0;
-            if (dragPointerId == null || dragCollapsed) return;
-            const raw = rawShareFromClientY(y);
-            if (raw < CONTENT_SPLIT_COLLAPSE_AT) collapseArmed = true;
-            if (collapseArmed && raw >= CONTENT_SPLIT_COLLAPSE_AT) {
-                dragCollapsed = true;
-                collapseCatalog({ forceInstant: true });
-                content.classList.remove('is-splitting');
-                return;
-            }
-            applyShare(raw >= CONTENT_SPLIT_COLLAPSE_AT ? CONTENT_SPLIT_MAX : raw);
-        });
-    });
-
-    splitter.addEventListener('pointerup', endDrag);
-    splitter.addEventListener('pointercancel', endDrag);
-
-    splitter.addEventListener('keydown', (e) => {
-        if (CatalogCollapse.busy) return;
-
-        if (CatalogCollapse.isCollapsed?.()) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                if (e.key === 'Home') {
-                    CatalogCollapse.setCollapsed?.(false, { forceInstant: true });
-                    applyShare(CONTENT_SPLIT_MIN, { persist: true });
-                } else {
-                    expandToSaved({ forceInstant: true });
-                }
-            }
-            return;
-        }
-
-        let delta = 0;
-        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') delta = -CONTENT_SPLIT_STEP;
-        else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') delta = CONTENT_SPLIT_STEP;
-        else if (e.key === 'Home') {
-            e.preventDefault();
-            applyShare(CONTENT_SPLIT_MIN, { persist: true });
-            return;
-        } else if (e.key === 'End' || e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            collapseCatalog({ forceInstant: true });
-            return;
-        } else {
-            return;
-        }
-        e.preventDefault();
-        const current = Number(splitter.getAttribute('aria-valuenow')) || SettingsStore.getContentSplit();
-        const next = current + delta;
-        if (next > CONTENT_SPLIT_MAX) {
-            collapseCatalog({ forceInstant: true });
-            return;
-        }
-        applyShare(next, { persist: true });
-    });
-}
 
 let refreshInFlight = false;
 
@@ -891,15 +517,27 @@ async function handleManualRefresh() {
     }
 }
 
+function syncRemoteTabChrome() {
+    const tab = appState.activeTab;
+    const showFilters = tab === 'browse' || tab === 'favorites' || tab === 'recents';
+    const catalogTools = el('remote-catalog-tools');
+    const body = el('tv-catalog-body');
+
+    if (catalogTools) {
+        catalogTools.classList.toggle('is-visible', showFilters);
+    }
+    if (body) {
+        body.classList.toggle('is-remote-view', tab === 'remote');
+        body.classList.toggle('is-subview', showFilters);
+    }
+    syncRemoteNav(tab);
+    syncRemoteChannelBar(tab);
+}
+
 function switchTab(tabName) {
     els('.tv-panel').forEach(panel => panel.classList.remove('is-active'));
     const panel = el(tabName + '-panel');
     if (panel) panel.classList.add('is-active');
-    els('.tv-tab').forEach(tab => {
-        const active = tab.dataset.tab === tabName;
-        tab.classList.toggle('is-active', active);
-        tab.setAttribute('aria-selected', String(active));
-    });
 
     const backBtn = el('back-btn');
     if (backBtn) {
@@ -913,6 +551,7 @@ function switchTab(tabName) {
     }
 
     appState.activeTab = tabName;
+    syncRemoteTabChrome();
     TileFrames.syncLiveRefresh(currentRefreshKey());
     ListSort.syncSortControls();
     if (tabName === 'favorites') {
@@ -931,7 +570,24 @@ function switchTab(tabName) {
     }
     syncPlayFavoritesMosaicBtn();
     syncCatalogLayoutBtn();
+    syncBrowserPopoutBtn();
+    RemoteExternalPopout.syncBtn();
     updateRefreshAge();
+    RemotePanel.syncRemotePanel();
+}
+
+export { switchTab };
+
+function bindViewTransitionSelect() {
+    const select = el('catalog-transition-select');
+    if (!select || select.dataset.bound === '1') return;
+    select.dataset.bound = '1';
+    fillViewTransitionSelect(select, SettingsStore.getCatalogTransition());
+    select.addEventListener('change', () => {
+        const next = SettingsStore.setCatalogTransition(select.value);
+        select.value = next;
+        showAppToast(`View transition: ${next.charAt(0).toUpperCase()}${next.slice(1)}`);
+    });
 }
 
 async function init() {
@@ -958,9 +614,11 @@ async function init() {
             getRefreshKey: currentRefreshKey,
             onPlay: startPlayback
         });
-        ChannelPickerModal.init({
-            getDefaultOnPlay: () => startPlayback
+        RemoteModule.init({
+            getDefaultOnPlay: () => startPlayback,
+            switchTab
         });
+        RemotePanel.bind();
         BrowseView.init({
             appState,
             stampRefreshView,
@@ -985,14 +643,15 @@ async function init() {
         });
         PlayerChrome.updateNowPlayingHeader();
 
+        bindViewTransitionSelect();
         bindTabs();
-        bindCatalogToggle();
         bindPlayFavoritesMosaic();
         bindCatalogLayout();
         bindRefreshBtn();
         syncPlayFavoritesMosaicBtn();
         syncCatalogLayoutBtn();
-        bindContentSplitter();
+        syncRemoteTabChrome();
+        switchTab('remote');
         TvClock.init();
 
         PlayerChrome.bindControls();
@@ -1041,7 +700,12 @@ async function init() {
         }
 
         // Docked → modal teleport finishes under the boot cover.
-        ChannelPickerModal.restoreOpenIfNeeded();
+        RemoteModule.restoreOpenIfNeeded();
+        BrowserPopout.init();
+        bindBrowserPopoutBtn();
+        bindRemoteExternalPopoutBtn();
+        syncBrowserPopoutBtn();
+        RemoteExternalPopout.syncBtn();
 
         showAppToast('Ready');
         await reveal();
