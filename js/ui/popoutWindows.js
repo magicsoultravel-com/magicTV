@@ -107,8 +107,10 @@ export function copyThemeAttributes(sourceDoc, targetDoc) {
             dst.setAttribute(attr.name, attr.value);
         }
     }
-    if (src.style?.fontSize) {
-        dst.style.fontSize = src.style.fontSize;
+    if (!src.style || !dst.style) return;
+    for (let i = 0; i < src.style.length; i++) {
+        const name = src.style[i];
+        dst.style.setProperty(name, src.style.getPropertyValue(name), src.style.getPropertyPriority(name));
     }
 }
 

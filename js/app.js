@@ -369,13 +369,11 @@ function isBrowserExtracted() {
 function syncBrowserPopoutBtn() {
     const btn = el('browser-popout-btn');
     if (!btn) return;
-    const extracted = isBrowserExtracted();
+    const separate = SettingsStore.getBrowserPopoutPreferOpen();
     const onChannelTabs = CHANNEL_TABS.includes(appState.activeTab);
-    if (extracted) {
-        btn.classList.remove('is-hidden');
-    } else {
-        btn.classList.toggle('is-hidden', !onChannelTabs);
-    }
+    // Only a separate browser module exposes its own pop-out; otherwise the
+    // single remote pop-out carries the browser too.
+    btn.classList.toggle('is-hidden', !(separate && onChannelTabs));
     BrowserExternalPopout.syncBtn();
     BrowserPopout.syncPopoutChrome();
 }
@@ -547,17 +545,27 @@ function syncRemoteTabChrome() {
 }
 
 function activateTabPanels(tabName) {
-    if (BrowserPopout.isOpen()) {
-        BrowserPopout.syncActiveTab(tabName);
-        return;
-    }
-    if (BrowserExternalPopout.isPoppedOut()) {
-        BrowserExternalPopout.syncActiveTab(tabName);
-        return;
+    const remoteExtracted = RemoteExternalPopout.isPoppedOut();
+    const remoteUnified = remoteExtracted && RemoteExternalPopout.isUnifiedPopout();
+    const browserExtracted = !remoteUnified
+        && (BrowserPopout.isOpen() || BrowserExternalPopout.isPoppedOut());
+
+    if (browserExtracted) {
+        if (BrowserPopout.isOpen()) {
+            BrowserPopout.syncActiveTab(tabName);
+        } else {
+            BrowserExternalPopout.syncActiveTab(tabName);
+        }
     }
 
-    els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
-    el(`${tabName}-panel`)?.classList.add('is-active');
+    if (remoteExtracted) {
+        RemoteExternalPopout.syncActiveTab(tabName);
+    }
+
+    if (!browserExtracted && !remoteExtracted) {
+        els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
+        el(`${tabName}-panel`)?.classList.add('is-active');
+    }
 }
 
 function switchTab(tabName) {
@@ -758,11 +766,18 @@ async function init() {
             } else {
                 activateTabPanels(appState.activeTab);
             }
+            RemoteExternalPopout.syncBodyClasses();
             syncRemoteTabChrome();
             syncBrowserPopoutBtn();
         });
 
         window.addEventListener('remote:external_popout_changed', () => {
+            if (RemoteExternalPopout.isPoppedOut()) {
+                RemoteExternalPopout.syncActiveTab(appState.activeTab);
+            } else {
+                activateTabPanels(appState.activeTab);
+            }
+            syncRemoteTabChrome();
             syncBrowserPopoutBtn();
             RemoteExternalPopout.syncBtn();
         });

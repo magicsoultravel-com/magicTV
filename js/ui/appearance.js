@@ -1,6 +1,8 @@
+import { forEachAppDocument } from '../appDocuments.js';
 import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
+import { copyThemeAttributes } from './popoutWindows.js';
 import { showAppToast } from './toast.js';
 import { RemoteModule } from './remoteModule.js';
 import { BrowserPopout } from './browserPopout.js';
@@ -438,6 +440,8 @@ export const Appearance = {
                 document.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
             });
         }
+
+        forEachAppDocument((doc) => copyThemeAttributes(document, doc));
     },
 
     applyToTiles(container) {

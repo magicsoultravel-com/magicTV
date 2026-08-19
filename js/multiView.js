@@ -801,12 +801,15 @@ export const MultiView = {
                 this.raiseTileInStack(sideId);
                 this.persistPlacement();
             }
-        } else if (slot.player) {
-            slot.player.stop({ clearChannel: true }).catch(() => {});
-            if (this.mosaicPlacement[sideId]) {
-                delete this.mosaicPlacement[sideId];
-                this.persistPlacement();
+        } else {
+            if (slot.player) {
+                slot.player.stop({ clearChannel: true }).catch(() => {});
+                if (this.mosaicPlacement[sideId]) {
+                    delete this.mosaicPlacement[sideId];
+                    this.persistPlacement();
+                }
             }
+            delete this.rememberedSlotKeys[sideId];
             if (this.statusSlotId === sideId) this.setStatusSlot('center');
         }
 
@@ -815,6 +818,11 @@ export const MultiView = {
         this.syncLayout();
         this.mountAll();
         this.scheduleRefreshTiles();
+        if (!next) {
+            import('./ui/remoteModule.js')
+                .then(({ RemoteModule }) => RemoteModule.reconcileTargetIfDisabled?.())
+                .catch(() => {});
+        }
         if (!silent) {
             this.syncSettingsToggles();
             this.getPrimary()?.emitState();

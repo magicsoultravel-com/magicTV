@@ -36,4 +36,11 @@ describe('BrowserExternalPopout state', () => {
         const { BrowserExternalPopout } = await import('../js/ui/browserExternalPopout.js?ext=1');
         assert.equal(BrowserExternalPopout.isPoppedOut(), false);
     });
+
+    it('does not import remote-external mutual exclusion toast text', async () => {
+        const { readFileSync } = await import('node:fs');
+        const src = readFileSync(new URL('../js/ui/browserExternalPopout.js', import.meta.url), 'utf8');
+        assert.equal(src.includes('Pop the remote back in first'), false);
+        assert.equal(src.includes('Close the split browser window first'), false);
+    });
 });

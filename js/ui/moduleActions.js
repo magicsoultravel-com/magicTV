@@ -14,13 +14,20 @@ function pick(selector, preferredHosts = []) {
 }
 
 export function remoteEndActionsEl(preferredHost = null) {
-    const hosts = [preferredHost, document.querySelector('#remote-module-host'), document.querySelector('#remote-dock-host'), document.querySelector('#remote-module-staging')].filter(Boolean);
+    const hosts = [
+        preferredHost,
+        document.querySelector('.remote-popout-body'),
+        document.querySelector('#remote-module-host'),
+        document.querySelector('#remote-dock-host'),
+        document.querySelector('#remote-module-staging')
+    ].filter(Boolean);
     return pick(REMOTE_END, hosts);
 }
 
 export function browserEndActionsEl(preferredHost = null) {
     const hosts = [
         preferredHost,
+        document.querySelector('.browser-popout-body'),
         document.querySelector('.browser-popout-module__host'),
         document.querySelector('#remote-module-host'),
         document.querySelector('#remote-dock-host'),
@@ -32,12 +39,19 @@ export function browserEndActionsEl(preferredHost = null) {
 export function startActionsEl(preferredHost = null) {
     const hosts = [
         preferredHost,
+        document.querySelector('.browser-popout-body'),
+        document.querySelector('.remote-popout-body'),
         document.querySelector('.browser-popout-module__host'),
         document.querySelector('#remote-module-host'),
         document.querySelector('#remote-dock-host'),
         document.querySelector('#remote-module-staging')
     ].filter(Boolean);
     return pick(START, hosts);
+}
+
+export function isRemoteSeparated() {
+    return typeof document !== 'undefined'
+        && document.body.classList.contains('remote-external-popout-active');
 }
 
 export function isBrowserSeparated() {

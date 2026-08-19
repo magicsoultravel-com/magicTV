@@ -11,6 +11,10 @@ export function unregisterAppDocument(doc) {
     extraDocuments.delete(doc);
 }
 
+export function forEachAppDocument(fn) {
+    for (const doc of extraDocuments) fn(doc);
+}
+
 /** Search the main document then any registered popout documents. */
 export function getAppElementById(id) {
     if (!id) return null;

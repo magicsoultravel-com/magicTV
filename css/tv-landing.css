@@ -3933,13 +3933,21 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     background: transparent;
     color: var(--tv-text-secondary);
     cursor: pointer;
-    opacity: 0.8;
+    opacity: 0.5;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .tv-module__action svg {
     display: block;
     flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+}
+
+/* Unify every module quick-action glyph (remote + browser) to the same subtle
+   stroke weight and size as the pop-out icons, so all icons look identical. */
+.tv-module__action svg :where(path, rect, circle, ellipse, line, polyline, polygon) {
+    stroke-width: 0.95;
 }
 
 .tv-module__action:hover,
@@ -3971,6 +3979,35 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     color: var(--tv-main-2, #00FF88);
     background: color-mix(in srgb, var(--tv-main-2, #00FF88) 10%, transparent);
     border-color: color-mix(in srgb, var(--tv-main-2, #00FF88) 24%, transparent);
+}
+
+/* Module quick actions: reveal on the remote / browser module top bars only
+   while the user is hovering (or keyboard-focusing) that particular module.
+   Hidden (non-interactive) by default on pointer devices; always visible on touch. */
+@media (hover: hover) {
+    .remote-module__host > .tv-module__actions,
+    .remote-dock-sheet__inner > .tv-module__actions,
+    .browser-popout-module__host > .tv-module__actions,
+    .remote-popout-body > .tv-module__actions,
+    .browser-popout-body > .tv-module__actions {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+
+    .remote-module__host:hover > .tv-module__actions,
+    .remote-module__host:focus-within > .tv-module__actions,
+    .remote-dock-sheet__inner:hover > .tv-module__actions,
+    .remote-dock-sheet__inner:focus-within > .tv-module__actions,
+    .browser-popout-module__host:hover > .tv-module__actions,
+    .browser-popout-module__host:focus-within > .tv-module__actions,
+    .remote-popout-body:hover > .tv-module__actions,
+    .remote-popout-body:focus-within > .tv-module__actions,
+    .browser-popout-body:hover > .tv-module__actions,
+    .browser-popout-body:focus-within > .tv-module__actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .tv-module__body,
@@ -4099,6 +4136,20 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
 
 .remote-module__scroll.is-browser-popout-empty > .remote-panel.is-active ~ .browser-popout-placeholder {
     display: none;
+}
+
+.remote-module__scroll.is-remote-popout-empty > .tv-panel#remote-panel,
+.remote-module__scroll.is-remote-popout-empty > .tv-panel#settings-panel {
+    display: none !important;
+}
+
+.remote-module__scroll.is-remote-popout-empty > .browser-popout-placeholder {
+    display: none;
+}
+
+.remote-module__scroll.is-browser-popout-empty.is-remote-popout-empty > .browser-popout-placeholder,
+.remote-module__scroll.is-browser-popout-empty.is-remote-popout-empty > .remote-popout-placeholder {
+    display: flex;
 }
 
 .remote-panel__cell--screens,
@@ -4313,6 +4364,42 @@ body.remote-docked-expanded .remote-dock-tab {
     justify-content: flex-end;
 }
 
+.remote-popout-body > .remote-popout-module__shell {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 1 !important;
+}
+
+.remote-popout-module__shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    width: 100%;
+}
+
+.remote-popout-module__chrome {
+    flex-shrink: 0;
+    padding: 0.55rem var(--tv-spacing-sm, 0.5rem) 0.35rem;
+}
+
+.remote-popout-module__scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 var(--tv-spacing-sm, 0.5rem);
+}
+
+.remote-popout-module__scroll > .tv-panel {
+    display: none;
+}
+
+.remote-popout-module__scroll > .tv-panel.is-active {
+    display: block;
+}
+
 .remote-popout-body > .tv-module__body,
 .remote-popout-body > #tv-catalog-body {
     flex: 1;
@@ -4335,12 +4422,25 @@ body.remote-docked-expanded .remote-dock-tab {
     box-shadow: none;
 }
 
-body.remote-external-popout-active .remote-dock-tab,
-body.remote-external-popout-active .remote-dock-sheet,
-body.remote-external-popout-active #remote-module,
-body.remote-external-popout-active .remote-module__dialog {
+body.remote-external-popout-active--full .remote-dock-tab,
+body.remote-external-popout-active--full .remote-dock-sheet,
+body.remote-external-popout-active--full #remote-module,
+body.remote-external-popout-active--full .remote-module__dialog {
     visibility: hidden !important;
     pointer-events: none !important;
+}
+
+body.remote-external-popout-active--solo .remote-module__scroll.is-remote-popout-empty > .remote-popout-placeholder {
+    display: flex;
+}
+
+.remote-popout-body > .tv-module__body.is-remote-popout-live,
+.remote-popout-body > #tv-catalog-body.is-remote-popout-live {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 1 !important;
 }
 
 .remote-popout-placeholder {

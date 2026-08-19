@@ -13,8 +13,7 @@ import {
     prepareBlankPopoutDocument,
     unregisterPipWindow,
     windowNameForBrowser,
-    browserPopoutSize,
-    isPipOccupied
+    browserPopoutSize
 } from './popoutWindows.js';
 import { registerAppDocument, unregisterAppDocument } from '../appDocuments.js';
 import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
@@ -47,11 +46,18 @@ function popoutScrollEl() {
     return entry?.shell?.querySelector('.browser-popout-module__scroll') ?? null;
 }
 
-/** Keep channel tabs in the external window; remote/settings stay in the main remote scroll. */
+function remoteScrollEl() {
+    if (RemoteExternalPopout.isPoppedOut()) {
+        return RemoteExternalPopout.getPopoutScrollEl?.() ?? null;
+    }
+    return scrollEl();
+}
+
+/** Keep channel tabs in the external window; remote/settings stay in main or remote external scroll. */
 function syncActiveTab(tabName) {
     if (!entry) return false;
 
-    const remoteScroll = scrollEl();
+    const remoteScroll = remoteScrollEl();
     const browserScroll = popoutScrollEl();
 
     if (CHANNEL_TABS.includes(tabName)) {
@@ -179,10 +185,6 @@ async function openPopoutWindow() {
     const onPageHide = () => BrowserExternalPopout.handleWindowClosed();
 
     if (shouldUseDocumentPipFor(owner)) {
-        if (isPipOccupied()) {
-            showAppToast('Another popout window is already open');
-            return null;
-        }
         const pipWin = await requestPipWindow({ width: w, height: h, owner, onPageHide });
         if (!pipWin) {
             showAppToast('Could not open browser popout window');
@@ -237,7 +239,6 @@ export const BrowserExternalPopout = {
         const btn = el('browser-popout-btn');
         if (!btn) return;
         const popped = this.isPoppedOut();
-        btn.classList.remove('is-hidden');
         btn.innerHTML = popped ? CARD_ICONS.popoutExit : CARD_ICONS.popout;
         btn.classList.toggle('is-active', popped);
         btn.setAttribute('aria-pressed', String(popped));
@@ -252,13 +253,9 @@ export const BrowserExternalPopout = {
             showAppToast('Open the remote first');
             return;
         }
-        if (RemoteExternalPopout.isPoppedOut()) {
-            showAppToast('Pop the remote back in first');
-            return;
-        }
         if (BrowserPopout.isOpen()) {
-            showAppToast('Close the split browser window first');
-            return;
+            BrowserPopout.close({ persist: false });
+            showAppToast('Closed split browser for external window');
         }
 
         const scroll = scrollEl();
@@ -322,6 +319,7 @@ export const BrowserExternalPopout = {
         }
 
         this.syncBtn();
+        RemoteExternalPopout.syncBodyClasses();
         window.dispatchEvent(new CustomEvent('browser:external_popout_changed'));
     },
 
@@ -379,6 +377,7 @@ export const BrowserExternalPopout = {
         }
 
         this.syncBtn();
+        RemoteExternalPopout.syncBodyClasses();
         window.dispatchEvent(new CustomEvent('browser:external_popout_changed'));
     },
 

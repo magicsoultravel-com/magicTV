@@ -5,6 +5,8 @@ import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { showAppToast } from './toast.js';
 import { CARD_ICONS } from './icons.js';
 import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
+import { BrowserExternalPopout } from './browserExternalPopout.js';
+import { RemoteExternalPopout } from './remoteExternalPopout.js';
 
 const MIN_W = 520;
 const MIN_H = 720;
@@ -142,10 +144,17 @@ function popoutScrollEl() {
 }
 
 /** Keep channel tabs in the split window; remote/settings stay in the remote scroll. */
+function remoteScrollEl() {
+    if (RemoteExternalPopout.isPoppedOut()) {
+        return RemoteExternalPopout.getPopoutScrollEl?.() ?? null;
+    }
+    return scrollEl();
+}
+
 function syncActiveTab(tabName) {
     if (!open) return false;
 
-    const remoteScroll = scrollEl();
+    const remoteScroll = remoteScrollEl();
     const browserScroll = popoutScrollEl();
 
     if (CHANNEL_TABS.includes(tabName)) {
@@ -442,8 +451,8 @@ export const BrowserPopout = {
             return;
         }
         if (document.body.classList.contains('browser-external-popout-active')) {
-            showAppToast('Pop in external browser first');
-            return;
+            BrowserExternalPopout.popIn();
+            showAppToast('Popped in external browser for split view');
         }
         bindOnce();
         open = true;

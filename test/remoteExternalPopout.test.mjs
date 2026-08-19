@@ -49,8 +49,31 @@ function makeEl(tag = 'div', id = '') {
 
 describe('RemoteExternalPopout state', () => {
     beforeEach(() => {
-        const host = makeEl('div', 'remote-dock-host');
+        const scroll = makeEl('div');
+        scroll.className = 'remote-module__scroll';
+        scroll.querySelector = (sel) => {
+            if (sel === '.remote-module__scroll') return scroll;
+            return null;
+        };
+        scroll.querySelectorAll = () => [];
+
         const body = makeEl('div', 'tv-catalog-body');
+        body.className = 'tv-module__body remote-module__shell';
+        body.querySelector = (sel) => {
+            if (sel === '.remote-module__scroll') return scroll;
+            if (sel === '.remote-module__chrome') return makeEl('header');
+            if (sel === '.remote-module__brand') return makeEl('h2');
+            return null;
+        };
+        body.appendChild(scroll);
+
+        const remotePanel = makeEl('div', 'remote-panel');
+        remotePanel.classList.add('is-active');
+        const settingsPanel = makeEl('div', 'settings-panel');
+        scroll.appendChild(remotePanel);
+        scroll.appendChild(settingsPanel);
+
+        const host = makeEl('div', 'remote-dock-host');
         const start = makeEl('div');
         start.className = 'tv-module__actions tv-module__actions--start';
         const remoteEnd = makeEl('div');
@@ -64,19 +87,32 @@ describe('RemoteExternalPopout state', () => {
 
         const els = new Map([
             ['tv-catalog-body', body],
+            ['remote-panel', remotePanel],
+            ['settings-panel', settingsPanel],
             ['remote-dock-host', host],
             ['remote-external-popout-btn', makeEl('button', 'remote-external-popout-btn')]
         ]);
 
         globalThis.document = {
             body: {
-                classList: { _set: new Set(), add(c) { this._set.add(c); }, remove(c) { this._set.delete(c); }, contains(c) { return this._set.has(c); } },
+                classList: { _set: new Set(), add(c) { this._set.add(c); }, remove(c) { this._set.delete(c); }, contains(c) { return this._set.has(c); }, toggle(c, force) {
+                    const on = force === undefined ? !this._set.has(c) : !!force;
+                    if (on) this._set.add(c); else this._set.delete(c);
+                    return on;
+                } },
                 appendChild() { return {}; }
             },
             head: { querySelectorAll: () => [], prepend() {} },
             documentElement: { attributes: [], dataset: {}, style: {} },
             getElementById: (id) => els.get(id) || null,
-            querySelector: () => null,
+            querySelector: (sel) => {
+                if (sel === '#remote-module-host') return null;
+                if (sel === '#remote-dock-host') return host;
+                if (sel === '#remote-module-staging') return null;
+                if (sel === '.remote-popout-body') return null;
+                if (sel === '.browser-popout-body') return null;
+                return null;
+            },
             querySelectorAll: (sel) => {
                 if (sel.includes('actions--start')) return [start];
                 if (sel.includes('actions--remote-end')) return [remoteEnd];
@@ -112,6 +148,17 @@ describe('RemoteExternalPopout state', () => {
         const { RemoteExternalPopout } = await import('../js/ui/remoteExternalPopout.js?state=1');
         assert.equal(RemoteExternalPopout.isPoppedOut(), false);
         assert.equal(RemoteExternalPopout.getPopoutWindow(), null);
+    });
+
+    it('exports syncActiveTab helper', async () => {
+        const { RemoteExternalPopout } = await import('../js/ui/remoteExternalPopout.js?state=2');
+        assert.equal(typeof RemoteExternalPopout.syncActiveTab, 'function');
+        assert.equal(RemoteExternalPopout.syncActiveTab('browse'), false);
+    });
+
+    it('starts in unified mode flag false when not popped out', async () => {
+        const { RemoteExternalPopout } = await import('../js/ui/remoteExternalPopout.js?state=3');
+        assert.equal(RemoteExternalPopout.isUnifiedPopout(), false);
     });
 });
 

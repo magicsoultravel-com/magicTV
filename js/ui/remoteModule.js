@@ -216,17 +216,51 @@ function clearTargetHighlight() {
     });
 }
 
+function isSlotHighlightable(slotId) {
+    if (!slotId) return false;
+    if (slotId !== 'center' && !MultiView.slots?.[slotId]?.enabled) return false;
+    const tile = el(`player-tile-${slotId}`);
+    return Boolean(tile && !tile.classList.contains('is-hidden'));
+}
+
+/** Prefer stored target when still enabled; otherwise fall back to status slot or center. */
+function resolveEffectiveTarget(preferred) {
+    const seen = new Set();
+    for (const id of [preferred, MultiView.statusSlotId, 'center']) {
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        if (isSlotHighlightable(id)) return id;
+    }
+    return 'center';
+}
+
 function syncTargetHighlight() {
     if (mode !== 'hidden' && targetSlotId) {
+        const effective = resolveEffectiveTarget(targetSlotId);
+        if (effective !== targetSlotId) {
+            targetSlotId = effective;
+            persistState({ targetSlotId: effective, open: true, mode });
+        }
         clearTargetHighlight();
         const mosaic = el('player-mosaic');
-        if (!mosaic?.classList.contains('has-corners')) return;
-        const tile = el(`player-tile-${targetSlotId}`);
-        if (!tile || tile.classList.contains('is-hidden')) return;
-        tile.classList.add('is-channel-picker-target');
+        if (!mosaic?.classList.contains('has-corners')) {
+            syncBrowseButtons();
+            return;
+        }
+        const tile = el(`player-tile-${effective}`);
+        if (tile && !tile.classList.contains('is-hidden')) {
+            tile.classList.add('is-channel-picker-target');
+        }
+        syncBrowseButtons();
         return;
     }
     MultiView.syncTileStatusHighlight?.();
+}
+
+/** Reconcile remote target when a mosaic slot was disabled (e.g. via Settings). */
+function reconcileTargetIfDisabled() {
+    if (mode === 'hidden') return;
+    syncTargetHighlight();
 }
 
 function setBrowseButtonState(btn, active) {
@@ -880,6 +914,7 @@ export const RemoteModule = {
 
     syncTargetHighlight,
     syncBrowseButtons,
+    reconcileTargetIfDisabled,
     applyOpacity,
     resetIdleFade: onUserActivity
 };
