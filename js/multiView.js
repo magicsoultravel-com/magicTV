@@ -150,6 +150,10 @@ export const MultiView = {
     focusScreen(slotId) {
         if (!SLOT_IDS.includes(slotId)) return;
         this.setStatusSlot(slotId);
+        if (this.hasCustomPlacement()) {
+            this.raiseTileInStack(slotId);
+            this.persistPlacement();
+        }
         this.maybeRetargetChannelPicker(slotId);
     },
 
@@ -161,7 +165,7 @@ export const MultiView = {
         const next = SCREEN_ADD_ORDER.find((id) => !this.slots[id].enabled);
         if (next) {
             this.setSideEnabled(next, true);
-            this.setStatusSlot(next);
+            this.focusScreen(next);
             return;
         }
         const last = [...SCREEN_ADD_ORDER].reverse().find((id) => this.slots[id].enabled);
@@ -330,7 +334,7 @@ export const MultiView = {
                 this.scheduleRefreshTiles();
                 this.noteSlotPlayingForTiles(player);
             },
-            shouldRecordRecents: () => this.slots.center.player === player
+            shouldRecordRecents: () => true
         });
         player.init();
         slot.player = player;
@@ -560,7 +564,7 @@ export const MultiView = {
         this.setStatusSlot(slotId);
         try {
             const { ChannelPickerModal } = await import('./ui/channelPickerModal.js');
-            if (!ChannelPickerModal.isOpen() || !ChannelPickerModal.isPinned()) return;
+            if (!ChannelPickerModal.isOpen()) return;
             ChannelPickerModal.open(slotId);
         } catch {
             /* ignore */
@@ -832,6 +836,7 @@ export const MultiView = {
         if (CORNER_IDS.includes(id) && !this.slots[id]?.enabled) {
             this.setSideEnabled(id, true);
         }
+        this.setStatusSlot(id);
         this.mountAll();
         const startMuted = id !== 'center';
         const player = this.ensurePlayer(id, { startMuted });

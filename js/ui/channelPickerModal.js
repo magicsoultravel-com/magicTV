@@ -200,7 +200,7 @@ function applyOpacity() {
 }
 
 function playIntoTarget(channel) {
-    const slotId = targetSlotId || 'center';
+    const slotId = MultiView.statusSlotId || targetSlotId || 'center';
     const stayOpen = pinned;
     if (!stayOpen) ChannelPickerModal.close();
     TileFrames.setPlaybackBusy(true);

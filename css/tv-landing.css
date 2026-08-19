@@ -1543,8 +1543,8 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
     border-color: var(--tv-primary);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
     overflow: visible;
-    /* Only this tile above siblings + channel picker (8000); not the whole player slot. */
-    z-index: 9001 !important;
+    /* Tile raised just above hover controls (7400), below modal browser (8000); not the whole player slot. */
+    z-index: 7500;
 }
 
 /* Channel browser target (multi-screen only; see ChannelPickerModal.syncTargetHighlight). */
@@ -2128,7 +2128,7 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.45);
     border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
-    z-index: 30;
+    z-index: 7400;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
