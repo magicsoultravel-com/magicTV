@@ -291,7 +291,7 @@ export const TvClock = {
         if (!select) return;
 
         select.innerHTML = CLOCK_STYLES.map((s) => `
-            <option value="${s.id}">${s.label} (${s.desc})</option>
+            <option value="${s.id}">${s.label}</option>
         `).join('');
 
         select.value = this.isHidden ? 'hidden' : this.currentStyle;

@@ -27,7 +27,7 @@ export const VIEW_TRANSITION_LABELS = {
     flip: 'Flip',
     dissolve: 'Dissolve',
     grain: 'Grain',
-    random: 'Random (no repeat)'
+    random: 'Random'
 };
 
 export const DEFAULT_VIEW_TRANSITION = 'instant';

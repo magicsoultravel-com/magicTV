@@ -15,7 +15,8 @@ import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
 import { TvClock } from './ui/tvClock.js';
 import { RemoteModule } from './ui/remoteModule.js';
 import { RemotePanel, syncRemoteNav, syncRemoteChannelBar } from './ui/remotePanel.js';
-import { BrowserPopout, BROWSER_POPOUT_ICON } from './ui/browserPopout.js';
+import { BrowserPopout } from './ui/browserPopout.js';
+import { BrowserExternalPopout, BROWSER_EXTERNAL_ICON } from './ui/browserExternalPopout.js';
 import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
 import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
@@ -359,15 +360,19 @@ function syncPlayFavoritesMosaicBtn() {
     btn.classList.toggle('is-hidden', appState.activeTab !== 'favorites');
 }
 
+const CHANNEL_TABS = ['browse', 'favorites', 'recents'];
+
+function isBrowserExtracted() {
+    return BrowserPopout.isOpen() || BrowserExternalPopout.isPoppedOut();
+}
+
 function syncBrowserPopoutBtn() {
     const btn = el('browser-popout-btn');
     if (!btn) return;
-    const onChannelTabs = appState.activeTab === 'browse'
-        || appState.activeTab === 'favorites'
-        || appState.activeTab === 'recents';
+    const onChannelTabs = CHANNEL_TABS.includes(appState.activeTab);
     btn.classList.toggle('is-hidden', !onChannelTabs);
-    if (!btn.innerHTML.trim()) btn.innerHTML = BROWSER_POPOUT_ICON;
-    BrowserPopout.syncPopoutBtn();
+    if (!btn.innerHTML.trim()) btn.innerHTML = BROWSER_EXTERNAL_ICON;
+    BrowserExternalPopout.syncBtn();
     BrowserPopout.syncPopoutChrome();
 }
 
@@ -392,9 +397,9 @@ function bindBrowserPopoutBtn() {
     const btn = el('browser-popout-btn');
     if (!btn || btn.dataset.bound === '1') return;
     btn.dataset.bound = '1';
-    btn.innerHTML = BROWSER_POPOUT_ICON;
+    btn.innerHTML = BROWSER_EXTERNAL_ICON;
     btn.addEventListener('click', () => {
-        BrowserPopout.handleIconClick();
+        BrowserExternalPopout.handleIconClick();
     });
 }
 
@@ -519,25 +524,53 @@ async function handleManualRefresh() {
 
 function syncRemoteTabChrome() {
     const tab = appState.activeTab;
-    const showFilters = tab === 'browse' || tab === 'favorites' || tab === 'recents';
+    const extracted = isBrowserExtracted();
+    const isChannelTab = CHANNEL_TABS.includes(tab);
+    const showFilters = !extracted && isChannelTab;
     const catalogTools = el('remote-catalog-tools');
     const body = el('tv-catalog-body');
 
-    if (catalogTools) {
+    if (catalogTools && !extracted) {
         catalogTools.classList.toggle('is-visible', showFilters);
     }
     if (body) {
-        body.classList.toggle('is-remote-view', tab === 'remote');
+        body.classList.toggle('is-remote-view', extracted || tab === 'remote');
         body.classList.toggle('is-subview', showFilters);
+        body.classList.toggle('is-browser-split-active', extracted);
     }
     syncRemoteNav(tab);
     syncRemoteChannelBar(tab);
 }
 
+function activateTabPanels(tabName) {
+    if (BrowserPopout.isOpen()) {
+        BrowserPopout.syncActiveTab(tabName);
+        return;
+    }
+    if (BrowserExternalPopout.isPoppedOut()) {
+        BrowserExternalPopout.syncActiveTab(tabName);
+        return;
+    }
+
+    els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
+    el(`${tabName}-panel`)?.classList.add('is-active');
+}
+
 function switchTab(tabName) {
-    els('.tv-panel').forEach(panel => panel.classList.remove('is-active'));
-    const panel = el(tabName + '-panel');
-    if (panel) panel.classList.add('is-active');
+    appState.activeTab = tabName;
+
+    const splitPrefer = SettingsStore.getBrowserPopoutPreferOpen();
+    const isChannelTab = CHANNEL_TABS.includes(tabName);
+
+    if (splitPrefer && isChannelTab) {
+        if (!BrowserPopout.isOpen()) {
+            BrowserPopout.open({ browserTab: tabName });
+        } else {
+            BrowserPopout.syncActiveTab(tabName);
+        }
+    } else {
+        activateTabPanels(tabName);
+    }
 
     const backBtn = el('back-btn');
     if (backBtn) {
@@ -550,7 +583,6 @@ function switchTab(tabName) {
         }
     }
 
-    appState.activeTab = tabName;
     syncRemoteTabChrome();
     TileFrames.syncLiveRefresh(currentRefreshKey());
     ListSort.syncSortControls();
@@ -701,11 +733,29 @@ async function init() {
 
         // Docked → modal teleport finishes under the boot cover.
         RemoteModule.restoreOpenIfNeeded();
-        BrowserPopout.init();
+        const restoredBrowserTab = BrowserPopout.init({ activeTab: appState.activeTab });
+        if (restoredBrowserTab) {
+            appState.activeTab = restoredBrowserTab;
+            syncRemoteTabChrome();
+        }
         bindBrowserPopoutBtn();
         bindRemoteExternalPopoutBtn();
         syncBrowserPopoutBtn();
         RemoteExternalPopout.syncBtn();
+
+        window.addEventListener('browser:split_closed', () => {
+            activateTabPanels(appState.activeTab);
+            syncRemoteTabChrome();
+        });
+
+        window.addEventListener('browser:external_popout_changed', () => {
+            if (BrowserExternalPopout.isPoppedOut()) {
+                BrowserExternalPopout.syncActiveTab(appState.activeTab);
+            } else {
+                activateTabPanels(appState.activeTab);
+            }
+            syncRemoteTabChrome();
+        });
 
         showAppToast('Ready');
         await reveal();

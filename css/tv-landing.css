@@ -2346,11 +2346,13 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
 }
 
 .tv-module__action.ui-icon-btn {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 50%;
+    border-color: transparent;
+    background: transparent;
     color: var(--tv-text-primary);
-    background: color-mix(in srgb, var(--tv-bg-secondary) 88%, transparent);
 }
 
 .tv-controls__btn--main-1 {
@@ -3898,17 +3900,19 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
 }
 
 .tv-module__action {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--tv-border, #2A2E3A);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--tv-bg-secondary, #141829) 88%, transparent);
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
     color: var(--tv-text-secondary);
     cursor: pointer;
-    opacity: 1;
+    opacity: 0.8;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .tv-module__action svg {
@@ -3916,9 +3920,12 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     flex-shrink: 0;
 }
 
-.tv-module__action:hover {
+.tv-module__action:hover,
+.tv-module__action:focus-visible {
+    background: color-mix(in srgb, currentColor 10%, transparent);
     color: var(--tv-main-1);
-    border-color: var(--tv-border);
+    border-color: color-mix(in srgb, currentColor 16%, transparent);
+    opacity: 1;
 }
 
 .tv-module__body,
@@ -3987,6 +3994,11 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     display: none !important;
 }
 
+.remote-module__shell.is-browser-split-active .remote-panel.is-active {
+    display: flex !important;
+    flex-direction: column;
+}
+
 .remote-panel__grid {
     display: grid;
     grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
@@ -4038,6 +4050,10 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
 
 .remote-module__scroll.is-browser-popout-empty > .tv-panel:not(#settings-panel):not(#remote-panel) {
     display: none !important;
+}
+
+.remote-module__scroll.is-browser-popout-empty > .remote-panel.is-active ~ .browser-popout-placeholder {
+    display: none;
 }
 
 .remote-panel__cell--screens,
@@ -4112,6 +4128,11 @@ body.remote-docked-expanded .remote-dock-tab {
 }
 
 .browser-popout-module:not(.is-hidden) {
+    pointer-events: none;
+}
+
+.browser-popout-module__dialog,
+.browser-popout-module__host {
     pointer-events: auto;
 }
 
@@ -4554,10 +4575,6 @@ body.remote-undocked-open .remote-dock-tab {
     flex: 1;
     min-height: 3rem;
     opacity: 0.45;
-}
-
-body.browser-external-popout-active .browser-popout-module {
-    display: none !important;
 }
 
 

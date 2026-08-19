@@ -291,8 +291,13 @@ export const Appearance = {
                     browserPopoutToggle.getAttribute('aria-pressed') !== 'true'
                 );
                 syncBrowserPopoutToggleUi(next);
-                BrowserPopout.syncPopoutBtn();
-                showAppToast(next ? 'Browser opens in a separate window' : 'Browser stays in the remote');
+                if (!next) {
+                    BrowserPopout.close();
+                }
+                BrowserExternalPopout.syncBtn();
+                showAppToast(next
+                    ? 'Browse/Favorites/Recents open in a split window'
+                    : 'Browser panels docked in remote');
             });
         }
 

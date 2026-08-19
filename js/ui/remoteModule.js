@@ -10,6 +10,7 @@ import { ACTION_ICONS } from './icons.js';
 import { RemotePanel } from './remotePanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { BrowserPopout } from './browserPopout.js';
+import { BrowserExternalPopout } from './browserExternalPopout.js';
 
 const MIN_W = 260;
 const MIN_H = 560;
@@ -759,7 +760,10 @@ export const RemoteModule = {
             RemoteExternalPopout.popIn();
         }
         if (BrowserPopout.isOpen()) {
-            BrowserPopout.popIn();
+            BrowserPopout.close();
+        }
+        if (BrowserExternalPopout.isPoppedOut()) {
+            BrowserExternalPopout.popIn();
         }
 
         persistState({ open: false, mode: 'hidden' });
