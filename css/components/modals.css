@@ -1,0 +1,255 @@
+/** @css {slice}: Channel picker modal, tab-bar popup controls (tv-landing.css lines 3457–3709) */
+
+/* ===== Channel picker modal (teleported catalog) ===== */
+.channel-picker-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 8000;
+    display: block;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.channel-picker-modal.is-hidden,
+.channel-picker-modal[hidden] {
+    display: none !important;
+}
+
+.channel-picker-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--tv-bg, #0A0E27) 55%, transparent);
+    backdrop-filter: blur(4px);
+    pointer-events: auto;
+}
+
+.channel-picker-modal.is-pinned .channel-picker-modal__backdrop {
+    background: transparent;
+    backdrop-filter: none;
+    pointer-events: none;
+}
+
+.channel-picker-modal__dialog {
+    position: fixed;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(1100px, calc(100vw - 2rem));
+    height: min(70vh, 640px);
+    min-width: 360px;
+    min-height: 280px;
+    max-width: calc(100vw - 0.5rem);
+    max-height: calc(100vh - 0.5rem);
+    box-sizing: border-box;
+    background: var(--tv-bg-secondary, #141829);
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-radius: 10px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    pointer-events: auto;
+    opacity: var(--channel-picker-opacity, 1);
+}
+
+.channel-picker-modal__header {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0.3rem 0.85rem;
+    border-bottom: 1px solid var(--tv-border, #2A2E3A);
+    background: rgba(0, 0, 0, 0.25);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.channel-picker-modal__header.is-dragging {
+    cursor: grabbing;
+}
+
+/* Pin/close inside tv-catalog__actions--end inherit .tv-catalog__action base styles.
+   Only the active/pinned state of the pin needs an override. */
+
+/* Hide pin/close in docked catalog — they are modal-only controls */
+#channel-picker-pin,
+#channel-picker-close {
+    display: none;
+}
+
+/* Show them when teleported into the modal host */
+.channel-picker-modal__host #channel-picker-pin,
+.channel-picker-modal__host #channel-picker-close {
+    display: flex;
+}
+
+.channel-picker-modal__pin.is-active,
+.channel-picker-modal__pin[aria-pressed="true"] {
+    color: var(--tv-main-3, #FF00FF);
+}
+
+.channel-picker-modal__host {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Layout toggle teleported with the catalog body — float top-right over the host */
+.channel-picker-modal__host > .tv-catalog__actions--end {
+    position: absolute;
+    top: 0.2rem;
+    right: var(--tv-spacing-sm, 0.5rem);
+    left: auto;
+    z-index: 3;
+    pointer-events: auto;
+}
+
+.channel-picker-modal__host .tv-catalog__body {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+}
+
+.channel-picker-modal__host .tv-panel.is-active {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.channel-picker-modal__resize {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    z-index: 10;
+    touch-action: none;
+}
+
+.channel-picker-modal__resize[data-picker-resize="nw"] {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
+}
+
+.channel-picker-modal__resize[data-picker-resize="ne"] {
+    top: 0;
+    right: 0;
+    cursor: nesw-resize;
+}
+
+.channel-picker-modal__resize[data-picker-resize="sw"] {
+    bottom: 0;
+    left: 0;
+    cursor: nesw-resize;
+}
+
+.channel-picker-modal__resize[data-picker-resize="se"] {
+    bottom: 0;
+    right: 0;
+    cursor: nwse-resize;
+}
+
+/* Docked catalog shell while body is teleported */
+.tv-catalog.is-catalog-teleported {
+    flex: 0 0 0;
+    min-height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Left actions (collapse / mosaic) stay docked and hidden; end actions teleport into the modal */
+.tv-catalog.is-catalog-teleported > .tv-catalog__actions:not(.tv-catalog__actions--end),
+.tv-catalog.is-catalog-teleported .tv-catalog__clip {
+    display: none;
+}
+
+.tv-content:has(.tv-catalog.is-catalog-teleported) #content-splitter {
+    display: none;
+}
+
+.tv-content:has(.tv-catalog.is-catalog-teleported) #player-slot {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+/* ===== TAB BAR POPUP CONTROLS =====
+   Filter input, category select, and sort select appear as popups
+   above their toggle buttons when activated. */
+.tv-tab--filter-input {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    top: auto;
+    right: 0;
+    left: auto;
+    min-width: 180px;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+    z-index: 100;
+}
+.tv-tab--filter-input.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.tv-tab--category {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    top: auto;
+    right: 0;
+    left: auto;
+    min-width: 160px;
+    margin: 0;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+    z-index: 100;
+}
+.tv-tab--category.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.tv-tab--sort {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    top: auto;
+    right: 0;
+    left: auto;
+    min-width: 140px;
+    margin: 0;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+    z-index: 100;
+}
+.tv-tab--sort.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+

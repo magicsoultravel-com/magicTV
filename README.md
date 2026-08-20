@@ -59,8 +59,18 @@ npm test            # or: node --test
 magicTV/
 ├── index.html              # App shell & layout
 ├── css/
-│   ├── base.tv.css        # Core styles & theme variables
-│   └── tv-landing.css     # Landing page layout & components
+│   ├── base.tv.css         # Core styles & theme variables
+│   ├── tv-clock.css         # Header clock widget styles
+│   ├── tv-landing.css       # @import hub — loads components in cascade order
+│   └── components/          # Per-domain stylesheets (split via scripts/split-css.py)
+│       ├── boot-screen.css  # Boot cover, test card, toast system, app skeleton
+│       ├── layout.css       # Header, bottom tabs, filter/sort toolbar, splitter
+│       ├── catalog.css      # Channel/country grids, tiles, visited accents, favorites
+│       ├── mosaic.css       # Active-tile indicators, mosaic grid, free layout
+│       ├── player.css       # Player slots, playback surfaces, swap animations, controls
+│       ├── settings.css     # Settings panels, appearance controls, responsive tweaks
+│       ├── modals.css       # Channel picker modal, tab-bar popups
+│       └── remote.css       # Remote module, textures, external popouts (PiP/popup)
 ├── js/
 │   ├── app.js             # Main app logic (tabs, events, state)
 │   ├── tvPlayer.js        # HLS player state machine (extracted)

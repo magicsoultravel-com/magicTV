@@ -1,0 +1,557 @@
+/** @css {slice}: Header, bottom tabs, filter/sort toolbar, content splitter (tv-landing.css lines 167–721) */
+
+/* ===== HEADER =====
+   Fixed px sizes so the appearance text-size scale (html font-size) does not
+   resize the chrome. Rem elsewhere in the app still follows the slider. */
+.tv-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 16px 24px;
+    padding-top: max(16px, env(safe-area-inset-top, 0px));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 5%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 3%, transparent) 100%);
+    border-bottom: 1px solid var(--tv-border);
+    flex-shrink: 0;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.tv-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.tv-icon {
+    width: 32px;
+    height: 32px;
+    display: block;
+    background: #2d2d2d;
+    border-radius: 4px;
+    padding: 2px;
+    flex-shrink: 0;
+}
+
+.tv-brand h1 {
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 24px;
+    letter-spacing: 0.05em;
+    margin: 0;
+    line-height: 1.3;
+    padding-bottom: 2px;
+}
+
+.tv-channel-info {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    margin-left: 0;
+}
+
+.tv-header-now-playing {
+    font-size: 13px;
+    color: var(--tv-text-secondary);
+    margin-right: 4px;
+    line-height: 1;
+    align-self: center;
+}
+
+/* Channel identity in the header uses the same neon-gradient treatment the
+   now-playing card used to, so live playback stays visible at the top. */
+.tv-header-channel-name {
+    font-size: 24px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+}
+
+.tv-header-channel-flag {
+    font-size: 24px;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tv-primary) 30%, transparent));
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* Mosaic reset lives in the main suite; shown only with a custom layout */
+#mosaic-reset-btn.is-hidden,
+#mosaic-reset-btn[hidden] {
+    display: none;
+}
+
+
+/* ===== TABS (bottom) ===== */
+.tv-tabs {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--tv-spacing-sm);
+    padding: var(--tv-spacing-sm) var(--tv-spacing-lg);
+    padding-bottom: max(var(--tv-spacing-sm), env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid var(--tv-border);
+}
+
+.tv-tab-popup {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+.tv-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1.25rem;
+    border: 2px solid transparent;
+    border-top: 2px solid var(--tv-border);
+    background: transparent;
+    color: var(--tv-text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    transition: var(--tv-transition);
+    position: relative;
+}
+
+.tv-tab .ui-icon {
+    flex-shrink: 0;
+    display: block;
+    width: 14px;
+    height: 14px;
+    shape-rendering: geometricPrecision;
+    transition: transform 0.15s ease;
+}
+
+.tv-tab.is-active .tv-tab .ui-icon {
+    transform: scale(1.1);
+}
+
+.tv-tab:hover {
+    color: var(--tv-primary);
+    border-top-color: var(--tv-primary);
+}
+
+.tv-tab.is-active {
+    color: var(--tv-primary);
+    border-top-color: var(--tv-primary);
+    box-shadow: 0 -2px 0 var(--tv-primary);
+    background: color-mix(in srgb, var(--tv-primary) 5%, transparent);
+}
+
+.tv-tab.is-active:hover {
+    color: var(--tv-primary);
+    border-top-color: var(--tv-primary);
+    background: color-mix(in srgb, var(--tv-primary) 10%, transparent);
+}
+
+.tv-tab.is-pink-active {
+    color: var(--tv-secondary);
+    border-top-color: var(--tv-secondary);
+    box-shadow: 0 -2px 0 var(--tv-secondary);
+    background: color-mix(in srgb, var(--tv-secondary) 5%, transparent);
+}
+
+.tv-tab.is-pink-active:hover {
+    color: var(--tv-secondary);
+    border-top-color: var(--tv-secondary);
+    background: color-mix(in srgb, var(--tv-secondary) 10%, transparent);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== TAB RESPONSIVE BEHAVIOR =====
+   When viewport width is tight, hide tab text labels to show only icons.
+   This prevents horizontal scrolling overflow and improves touch targets.
+   The threshold at 560px ensures text doesn't get clipped in narrow viewports
+   (e.g., modals on phones, split-screen, or landscape tablets).
+   When the channel picker modal is open, always show icon-only tabs to
+   maximize vertical space for the modal content. */
+@media (max-width: 560px) {
+    .tv-tab-text {
+        display: none;
+    }
+    .tv-tab {
+        justify-content: center;
+        align-items: center;
+        padding: 0.35rem;
+        min-width: 36px;
+        width: 36px;
+        box-sizing: border-box;
+    }
+    .tv-tab .ui-icon {
+        width: 12px;
+        height: 12px;
+    }
+}
+
+/* Icon-only mode when modal is open - gives more space to modal content */
+body.has-remote-module .tv-tab-text,
+body.has-channel-picker .tv-tab-text {
+    display: none;
+}
+body.has-channel-picker .tv-tab {
+    justify-content: center;
+    align-items: center;
+    padding: 0.35rem;
+    min-width: 36px;
+    width: 36px;
+    box-sizing: border-box;
+}
+body.has-channel-picker .tv-tab .ui-icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* ===== CONTENT AREA ===== */
+.tv-content {
+    --tv-player-share: 50;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.tv-content.is-splitting {
+    --catalog-dur: 0s !important;
+}
+
+.tv-content.is-splitting,
+.tv-content.is-splitting * {
+    cursor: row-resize;
+    user-select: none;
+}
+
+/* Drag handle between player (top) and browse/catalog (bottom). */
+.tv-content-splitter {
+    flex: 0 0 8px;
+    position: relative;
+    z-index: 4;
+    margin: 2px 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    cursor: row-resize;
+    touch-action: none;
+    outline: none;
+}
+
+.tv-content-splitter::before {
+    content: '';
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    top: 50%;
+    height: 3px;
+    transform: translateY(-50%);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--tv-border) 70%, transparent);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tv-content-splitter:hover::before,
+.tv-content-splitter:focus-visible::before,
+.tv-content.is-splitting .tv-content-splitter::before {
+    background: var(--tv-primary);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--tv-primary) 35%, transparent);
+}
+
+/* Catalog = panels + tabs under the player; can collapse to a one-row toggle. */
+.tv-catalog {
+    display: flex;
+    flex-direction: column;
+    flex: calc(100 - var(--tv-player-share)) 1 0;
+    min-height: 0;
+    position: relative;
+}
+
+.tv-catalog.is-animating {
+    flex: 0 0 auto;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.tv-catalog__actions {
+    position: absolute;
+    top: 0.2rem;
+    left: var(--tv-spacing-sm, 0.5rem);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.tv-catalog__actions--end {
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
+}
+
+.tv-catalog__toggle,
+.tv-catalog__action {
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--tv-text-secondary);
+    cursor: pointer;
+    transition: var(--tv-transition);
+    box-shadow: none;
+}
+
+.tv-catalog__toggle:hover,
+.tv-catalog__action:hover {
+    color: var(--tv-primary);
+    border-color: transparent;
+    background: transparent;
+}
+
+.tv-catalog__action.is-loading {
+    animation: spin 0.8s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.tv-catalog.is-animating .tv-catalog__toggle,
+.tv-catalog.is-animating .tv-catalog__action {
+    pointer-events: auto;
+}
+
+/* Catalog chrome: reveal toggle / layout / refresh on browser hover (pointer devices). */
+@media (hover: hover) {
+    .tv-catalog:not(.is-collapsed) .tv-catalog__toggle,
+    .tv-catalog:not(.is-collapsed) #catalog-layout-btn,
+    .tv-catalog:not(.is-collapsed) #refresh-btn,
+    .tv-catalog:not(.is-collapsed) #channel-picker-pin,
+    .tv-catalog:not(.is-collapsed) #channel-picker-close {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease, color var(--tv-transition);
+    }
+
+    .tv-catalog:not(.is-collapsed):hover .tv-catalog__toggle,
+    .tv-catalog:not(.is-collapsed):focus-within .tv-catalog__toggle,
+    .tv-catalog:not(.is-collapsed):hover #catalog-layout-btn,
+    .tv-catalog:not(.is-collapsed):focus-within #catalog-layout-btn,
+    .tv-catalog:not(.is-collapsed):hover #refresh-btn,
+    .tv-catalog:not(.is-collapsed):focus-within #refresh-btn,
+    .tv-catalog:not(.is-collapsed):hover #channel-picker-pin,
+    .tv-catalog:not(.is-collapsed):focus-within #channel-picker-pin,
+    .tv-catalog:not(.is-collapsed):hover #channel-picker-close,
+    .tv-catalog:not(.is-collapsed):focus-within #channel-picker-close {
+        opacity: 0.4;
+        pointer-events: auto;
+    }
+
+    .tv-catalog:not(.is-collapsed) .tv-catalog__toggle:hover,
+    .tv-catalog:not(.is-collapsed) .tv-catalog__toggle:focus-visible,
+    .tv-catalog:not(.is-collapsed) #catalog-layout-btn:hover,
+    .tv-catalog:not(.is-collapsed) #catalog-layout-btn:focus-visible,
+    .tv-catalog:not(.is-collapsed) #refresh-btn:hover,
+    .tv-catalog:not(.is-collapsed) #refresh-btn:focus-visible,
+    .tv-catalog:not(.is-collapsed) #channel-picker-pin:hover,
+    .tv-catalog:not(.is-collapsed) #channel-picker-pin:focus-visible,
+    .tv-catalog:not(.is-collapsed) #channel-picker-close:hover,
+    .tv-catalog:not(.is-collapsed) #channel-picker-close:focus-visible {
+        opacity: 1;
+        color: var(--tv-primary);
+    }
+}
+
+/* Teleported chrome in the channel picker stays always visible. */
+.channel-picker-modal__host > .tv-catalog__actions--end .tv-catalog__action {
+    opacity: 0.55;
+    pointer-events: auto;
+}
+.channel-picker-modal__host > .tv-catalog__actions--end .tv-catalog__action:hover,
+.channel-picker-modal__host > .tv-catalog__actions--end .tv-catalog__action:focus-visible {
+    opacity: 1;
+}
+
+.tv-catalog__clip {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tv-catalog__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    transform-origin: top center;
+}
+
+.tv-catalog.is-collapsed {
+    flex: 0 0 auto;
+    min-height: calc(28px + 2 * var(--tv-spacing-sm, 0.5rem));
+}
+
+.tv-catalog.is-collapsed .tv-catalog__clip {
+    display: none;
+}
+
+#player-slot {
+    flex: 1 1 0;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+/* Player fills its split pane (same fill rules when catalog is collapsed). */
+.tv-content .tv-player-mosaic {
+    flex: 1;
+    min-height: 0;
+}
+
+.tv-content .tv-player-mosaic:not(.has-corners) {
+    grid-template-rows: 1fr;
+}
+
+.tv-content .tv-player-tile.is-primary {
+    height: 100%;
+    min-height: 0;
+}
+
+.tv-content .tv-player-mosaic.is-free-layout .tv-player-tile.is-primary.is-placed {
+    height: auto;
+    align-self: auto;
+}
+
+.tv-content .tv-player-tile .tv-playback-surface,
+.tv-content .tv-player-tile .tv-playback-surface video,
+.tv-content .tv-player-mosaic.has-corners .tv-player-tile.is-primary .tv-playback-surface,
+.tv-content .tv-player-mosaic.has-corners .tv-player-tile.is-primary .tv-playback-surface video,
+.tv-content .tv-player-mosaic.has-corners .tv-player-tile:not(.is-primary) .tv-playback-surface,
+.tv-content .tv-player-mosaic.has-corners .tv-player-tile:not(.is-primary) .tv-playback-surface video,
+.tv-content .tv-player-video {
+    max-height: none;
+    height: 100%;
+    aspect-ratio: auto;
+}
+
+.tv-content:has(.tv-catalog.is-collapsed) #player-slot,
+.tv-content:has(.tv-catalog.is-animating) #player-slot {
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+.tv-content:has(.tv-catalog.is-animating) .tv-content-splitter {
+    visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tv-catalog.is-animating {
+        transition: none !important;
+    }
+}
+
+.tv-panel {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--tv-spacing-lg);
+    width: 100%;
+    animation: fadeIn 0.3s ease;
+}
+
+/* ===== BROWSE TOOLBAR (filter lives in the bottom tab bar now) ===== */
+/* The shared Filter input sits in the tab bar and applies to the active list:
+   countries, a country's channels, favorites or recents. */
+.tv-tab--filter {
+    flex: 1 1 160px;
+    max-width: 240px;
+    min-width: 0;
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--tv-border);
+    color: var(--tv-text-primary);
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--tv-radius-sm);
+    outline: none;
+}
+
+.tv-tab--filter:focus {
+    border-color: var(--tv-primary);
+    box-shadow: 0 0 0 1px var(--tv-primary);
+}
+
+.tv-tab--filter::placeholder {
+    color: var(--tv-text-muted);
+}
+
+.tv-tab--sort,
+.tv-tab--category {
+    flex: 0 1 120px;
+    max-width: 140px;
+    min-width: 0;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border);
+    color: var(--tv-text-primary);
+    font-size: 0.8rem;
+    padding: 0.5rem 0.5rem;
+    border-radius: var(--tv-radius-sm);
+    outline: none;
+    cursor: pointer;
+    color-scheme: dark;
+}
+
+.tv-tab--category {
+    flex: 0 1 140px;
+    max-width: 160px;
+}
+
+.tv-tab--sort:focus,
+.tv-tab--category:focus {
+    border-color: var(--tv-primary);
+    box-shadow: 0 0 0 1px var(--tv-primary);
+}
+
+.tv-tab--sort option,
+.tv-tab--category option {
+    background: var(--tv-bg-secondary);
+    color: var(--tv-text-primary);
+}
+ 
+ .tv-tab--sort.is-hidden,
+.tv-tab--sort-dir.is-hidden,
+.tv-tab--sort-btn.is-hidden,
+.tv-tab--category.is-hidden,
+.tv-tab--category-btn.is-hidden,
+.tv-tab-popup.is-hidden {
+    display: none;
+}
+

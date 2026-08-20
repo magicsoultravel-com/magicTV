@@ -1,0 +1,655 @@
+/** @css {slice}: Settings panels, appearance controls, sliders, responsive tweaks (tv-landing.css lines 2804–3456) */
+
+/* ===== SETTINGS PANEL ===== */
+.settings-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-lg);
+    max-width: 600px;
+}
+
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-md);
+    padding: var(--tv-spacing-md);
+    background: color-mix(in srgb, var(--tv-primary) 5%, transparent);
+    border: 1px solid var(--tv-border-light);
+    border-radius: var(--tv-radius-md);
+}
+
+.settings-section__title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: var(--tv-primary);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.settings-section__title .ui-icon {
+    flex-shrink: 0;
+    color: currentColor;
+    width: 16px;
+    height: 16px;
+    shape-rendering: geometricPrecision;
+}
+
+.settings-section__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--tv-spacing-md);
+}
+
+.settings-section__label {
+    font-size: 0.875rem;
+    color: var(--tv-text-secondary);
+}
+
+.settings-section__control {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-spacing-sm);
+}
+
+.settings-section__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--tv-spacing-sm);
+}
+
+.settings-section--collapsible > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--tv-spacing-sm);
+}
+
+.settings-section--collapsible > summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-section--collapsible > summary .settings-section__title {
+    margin: 0;
+}
+
+.settings-section__count {
+    color: var(--tv-text-muted);
+    font-weight: 400;
+    text-transform: none;
+}
+
+.settings-section__chevron {
+    color: var(--tv-text-muted);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.settings-section--collapsible[open] .settings-section__chevron {
+    transform: rotate(180deg);
+}
+
+.settings-hidden-browser {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-sm);
+    padding-top: var(--tv-spacing-xs);
+}
+
+.settings-hidden-back-btn {
+    align-self: flex-start;
+    padding: var(--tv-spacing-xs) var(--tv-spacing-sm);
+    background: color-mix(in srgb, var(--tv-secondary) 12%, transparent);
+    color: var(--tv-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.settings-hidden-back-btn:hover {
+    background: color-mix(in srgb, var(--tv-secondary) 20%, transparent);
+}
+
+.settings-hidden-grid {
+    margin-bottom: 0;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr));
+}
+
+.settings-hidden-grid .channel-tile,
+.settings-hidden-grid .country-tile {
+    min-width: 0;
+    max-width: none;
+}
+
+.settings-color-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-sm);
+    padding-top: var(--tv-spacing-xs);
+}
+
+.settings-color-group__title {
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tv-text-muted);
+}
+
+.settings-color {
+    width: 40px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--tv-border-light);
+    border-radius: var(--tv-radius-sm);
+    background: transparent;
+    cursor: pointer;
+}
+
+.settings-font-picker {
+    position: relative;
+    min-width: 11rem;
+}
+
+.settings-font-picker__trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.65rem;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border-light);
+    border-radius: var(--tv-radius-sm);
+    color: var(--tv-text-primary);
+    cursor: pointer;
+    text-align: left;
+}
+
+.settings-font-picker__trigger::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--tv-text-secondary);
+    flex-shrink: 0;
+}
+
+.settings-font-picker__current {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-font-picker__menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 40;
+    min-width: 100%;
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: 0.25rem;
+    background: var(--tv-bg-secondary);
+    border: 1px solid var(--tv-border-light);
+    border-radius: var(--tv-radius-sm);
+    box-shadow: var(--tv-shadow);
+}
+
+.settings-font-picker__option {
+    display: block;
+    width: 100%;
+    padding: 0.45rem 0.65rem;
+    border: none;
+    border-radius: var(--tv-radius-sm);
+    background: transparent;
+    color: var(--tv-text-primary);
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1.3;
+}
+
+.settings-font-picker__option:hover,
+.settings-font-picker__option:focus-visible {
+    background: color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    outline: none;
+}
+
+.settings-font-picker__option.is-selected {
+    color: var(--tv-primary);
+    background: color-mix(in srgb, var(--tv-primary) 10%, transparent);
+}
+
+.settings-color::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.settings-color::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+.settings-toggle {
+    width: 44px;
+    height: 24px;
+    background: var(--tv-border-light);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: var(--tv-transition);
+}
+
+.settings-toggle.is-active {
+    background: var(--tv-primary);
+}
+
+.settings-toggle::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: var(--tv-bg);
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: var(--tv-transition);
+}
+
+/* ===== APPEARANCE SETTINGS ===== */
+.settings-slider {
+    width: 120px;
+    height: 4px;
+    background: var(--tv-border-light);
+    border-radius: 2px;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    cursor: pointer;
+}
+
+.settings-slider::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--tv-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px color-mix(in srgb, var(--tv-primary) 50%, transparent);
+}
+
+.settings-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--tv-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 6px color-mix(in srgb, var(--tv-primary) 50%, transparent);
+}
+
+.settings-value {
+    font-size: 0.875rem;
+    color: var(--tv-text-primary);
+    min-width: 3.25rem;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Tile / list width CSS variables - controlled by appearance settings */
+:root {
+    --tv-tile-width: 180px;
+    --tv-list-width: 300px;
+}
+
+/* Channel tile width - controlled by appearance setting */
+.channel-tile {
+    width: var(--tv-tile-width);
+    min-width: var(--tv-tile-width);
+    max-width: var(--tv-tile-width);
+}
+
+/* Channel / country grids in list layout — compact rows, multi-column fill.
+   Scoped on html so teleported modal catalog still matches. */
+html[data-channel-layout="list"] .channel-grid,
+html[data-channel-layout="list"] .country-grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--tv-list-width, 300px), 1fr));
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile,
+html[data-channel-layout="list"] .country-grid .country-tile {
+    width: var(--tv-list-width, 300px);
+    min-width: var(--tv-list-width, 300px);
+    max-width: var(--tv-list-width, 300px);
+    min-height: 32px;
+    gap: 0.35rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--tv-radius-sm);
+    contain-intrinsic-size: auto 34px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__icon,
+html[data-channel-layout="list"] .country-grid .country-tile__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.95rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__letter-avatar {
+    font-size: 0.7rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__name,
+html[data-channel-layout="list"] .country-grid .country-tile__name {
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__body,
+html[data-channel-layout="list"] .country-grid .country-tile__body {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__flag {
+    font-size: 0.7rem;
+}
+
+html[data-channel-layout="list"] .country-grid .country-tile__count {
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn {
+    width: 14px;
+    height: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__hide-btn,
+html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn {
+    width: 14px;
+    height: 14px;
+    right: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .channel-tile__hide-btn svg,
+html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Channel tile body - with text clipping when narrow */
+.channel-tile__body {
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Tile names use rem so they follow the root text-size scale */
+.channel-tile__name,
+.country-tile__name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.8rem;
+}
+
+/* Duplicate-text marquee — never shows whitespace because two copies of the
+   text sit side by side, and the track scrolls by exactly 50% (one copy). */
+.channel-tile.narrow .channel-tile__name,
+.country-tile.narrow .country-tile__name {
+    overflow: hidden;
+    text-overflow: clip;
+}
+
+.channel-tile.narrow .marquee-track,
+.country-tile.narrow .marquee-track {
+    display: inline-flex;
+    white-space: nowrap;
+    will-change: transform;
+    animation: marquee-dup 4s linear infinite alternate;
+}
+
+.channel-tile.narrow .marquee-text,
+.country-tile.narrow .marquee-text {
+    flex-shrink: 0;
+}
+
+@keyframes marquee-dup {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+/* Settings reset — icon only */
+.settings-reset-btn {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+    background: transparent;
+    color: var(--tv-text-secondary);
+    border: 1px solid transparent;
+    border-radius: var(--tv-radius-sm);
+    cursor: pointer;
+    transition: var(--tv-transition);
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+.settings-reset-btn:hover {
+    background: var(--tv-border-light);
+    color: var(--tv-primary);
+    border-color: var(--tv-border);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tv-header {
+        padding: 16px;
+        padding-top: max(16px, env(safe-area-inset-top, 0px));
+    }
+
+    .tv-brand h1 {
+        font-size: 20px;
+    }
+
+    .tv-icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .tv-header-channel-name,
+    .tv-header-channel-flag {
+        font-size: 20px;
+    }
+
+    .tv-tabs {
+        padding: var(--tv-spacing-sm) var(--tv-spacing-md);
+        padding-bottom: max(var(--tv-spacing-sm), env(safe-area-inset-bottom, 0px));
+        gap: var(--tv-spacing-xs);
+    }
+
+    .tv-content {
+        padding: var(--tv-spacing-md);
+    }
+}
+
+/* Tablet-only tab label sizing — do not override icon-only narrow mode below 560px. */
+@media (max-width: 768px) and (min-width: 561px) {
+    .tv-tab {
+        padding: 0.5rem 1rem;
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tv-header {
+        padding: 8px 16px;
+        padding-top: max(8px, env(safe-area-inset-top, 0px));
+    }
+
+    .tv-brand h1 {
+        font-size: 18px;
+    }
+
+    .tv-header-channel-name,
+    .tv-header-channel-flag {
+        font-size: 18px;
+    }
+
+    .tv-content {
+        padding: var(--tv-spacing-sm);
+    }
+
+    .tv-controls__volume {
+        display: none;
+    }
+
+    .tv-controls__info {
+        font-size: 0.65rem;
+    }
+}
+
+/* Short viewports: phones, landscape, and "Request desktop site" (wide CSS
+   width but phone height). Width-only breakpoints miss that case. */
+@media (max-height: 720px) {
+    .tv-player-controls {
+        padding: 0.35rem var(--tv-spacing-sm);
+        gap: var(--tv-spacing-sm);
+    }
+
+    .tv-controls__info {
+        display: none;
+    }
+}
+
+@media (max-height: 560px) {
+    .tv-header {
+        padding-top: max(8px, env(safe-area-inset-top, 0px));
+        padding-bottom: 8px;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .tv-brand h1,
+    .tv-header-channel-name,
+    .tv-header-channel-flag {
+        font-size: 18px;
+    }
+}
+
+.settings-toggle.is-active::after {
+    left: 22px;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    gap: var(--tv-spacing-md);
+    color: var(--tv-text-muted);
+    text-align: center;
+}
+
+.empty-state__icon {
+    font-size: 3rem;
+    opacity: 0.5;
+    color: var(--tv-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-state__icon .ui-icon {
+    display: block;
+}
+
+.empty-state__text {
+    font-size: 0.875rem;
+}
+
+.tv-panel.is-active {
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Full-screen film-grain wipe used by Catalog collapse → Grain. */
+.catalog-grain-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    pointer-events: none;
+    opacity: 0;
+    display: none;
+    overflow: hidden;
+    background: #000;
+}
+
+.catalog-grain-overlay.is-active {
+    display: block;
+}
+
+.catalog-grain-overlay--scoped {
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    border-radius: inherit;
+}
+
+.catalog-grain-overlay__veil {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 1;
+}
+
+.catalog-grain-overlay__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0.7;
+    mix-blend-mode: screen;
+    image-rendering: pixelated;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .catalog-grain-overlay__canvas {
+        opacity: 0.35;
+    }
+}
+

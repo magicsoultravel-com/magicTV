@@ -1,0 +1,554 @@
+/** @css {slice}: Channel/country grids, tiles, visited accents, favorites, settings preview (tv-landing.css lines 722–1273) */
+
+/* ===== CHANNEL GRID ===== */
+
+
+/* ===== CHANNEL GRID ===== */
+.channel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--tv-tile-width, 180px), 1fr));
+    gap: var(--tv-grid-gap);
+    margin-bottom: var(--tv-spacing-lg);
+    flex-shrink: 0;
+}
+
+.channel-tile {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--tv-spacing-sm);
+    padding: var(--tv-spacing-xs) var(--tv-spacing-sm);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 6%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 3%, transparent) 100%);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-md);
+    cursor: pointer;
+    transition: var(--tv-transition);
+    min-height: 64px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    /* Skip layout/paint entirely for tiles that are far off-screen; kept in
+       reserve so long countries scroll without reflowing the whole grid. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 68px;
+}
+
+.channel-tile:hover {
+    border-color: var(--tv-primary);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 12%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 6%, transparent) 100%);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+}
+
+/* ===== VISITED CHANNEL ACCENT =====
+   Gated via html[data-visited-style] (set by Appearance). Tiles marked
+   .is-visited pick up the selected main accent; "undistinguished" (default)
+   keeps visited tiles identical to unvisited ones. */
+html[data-visited-style="accent-1"] .channel-tile.is-visited { --tv-visited-accent: var(--tv-main-1); }
+html[data-visited-style="accent-2"] .channel-tile.is-visited { --tv-visited-accent: var(--tv-main-2); }
+html[data-visited-style="accent-3"] .channel-tile.is-visited { --tv-visited-accent: var(--tv-main-3); }
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited {
+    border-color: color-mix(in srgb, var(--tv-visited-accent) 45%, var(--tv-border));
+    box-shadow: inset 3px 0 0 0 var(--tv-visited-accent);
+}
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited .channel-tile__icon {
+    border-color: color-mix(in srgb, var(--tv-visited-accent) 45%, var(--tv-border-light));
+}
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited .channel-tile__letter-avatar {
+    color: var(--tv-visited-accent);
+}
+
+html[data-visited-style]:not([data-visited-style="undistinguished"]) .channel-tile.is-visited .channel-tile__flag {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tv-visited-accent) 30%, transparent);
+}
+
+/* ===== NON-VISITED CHANNEL ACCENT =====
+   Mirror of visited accent but applied to unvisited tiles. */
+html[data-non-visited-style="accent-1"] .channel-tile:not(.is-visited) { --tv-non-visited-accent: var(--tv-main-1); }
+html[data-non-visited-style="accent-2"] .channel-tile:not(.is-visited) { --tv-non-visited-accent: var(--tv-main-2); }
+html[data-non-visited-style="accent-3"] .channel-tile:not(.is-visited) { --tv-non-visited-accent: var(--tv-main-3); }
+
+html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .channel-tile:not(.is-visited) {
+    border-color: color-mix(in srgb, var(--tv-non-visited-accent) 45%, var(--tv-border));
+    box-shadow: inset 3px 0 0 0 var(--tv-non-visited-accent);
+}
+
+html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .channel-tile:not(.is-visited) .channel-tile__icon {
+    border-color: color-mix(in srgb, var(--tv-non-visited-accent) 45%, var(--tv-border-light));
+}
+
+html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .channel-tile:not(.is-visited) .channel-tile__letter-avatar {
+    color: var(--tv-non-visited-accent);
+}
+
+html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .channel-tile:not(.is-visited) .channel-tile__flag {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tv-non-visited-accent) 30%, transparent);
+}
+
+/* Favorites tab: drag-to-reorder */
+#favorites-grid .channel-tile {
+    cursor: grab;
+    touch-action: none;
+}
+
+#favorites-grid.is-sort-locked .channel-tile {
+    cursor: pointer;
+    touch-action: auto;
+}
+
+#favorites-grid.is-reordering {
+    user-select: none;
+}
+
+#favorites-grid.is-reordering .channel-tile {
+    transition: none;
+    content-visibility: visible;
+}
+
+#favorites-grid .channel-tile.is-dragging {
+    cursor: grabbing;
+    opacity: 0.92;
+    content-visibility: visible;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--tv-primary) 25%, transparent);
+    border-color: var(--tv-primary);
+    z-index: 5;
+}
+
+#favorites-grid .channel-tile.is-drag-float {
+    position: fixed;
+    margin: 0;
+    pointer-events: none;
+    z-index: 40;
+    will-change: transform;
+}
+
+#favorites-grid .channel-tile--placeholder {
+    cursor: default;
+    pointer-events: none;
+    opacity: 0.35;
+    border-style: dashed;
+    background: color-mix(in srgb, var(--tv-primary) 8%, transparent);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+/* Hover fav — 20px thin SVG star flush to the tile's top-right corner */
+.channel-tile__fav-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.channel-tile__hide-btn {
+    position: absolute;
+    top: 0;
+    right: 20px;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.channel-tile__fav-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.channel-tile__hide-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.channel-tile:hover .channel-tile__fav-btn,
+.channel-tile:focus-within .channel-tile__fav-btn,
+.channel-tile__fav-btn.is-active,
+.channel-tile:hover .channel-tile__hide-btn,
+.channel-tile:focus-within .channel-tile__hide-btn,
+.channel-tile:hover .channel-tile__unhide-btn,
+.channel-tile:focus-within .channel-tile__unhide-btn,
+.channel-tile:hover .channel-tile__unvisit-btn,
+.channel-tile:focus-within .channel-tile__unvisit-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.channel-tile__fav-btn:hover,
+.channel-tile__fav-btn:focus-visible {
+    color: var(--tv-secondary);
+    outline: none;
+}
+
+.channel-tile__hide-btn:hover,
+.channel-tile__hide-btn:focus-visible,
+.channel-tile__unhide-btn:hover,
+.channel-tile__unhide-btn:focus-visible,
+.channel-tile__unvisit-btn:hover,
+.channel-tile__unvisit-btn:focus-visible {
+    color: var(--tv-secondary);
+    outline: none;
+}
+
+.channel-tile__fav-btn.is-active {
+    color: var(--tv-secondary);
+}
+
+.channel-tile__unhide-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.channel-tile__unhide-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+/* Visited-list unvisit button — same position as unhide */
+.channel-tile__unvisit-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.channel-tile__unvisit-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+/* Icon area — 40×40 square */
+/* Country tiles share the same base shell as channel tiles */
+.country-tile {
+    composes: channel-tile;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--tv-spacing-sm);
+    padding: var(--tv-spacing-xs) var(--tv-spacing-sm);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 6%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 3%, transparent) 100%);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-md);
+    cursor: pointer;
+    transition: var(--tv-transition);
+    min-height: 72px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 76px;
+    min-width: var(--tv-tile-width);
+    max-width: var(--tv-tile-width);
+    width: var(--tv-tile-width);
+}
+
+.country-tile:hover,
+.country-tile:focus-visible {
+    border-color: var(--tv-primary);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 12%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 6%, transparent) 100%);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    transform: none;
+    outline: none;
+}
+
+.country-tile__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--tv-radius-sm);
+    background: color-mix(in srgb, var(--tv-primary) 8%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tv-border-light);
+    flex-shrink: 0;
+    font-size: 1.5rem;
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tv-primary) 35%, transparent));
+}
+
+.country-tile__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.country-tile__name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--tv-text-primary);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.country-tile__count {
+    font-size: 0.7rem;
+    color: var(--tv-text-muted);
+    white-space: nowrap;
+}
+
+/* ===== SETTINGS PREVIEW TILE ===== */
+.settings-preview {
+    margin: var(--tv-spacing-sm) 0 var(--tv-spacing-md);
+    border: 1px dashed var(--tv-border-light);
+    border-radius: var(--tv-radius-md);
+    padding: var(--tv-spacing-md);
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.settings-preview__label {
+    font-size: 0.7rem;
+    color: var(--tv-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--tv-spacing-sm);
+}
+
+.settings-preview .channel-tile {
+    /* Inside preview, the tile still follows --tv-tile-width so users see live effect */
+    cursor: default;
+    contain: none;
+    content-visibility: visible;
+    max-width: 100%;
+}
+
+/* Preview variants — tile and list side by side */
+.settings-preview__variants {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-md);
+    margin-top: var(--tv-spacing-sm);
+}
+
+.settings-preview__variant-label {
+    font-size: 0.65rem;
+    color: var(--tv-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: var(--tv-spacing-xs);
+}
+
+.settings-preview__tile-grid {
+    display: grid;
+    grid-template-columns: minmax(min(100%, var(--tv-tile-width, 180px)), 1fr);
+}
+
+.settings-preview__list-grid {
+    display: grid;
+    grid-template-columns: minmax(min(100%, var(--tv-list-width, 300px)), 1fr);
+}
+
+.settings-preview__list-grid .channel-tile {
+    width: var(--tv-list-width);
+    min-width: var(--tv-list-width);
+    max-width: var(--tv-list-width);
+    min-height: 32px;
+    gap: 0.35rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--tv-radius-sm);
+    contain-intrinsic-size: auto 34px;
+}
+
+.settings-preview__list-grid .channel-tile__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.95rem;
+}
+
+.settings-preview__list-grid .channel-tile__letter-avatar {
+    font-size: 0.7rem;
+}
+
+.settings-preview__list-grid .channel-tile__name {
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+.settings-preview__list-grid .channel-tile__flag {
+    font-size: 0.7rem;
+}
+
+/* Narrow tile marquee behavior — no scrollbar, text animates */
+.channel-tile.narrow .channel-tile__name {
+    display: block; /* override the hide */
+}
+.channel-tile__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--tv-radius-sm);
+    background: color-mix(in srgb, var(--tv-primary) 8%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tv-border-light);
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.channel-tile__capture-frame {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.channel-tile__letter-avatar {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--tv-primary);
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.channel-tile__letter-avatar.is-hidden { display: none; }
+
+.channel-tile__logo-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: var(--tv-radius-sm);
+}
+
+.channel-tile__logo-img.is-hidden { display: none; }
+
+.channel-tile__frame-waiting,
+.channel-tile__frame-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tv-text-muted);
+    line-height: 1;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.channel-tile__frame-waiting {
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+.channel-tile__frame-loading {
+    color: var(--tv-primary);
+}
+
+.channel-tile__frame-loading svg {
+    display: block;
+    animation: spin 0.8s linear infinite;
+}
+
+.channel-tile__frame-waiting.is-hidden,
+.channel-tile__frame-loading.is-hidden {
+    display: none;
+}
+
+.channel-tile__capture-frame[data-frame-state="loading"] .channel-tile__letter-avatar {
+    opacity: 0.35;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+.channel-tile__offline-badge {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 120, 120, 0.95);
+    line-height: 1;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.channel-tile__offline-badge.is-hidden { display: none; }
+
+.channel-tile__offline-badge svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+}
+
