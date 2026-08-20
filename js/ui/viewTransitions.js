@@ -14,6 +14,11 @@ export const VIEW_TRANSITIONS = [
     'flip',
     'dissolve',
     'grain',
+    'glitch',
+    'slideleft',
+    'slideright',
+    'spiralin',
+    'spiralout',
     'random'
 ];
 
@@ -27,6 +32,11 @@ export const VIEW_TRANSITION_LABELS = {
     flip: 'Flip',
     dissolve: 'Dissolve',
     grain: 'Grain',
+    glitch: 'Glitch',
+    slideleft: 'Slide Left',
+    slideright: 'Slide Right',
+    spiralin: 'Spiral In',
+    spiralout: 'Spiral Out',
     random: 'Random'
 };
 
@@ -45,7 +55,12 @@ export const VIEW_MOTION = {
     crossfade: { duration: 280, easing: 'ease' },
     flip: { duration: 420, easing: 'ease-in-out' },
     dissolve: { duration: 280, easing: 'ease-in-out' },
-    grain: { duration: 520, easing: 'ease-in-out' }
+    grain: { duration: 520, easing: 'ease-in-out' },
+    glitch: { duration: 480, easing: 'cubic-bezier(0.68, -0.55, 0.27, 1.55)' },
+    slideleft: { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    slideright: { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    spiralin: { duration: 700, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' },
+    spiralout: { duration: 700, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' }
 };
 
 /** Half-phase durations for mosaic tile CSS swap animations. */
@@ -55,7 +70,12 @@ export const TILE_SWAP_DURATIONS = {
     fade: 240,
     spring: 420,
     crossfade: 240,
-    flip: 380
+    flip: 380,
+    glitch: 480,
+    slideleft: 380,
+    slideright: 380,
+    spiralin: 700,
+    spiralout: 700
 };
 
 /** @type {Record<string, string[]>} */
