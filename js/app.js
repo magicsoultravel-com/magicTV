@@ -648,11 +648,9 @@ async function init() {
     };
 
     try {
-        showAppToast('Loading theme…');
         primeBootScreen();
         Appearance.applyStyles();
 
-        showAppToast('Preparing screens…');
         ChannelGrid.init({
             appState,
             getRefreshKey: currentRefreshKey,
@@ -716,7 +714,6 @@ async function init() {
 
         // Mosaic stubs already painted in MultiView.init; attach streams under cover.
         // Catalog/countries can be slow on cold cache — kick off but do not gate reveal.
-        showAppToast('Restoring screens…');
         const restorePromise = MultiView.restoreSlots().catch(() => false);
         const countriesPromise = BrowseView.refreshCountries().catch(() => {});
 
@@ -782,7 +779,6 @@ async function init() {
             RemoteExternalPopout.syncBtn();
         });
 
-        showAppToast('Ready');
         await reveal();
 
         await countriesPromise;

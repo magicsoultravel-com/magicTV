@@ -590,6 +590,25 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg {
     font-size: 0.875rem;
 }
 
+.catalog-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+    padding: var(--tv-spacing-lg);
+    color: var(--tv-text-muted);
+    text-align: center;
+}
+
+.catalog-status--error {
+    color: var(--tv-text-secondary);
+}
+
+.catalog-status__text {
+    font-size: 0.875rem;
+    margin: 0;
+}
+
 .tv-panel.is-active {
     display: flex;
     flex-direction: column;

@@ -36,11 +36,7 @@ export function supportsDocumentPip() {
     }
 }
 
-/** Auto: PiP when supported and nothing else occupies it, else classic popup. */
-export function shouldUsePipPopout() {
-    return shouldUseDocumentPipFor(null);
-}
-
+/** True when the page already has a native video Picture-in-Picture element. */
 export function anyNativeVideoPipActive() {
     try {
         return typeof document !== 'undefined' && !!document.pictureInPictureElement;

@@ -111,6 +111,14 @@ html.is-booting #toast-container {
 }
 
 /* Existing toast host — bottom-right, theme tokens (used during boot and runtime). */
+#toast-container {
+    position: fixed;
+    bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
+    right: max(2rem, env(safe-area-inset-right, 0px));
+    z-index: 9999;
+    pointer-events: none;
+}
+
 .app-toast-host {
     display: flex;
     flex-direction: column;

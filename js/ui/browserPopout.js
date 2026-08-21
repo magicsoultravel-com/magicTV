@@ -3,7 +3,6 @@ import { el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { showAppToast } from './toast.js';
-import { CARD_ICONS } from './icons.js';
 import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
 import { BrowserExternalPopout } from './browserExternalPopout.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
@@ -494,5 +493,3 @@ export const BrowserPopout = {
     syncPopoutChrome,
     syncPopoutBtn
 };
-
-export const BROWSER_POPOUT_ICON = CARD_ICONS.popout;

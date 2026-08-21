@@ -176,10 +176,6 @@ input::placeholder {
     display: none !important;
 }
 
-.is-invisible {
-    visibility: hidden !important;
-}
-
 /* Responsive grid mixin values */
 @media (max-width: 480px) {
     :root {

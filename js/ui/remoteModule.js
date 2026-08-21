@@ -919,5 +919,3 @@ export const RemoteModule = {
     resetIdleFade: onUserActivity
 };
 
-/** @deprecated Use RemoteModule */
-export const ChannelPickerModal = RemoteModule;

@@ -209,13 +209,18 @@ export const ChannelGrid = {
 
     render(container, channels, { append = false } = {}) {
         if (!container) return;
-        const html = channels.map(ch => tileHtml(ch)).join('');
+        const list = channels || [];
+        if (!append && !list.length) {
+            container.innerHTML = '<div class="empty-state" role="status"><p class="empty-state__text">No channels</p></div>';
+            return;
+        }
+        const html = list.map(ch => tileHtml(ch)).join('');
         if (append && container.querySelector('.channel-tile')) {
             container.insertAdjacentHTML('beforeend', html);
         } else {
             container.innerHTML = html;
         }
-        wireTiles(container, channels);
+        wireTiles(container, list);
         TileFrames.observe(container, { viewKey: deps.getRefreshKey?.() || null });
         Appearance.applyToTiles(container);
         this.syncPlayingTiles();

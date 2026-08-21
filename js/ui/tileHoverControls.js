@@ -24,7 +24,7 @@ function controlBtn(action, label, content, target, extraClass = '') {
 }
 
 function muteBtn(target) {
-    return `<button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" data-controls-target="${target}" title="Unmute" aria-label="Mute or unmute" aria-pressed="true">${MUTE_SVG}</button>`;
+    return `<button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" data-controls-target="${target}" title="Unmute" aria-label="Unmute" aria-pressed="true">${MUTE_SVG}</button>`;
 }
 
 function castWrap() {

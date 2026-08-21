@@ -36,11 +36,6 @@ export {
     normalizeViewTransition
 } from '../ui/viewTransitions.js';
 
-/** @deprecated Use VIEW_TRANSITIONS — kept for older imports. */
-export const SWAP_TRANSITIONS = VIEW_TRANSITIONS;
-/** @deprecated Use VIEW_TRANSITIONS — kept for older imports. */
-export const CATALOG_TRANSITIONS = VIEW_TRANSITIONS;
-
 const DEFAULT_TEXT_SIZE = 16;
 const DEFAULT_TILE_WIDTH = 180;
 const DEFAULT_LIST_WIDTH = 300;

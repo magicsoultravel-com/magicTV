@@ -6,10 +6,14 @@ import { ChannelGrid } from './channelGrid.js';
 import { Appearance } from './appearance.js';
 import { MultiView } from '../multiView.js';
 import { channelKey } from '../tvProviders/channelShape.js';
+import { RemotePanel, syncRemoteChannelBar } from './remotePanel.js';
 
 let deps = {
     appState: null
 };
+
+/** Edge-trigger key so resume/error toasts fire once per episode, not every state tick. */
+let lastPlaybackToastKey = null;
 
 export const PlayerChrome = {
     init({ appState }) {
@@ -113,17 +117,22 @@ export const PlayerChrome = {
         }
 
         this.updateBufferQuality();
-        if (typeof document !== 'undefined') {
-            import('./remotePanel.js').then(({ RemotePanel, syncRemoteChannelBar }) => {
-                RemotePanel.syncRemotePanel?.();
-                syncRemoteChannelBar?.(deps.appState?.activeTab || 'remote');
-            }).catch(() => {});
-        }
+        RemotePanel.syncRemotePanel?.();
+        syncRemoteChannelBar?.(deps.appState?.activeTab || 'remote');
 
+        let toastKey = null;
         if (state.resumeBlocked) {
-            showAppToast('Tap ▶ to start playback');
-        } else if (state.error && !state.resumeBlocked) {
-            showAppToast('Stream unavailable');
+            toastKey = 'resumeBlocked';
+        } else if (state.error) {
+            toastKey = `error:${channelKey(state.channel) || ''}`;
+        }
+        if (toastKey) {
+            if (toastKey !== lastPlaybackToastKey) {
+                showAppToast(state.resumeBlocked ? 'Tap ▶ to start playback' : 'Stream unavailable');
+                lastPlaybackToastKey = toastKey;
+            }
+        } else {
+            lastPlaybackToastKey = null;
         }
 
         this.updateNowPlayingHeader();

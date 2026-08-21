@@ -642,11 +642,6 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     height: var(--remote-btn-size, 40px);
 }
 
-.remote-panel__btn--placeholder {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
 .remote-panel__volume {
     width: 100%;
     min-width: 0;

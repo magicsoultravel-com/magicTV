@@ -9,6 +9,8 @@ import {
     resolveSwapPlaybackAction,
     applySwapPlaybackContinuity
 } from '../js/mosaic/swapPlayback.js';
+import { clearSwapClasses } from '../js/mosaic/constants.js';
+import { TILE_SWAP_DURATIONS } from '../js/ui/viewTransitions.js';
 
 test('shouldResumeAfterSwap only when was playing and not stopped', () => {
     assert.equal(shouldResumeAfterSwap({ wasPlaying: true, stopped: false }), true);
@@ -112,4 +114,26 @@ test('applySwapPlaybackContinuity uses player identity not slot', () => {
     assert.deepEqual(calls, ['live']);
     assert.equal(stopped.posterDataUrl, 'poster');
     assert.equal(live.posterDataUrl, null);
+});
+
+test('clearSwapClasses removes every TILE_SWAP_DURATIONS mode class', () => {
+    const classes = new Set([
+        'tv-swap-out',
+        'tv-swap-in',
+        'is-swapping',
+        ...Object.keys(TILE_SWAP_DURATIONS).map((mode) => `tv-swap--${mode}`)
+    ]);
+    const tile = {
+        classList: {
+            remove(...names) {
+                for (const name of names) classes.delete(name);
+            }
+        }
+    };
+    clearSwapClasses(tile);
+    assert.equal(classes.size, 0);
+    // Explicitly cover modes that used to stick after swap cleanup.
+    for (const mode of ['glitch', 'slideleft', 'slideright', 'spiralin', 'spiralout']) {
+        assert.ok(Object.hasOwn(TILE_SWAP_DURATIONS, mode));
+    }
 });

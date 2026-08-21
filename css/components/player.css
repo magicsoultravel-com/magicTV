@@ -62,7 +62,7 @@
     z-index: 7500;
 }
 
-/* Channel browser target (multi-screen only; see ChannelPickerModal.syncTargetHighlight). */
+/* Mosaic tile highlight while browsing for a target screen. */
 .tv-player-tile.is-channel-picker-target {
     border-color: var(--tv-primary);
     box-shadow:
@@ -836,7 +836,7 @@
     font-size: 0.55rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: color-mix(in srgb, var(--tv-text) 70%, transparent);
+    color: color-mix(in srgb, var(--tv-text-primary) 70%, transparent);
     margin-right: 0.15rem;
     user-select: none;
 }
@@ -909,9 +909,20 @@
 }
 
 .tv-player-tile:hover .tv-player-tile__hover,
-.tv-player-tile:focus-within .tv-player-tile__hover {
+.tv-player-tile:focus-within .tv-player-tile__hover,
+.tv-player-tile.is-selected .tv-player-tile__hover,
+.tv-player-tile.is-channel-picker-target .tv-player-tile__hover {
     opacity: 1;
     pointer-events: auto;
+}
+
+@media (hover: none) {
+    .tv-player-tile.is-primary .tv-player-tile__hover,
+    .tv-player-tile.is-selected .tv-player-tile__hover,
+    .tv-player-tile.is-channel-picker-target .tv-player-tile__hover {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .tv-player-tile__hover,

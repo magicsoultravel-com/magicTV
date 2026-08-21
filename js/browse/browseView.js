@@ -18,6 +18,11 @@ let deps = {
 
 let scrollLoadingBound = false;
 
+function catalogStatusHtml(text, { error = false } = {}) {
+    const cls = error ? 'catalog-status catalog-status--error' : 'catalog-status';
+    return `<div class="${cls}" role="status"><p class="catalog-status__text">${escapeHtml(text)}</p></div>`;
+}
+
 function browsePanelNeedsMore() {
     const appState = deps.appState;
     const panel = el('browse-panel');
@@ -158,7 +163,7 @@ export const BrowseView = {
                 tab.classList.remove('is-pink-active');
             });
         }
-        if (channels) channels.innerHTML = '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
+        if (channels) channels.innerHTML = catalogStatusHtml('Loading channels…');
         deps.updateRefreshAge();
         ListSort.syncSortControls();
 
@@ -214,6 +219,10 @@ export const BrowseView = {
             if (generation !== appState.browseGeneration) return;
             if (dirty) appState.browseSortDirty = true;
             console.error('Failed to load channels:', err);
+            const grid = el('channels-container');
+            if (grid && !appState.browseChannels.length) {
+                grid.innerHTML = catalogStatusHtml('Failed to load channels', { error: true });
+            }
             showAppToast('Failed to load channels');
         } finally {
             if (generation === appState.browseGeneration) {
@@ -254,9 +263,7 @@ export const BrowseView = {
         appState.browseSortDirty = false;
         const container = el('channels-container');
         if (container) {
-            container.innerHTML = query
-                ? '<div class="empty-state"><p class="empty-state__text">Filtering…</p></div>'
-                : '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
+            container.innerHTML = catalogStatusHtml(query ? 'Filtering…' : 'Loading channels…');
         }
         this.loadMoreChannels(false);
     },
@@ -271,7 +278,7 @@ export const BrowseView = {
         appState.browseSortDirty = false;
         const container = el('channels-container');
         if (container) {
-            container.innerHTML = '<div class="empty-state"><p class="empty-state__text">Loading channels…</p></div>';
+            container.innerHTML = catalogStatusHtml('Loading channels…');
         }
         await this.loadMoreChannels(true);
     },

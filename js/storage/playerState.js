@@ -9,8 +9,6 @@ export const DEFAULT_RECENTS_CAP = 20;
 export const RECENTS_CAP_MIN = 1;
 export const RECENTS_CAP_MAX = 100;
 
-/** @deprecated Use DEFAULT_RECENTS_CAP / getRecentsCap() — kept for older imports. */
-export const RECENTS_CAP = DEFAULT_RECENTS_CAP;
 
 export const DEFAULT_VISITED_STYLE = 'undistinguished';
 export const VISITED_STYLES = ['undistinguished', 'accent-1', 'accent-2', 'accent-3'];
@@ -223,7 +221,6 @@ function normalizeRemoteModule(raw, legacyPicker) {
     };
 }
 
-/** @deprecated alias */
 function normalizeChannelPicker(raw) {
     return normalizeRemoteModule(null, raw);
 }

@@ -18,8 +18,6 @@ export const CARD_ICONS = {
     popin: '<svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><rect x="1.5" y="3.2" width="5" height="4.8" rx="0.6" fill="none" stroke="currentColor" stroke-width="0.95"/><path d="M10.6 6H7.9M8.2 3.3 6.5 6 8.2 8.7" fill="none" stroke="currentColor" stroke-width="0.95" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     chevronRight: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M4.8 3.2 7.6 6 4.8 8.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     chevronDown: '<svg viewBox="0 0 12 12" width="9" height="9" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    /** @deprecated Prefer disconnect for unreachable streams; kept for rare geo/block use. */
-    prohibited: '<svg viewBox="0 0 12 12" width="18" height="18" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.15"/><path d="M3.1 3.1l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>',
     /** Unreachable / unable to connect — broken link for failed tile grabs. */
     disconnect: '<svg viewBox="0 0 12 12" width="18" height="18" focusable="false" aria-hidden="true"><path d="M4.2 4.8c.9-.9 2.3-.9 3.2 0M7.8 7.2c-.9.9-2.3.9-3.2 0" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/><path d="M5.1 5.1l1.8 1.8M2.6 9.4l6.8-6.8" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>',
     /** Queued / not yet capturing — simple hourglass. */
