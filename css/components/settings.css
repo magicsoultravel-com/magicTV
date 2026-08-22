@@ -384,13 +384,20 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn {
     right: 14px;
 }
 
+html[data-channel-layout="list"] .channel-grid .channel-tile__refresh-btn {
+    width: 14px;
+    height: 14px;
+    right: 28px;
+}
+
 html[data-channel-layout="list"] .channel-grid .channel-tile__fav-btn svg {
     width: 14px;
     height: 14px;
 }
 
 html[data-channel-layout="list"] .channel-grid .channel-tile__hide-btn svg,
-html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg {
+html[data-channel-layout="list"] .channel-grid .channel-tile__unhide-btn svg,
+html[data-channel-layout="list"] .channel-grid .channel-tile__refresh-btn svg {
     width: 14px;
     height: 14px;
 }

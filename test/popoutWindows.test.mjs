@@ -67,13 +67,13 @@ describe('popoutWindows PiP occupancy', () => {
         assert.equal(mod.shouldUseDocumentPipFor({ type: 'module', id: 'browser' }), false);
     });
 
-    it('browserPopoutSize uses popup dimensions when PiP is occupied by remote', async () => {
+    it('remotePopoutSize uses popup dimensions when PiP is occupied by another owner', async () => {
         const mod = await import('../js/ui/popoutWindows.js?pipOcc=5');
         const win = { closed: false, addEventListener() {} };
-        mod.registerPipWindow(win, { type: 'module', id: 'remote' });
-        const { w, h } = mod.browserPopoutSize();
-        assert.equal(w, mod.BROWSER_POPUP_W);
-        assert.equal(h, mod.BROWSER_POPUP_H);
+        mod.registerPipWindow(win, { type: 'module', id: 'browser' });
+        const { w, h } = mod.remotePopoutSize();
+        assert.equal(w, mod.REMOTE_POPUP_W);
+        assert.equal(h, mod.REMOTE_POPUP_H);
     });
 });
 

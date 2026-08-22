@@ -25,8 +25,10 @@ function tileHtml(ch) {
     const isVisited = TvPlayer.isVisited(ch);
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
     const hideLabel = 'Hide channel';
+    const refreshLabel = 'Refresh preview';
     return `
         <div class="channel-tile${isVisited ? ' is-visited' : ''}" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
+            <button type="button" class="channel-tile__refresh-btn" title="${refreshLabel}" aria-label="${refreshLabel}">${CARD_ICONS.tileRefresh}</button>
             <button type="button" class="channel-tile__hide-btn" title="${hideLabel}" aria-label="${hideLabel}">${CARD_ICONS.tileEye}</button>
             <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
             <div class="channel-tile__icon">
@@ -150,6 +152,16 @@ function wireTiles(container, channels) {
                 ChannelGrid.hideChannel(ch);
             });
             hideBtn.addEventListener('keydown', (e) => e.stopPropagation());
+        }
+        const refreshBtn = tile.querySelector('.channel-tile__refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const frame = tile.querySelector('.channel-tile__capture-frame');
+                if (frame) TileFrames.refreshFrame(frame);
+            });
+            refreshBtn.addEventListener('keydown', (e) => e.stopPropagation());
         }
         const favBtn = tile.querySelector('.channel-tile__fav-btn');
         if (favBtn && ch) {

@@ -381,11 +381,7 @@
         </div>
         <div class="tv-module__actions tv-module__actions--browser-end">
             <button type="button" id="catalog-layout-btn" class="tv-module__action ui-icon-btn is-hidden" title="List view" aria-label="List view"></button>
-            <button type="button" id="browser-popout-btn" class="tv-module__action ui-icon-btn tv-module__action--echo is-hidden" title="Pop out browser" aria-label="Pop out browser" aria-pressed="false"></button>
             <button type="button" id="refresh-btn" class="tv-module__action ui-icon-btn" title="Refresh this tab" aria-label="Refresh this tab"></button>
-            <button type="button" id="browser-popout-close" class="tv-module__action ui-icon-btn is-hidden" title="Close browser window" aria-label="Close browser window">
-                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            </button>
         </div>
         <div id="tv-catalog-body" class="tv-module__body remote-module__shell">
             <header class="remote-module__chrome">
@@ -671,12 +667,6 @@
                                                     <select id="remote-texture-select" class="settings-select" aria-label="Remote shell texture"></select>
                                                 </div>
                                             </div>
-                                            <div class="settings-section__item">
-                                                <label class="settings-section__label" for="browser-popout-prefer-open">Split browser window</label>
-                                                <div class="settings-section__control">
-                                                    <button type="button" id="browser-popout-prefer-open" class="settings-toggle" aria-pressed="false" aria-label="Open browse, favorites, and recents in a separate in-page window"></button>
-                                                </div>
-                                            </div>
                                             <div class="settings-preview">
                                                 <div class="settings-preview__label">Preview</div>
                                                 <div class="settings-preview__variants">
@@ -823,23 +813,6 @@
     <div id="remote-dock-sheet" class="remote-dock-sheet is-collapsed" aria-hidden="true">
         <div class="remote-dock-sheet__resize" data-dock-resize aria-hidden="true"></div>
         <div id="remote-dock-host" class="remote-dock-sheet__inner"></div>
-    </div>
-
-    <div id="browser-popout-module" class="browser-popout-module is-hidden" hidden aria-hidden="true">
-        <div
-            id="browser-popout-dialog"
-            class="browser-popout-module__dialog"
-            role="dialog"
-            aria-modal="false"
-            aria-label="Channel browser"
-            tabindex="-1"
-        >
-            <div id="browser-popout-host" class="browser-popout-module__host"></div>
-            <span class="browser-popout-module__resize" data-browser-popout-resize="nw" aria-hidden="true"></span>
-            <span class="browser-popout-module__resize" data-browser-popout-resize="ne" aria-hidden="true"></span>
-            <span class="browser-popout-module__resize" data-browser-popout-resize="sw" aria-hidden="true"></span>
-            <span class="browser-popout-module__resize" data-browser-popout-resize="se" aria-hidden="true"></span>
-        </div>
     </div>
 
     <div id="remote-module" class="remote-module is-hidden" hidden aria-hidden="true">

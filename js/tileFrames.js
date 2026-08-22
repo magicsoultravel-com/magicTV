@@ -41,6 +41,8 @@ const state = {
     warm: [],
     pending: new Set(),
     forceHeavy: new WeakSet(),
+    /** Soft-fail (timeout/black) frames already given one automatic requeue. */
+    softRetry: new WeakSet(),
     running: 0,
     heavyRunning: 0,
     playbackBusy: false,
@@ -49,9 +51,21 @@ const state = {
     activeGrid: null
 };
 
-/** Facade: injects live refreshEpoch for stale-capture UI skips. */
+/** Facade: injects live refreshEpoch + skipOffline when play owns this stream. */
 export function settleFrameCapture(frame, dataUrl, url, epoch, failReason = null, channelKey = '') {
-    settleFrameCaptureUi(frame, dataUrl, url, epoch, failReason, state.refreshEpoch, channelKey);
+    const stream = (url || '').trim();
+    const gate = stream ? liveSnapByUrl.get(stream) : null;
+    const skipOffline = !!(gate && (gate.noted || gate.inFlight));
+    return settleFrameCaptureUi(
+        frame,
+        dataUrl,
+        url,
+        epoch,
+        failReason,
+        state.refreshEpoch,
+        channelKey,
+        skipOffline
+    );
 }
 
 export { setFrameState, isMostlyBlackImageData };
@@ -293,7 +307,7 @@ async function isMostlyBlackDataUrl(dataUrl) {
 
 /**
  * Cheap → heavy capture path for one frame.
- * @returns {Promise<'requeue-heavy'|void>}
+ * @returns {Promise<'requeue-heavy'|'requeue-soft'|void>}
  */
 async function captureFrame(frame, tier, epoch) {
     const stale = () => epoch !== state.refreshEpoch || !frame.isConnected;
@@ -338,7 +352,7 @@ async function captureFrame(frame, tier, epoch) {
 
     const result = await captureStreamFrame(url, { playbackBusy: state.playbackBusy });
     if (stale()) return;
-    settleFrameCapture(
+    const settled = settleFrameCapture(
         frame,
         result?.dataUrl || null,
         url,
@@ -346,6 +360,11 @@ async function captureFrame(frame, tier, epoch) {
         result?.fail || null,
         chKey
     );
+    // One automatic retry for soft misses (timeout/black) — not for hard D/C.
+    if (settled === 'waiting' && !state.softRetry.has(frame)) {
+        state.softRetry.add(frame);
+        return 'requeue-soft';
+    }
 }
 
 let folderFramePumpQueued = false;
@@ -374,12 +393,21 @@ function drain() {
         let requeued = false;
         captureFrame(frame, tier, epoch)
             .then((result) => {
-                if (result !== 'requeue-heavy') return;
-                requeued = true;
-                state.forceHeavy.add(frame);
-                state.pending.add(frame);
-                (isInViewport(frame) ? state.hot : state.warm).unshift(frame);
-                markWaiting(frame);
+                if (result === 'requeue-heavy') {
+                    requeued = true;
+                    state.forceHeavy.add(frame);
+                    state.pending.add(frame);
+                    (isInViewport(frame) ? state.hot : state.warm).unshift(frame);
+                    markWaiting(frame);
+                    return;
+                }
+                if (result === 'requeue-soft') {
+                    requeued = true;
+                    state.pending.add(frame);
+                    // Soft retry at the back so fresh tiles stay ahead.
+                    (isInViewport(frame) ? state.hot : state.warm).push(frame);
+                    markWaiting(frame);
+                }
             })
             .finally(() => {
                 state.running = Math.max(0, state.running - 1);
@@ -551,6 +579,7 @@ async function refresh(container, opts = {}) {
     for (const frame of frames) {
         state.pending.delete(frame);
         state.forceHeavy.delete(frame);
+        state.softRetry.delete(frame);
         const url = streamUrl(frame);
         const chKey = tileChannelKey(frame);
         const logo = tileLogo(frame);
@@ -568,6 +597,57 @@ async function refresh(container, opts = {}) {
     await Promise.resolve();
 
     queueContainer(container, { reobserve: true });
+}
+
+/**
+ * Re-grab a single tile preview without aborting other captures or bumping epoch.
+ * @param {HTMLElement} frameOrTile capture-frame or channel-tile
+ */
+async function refreshFrame(frameOrTile) {
+    if (!frameOrTile) return;
+    const frame = frameOrTile.classList?.contains('channel-tile__capture-frame')
+        ? frameOrTile
+        : frameOrTile.querySelector?.('.channel-tile__capture-frame');
+    if (!frame?.isConnected) return;
+
+    for (const queue of [state.hot, state.warm]) {
+        const i = queue.indexOf(frame);
+        if (i >= 0) queue.splice(i, 1);
+    }
+    state.pending.delete(frame);
+    state.forceHeavy.delete(frame);
+    state.softRetry.delete(frame);
+
+    const url = streamUrl(frame);
+    const chKey = tileChannelKey(frame);
+    const logo = tileLogo(frame);
+    const keys = [url, chKey, logo].filter(Boolean);
+    if (keys.length) await FrameCache.removeFrames(keys).catch(() => {});
+
+    delete frame.dataset.captured;
+    delete frame.dataset.provisional;
+    delete frame.dataset.frameFail;
+
+    if (!url) {
+        if (logo) {
+            setFrameState(frame, 'captured', logo);
+        } else if (chKey) {
+            setFrameState(frame, 'waiting');
+        } else {
+            setFrameState(frame, 'offline');
+        }
+        return;
+    }
+
+    if (logo) applyProvisional(frame, logo);
+    else setFrameState(frame, 'waiting');
+
+    // Skip cache/logo short-circuit — force a live heavy grab for this tile only.
+    state.forceHeavy.add(frame);
+    state.pending.add(frame);
+    state.hot.unshift(frame);
+    markWaiting(frame);
+    drain();
 }
 
 function enqueueFolderFramesForRefresh(container) {
@@ -655,27 +735,52 @@ function warmup() {
     loadHlsLibrary().catch(() => {});
 }
 
-/** @type {Map<string, { noted: boolean, inFlight: boolean, gen: number }>} */
+/** @type {Map<string, { noted: boolean, inFlight: boolean, gen: number, retries: number, retryTimer: ReturnType<typeof setTimeout>|null }>} */
 const liveSnapByUrl = new Map();
 /** @internal test seam */
 let liveTileSnap = waitAndSnapshotTileFrame;
+/** Delay between live-snap retries while a laggy channel is playing. */
+let liveSnapRetryMs = 2000;
+/** Max deferred retries after the first attempt (total attempts = 1 + max). */
+let liveSnapMaxRetries = 8;
 
 function snapGate(stream) {
     let gate = liveSnapByUrl.get(stream);
     if (!gate) {
-        gate = { noted: false, inFlight: false, gen: 0 };
+        gate = { noted: false, inFlight: false, gen: 0, retries: 0, retryTimer: null };
         liveSnapByUrl.set(stream, gate);
     }
     return gate;
+}
+
+function clearLiveSnapRetry(gate) {
+    if (!gate?.retryTimer) return;
+    clearTimeout(gate.retryTimer);
+    gate.retryTimer = null;
 }
 
 function armLiveSnap(url) {
     const stream = (url || '').trim();
     if (!stream) return;
     const gate = snapGate(stream);
+    clearLiveSnapRetry(gate);
     gate.noted = false;
     gate.inFlight = false;
+    gate.retries = 0;
     gate.gen += 1;
+}
+
+function scheduleLiveSnapRetry(stream, video, chKey, generation) {
+    const gate = snapGate(stream);
+    clearLiveSnapRetry(gate);
+    if (gate.retries >= liveSnapMaxRetries) return;
+    gate.retryTimer = setTimeout(() => {
+        gate.retryTimer = null;
+        const g = snapGate(stream);
+        if (g.gen !== generation || g.noted || g.inFlight) return;
+        g.retries += 1;
+        notePlayingVideo(stream, video, chKey);
+    }, liveSnapRetryMs);
 }
 
 function paintPlayingFrame(stream, dataUrl, chKey = '') {
@@ -691,6 +796,36 @@ function paintPlayingFrame(stream, dataUrl, chKey = '') {
             setFrameState(frame, 'captured', dataUrl);
             state.pending.delete(frame);
             state.forceHeavy.delete(frame);
+            state.softRetry.delete(frame);
+            for (const queue of [state.hot, state.warm]) {
+                const i = queue.indexOf(frame);
+                if (i >= 0) queue.splice(i, 1);
+            }
+        });
+    } catch { /* ignore */ }
+}
+
+/**
+ * Playback started but live snap was still black/null — clear a sticky D/C badge.
+ * Channel works; thumb can catch up on a later snap.
+ */
+function clearOfflineForPlaying(stream, chKey = '') {
+    try {
+        document.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
+            if (!frame.isConnected) return;
+            if (frame.dataset.frameState !== 'offline') return;
+            const url = streamUrl(frame);
+            const key = tileChannelKey(frame);
+            const matchUrl = Boolean(stream && url && url === stream);
+            const matchKey = Boolean(chKey && key && key === chKey);
+            if (!matchUrl && !matchKey) return;
+            delete frame.dataset.frameFail;
+            const logo = tileLogo(frame);
+            if (logo) applyProvisional(frame, logo);
+            else setFrameState(frame, 'waiting');
+            state.pending.delete(frame);
+            state.forceHeavy.delete(frame);
+            state.softRetry.delete(frame);
             for (const queue of [state.hot, state.warm]) {
                 const i = queue.indexOf(frame);
                 if (i >= 0) queue.splice(i, 1);
@@ -701,6 +836,7 @@ function paintPlayingFrame(stream, dataUrl, chKey = '') {
 
 /**
  * Snap from a real playing <video>, cache, and paint matching tiles.
+ * On black/null, clears D/C and schedules capped retries for laggy streams.
  */
 function notePlayingVideo(url, video, channelKey = '') {
     const stream = (url || '').trim();
@@ -723,9 +859,15 @@ function notePlayingVideo(url, video, channelKey = '') {
                 () => snapGate(stream).gen !== generation
             );
             if (snapGate(stream).gen !== generation) return false;
-            if (!snap?.dataUrl) return false;
+            if (!snap?.dataUrl) {
+                // Playback already proved the stream works — do not leave D/C frozen.
+                clearOfflineForPlaying(stream, chKey);
+                scheduleLiveSnapRetry(stream, video, chKey, generation);
+                return false;
+            }
 
             gate.noted = true;
+            clearLiveSnapRetry(gate);
             const keys = [stream, chKey].filter(Boolean);
             FrameCache.setFrames(keys, snap.dataUrl).catch(() => {});
             paintPlayingFrame(stream, snap.dataUrl, chKey);
@@ -748,10 +890,12 @@ function notePlayingVideo(url, video, channelKey = '') {
 }
 
 function _resetForTests() {
+    for (const gate of liveSnapByUrl.values()) clearLiveSnapRetry(gate);
     state.hot.length = 0;
     state.warm.length = 0;
     state.pending.clear();
     state.forceHeavy = new WeakSet();
+    state.softRetry = new WeakSet();
     state.running = 0;
     state.heavyRunning = 0;
     state.playbackBusy = false;
@@ -760,6 +904,8 @@ function _resetForTests() {
     state.activeGrid = null;
     liveSnapByUrl.clear();
     liveTileSnap = waitAndSnapshotTileFrame;
+    liveSnapRetryMs = 2000;
+    liveSnapMaxRetries = 8;
     if (state.observer) {
         state.observer.disconnect();
         state.observer = null;
@@ -771,9 +917,15 @@ function _setLiveTileSnapForTests(fn) {
     liveTileSnap = typeof fn === 'function' ? fn : waitAndSnapshotTileFrame;
 }
 
+function _setLiveSnapRetryForTests({ ms, max } = {}) {
+    if (Number.isFinite(ms)) liveSnapRetryMs = Math.max(0, ms);
+    if (Number.isFinite(max)) liveSnapMaxRetries = Math.max(0, max);
+}
+
 export const TileFrames = {
     observe,
     refresh,
+    refreshFrame,
     clearLiveRefresh,
     syncLiveRefresh,
     isLiveRefreshActive,
@@ -789,10 +941,13 @@ export const TileFrames = {
     isMostlyBlackImageData,
     _resetForTests,
     _setLiveTileSnapForTests,
+    _setLiveSnapRetryForTests,
     /** @internal */
     _onFrameVisibility: onFrameVisibility,
     /** @internal */
     _state: state,
+    /** @internal */
+    _liveSnapByUrl: liveSnapByUrl,
     MAX_TOTAL,
     MAX_CHEAP,
     MAX_HEAVY,

@@ -74,6 +74,7 @@ describe('RemoteExternalPopout state', () => {
         scroll.appendChild(settingsPanel);
 
         const host = makeEl('div', 'remote-dock-host');
+        host.className = 'remote-dock-sheet__inner';
         const start = makeEl('div');
         start.className = 'tv-module__actions tv-module__actions--start';
         const remoteEnd = makeEl('div');
@@ -109,8 +110,7 @@ describe('RemoteExternalPopout state', () => {
                 if (sel === '#remote-module-host') return null;
                 if (sel === '#remote-dock-host') return host;
                 if (sel === '#remote-module-staging') return null;
-                if (sel === '.remote-popout-body') return null;
-                if (sel === '.browser-popout-body') return null;
+                if (sel === '#remote-external-host') return null;
                 return null;
             },
             querySelectorAll: (sel) => {
@@ -156,7 +156,7 @@ describe('RemoteExternalPopout state', () => {
         assert.equal(RemoteExternalPopout.syncActiveTab('browse'), false);
     });
 
-    it('starts in unified mode flag false when not popped out', async () => {
+    it('isUnifiedPopout is false when not popped out', async () => {
         const { RemoteExternalPopout } = await import('../js/ui/remoteExternalPopout.js?state=3');
         assert.equal(RemoteExternalPopout.isUnifiedPopout(), false);
     });

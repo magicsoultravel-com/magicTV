@@ -7,25 +7,32 @@ import { loadHlsLibrary, isHlsUrl, canPlayNativeHls } from '../tvHls.js';
 /** Idle overall / media-ready budgets (top-of-list grabs). Tuned ~aef5 VIDEO_TIMEOUT. */
 export const CAPTURE_BUDGET_MS = 5500;
 export const MEDIA_READY_TIMEOUT = 3500;
-const FRAME_POLL_MS = 1000;
+/** Soft floor for post-ready poll; actual wait uses remaining overall budget. */
+const FRAME_POLL_MS = 2000;
 /** Tighter budgets while the main player is busy. */
 export const CAPTURE_BUDGET_BUSY_MS = 3500;
 export const MEDIA_READY_BUSY_MS = 2500;
-const FRAME_POLL_BUSY_MS = 600;
+const FRAME_POLL_BUSY_MS = 1200;
 
+/** Softer than the old LL one-shot: laggy IPTV often needs longer first loads. */
 export const CAPTURE_HLS_CONFIG = {
     enableWorker: true,
-    lowLatencyMode: true,
-    maxBufferLength: 1,
-    maxMaxBufferLength: 2,
+    lowLatencyMode: false,
+    maxBufferLength: 2,
+    maxMaxBufferLength: 4,
     maxBufferSize: 512 * 1024,
     maxBufferHole: 0.5,
     startLevel: 0,
     abrEwmaDefaultEstimate: 200000,
-    manifestLoadingTimeOut: 2000,
-    levelLoadingTimeOut: 2000,
-    fragLoadingTimeOut: 2000
+    manifestLoadingTimeOut: 8000,
+    levelLoadingTimeOut: 8000,
+    fragLoadingTimeOut: 8000
 };
+
+/** Hard fails → D/C badge. Soft fails (timeout/black) stay recoverable. */
+export function isHardCaptureFail(failReason) {
+    return failReason === 'media' || failReason === 'hls-lib';
+}
 
 export function captureBudgets(playbackBusy = false) {
     if (playbackBusy) {
@@ -105,7 +112,7 @@ function sleep(ms) {
 }
 
 /** Budget for snapping a channel-tile thumb from the live primary player. */
-export const LIVE_TILE_SNAP_BUDGET_MS = 3000;
+export const LIVE_TILE_SNAP_BUDGET_MS = 5000;
 
 /**
  * Wait for a usable (non-black) 56×56 JPEG from a playing <video>.
@@ -310,11 +317,11 @@ export async function captureStreamFrame(url, { playbackBusy = false } = {}) {
             snap = snapshotVideoFrame(video);
             if (snap.dataUrl) return snap;
 
-            const remaining = Math.min(
-                budgets.poll,
-                budgets.overall - (Date.now() - started)
-            );
-            return await waitForVideoFrame(video, remaining, () => session.aborted);
+            // Use remaining overall budget (at least poll floor) so dark/slow
+            // first GOPs are not capped at ~1s after media-ready.
+            const remainingOverall = Math.max(0, budgets.overall - (Date.now() - started));
+            const pollMs = Math.max(budgets.poll, remainingOverall);
+            return await waitForVideoFrame(video, pollMs, () => session.aborted);
         } catch {
             return { dataUrl: null, fail: 'media' };
         } finally {

@@ -9,8 +9,6 @@ import { SettingsStore } from '../storage/settingsStore.js';
 import { ACTION_ICONS } from './icons.js';
 import { RemotePanel } from './remotePanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
-import { BrowserPopout } from './browserPopout.js';
-import { BrowserExternalPopout } from './browserExternalPopout.js';
 import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
 
 const MIN_W = 260;
@@ -35,6 +33,8 @@ let browserEndActionsNextSibling = null;
 let bound = false;
 let pinned = false;
 let sheetExpanded = false;
+/** @type {HTMLElement|null} External OS-window host; when set, mount prefers it over in-page hosts. */
+let externalHost = null;
 
 let idleDelayTimer = null;
 let fadeRafId = null;
@@ -361,7 +361,7 @@ function onUserActivity() {
 }
 
 function bindIdleHoverPreview() {
-    const selector = '.remote-dock-tab, .remote-dock-sheet.is-expanded, .remote-module__dialog, .browser-popout-module__dialog';
+    const selector = '.remote-dock-tab, .remote-dock-sheet.is-expanded, .remote-module__dialog';
     document.addEventListener('pointerover', (e) => {
         if (idleOpacityMult > 0.01) return;
         if (!e.target.closest?.(selector)) return;
@@ -407,10 +407,15 @@ function playIntoTarget(channel) {
     });
 }
 
-function getActiveHost() {
+function getInPageHost() {
     if (mode === 'undocked') return undockedHostEl();
     if (mode === 'docked') return dockHostEl();
     return stagingEl();
+}
+
+function getActiveHost() {
+    if (externalHost) return externalHost;
+    return getInPageHost();
 }
 
 function restoreBodyToStaging() {
@@ -540,6 +545,7 @@ function updateBodyClasses() {
 
 function onKeydown(e) {
     if (e.key === 'Escape' && mode !== 'hidden') {
+        if (RemoteExternalPopout.isPoppedOut()) return;
         e.preventDefault();
         if (mode === 'undocked' && !pinned) RemoteModule.close();
         else if (mode === 'docked' && sheetExpanded) RemoteModule.toggleDockedSheet();
@@ -816,15 +822,10 @@ export const RemoteModule = {
         if (RemoteExternalPopout.isPoppedOut()) {
             RemoteExternalPopout.popIn();
         }
-        if (BrowserPopout.isOpen()) {
-            BrowserPopout.close();
-        }
-        if (BrowserExternalPopout.isPoppedOut()) {
-            BrowserExternalPopout.popIn();
-        }
 
         persistState({ open: false, mode: 'hidden' });
 
+        externalHost = null;
         restoreBodyToStaging();
         showUndockedUI(false);
         setSheetExpanded(false, { persist: false });
@@ -849,10 +850,13 @@ export const RemoteModule = {
         if (mode !== 'undocked') return;
         showUndockedUI(false);
         mode = 'docked';
-        mountToActiveHost();
-        setSheetExpanded(true);
-        const saved = getSavedState();
-        applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+        // While external, only update the return host; remount happens on pop-in.
+        if (!externalHost) {
+            mountToActiveHost();
+            setSheetExpanded(true);
+            const saved = getSavedState();
+            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+        }
         updateBodyClasses();
         persistState({ mode: 'docked', open: true });
         syncBrowseButtons();
@@ -864,13 +868,53 @@ export const RemoteModule = {
         mode = 'undocked';
         setSheetExpanded(false, { persist: false });
         dockSheetEl()?.style.removeProperty('height');
-        showUndockedUI(true);
-        restoreFromState();
-        mountToActiveHost();
-        applyOpacity();
+        if (!externalHost) {
+            showUndockedUI(true);
+            restoreFromState();
+            mountToActiveHost();
+            applyOpacity();
+        }
         updateBodyClasses();
         persistState({ mode: 'undocked', open: true });
         syncBrowseButtons();
+        RemotePanel.syncRemotePanel();
+    },
+
+    getInPageHost,
+
+    getActiveHost,
+
+    setExternalHost(host) {
+        externalHost = host || null;
+    },
+
+    clearExternalHost() {
+        externalHost = null;
+    },
+
+    mountTo(host) {
+        if (!host) return;
+        teleportBodyTo(host);
+        updateBodyClasses();
+    },
+
+    /** Remount into the current in-page host after an external pop-in. */
+    returnFromExternal() {
+        externalHost = null;
+        if (mode === 'undocked') {
+            showUndockedUI(true);
+            restoreFromState();
+            mountToActiveHost();
+            applyOpacity();
+        } else if (mode === 'docked') {
+            showUndockedUI(false);
+            setSheetExpanded(true, { persist: false });
+            const saved = getSavedState();
+            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+            mountToActiveHost();
+        } else {
+            mountToActiveHost();
+        }
         RemotePanel.syncRemotePanel();
     },
 

@@ -58,7 +58,6 @@ const REMOTE_IDLE_DELAY_MIN = 0;
 const REMOTE_IDLE_DELAY_MAX = 300;
 const REMOTE_IDLE_FADE_MIN = 1;
 const REMOTE_IDLE_FADE_MAX = 120;
-const DEFAULT_BROWSER_POPOUT_PREFER_OPEN = false;
 const DEFAULT_REMOTE_TEXTURE = 'none';
 const CATALOG_LAYOUTS = ['tiles', 'list'];
 const DEFAULT_ACTIVE_TILE_STYLE = 'none';
@@ -243,17 +242,6 @@ export const SettingsStore = {
         return clampedValue;
     },
 
-    getBrowserPopoutPreferOpen() {
-        const raw = readPersistedState();
-        return raw.browserPopoutPreferOpen === true;
-    },
-
-    setBrowserPopoutPreferOpen(value) {
-        const next = value === true;
-        patchPersistedState({ browserPopoutPreferOpen: next });
-        return next;
-    },
-
     getRemoteTexture() {
         const raw = readPersistedState();
         return normalizeRemoteTexture(raw.remoteTexture);
@@ -339,7 +327,6 @@ export const SettingsStore = {
         const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
         const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
         const remoteIdleFadeSec = this.setRemoteIdleFadeSec(DEFAULT_REMOTE_IDLE_FADE_SEC);
-        const browserPopoutPreferOpen = this.setBrowserPopoutPreferOpen(DEFAULT_BROWSER_POPOUT_PREFER_OPEN);
         const remoteTexture = this.setRemoteTexture(DEFAULT_REMOTE_TEXTURE);
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
         const activeTileStyle = this.setActiveTileStyle(DEFAULT_ACTIVE_TILE_STYLE);
@@ -356,7 +343,6 @@ export const SettingsStore = {
             remoteIdleFadeEnabled,
             remoteIdleDelaySec,
             remoteIdleFadeSec,
-            browserPopoutPreferOpen,
             remoteTexture,
             catalogLayout,
             activeTileStyle,
@@ -419,32 +405,6 @@ export const SettingsStore = {
 
     getSwapTransitionOptions() {
         return VIEW_TRANSITIONS.slice();
-    },
-
-    getCatalogCollapsed() {
-        return Boolean(readPersistedState().catalogCollapsed);
-    },
-
-    setCatalogCollapsed(collapsed) {
-        const next = Boolean(collapsed);
-        patchPersistedState({ catalogCollapsed: next });
-        return next;
-    },
-
-    getContentSplit() {
-        const raw = readPersistedState().contentSplit;
-        const n = Number(raw);
-        if (!Number.isFinite(n)) return 50;
-        return Math.min(85, Math.max(15, Math.round(n)));
-    },
-
-    setContentSplit(value) {
-        const n = Number(value);
-        const next = Number.isFinite(n)
-            ? Math.min(85, Math.max(15, Math.round(n)))
-            : 50;
-        patchPersistedState({ contentSplit: next });
-        return next;
     },
 
     getCatalogTransition() {

@@ -15,7 +15,6 @@ const KNOWN_IDS = [
     'remote-panel', 'remote-panel-footer', 'remote-catalog-tools', 'remote-channel-bar', 'remote-channel-name', 'tv-catalog-body', 'remote-module-staging',
     'remote-dock-tab', 'remote-dock-sheet', 'remote-dock-host',
     'remote-module', 'remote-module-dialog', 'remote-module-host',
-    'browser-popout-module', 'browser-popout-dialog', 'browser-popout-host', 'browser-popout-btn', 'browser-popout-close',
     'remote-external-popout-btn',
     'remote-module-pin', 'remote-module-close', 'remote-back-btn',
     'player-tile-topLeft', 'player-tile-center', 'player-tile-topRight',

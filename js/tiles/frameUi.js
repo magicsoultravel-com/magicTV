@@ -2,6 +2,7 @@
  * Frame tile UI state (waiting → provisional | loading → captured | offline).
  */
 import { FrameCache } from '../storage/frameCache.js';
+import { isHardCaptureFail } from './streamCapture.js';
 
 /**
  * @param {HTMLElement} frame
@@ -139,6 +140,8 @@ export function setFrameState(frame, next, src) {
  * Apply the final UI state after a grab settles. Never leaves `loading`.
  * Skips both cache write and UI when epoch is stale.
  * On fail with a provisional logo, keep that logo as captured instead of offline.
+ * Soft fails (timeout/black) leave waiting — not D/C — so laggy streams can recover.
+ * Hard fails (media/hls-lib) paint the disconnect badge unless skipOffline / already captured.
  *
  * @param {HTMLElement} frame
  * @param {string|null} dataUrl
@@ -147,6 +150,8 @@ export function setFrameState(frame, next, src) {
  * @param {'hls-lib'|'timeout'|'media'|'black'|null} [failReason]
  * @param {number} currentEpoch
  * @param {string} [channelKey]
+ * @param {boolean} [skipOffline] when true (live snap owns this URL), hard fails stay waiting
+ * @returns {'captured'|'offline'|'waiting'|void}
  */
 export function settleFrameCapture(
     frame,
@@ -155,7 +160,8 @@ export function settleFrameCapture(
     epoch,
     failReason = null,
     currentEpoch = epoch,
-    channelKey = ''
+    channelKey = '',
+    skipOffline = false
 ) {
     if (epoch !== currentEpoch) return;
     if (dataUrl && url) {
@@ -166,7 +172,11 @@ export function settleFrameCapture(
     if (dataUrl) {
         delete frame.dataset.frameFail;
         setFrameState(frame, 'captured', dataUrl);
-        return;
+        return 'captured';
+    }
+    // Never demote a successful thumb to D/C (late offscreen race).
+    if (frame.dataset.frameState === 'captured') {
+        return 'captured';
     }
     const provisionalSrc = frame.dataset.provisional
         ? (frame.querySelector('.channel-tile__logo-img')?.getAttribute('src') || '')
@@ -174,13 +184,24 @@ export function settleFrameCapture(
     if (provisionalSrc) {
         delete frame.dataset.frameFail;
         setFrameState(frame, 'captured', provisionalSrc);
-        return;
+        return 'captured';
     }
     if (failReason) {
-        frame.dataset.frameFail = failReason;
         try { console.debug('[TileFrames] capture fail', failReason, url); } catch { /* ignore */ }
-    } else {
-        delete frame.dataset.frameFail;
     }
-    setFrameState(frame, 'offline');
+    if (isHardCaptureFail(failReason)) {
+        if (skipOffline) {
+            setFrameState(frame, 'waiting');
+            frame.dataset.frameFail = failReason;
+            return 'waiting';
+        }
+        frame.dataset.frameFail = failReason;
+        setFrameState(frame, 'offline');
+        return 'offline';
+    }
+    // Soft / unknown: recoverable — do not freeze as D/C.
+    setFrameState(frame, 'waiting');
+    if (failReason) frame.dataset.frameFail = failReason;
+    else delete frame.dataset.frameFail;
+    return 'waiting';
 }

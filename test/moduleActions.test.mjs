@@ -27,14 +27,4 @@ describe('moduleActions separation flags', () => {
         document.body.classList.add('remote-external-popout-active');
         assert.equal(isRemoteSeparated(), true);
     });
-
-    it('isBrowserSeparated reflects browser external and in-page split classes', async () => {
-        const { isBrowserSeparated } = await import('../js/ui/moduleActions.js?sep=2');
-        assert.equal(isBrowserSeparated(), false);
-        document.body.classList.add('browser-external-popout-active');
-        assert.equal(isBrowserSeparated(), true);
-        document.body.classList.remove('browser-external-popout-active');
-        document.body.classList.add('browser-popout-open');
-        assert.equal(isBrowserSeparated(), true);
-    });
 });

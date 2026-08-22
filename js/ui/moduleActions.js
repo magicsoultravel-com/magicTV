@@ -1,12 +1,22 @@
-/** Shared lookups for remote vs browser module action bars. */
+/** Shared lookups for remote module action bars. */
 import { queryAllInApp } from '../tvUtils.js';
 
 const REMOTE_END = '.tv-module__actions--remote-end';
 const BROWSER_END = '.tv-module__actions--browser-end';
 const START = '.tv-module__actions--start';
 
-function pick(selector, preferredHosts = []) {
-    for (const host of preferredHosts) {
+function preferredHosts(extra = null) {
+    return [
+        extra,
+        document.querySelector('#remote-external-host'),
+        document.querySelector('#remote-module-host'),
+        document.querySelector('#remote-dock-host'),
+        document.querySelector('#remote-module-staging')
+    ].filter(Boolean);
+}
+
+function pick(selector, hosts = []) {
+    for (const host of hosts) {
         const found = host.querySelector?.(selector);
         if (found) return found;
     }
@@ -14,48 +24,18 @@ function pick(selector, preferredHosts = []) {
 }
 
 export function remoteEndActionsEl(preferredHost = null) {
-    const hosts = [
-        preferredHost,
-        document.querySelector('.remote-popout-body'),
-        document.querySelector('#remote-module-host'),
-        document.querySelector('#remote-dock-host'),
-        document.querySelector('#remote-module-staging')
-    ].filter(Boolean);
-    return pick(REMOTE_END, hosts);
+    return pick(REMOTE_END, preferredHosts(preferredHost));
 }
 
 export function browserEndActionsEl(preferredHost = null) {
-    const hosts = [
-        preferredHost,
-        document.querySelector('.browser-popout-body'),
-        document.querySelector('.browser-popout-module__host'),
-        document.querySelector('#remote-module-host'),
-        document.querySelector('#remote-dock-host'),
-        document.querySelector('#remote-module-staging')
-    ].filter(Boolean);
-    return pick(BROWSER_END, hosts);
+    return pick(BROWSER_END, preferredHosts(preferredHost));
 }
 
 export function startActionsEl(preferredHost = null) {
-    const hosts = [
-        preferredHost,
-        document.querySelector('.browser-popout-body'),
-        document.querySelector('.remote-popout-body'),
-        document.querySelector('.browser-popout-module__host'),
-        document.querySelector('#remote-module-host'),
-        document.querySelector('#remote-dock-host'),
-        document.querySelector('#remote-module-staging')
-    ].filter(Boolean);
-    return pick(START, hosts);
+    return pick(START, preferredHosts(preferredHost));
 }
 
 export function isRemoteSeparated() {
     return typeof document !== 'undefined'
         && document.body.classList.contains('remote-external-popout-active');
-}
-
-export function isBrowserSeparated() {
-    return typeof document !== 'undefined'
-        && (document.body.classList.contains('browser-popout-open')
-            || document.body.classList.contains('browser-external-popout-active'));
 }

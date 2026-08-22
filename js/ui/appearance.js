@@ -5,7 +5,6 @@ import { SettingsStore } from '../storage/settingsStore.js';
 import { copyThemeAttributes } from './popoutWindows.js';
 import { showAppToast } from './toast.js';
 import { RemoteModule } from './remoteModule.js';
-import { BrowserPopout } from './browserPopout.js';
 import { REMOTE_TEXTURES } from './remoteTextures.js';
 import {
     THEME_COLOR_KEYS,
@@ -34,14 +33,6 @@ function syncRemoteIdleFadeUi({ enabled, delaySec, fadeSec }) {
     if (idleFadeSlider) idleFadeSlider.value = String(fadeSec);
     if (idleFadeValue) idleFadeValue.textContent = `${fadeSec}s`;
     if (idleFadeSlider) idleFadeSlider.setAttribute('aria-valuetext', `${fadeSec}s`);
-}
-
-function syncBrowserPopoutToggleUi(enabled) {
-    const toggle = el('browser-popout-prefer-open');
-    if (!toggle) return;
-    const on = enabled === true;
-    toggle.classList.toggle('is-active', on);
-    toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
 function setFontPickerOpen(open) {
@@ -285,24 +276,6 @@ export const Appearance = {
             });
         }
 
-        const browserPopoutToggle = el('browser-popout-prefer-open');
-        if (browserPopoutToggle && browserPopoutToggle.dataset.bound !== '1') {
-            browserPopoutToggle.dataset.bound = '1';
-            browserPopoutToggle.addEventListener('click', () => {
-                const next = SettingsStore.setBrowserPopoutPreferOpen(
-                    browserPopoutToggle.getAttribute('aria-pressed') !== 'true'
-                );
-                syncBrowserPopoutToggleUi(next);
-                if (!next) {
-                    BrowserPopout.close();
-                }
-                BrowserExternalPopout.syncBtn();
-                showAppToast(next
-                    ? 'Browse/Favorites/Recents open in a split window'
-                    : 'Browser panels docked in remote');
-            });
-        }
-
         const remoteTextureSelect = el('remote-texture-select');
         if (remoteTextureSelect && remoteTextureSelect.dataset.bound !== '1') {
             remoteTextureSelect.dataset.bound = '1';
@@ -374,7 +347,6 @@ export const Appearance = {
                     remoteIdleFadeEnabled,
                     remoteIdleDelaySec,
                     remoteIdleFadeSec,
-                    browserPopoutPreferOpen,
                     activeTileStyle,
                     visitedStyle,
                     nonVisitedStyle,
@@ -391,7 +363,6 @@ export const Appearance = {
                     delaySec: remoteIdleDelaySec,
                     fadeSec: remoteIdleFadeSec
                 });
-                syncBrowserPopoutToggleUi(browserPopoutPreferOpen);
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
                 if (nonVisitedStyleSelect) nonVisitedStyleSelect.value = nonVisitedStyle;
@@ -532,8 +503,6 @@ export const Appearance = {
             delaySec: SettingsStore.getRemoteIdleDelaySec(),
             fadeSec: SettingsStore.getRemoteIdleFadeSec()
         });
-
-        syncBrowserPopoutToggleUi(SettingsStore.getBrowserPopoutPreferOpen());
 
         const remoteTextureSelect = el('remote-texture-select');
         if (remoteTextureSelect) {

@@ -182,6 +182,8 @@ function endDrag(s) {
 function onPointerDown(e) {
     if (e.button != null && e.button !== 0) return;
     if (e.target.closest?.('.channel-tile__fav-btn')) return;
+    if (e.target.closest?.('.channel-tile__hide-btn')) return;
+    if (e.target.closest?.('.channel-tile__refresh-btn')) return;
     if (!deps.isReorderEnabled()) return;
 
     const grid = el('favorites-grid');

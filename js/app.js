@@ -15,8 +15,6 @@ import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
 import { TvClock } from './ui/tvClock.js';
 import { RemoteModule } from './ui/remoteModule.js';
 import { RemotePanel, syncRemoteNav, syncRemoteChannelBar } from './ui/remotePanel.js';
-import { BrowserPopout } from './ui/browserPopout.js';
-import { BrowserExternalPopout, BROWSER_EXTERNAL_ICON } from './ui/browserExternalPopout.js';
 import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
 import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
@@ -364,22 +362,6 @@ function syncPlayFavoritesMosaicBtn() {
 
 const CHANNEL_TABS = ['browse', 'favorites', 'recents'];
 
-function isBrowserExtracted() {
-    return BrowserPopout.isOpen() || BrowserExternalPopout.isPoppedOut();
-}
-
-function syncBrowserPopoutBtn() {
-    const btn = el('browser-popout-btn');
-    if (!btn) return;
-    const separate = SettingsStore.getBrowserPopoutPreferOpen();
-    const onChannelTabs = CHANNEL_TABS.includes(appState.activeTab);
-    // Only a separate browser module exposes its own pop-out; otherwise the
-    // single remote pop-out carries the browser too.
-    btn.classList.toggle('is-hidden', !(separate && onChannelTabs));
-    BrowserExternalPopout.syncBtn();
-    BrowserPopout.syncPopoutChrome();
-}
-
 function bindRemoteExternalPopoutBtn() {
     const btn = el('remote-external-popout-btn');
     if (!btn || btn.dataset.bound === '1') return;
@@ -394,16 +376,6 @@ function bindRemoteExternalPopoutBtn() {
             return;
         }
         RemoteExternalPopout.popOut();
-    });
-}
-
-function bindBrowserPopoutBtn() {
-    const btn = el('browser-popout-btn');
-    if (!btn || btn.dataset.bound === '1') return;
-    btn.dataset.bound = '1';
-    btn.innerHTML = BROWSER_EXTERNAL_ICON;
-    btn.addEventListener('click', () => {
-        BrowserExternalPopout.handleIconClick();
     });
 }
 
@@ -528,63 +500,34 @@ async function handleManualRefresh() {
 
 function syncRemoteTabChrome() {
     const tab = appState.activeTab;
-    const extracted = isBrowserExtracted();
     const isChannelTab = CHANNEL_TABS.includes(tab);
-    const showFilters = !extracted && isChannelTab;
+    const showFilters = isChannelTab;
     const catalogTools = el('remote-catalog-tools');
     const body = el('tv-catalog-body');
 
-    if (catalogTools && !extracted) {
+    if (catalogTools) {
         catalogTools.classList.toggle('is-visible', showFilters);
     }
     if (body) {
-        body.classList.toggle('is-remote-view', extracted || tab === 'remote');
+        body.classList.toggle('is-remote-view', tab === 'remote');
         body.classList.toggle('is-subview', showFilters);
-        body.classList.toggle('is-browser-split-active', extracted);
     }
     syncRemoteNav(tab);
     syncRemoteChannelBar(tab);
 }
 
 function activateTabPanels(tabName) {
-    const remoteExtracted = RemoteExternalPopout.isPoppedOut();
-    const remoteUnified = remoteExtracted && RemoteExternalPopout.isUnifiedPopout();
-    const browserExtracted = !remoteUnified
-        && (BrowserPopout.isOpen() || BrowserExternalPopout.isPoppedOut());
-
-    if (browserExtracted) {
-        if (BrowserPopout.isOpen()) {
-            BrowserPopout.syncActiveTab(tabName);
-        } else {
-            BrowserExternalPopout.syncActiveTab(tabName);
-        }
-    }
-
-    if (remoteExtracted) {
+    if (RemoteExternalPopout.isPoppedOut()) {
         RemoteExternalPopout.syncActiveTab(tabName);
+        return;
     }
-
-    if (!browserExtracted && !remoteExtracted) {
-        els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
-        el(`${tabName}-panel`)?.classList.add('is-active');
-    }
+    els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
+    el(`${tabName}-panel`)?.classList.add('is-active');
 }
 
 function switchTab(tabName) {
     appState.activeTab = tabName;
-
-    const splitPrefer = SettingsStore.getBrowserPopoutPreferOpen();
-    const isChannelTab = CHANNEL_TABS.includes(tabName);
-
-    if (splitPrefer && isChannelTab) {
-        if (!BrowserPopout.isOpen()) {
-            BrowserPopout.open({ browserTab: tabName });
-        } else {
-            BrowserPopout.syncActiveTab(tabName);
-        }
-    } else {
-        activateTabPanels(tabName);
-    }
+    activateTabPanels(tabName);
 
     const backBtn = el('back-btn');
     if (backBtn) {
@@ -616,7 +559,6 @@ function switchTab(tabName) {
     }
     syncPlayFavoritesMosaicBtn();
     syncCatalogLayoutBtn();
-    syncBrowserPopoutBtn();
     RemoteExternalPopout.syncBtn();
     updateRefreshAge();
     RemotePanel.syncRemotePanel();
@@ -745,31 +687,8 @@ async function init() {
 
         // Docked → modal teleport finishes under the boot cover.
         RemoteModule.restoreOpenIfNeeded();
-        const restoredBrowserTab = BrowserPopout.init({ activeTab: appState.activeTab });
-        if (restoredBrowserTab) {
-            appState.activeTab = restoredBrowserTab;
-            syncRemoteTabChrome();
-        }
-        bindBrowserPopoutBtn();
         bindRemoteExternalPopoutBtn();
-        syncBrowserPopoutBtn();
         RemoteExternalPopout.syncBtn();
-
-        window.addEventListener('browser:split_closed', () => {
-            activateTabPanels(appState.activeTab);
-            syncRemoteTabChrome();
-        });
-
-        window.addEventListener('browser:external_popout_changed', () => {
-            if (BrowserExternalPopout.isPoppedOut()) {
-                BrowserExternalPopout.syncActiveTab(appState.activeTab);
-            } else {
-                activateTabPanels(appState.activeTab);
-            }
-            RemoteExternalPopout.syncBodyClasses();
-            syncRemoteTabChrome();
-            syncBrowserPopoutBtn();
-        });
 
         window.addEventListener('remote:external_popout_changed', () => {
             if (RemoteExternalPopout.isPoppedOut()) {
@@ -778,7 +697,6 @@ async function init() {
                 activateTabPanels(appState.activeTab);
             }
             syncRemoteTabChrome();
-            syncBrowserPopoutBtn();
             RemoteExternalPopout.syncBtn();
         });
 

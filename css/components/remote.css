@@ -184,15 +184,13 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
 
 body.remote-idle-faded .remote-dock-tab,
 body.remote-idle-faded .remote-dock-sheet.is-expanded,
-body.remote-idle-faded .remote-module__dialog,
-body.remote-idle-faded .browser-popout-module__dialog {
+body.remote-idle-faded .remote-module__dialog {
     pointer-events: none;
 }
 
 body.remote-idle-faded.remote-idle-hover-preview .remote-dock-tab,
 body.remote-idle-faded.remote-idle-hover-preview .remote-dock-sheet.is-expanded,
-body.remote-idle-faded.remote-idle-hover-preview .remote-module__dialog,
-body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog {
+body.remote-idle-faded.remote-idle-hover-preview .remote-module__dialog {
     pointer-events: auto;
 }
 
@@ -365,11 +363,6 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     gap: 0.25rem;
 }
 
-.remote-module__host > .tv-module__actions--browser-end:has(#browser-popout-btn.is-hidden):not(:has(.tv-module__action:not(.is-hidden))),
-.remote-dock-sheet__inner > .tv-module__actions--browser-end:has(#browser-popout-btn.is-hidden):not(:has(.tv-module__action:not(.is-hidden))) {
-    right: calc(var(--tv-spacing-sm, 0.5rem) + 2.5rem);
-}
-
 .remote-module__host > .tv-module__actions--remote-end:only-of-type,
 .remote-dock-sheet__inner > .tv-module__actions--remote-end:only-of-type {
     right: var(--tv-spacing-sm, 0.5rem);
@@ -449,10 +442,7 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
    Hidden (non-interactive) by default on pointer devices; always visible on touch. */
 @media (hover: hover) {
     .remote-module__host > .tv-module__actions,
-    .remote-dock-sheet__inner > .tv-module__actions,
-    .browser-popout-module__host > .tv-module__actions,
-    .remote-popout-body > .tv-module__actions,
-    .browser-popout-body > .tv-module__actions {
+    .remote-dock-sheet__inner > .tv-module__actions {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.15s ease;
@@ -461,13 +451,7 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     .remote-module__host:hover > .tv-module__actions,
     .remote-module__host:focus-within > .tv-module__actions,
     .remote-dock-sheet__inner:hover > .tv-module__actions,
-    .remote-dock-sheet__inner:focus-within > .tv-module__actions,
-    .browser-popout-module__host:hover > .tv-module__actions,
-    .browser-popout-module__host:focus-within > .tv-module__actions,
-    .remote-popout-body:hover > .tv-module__actions,
-    .remote-popout-body:focus-within > .tv-module__actions,
-    .browser-popout-body:hover > .tv-module__actions,
-    .browser-popout-body:focus-within > .tv-module__actions {
+    .remote-dock-sheet__inner:focus-within > .tv-module__actions {
         opacity: 1;
         pointer-events: auto;
     }
@@ -539,11 +523,6 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     display: none !important;
 }
 
-.remote-module__shell.is-browser-split-active .remote-panel.is-active {
-    display: flex !important;
-    flex-direction: column;
-}
-
 .remote-panel__grid {
     display: grid;
     grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
@@ -591,28 +570,6 @@ body.remote-idle-faded.remote-idle-hover-preview .browser-popout-module__dialog 
     margin-left: 0;
     flex-direction: row-reverse;
     gap: var(--tv-spacing-sm);
-}
-
-.remote-module__scroll.is-browser-popout-empty > .tv-panel:not(#settings-panel):not(#remote-panel) {
-    display: none !important;
-}
-
-.remote-module__scroll.is-browser-popout-empty > .remote-panel.is-active ~ .browser-popout-placeholder {
-    display: none;
-}
-
-.remote-module__scroll.is-remote-popout-empty > .tv-panel#remote-panel,
-.remote-module__scroll.is-remote-popout-empty > .tv-panel#settings-panel {
-    display: none !important;
-}
-
-.remote-module__scroll.is-remote-popout-empty > .browser-popout-placeholder {
-    display: none;
-}
-
-.remote-module__scroll.is-browser-popout-empty.is-remote-popout-empty > .browser-popout-placeholder,
-.remote-module__scroll.is-browser-popout-empty.is-remote-popout-empty > .remote-popout-placeholder {
-    display: flex;
 }
 
 .remote-panel__cell--screens,
@@ -674,120 +631,6 @@ body.remote-docked-expanded .remote-dock-tab {
     display: none !important;
 }
 
-.browser-popout-module {
-    position: fixed;
-    inset: 0;
-    z-index: 8520;
-    pointer-events: none;
-}
-
-.browser-popout-module:not(.is-hidden) {
-    pointer-events: none;
-}
-
-.browser-popout-module__dialog,
-.browser-popout-module__host {
-    pointer-events: auto;
-}
-
-.browser-popout-module__dialog {
-    position: fixed;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 520px;
-    min-height: 720px;
-    max-width: calc(100vw - 0.5rem);
-    max-height: calc(100vh - 0.5rem);
-    box-sizing: border-box;
-    background: var(--tv-bg-secondary, #141829);
-    border: 1px solid var(--tv-border, #2A2E3A);
-    border-radius: 18px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
-    overflow: hidden;
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--remote-idle-opacity-mult, 1));
-    transition: opacity 0.15s ease;
-    cursor: grab;
-}
-
-.browser-popout-module__dialog.is-dragging {
-    cursor: grabbing;
-}
-
-.browser-popout-module__host {
-    position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.browser-popout-module__shell {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.browser-popout-module__chrome {
-    flex-shrink: 0;
-    padding: 0.35rem 0.85rem 0.25rem;
-}
-
-.browser-popout-module__scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-}
-
-.browser-popout-module__scroll > .tv-panel {
-    display: none;
-    min-height: 0;
-}
-
-.browser-popout-module__scroll > .tv-panel.is-active {
-    display: block;
-}
-
-.browser-popout-module__footer {
-    flex-shrink: 0;
-}
-
-.browser-popout-module__host > .tv-module__actions--browser-end {
-    position: absolute;
-    top: 0.35rem;
-    right: var(--tv-spacing-sm, 0.5rem);
-    z-index: 6;
-    pointer-events: auto;
-}
-
-.browser-popout-module__host > .tv-module__actions--start {
-    position: absolute;
-    top: 0.35rem;
-    left: var(--tv-spacing-sm, 0.5rem);
-    z-index: 6;
-    pointer-events: auto;
-}
-
-.browser-popout-module__resize {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    z-index: 12;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--tv-main-2, #00FF88) 55%, transparent);
-    opacity: 0.35;
-}
-
-.browser-popout-module__resize:hover {
-    opacity: 0.85;
-}
-
-.browser-popout-module__resize[data-browser-popout-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
-.browser-popout-module__resize[data-browser-popout-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
-.browser-popout-module__resize[data-browser-popout-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
-.browser-popout-module__resize[data-browser-popout-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
-
 /* --- Remote external popout (Document PiP / popup window) --- */
 
 .remote-popout-body {
@@ -803,78 +646,23 @@ body.remote-docked-expanded .remote-dock-tab {
     opacity: 1 !important;
 }
 
-.remote-popout-body > .tv-module__actions--start,
-.remote-popout-body > .tv-module__actions--remote-end,
-.remote-popout-body > .tv-module__actions--browser-end {
+.remote-popout-body > .remote-module__host {
     position: relative;
-    z-index: 4;
-    flex-shrink: 0;
-    pointer-events: auto;
-}
-
-.remote-popout-body > .tv-module__actions--start {
-    padding: 0.35rem var(--tv-spacing-sm, 0.5rem) 0;
-}
-
-.remote-popout-body > .tv-module__actions--remote-end,
-.remote-popout-body > .tv-module__actions--browser-end {
-    padding: 0 var(--tv-spacing-sm, 0.5rem) 0.35rem;
-    justify-content: flex-end;
-}
-
-.remote-popout-body > .remote-popout-module__shell {
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
+    height: 100%;
     display: flex;
     flex-direction: column;
     opacity: 1 !important;
 }
 
-.remote-popout-module__shell {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    flex: 1;
-    width: 100%;
-}
-
-.remote-popout-module__chrome {
-    flex-shrink: 0;
-    padding: 0.55rem var(--tv-spacing-sm, 0.5rem) 0.35rem;
-}
-
-.remote-popout-module__scroll {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    padding: 0 var(--tv-spacing-sm, 0.5rem);
-}
-
-.remote-popout-module__scroll > .tv-panel {
-    display: none;
-}
-
-.remote-popout-module__scroll > .tv-panel.is-active {
-    display: block;
-}
-
-.remote-popout-body > .tv-module__body,
-.remote-popout-body > #tv-catalog-body {
+.remote-popout-body > .remote-module__host > .tv-module__body,
+.remote-popout-body > .remote-module__host > #tv-catalog-body {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
     opacity: 1 !important;
-}
-
-.is-remote-popout-live {
-    width: 100%;
-    max-width: none;
-    min-height: 0;
-    opacity: 1 !important;
-}
-
-.is-remote-popout-live.remote-module__shell {
     border: none;
     border-radius: 0;
     box-shadow: none;
@@ -886,19 +674,6 @@ body.remote-external-popout-active--full #remote-module,
 body.remote-external-popout-active--full .remote-module__dialog {
     visibility: hidden !important;
     pointer-events: none !important;
-}
-
-body.remote-external-popout-active--solo .remote-module__scroll.is-remote-popout-empty > .remote-popout-placeholder {
-    display: flex;
-}
-
-.remote-popout-body > .tv-module__body.is-remote-popout-live,
-.remote-popout-body > #tv-catalog-body.is-remote-popout-live {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    opacity: 1 !important;
 }
 
 .remote-popout-placeholder {
@@ -982,14 +757,12 @@ body.remote-undocked-open .remote-dock-tab {
 
 /* --- Remote shell textures (theme supplies color) --- */
 
-.remote-module__shell,
-.browser-popout-module__shell {
+.remote-module__shell {
     position: relative;
     isolation: isolate;
 }
 
-.remote-module__shell::before,
-.browser-popout-module__shell::before {
+.remote-module__shell::before::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -998,19 +771,16 @@ body.remote-undocked-open .remote-dock-tab {
     border-radius: inherit;
 }
 
-.remote-module__shell > *,
-.browser-popout-module__shell > * {
+.remote-module__shell > * > * {
     position: relative;
     z-index: 1;
 }
 
-[data-remote-texture="none"] .remote-module__shell::before,
-[data-remote-texture="none"] .browser-popout-module__shell::before {
+[data-remote-texture="none"] .remote-module__shell::before {
     display: none;
 }
 
-[data-remote-texture="carbon"] .remote-module__shell::before,
-[data-remote-texture="carbon"] .browser-popout-module__shell::before {
+[data-remote-texture="carbon"] .remote-module__shell::before {
     opacity: 0.16;
     background-image:
         repeating-linear-gradient(
@@ -1025,8 +795,7 @@ body.remote-undocked-open .remote-dock-tab {
         );
 }
 
-[data-remote-texture="brushed"] .remote-module__shell::before,
-[data-remote-texture="brushed"] .browser-popout-module__shell::before {
+[data-remote-texture="brushed"] .remote-module__shell::before {
     opacity: 0.12;
     background-image: repeating-linear-gradient(
         180deg,
@@ -1035,8 +804,7 @@ body.remote-undocked-open .remote-dock-tab {
     );
 }
 
-[data-remote-texture="noise"] .remote-module__shell::before,
-[data-remote-texture="noise"] .browser-popout-module__shell::before {
+[data-remote-texture="noise"] .remote-module__shell::before {
     opacity: 0.1;
     background-image:
         radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--tv-text-primary) 18%, transparent) 0 0.6px, transparent 0.7px),
@@ -1045,8 +813,7 @@ body.remote-undocked-open .remote-dock-tab {
     background-size: 4px 4px, 5px 5px, 6px 6px;
 }
 
-[data-remote-texture="grid"] .remote-module__shell::before,
-[data-remote-texture="grid"] .browser-popout-module__shell::before {
+[data-remote-texture="grid"] .remote-module__shell::before {
     opacity: 0.11;
     background-image:
         linear-gradient(color-mix(in srgb, var(--tv-text-primary) 16%, transparent) 1px, transparent 1px),
@@ -1054,8 +821,7 @@ body.remote-undocked-open .remote-dock-tab {
     background-size: 14px 14px;
 }
 
-[data-remote-texture="dots"] .remote-module__shell::before,
-[data-remote-texture="dots"] .browser-popout-module__shell::before {
+[data-remote-texture="dots"] .remote-module__shell::before {
     opacity: 0.13;
     background-image: radial-gradient(
         circle,
@@ -1065,125 +831,13 @@ body.remote-undocked-open .remote-dock-tab {
     background-size: 6px 6px;
 }
 
-[data-remote-texture="weave"] .remote-module__shell::before,
-[data-remote-texture="weave"] .browser-popout-module__shell::before {
+[data-remote-texture="weave"] .remote-module__shell::before {
     opacity: 0.12;
     background-image:
         repeating-linear-gradient(0deg, transparent 0 7px, color-mix(in srgb, var(--tv-text-primary) 12%, transparent) 7px 8px),
         repeating-linear-gradient(90deg, transparent 0 7px, color-mix(in srgb, var(--tv-text-primary) 10%, transparent) 7px 8px);
 }
 
-.is-remote-popout-live.remote-module__shell::before,
-.is-browser-popout-live .browser-popout-module__shell::before {
+.remote-popout-body .remote-module__shell::before {
     border-radius: 0;
 }
-
-/* --- Browser external popout --- */
-
-.browser-popout-body {
-    margin: 0;
-    min-height: 100vh;
-    height: 100vh;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    background: var(--tv-bg-primary, #0a0c14);
-    color: var(--tv-text-primary, #e8eaef);
-    overflow: hidden;
-    opacity: 1 !important;
-}
-
-.browser-popout-body > .tv-module__actions--start,
-.browser-popout-body > .tv-module__actions--browser-end {
-    flex-shrink: 0;
-    pointer-events: auto;
-    padding: 0.35rem var(--tv-spacing-sm, 0.5rem);
-}
-
-.browser-popout-body > .tv-module__actions--browser-end {
-    justify-content: flex-end;
-}
-
-.browser-popout-body > .browser-popout-module__shell,
-.browser-popout-body > .browser-popout-module__shell.is-browser-popout-live {
-    flex: 1;
-    min-height: 0;
-    opacity: 1 !important;
-}
-
-.is-browser-popout-live {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    height: 100%;
-    width: 100%;
-    background: var(--tv-bg-secondary, #141829);
-    border-radius: 0;
-    overflow: hidden;
-}
-
-.browser-popout-body .browser-popout-module__chrome {
-    flex: 0 0 auto;
-    padding: 2.35rem var(--tv-spacing-md, 1rem) 0.35rem;
-    text-align: center;
-}
-
-.browser-popout-body .browser-popout-module__scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-}
-
-.browser-popout-body .browser-popout-module__footer {
-    flex: 0 0 auto;
-}
-
-.browser-popout-placeholder {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-height: 8rem;
-    margin: 0.35rem 0;
-    border: 1px dashed color-mix(in srgb, #60a5fa 55%, transparent);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--tv-bg-secondary, #141829) 88%, transparent);
-    overflow: hidden;
-}
-
-.browser-popout-placeholder__header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.55rem;
-    border-bottom: 1px solid var(--tv-border, #2A2E3A);
-    position: relative;
-    z-index: 7;
-    pointer-events: auto;
-}
-
-.browser-popout-placeholder__title {
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    opacity: 0.65;
-    color: var(--tv-text-secondary);
-}
-
-.browser-popout-placeholder__spacer {
-    flex: 1;
-}
-
-.browser-popout-placeholder__actions {
-    display: flex;
-    gap: 0.25rem;
-}
-
-.browser-popout-placeholder__body {
-    flex: 1;
-    min-height: 3rem;
-    opacity: 0.45;
-}
-
-

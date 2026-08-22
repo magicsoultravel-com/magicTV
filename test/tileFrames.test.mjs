@@ -83,6 +83,9 @@ function makeFrame({
     const frame = {
         dataset: { frameState: 'waiting' },
         isConnected: connected,
+        classList: {
+            contains: (c) => c === 'channel-tile__capture-frame'
+        },
         querySelector(sel) { return map[sel] || null; },
         closest(sel) {
             if (sel === '.channel-tile') return tile;
@@ -275,14 +278,65 @@ test('viewport intersect enqueues a below-fold waiting frame into hot', () => {
     TileFrames._resetForTests();
 });
 
-test('settleFrameCapture paints offline on null without provisional', () => {
+test('settleFrameCapture leaves waiting on soft fail without provisional', () => {
     TileFrames._resetForTests();
     const frame = makeFrame();
     setFrameState(frame, 'loading');
     settleFrameCapture(frame, null, 'https://example.test/fail.m3u8', TileFrames._state.refreshEpoch, 'timeout');
-    assert.equal(frame.dataset.frameState, 'offline');
+    assert.equal(frame.dataset.frameState, 'waiting');
     assert.equal(frame.dataset.frameFail, 'timeout');
+    assert.equal(frame.dataset.captured, undefined);
+    assert.equal(frame._badge.classList.contains('is-hidden'), true);
+});
+
+test('settleFrameCapture leaves waiting on black soft fail', () => {
+    TileFrames._resetForTests();
+    const frame = makeFrame();
+    setFrameState(frame, 'loading');
+    settleFrameCapture(frame, null, 'https://example.test/black.m3u8', TileFrames._state.refreshEpoch, 'black');
+    assert.equal(frame.dataset.frameState, 'waiting');
+    assert.equal(frame.dataset.frameFail, 'black');
+    assert.equal(frame.dataset.captured, undefined);
+});
+
+test('settleFrameCapture paints offline only on hard fail without provisional', () => {
+    TileFrames._resetForTests();
+    const frame = makeFrame();
+    setFrameState(frame, 'loading');
+    settleFrameCapture(frame, null, 'https://example.test/fail.m3u8', TileFrames._state.refreshEpoch, 'media');
+    assert.equal(frame.dataset.frameState, 'offline');
+    assert.equal(frame.dataset.frameFail, 'media');
     assert.equal(frame._badge.classList.contains('is-hidden'), false);
+});
+
+test('settleFrameCapture does not demote captured to offline on late hard fail', () => {
+    TileFrames._resetForTests();
+    const url = 'https://example.test/late-fail.m3u8';
+    const frame = makeFrame({ url });
+    setFrameState(frame, 'captured', 'data:image/jpeg;base64,good');
+    settleFrameCapture(frame, null, url, TileFrames._state.refreshEpoch, 'media');
+    assert.equal(frame.dataset.frameState, 'captured');
+    assert.equal(frame._img.src, 'data:image/jpeg;base64,good');
+    assert.equal(frame._badge.classList.contains('is-hidden'), true);
+});
+
+test('settleFrameCapture skips offline when live snap owns the URL', () => {
+    TileFrames._resetForTests();
+    const url = 'https://example.test/playing-protect.m3u8';
+    const frame = makeFrame({ url });
+    setFrameState(frame, 'loading');
+    // Simulate in-flight live snap for this stream.
+    TileFrames._liveSnapByUrl.set(url, {
+        noted: false,
+        inFlight: true,
+        gen: 1,
+        retries: 0,
+        retryTimer: null
+    });
+    settleFrameCapture(frame, null, url, TileFrames._state.refreshEpoch, 'media');
+    assert.equal(frame.dataset.frameState, 'waiting');
+    assert.equal(frame.dataset.captured, undefined);
+    assert.equal(frame._badge.classList.contains('is-hidden'), true);
 });
 
 test('settleFrameCapture keeps provisional logo instead of offline', () => {
@@ -293,6 +347,16 @@ test('settleFrameCapture keeps provisional logo instead of offline', () => {
     settleFrameCapture(frame, null, 'https://example.test/fail.m3u8', TileFrames._state.refreshEpoch, 'timeout');
     assert.equal(frame.dataset.frameState, 'captured');
     assert.equal(frame._img.src, 'https://logo.test/keep.png');
+    assert.equal(frame._badge.classList.contains('is-hidden'), true);
+});
+
+test('settleFrameCapture keeps provisional logo on hard fail too', () => {
+    TileFrames._resetForTests();
+    const frame = makeFrame({ logo: 'https://logo.test/keep.png' });
+    setFrameState(frame, 'provisional', 'https://logo.test/keep.png');
+    setFrameState(frame, 'loading');
+    settleFrameCapture(frame, null, 'https://example.test/fail.m3u8', TileFrames._state.refreshEpoch, 'media');
+    assert.equal(frame.dataset.frameState, 'captured');
     assert.equal(frame._badge.classList.contains('is-hidden'), true);
 });
 
@@ -372,6 +436,39 @@ test('refresh with viewKey clears cache, paints provisional, and requeues', asyn
         );
     } finally {
         restoreIO();
+        TileFrames._resetForTests();
+        await FrameCache.clearFrames();
+    }
+});
+
+test('refreshFrame clears one tile cache and force-requeues without bumping epoch', async () => {
+    await FrameCache.clearFrames();
+    TileFrames._resetForTests();
+    holdDrain();
+
+    const url = 'https://example.test/one-tile.m3u8';
+    const chKey = 'iptv-org:one-tile';
+    const otherUrl = 'https://example.test/other-tile.m3u8';
+    await FrameCache.setFrame(url, 'data:image/jpeg;base64,old');
+    await FrameCache.setFrame(otherUrl, 'data:image/jpeg;base64,keep');
+
+    const frame = makeFrame({ url, channel: chKey, logo: 'https://logo.test/one.png' });
+    const other = makeFrame({ url: otherUrl });
+    setFrameState(frame, 'offline');
+    setFrameState(other, 'captured', 'data:image/jpeg;base64,keep');
+    const epoch = TileFrames._state.refreshEpoch;
+
+    try {
+        await TileFrames.refreshFrame(frame);
+        assert.equal(TileFrames._state.refreshEpoch, epoch);
+        assert.equal(await FrameCache.getFrame(url), null);
+        assert.equal(await FrameCache.getFrame(otherUrl), 'data:image/jpeg;base64,keep');
+        assert.equal(other.dataset.frameState, 'captured');
+        assert.equal(frame.dataset.captured, undefined);
+        assert.equal(TileFrames._state.pending.has(frame), true);
+        assert.equal(TileFrames._state.hot[0], frame);
+        assert.equal(TileFrames._state.forceHeavy.has(frame), true);
+    } finally {
         TileFrames._resetForTests();
         await FrameCache.clearFrames();
     }
@@ -501,9 +598,10 @@ test('notePlayingVideo waits, paints matching tiles, and caches', async () => {
     }
 });
 
-test('notePlayingVideo leaves tiles alone when snap stays null', async () => {
+test('notePlayingVideo leaves waiting tiles alone when snap stays null', async () => {
     await FrameCache.clearFrames();
     TileFrames._resetForTests();
+    TileFrames._setLiveSnapRetryForTests({ ms: 60_000, max: 0 });
 
     const url = 'https://example.test/live-null.m3u8';
     const frame = makeFrame({ url });
@@ -522,6 +620,116 @@ test('notePlayingVideo leaves tiles alone when snap stays null', async () => {
         const ok = await TileFrames.notePlayingVideo(url, { videoWidth: 640, videoHeight: 360 });
         assert.equal(ok, false);
         assert.equal(frame.dataset.frameState, 'waiting');
+        assert.equal(await FrameCache.getFrame(url), null);
+    } finally {
+        if (PrevDoc === undefined) delete globalThis.document;
+        else globalThis.document = PrevDoc;
+        TileFrames._resetForTests();
+    }
+});
+
+test('notePlayingVideo retries until snap succeeds', async () => {
+    await FrameCache.clearFrames();
+    TileFrames._resetForTests();
+    TileFrames._setLiveSnapRetryForTests({ ms: 5, max: 8 });
+
+    const url = 'https://example.test/live-retry.m3u8';
+    const dataUrl = 'data:image/jpeg;base64,retryok';
+    const frame = makeFrame({ url });
+    setFrameState(frame, 'waiting');
+
+    const PrevDoc = globalThis.document;
+    globalThis.document = {
+        querySelectorAll(sel) {
+            if (sel === '.channel-tile__capture-frame') return [frame];
+            return [];
+        }
+    };
+
+    let calls = 0;
+    TileFrames._setLiveTileSnapForTests(async () => {
+        calls += 1;
+        if (calls < 2) return { dataUrl: null, fail: 'black' };
+        return { dataUrl, fail: null };
+    });
+
+    try {
+        assert.equal(await TileFrames.notePlayingVideo(url, { videoWidth: 640, videoHeight: 360 }), false);
+        assert.equal(frame.dataset.frameState, 'waiting');
+        await new Promise((r) => setTimeout(r, 40));
+        assert.ok(calls >= 2);
+        assert.equal(frame.dataset.frameState, 'captured');
+        assert.equal(frame._img.src, dataUrl);
+    } finally {
+        if (PrevDoc === undefined) delete globalThis.document;
+        else globalThis.document = PrevDoc;
+        TileFrames._resetForTests();
+        await FrameCache.clearFrames();
+    }
+});
+
+test('armLiveSnap cancels pending live-snap retry', async () => {
+    await FrameCache.clearFrames();
+    TileFrames._resetForTests();
+    TileFrames._setLiveSnapRetryForTests({ ms: 30, max: 8 });
+
+    const url = 'https://example.test/live-cancel-retry.m3u8';
+    const frame = makeFrame({ url });
+    setFrameState(frame, 'waiting');
+
+    const PrevDoc = globalThis.document;
+    globalThis.document = {
+        querySelectorAll(sel) {
+            if (sel === '.channel-tile__capture-frame') return [frame];
+            return [];
+        }
+    };
+
+    let calls = 0;
+    TileFrames._setLiveTileSnapForTests(async () => {
+        calls += 1;
+        return { dataUrl: null, fail: 'black' };
+    });
+
+    try {
+        await TileFrames.notePlayingVideo(url, { videoWidth: 1, videoHeight: 1 });
+        assert.equal(calls, 1);
+        TileFrames.armLiveSnap(url);
+        await new Promise((r) => setTimeout(r, 60));
+        assert.equal(calls, 1, 'retry must not fire after armLiveSnap');
+        assert.equal(frame.dataset.frameState, 'waiting');
+    } finally {
+        if (PrevDoc === undefined) delete globalThis.document;
+        else globalThis.document = PrevDoc;
+        TileFrames._resetForTests();
+    }
+});
+
+test('notePlayingVideo clears offline D/C when snap stays null', async () => {
+    await FrameCache.clearFrames();
+    TileFrames._resetForTests();
+    TileFrames._setLiveSnapRetryForTests({ ms: 60_000, max: 0 });
+
+    const url = 'https://example.test/live-clear-dc.m3u8';
+    const frame = makeFrame({ url });
+    setFrameState(frame, 'offline');
+    assert.equal(frame.dataset.captured, '1');
+
+    const PrevDoc = globalThis.document;
+    globalThis.document = {
+        querySelectorAll(sel) {
+            if (sel === '.channel-tile__capture-frame') return [frame];
+            return [];
+        }
+    };
+    TileFrames._setLiveTileSnapForTests(async () => ({ dataUrl: null, fail: 'black' }));
+
+    try {
+        const ok = await TileFrames.notePlayingVideo(url, { videoWidth: 640, videoHeight: 360 });
+        assert.equal(ok, false);
+        assert.equal(frame.dataset.frameState, 'waiting');
+        assert.equal(frame.dataset.captured, undefined);
+        assert.equal(frame._badge.classList.contains('is-hidden'), true);
         assert.equal(await FrameCache.getFrame(url), null);
     } finally {
         if (PrevDoc === undefined) delete globalThis.document;

@@ -183,13 +183,38 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     transition: opacity 0.15s ease, color 0.15s ease;
 }
 
+.channel-tile__refresh-btn {
+    position: absolute;
+    top: 0;
+    right: 40px;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
 .channel-tile__fav-btn svg {
     display: block;
     width: 20px;
     height: 20px;
 }
 
-.channel-tile__hide-btn svg {
+.channel-tile__hide-btn svg,
+.channel-tile__refresh-btn svg {
     display: block;
     width: 20px;
     height: 20px;
@@ -200,6 +225,8 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
 .channel-tile__fav-btn.is-active,
 .channel-tile:hover .channel-tile__hide-btn,
 .channel-tile:focus-within .channel-tile__hide-btn,
+.channel-tile:hover .channel-tile__refresh-btn,
+.channel-tile:focus-within .channel-tile__refresh-btn,
 .channel-tile:hover .channel-tile__unhide-btn,
 .channel-tile:focus-within .channel-tile__unhide-btn,
 .channel-tile:hover .channel-tile__unvisit-btn,
@@ -216,6 +243,8 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
 
 .channel-tile__hide-btn:hover,
 .channel-tile__hide-btn:focus-visible,
+.channel-tile__refresh-btn:hover,
+.channel-tile__refresh-btn:focus-visible,
 .channel-tile__unhide-btn:hover,
 .channel-tile__unhide-btn:focus-visible,
 .channel-tile__unvisit-btn:hover,

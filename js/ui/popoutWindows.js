@@ -5,10 +5,6 @@ export const REMOTE_PIP_W = 280;
 export const REMOTE_PIP_H = 640;
 export const REMOTE_POPUP_W = 280;
 export const REMOTE_POPUP_H = 640;
-export const BROWSER_PIP_W = 520;
-export const BROWSER_PIP_H = 720;
-export const BROWSER_POPUP_W = 520;
-export const BROWSER_POPUP_H = 720;
 
 /** @type {Window|null} */
 let activePipWindow = null;
@@ -169,19 +165,8 @@ export function windowNameForRemote() {
     return 'magictv-remote';
 }
 
-export function windowNameForBrowser() {
-    return 'magictv-browser';
-}
-
 export function remotePopoutSize() {
     const w = shouldUseDocumentPipFor({ type: 'module', id: 'remote' }) ? REMOTE_PIP_W : REMOTE_POPUP_W;
     const h = shouldUseDocumentPipFor({ type: 'module', id: 'remote' }) ? REMOTE_PIP_H : REMOTE_POPUP_H;
-    return { w, h };
-}
-
-export function browserPopoutSize() {
-    const owner = { type: 'module', id: 'browser' };
-    const w = shouldUseDocumentPipFor(owner) ? BROWSER_PIP_W : BROWSER_POPUP_W;
-    const h = shouldUseDocumentPipFor(owner) ? BROWSER_PIP_H : BROWSER_POPUP_H;
     return { w, h };
 }

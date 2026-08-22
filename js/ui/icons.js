@@ -8,6 +8,8 @@ export const CARD_ICONS = {
     tileStarFilled: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M6 1.8l1.4 2.8 3.1.5-2.3 2.1.6 3.1L6 8.6l-2.8 1.7.6-3.1-2.3-2.1 3.1-.5L6 1.8z" fill="currentColor" stroke="none"/></svg>',
     /** Large tile hover hide — open eye. */
     tileEye: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4S10.8 6 10.8 6s-1.6 3.4-4.8 3.4S1.2 6 1.2 6z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.4" fill="none" stroke="currentColor" stroke-width="0.45"/></svg>',
+    /** Large tile hover refresh — circular arrows (re-grab this tile only). */
+    tileRefresh: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M9.4 4.2A3.5 3.5 0 1 0 9.1 8" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round"/><path d="M9.4 2.2v2.4H7" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     /** Large tile unhide — eye with slash. */
     tileEyeOff: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4c1.1 0 2 .3 2.7.7M10.8 6s-1.6 3.4-4.8 3.4c-1.1 0-2-.3-2.7-.7M2.2 2.2l7.6 7.6" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round"/></svg>',
     /** Large tile visited-list — checkmark with a slash (remove from visited). */
