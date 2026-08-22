@@ -7,6 +7,7 @@ import { Appearance } from './appearance.js';
 import { MultiView } from '../multiView.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import { RemotePanel, syncRemoteChannelBar } from './remotePanel.js';
+import { updateProgrammeHeader } from './guidePanel.js';
 
 let deps = {
     appState: null
@@ -85,6 +86,8 @@ export const PlayerChrome = {
         if (headerInfo) headerInfo.classList.remove('is-hidden');
         if (headerName) headerName.textContent = name || 'Unknown';
         if (headerFlag) headerFlag.textContent = country ? countryFlagEmoji(country) : '';
+
+        updateProgrammeHeader().catch(() => {});
     },
 
     onPlayerStateChanged(e) {

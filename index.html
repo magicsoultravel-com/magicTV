@@ -27,9 +27,13 @@
                 <h1>magicTV</h1>
             </div>
             <div class="tv-channel-info is-hidden">
-                <span id="header-now-playing" class="tv-header-now-playing">now playing</span>
-                <span id="header-channel-name" class="tv-header-channel-name"></span>
-                <span id="header-channel-flag" class="tv-header-channel-flag"></span>
+                <div class="tv-channel-info__row">
+                    <span id="header-now-playing" class="tv-header-now-playing">now playing</span>
+                    <span id="header-channel-name" class="tv-header-channel-name"></span>
+                    <span id="header-channel-flag" class="tv-header-channel-flag"></span>
+                </div>
+                <span id="header-program-title" class="tv-header-program-title"></span>
+                <span id="header-program-next" class="tv-header-program-next"></span>
             </div>
             <div id="tv-clock-zone" class="tv-clock-zone" data-clock-style="digital">
                 <div class="tv-clock-display">
@@ -388,9 +392,23 @@
                     <h2 class="remote-module__brand">magic remote</h2>
                     <div id="remote-channel-bar" class="remote-module__channel-bar is-hidden">
                         <span id="remote-channel-name" class="tv-header-now-playing"></span>
+                        <span id="remote-program-title" class="remote-program-title"></span>
                     </div>
                 </header>
                         <div class="remote-module__scroll">
+                            <div id="guide-panel" class="guide-panel">
+                                <button type="button" id="guide-panel-toggle" class="guide-panel__toggle" aria-expanded="false" aria-controls="guide-panel-body">Today's schedule</button>
+                                <div id="guide-panel-body" class="guide-panel__body">
+                                    <div id="guide-status" class="guide-panel__status"></div>
+                                    <ul id="guide-today-list" class="guide-panel__list"></ul>
+                                    <details id="guide-tomorrow" class="guide-panel__tomorrow">
+                                        <summary>Tomorrow</summary>
+                                        <ul id="guide-tomorrow-list" class="guide-panel__list"></ul>
+                                    </details>
+                                    <button type="button" id="guide-favorites-btn" class="guide-panel__fav-btn">Look up guides for favorites</button>
+                                    <div id="guide-favorites-results" class="guide-panel__fav-results"></div>
+                                </div>
+                            </div>
                             <div id="remote-panel" class="tv-panel remote-panel is-active">
                     <div class="remote-panel__grid">
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="vol-down" title="Volume down" aria-label="Volume down"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>

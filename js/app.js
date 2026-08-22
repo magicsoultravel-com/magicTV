@@ -20,6 +20,8 @@ import { BrowserExternalPopout, BROWSER_EXTERNAL_ICON } from './ui/browserExtern
 import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
 import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
+import { GuidePanel } from './ui/guidePanel.js';
+import { warmGuideIndex } from './epg/epgService.js';
 
 import { ACTION_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
@@ -661,6 +663,7 @@ async function init() {
             switchTab
         });
         RemotePanel.bind();
+        GuidePanel.bind();
         BrowseView.init({
             appState,
             stampRefreshView,
@@ -782,6 +785,7 @@ async function init() {
         await reveal();
 
         await countriesPromise;
+        warmGuideIndex().catch(() => {});
         updateRefreshAge();
         const refreshAgeTimer = setInterval(updateRefreshAge, 60 * 1000);
         if (refreshAgeTimer?.unref) refreshAgeTimer.unref();
