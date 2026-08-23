@@ -137,6 +137,78 @@ test('mergeVisibleFavoriteOrder keeps non-visible slots', async () => {
     );
 });
 
+test('favorites root order migrates from legacy favorites list', () => {
+    TvPlayer.toggleFavorite(CHANNEL);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.deepEqual(raw.favoritesRootOrder, ['iptv-org:CNN.us']);
+    assert.deepEqual(raw.favoriteFolders, []);
+});
+
+test('create and delete empty favorite folder', () => {
+    const folder = TvPlayer.createFavoriteFolder('News');
+    assert.equal(folder.name, 'News');
+    assert.deepEqual(folder.items, []);
+    assert.deepEqual(TvPlayer.getFavoriteFolders().map((f) => f.id), [folder.id]);
+    assert.deepEqual(TvPlayer.getFavoritesRootOrder(), []);
+    assert.equal(TvPlayer.deleteFavoriteFolder(folder.id), true);
+    assert.deepEqual(TvPlayer.getFavoriteFolders(), []);
+    assert.deepEqual(TvPlayer.getFavoritesRootOrder(), []);
+});
+
+test('rename favorite folder persists name', () => {
+    const folder = TvPlayer.createFavoriteFolder('Old name');
+    assert.equal(TvPlayer.renameFavoriteFolder(folder.id, 'New name'), true);
+    assert.equal(TvPlayer.getFavoriteFolder(folder.id).name, 'New name');
+});
+
+test('favorite folders render before root channels in storage order', () => {
+    TvPlayer.toggleFavorite(CHANNEL);
+    const folder = TvPlayer.createFavoriteFolder('Top');
+    const b = { id: 'B.us', name: 'Beta', url_resolved: 'x' };
+    TvPlayer.toggleFavorite(b);
+    assert.deepEqual(TvPlayer.getFavoriteFolders()[0].id, folder.id);
+    assert.ok(TvPlayer.getFavoritesRootOrder().includes('iptv-org:B.us'));
+    assert.ok(!TvPlayer.getFavoritesRootOrder().includes(folder.id));
+});
+
+test('delete favorite folder rejects non-empty folder', () => {
+    TvPlayer.toggleFavorite(CHANNEL);
+    const folder = TvPlayer.createFavoriteFolder('News');
+    TvPlayer.moveFavoriteToFolder('iptv-org:CNN.us', folder.id);
+    assert.equal(TvPlayer.deleteFavoriteFolder(folder.id), false);
+    assert.ok(TvPlayer.getFavoriteFolder(folder.id));
+});
+
+test('move favorite into folder and back to root', () => {
+    const b = { id: 'B.us', name: 'Beta', url_resolved: 'x' };
+    TvPlayer.toggleFavorite(CHANNEL);
+    TvPlayer.toggleFavorite(b);
+    const folder = TvPlayer.createFavoriteFolder('Group');
+    assert.equal(TvPlayer.moveFavoriteToFolder('iptv-org:CNN.us', folder.id), true);
+    assert.deepEqual(TvPlayer.getFavoriteFolder(folder.id).items, ['iptv-org:CNN.us']);
+    assert.ok(!TvPlayer.getFavoritesRootOrder().includes('iptv-org:CNN.us'));
+    assert.ok(TvPlayer.getFavoritesRootOrder().includes('iptv-org:B.us'));
+    assert.equal(TvPlayer.moveFavoriteToRoot('iptv-org:CNN.us', { index: 0 }), true);
+    assert.deepEqual(TvPlayer.getFavoriteFolder(folder.id).items, []);
+    assert.equal(TvPlayer.getFavoritesRootOrder()[0], 'iptv-org:CNN.us');
+});
+
+test('unfavorite removes channel from folder layout', () => {
+    TvPlayer.toggleFavorite(CHANNEL);
+    const folder = TvPlayer.createFavoriteFolder('Group');
+    TvPlayer.moveFavoriteToFolder('iptv-org:CNN.us', folder.id);
+    TvPlayer.toggleFavorite(CHANNEL);
+    assert.equal(TvPlayer.isFavorite(CHANNEL), false);
+    assert.deepEqual(TvPlayer.getFavoriteFolder(folder.id).items, []);
+});
+
+test('mergeVisibleRootOrder keeps non-visible root channel keys', async () => {
+    const { mergeVisibleRootOrder } = await import('../js/storage/favoritesRecents.js');
+    const full = ['A', 'B', 'C'];
+    const visible = ['C', 'B'];
+    assert.deepEqual(mergeVisibleRootOrder(full, visible), ['A', 'C', 'B']);
+});
+
 // ----- Recents -----
 
 test('recents are recorded newest-first', () => {

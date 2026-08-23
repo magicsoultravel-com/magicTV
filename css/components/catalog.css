@@ -134,6 +134,155 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     overflow: hidden;
 }
 
+/* Favorite folder tiles — same footprint as channel tiles, solid theme fill */
+.favorite-folder-tile,
+.favorite-folder-parent-tile {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--tv-spacing-sm);
+    padding: var(--tv-spacing-xs) var(--tv-spacing-sm);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-md);
+    min-height: 64px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 68px;
+    box-sizing: border-box;
+}
+
+.favorite-folder-tile {
+    cursor: pointer;
+    background: color-mix(in srgb, var(--tv-primary) 18%, var(--tv-bg-secondary));
+    border-color: color-mix(in srgb, var(--tv-primary) 32%, var(--tv-border));
+    transition: var(--tv-transition);
+}
+
+.favorite-folder-tile:hover {
+    border-color: var(--tv-primary);
+    background: color-mix(in srgb, var(--tv-primary) 26%, var(--tv-bg-secondary));
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+}
+
+.favorite-folder-parent-tile {
+    cursor: pointer;
+    background: color-mix(in srgb, var(--tv-text-muted) 12%, var(--tv-bg-secondary));
+    border-style: dashed;
+    justify-content: center;
+}
+
+.favorite-folder-parent-tile:hover {
+    border-color: var(--tv-text-secondary);
+    background: color-mix(in srgb, var(--tv-text-muted) 18%, var(--tv-bg-secondary));
+}
+
+.favorite-folder-parent-tile.is-drop-target {
+    border-color: var(--tv-main-1-flip);
+    background: color-mix(in srgb, var(--tv-main-1-flip) 16%, var(--tv-bg-secondary));
+}
+
+.favorite-folder-tile.is-drop-target {
+    border-color: var(--tv-main-1-flip);
+    background: color-mix(in srgb, var(--tv-primary) 18%, var(--tv-bg-secondary));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tv-main-1-flip) 55%, transparent),
+        0 6px 18px color-mix(in srgb, var(--tv-main-1-flip) 22%, transparent);
+    transform: scale(1.03);
+    z-index: 3;
+}
+
+.favorite-folder-tile__icon {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tv-text-primary);
+}
+
+.favorite-folder-parent-tile__label {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.05em;
+    color: var(--tv-text-secondary);
+}
+
+.favorite-folder-tile__body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.favorite-folder-tile__name {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--tv-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.favorite-folder-tile__count {
+    font-size: 0.75rem;
+    color: var(--tv-text-secondary);
+    margin-top: 0.15rem;
+}
+
+.favorite-folder-tile__edit-btn,
+.favorite-folder-tile__delete-btn {
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.favorite-folder-tile__delete-btn {
+    right: 0;
+}
+
+.favorite-folder-tile__edit-btn {
+    right: 20px;
+}
+
+.favorite-folder-tile:hover .favorite-folder-tile__edit-btn,
+.favorite-folder-tile:hover .favorite-folder-tile__delete-btn,
+.favorite-folder-tile:focus-within .favorite-folder-tile__edit-btn,
+.favorite-folder-tile:focus-within .favorite-folder-tile__delete-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.favorite-folder-tile__edit-btn:hover,
+.favorite-folder-tile__edit-btn:focus-visible,
+.favorite-folder-tile__delete-btn:hover,
+.favorite-folder-tile__delete-btn:focus-visible {
+    color: var(--tv-secondary);
+    outline: none;
+}
+
+#favorites-grid.is-sort-locked .favorite-folder-tile {
+    cursor: pointer;
+}
+
 /* Hover fav — 20px thin SVG star flush to the tile's top-right corner */
 .channel-tile__fav-btn {
     position: absolute;

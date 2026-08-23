@@ -106,6 +106,16 @@ export function classifyTilePlayback({
     return { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected };
 }
 
+/** True when playback is actively delivering media (not buffering, pause, stop, or error). */
+export function isHealthyWatchPlayback(state = {}) {
+    const { uiPlaying, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback(state);
+    if (!state.hasChannel || !uiPlaying || uiPaused || uiStopped || uiDisconnected) return false;
+    if (state.wantPlaying !== true) return false;
+    if (state.loadPhase === 'connecting' || state.loadPhase === 'buffering') return false;
+    if (state.loading === true) return false;
+    return true;
+}
+
 /**
  * Reload resume: force muted during autoplay, then restore saved mute preference.
  * @param {boolean|undefined} savedMuted mosaicSlots entry muted (missing → muted)

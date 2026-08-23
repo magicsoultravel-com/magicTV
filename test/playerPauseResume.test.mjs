@@ -19,6 +19,7 @@ import {
     shouldBumpPlayGenerationOnPause,
     isAutoplayNotAllowedError,
     shouldRetryPlayMuted,
+    isHealthyWatchPlayback,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -423,4 +424,22 @@ test('mosaic swap resume path uses resume not toggle().catch', () => {
     assert.equal(typeof result?.catch, 'undefined');
     assert.throws(() => { result.catch(() => {}); }, TypeError);
     assert.doesNotThrow(() => resume());
+});
+
+test('isHealthyWatchPlayback credits active play only', () => {
+    const base = {
+        hasChannel: true,
+        playing: true,
+        wantPlaying: true,
+        loading: false,
+        loadPhase: 'idle',
+        pausePhase: 'idle',
+        stopped: false,
+        error: null,
+        posterDataUrl: null
+    };
+    assert.equal(isHealthyWatchPlayback(base), true);
+    assert.equal(isHealthyWatchPlayback({ ...base, loadPhase: 'buffering', loading: true }), false);
+    assert.equal(isHealthyWatchPlayback({ ...base, loadPhase: 'connecting' }), false);
+    assert.equal(isHealthyWatchPlayback({ ...base, playing: false, wantPlaying: true }), false);
 });

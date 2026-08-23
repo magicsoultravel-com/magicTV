@@ -13,6 +13,11 @@ import {
 } from '../storage/playerState.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import {
+    addWatchSeconds,
+    registerWatchAccrualFlusher,
+    unregisterWatchAccrualFlusher
+} from '../storage/watchStats.js';
+import {
     attachStream,
     destroyHls,
     applyHlsBufferConfig,
@@ -37,7 +42,8 @@ import {
     shouldContinuePlayAfterAttach,
     shouldBumpPlayGenerationOnPause,
     isAutoplayNotAllowedError,
-    shouldRetryPlayMuted
+    shouldRetryPlayMuted,
+    isHealthyWatchPlayback
 } from './pauseBuffer.js';
 
 /**
@@ -64,6 +70,50 @@ export function createPlayerInstance(options) {
         onState = null,
         shouldRecordRecents = () => true
     } = options;
+
+    const watchPlaybackState = () => ({
+        hasChannel: Boolean(player.channel),
+        playing: player.playing,
+        loading: player.loading,
+        loadPhase: player.loadPhase,
+        wantPlaying: player.wantPlaying,
+        error: player.error,
+        pausePhase: player.pausePhase,
+        stopped: player.stopped,
+        posterDataUrl: player.posterDataUrl
+    });
+
+    const flushWatchAccrual = () => {
+        if (!player.watchAccrueStartedAt || !player.watchAccrueKey) return;
+        const elapsed = (Date.now() - player.watchAccrueStartedAt) / 1000;
+        if (elapsed > 0) {
+            addWatchSeconds(player.watchAccrueKey, elapsed, player.channel);
+        }
+        player.watchAccrueKey = null;
+        player.watchAccrueStartedAt = null;
+    };
+
+    const syncWatchAccrual = () => {
+        if (!shouldRecordRecents()) return;
+        const key = channelKey(player.channel);
+        if (!key) {
+            flushWatchAccrual();
+            return;
+        }
+        if (isHealthyWatchPlayback(watchPlaybackState())) {
+            if (player.watchAccrueKey === key && player.watchAccrueStartedAt) return;
+            flushWatchAccrual();
+            player.watchAccrueKey = key;
+            player.watchAccrueStartedAt = Date.now();
+            return;
+        }
+        flushWatchAccrual();
+    };
+
+    const snapshotWatchAccrual = () => {
+        flushWatchAccrual();
+        syncWatchAccrual();
+    };
 
     const player = {
         id,
@@ -102,9 +152,12 @@ export function createPlayerInstance(options) {
         /** True only after an explicit stop(); cleared on play/pause/load. */
         stopped: false,
         playGeneration: 0,
+        watchAccrueKey: null,
+        watchAccrueStartedAt: null,
 
         init() {
             if (this.video) return;
+            registerWatchAccrualFlusher(snapshotWatchAccrual);
 
             this.videoHolder = document.createElement('div');
             this.videoHolder.className = 'tv-video-holder is-hidden';
@@ -163,6 +216,7 @@ export function createPlayerInstance(options) {
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
                 }
+                syncWatchAccrual();
             });
             this.video.addEventListener('progress', () => {
                 if (this.pausePhase !== 'idle') {
@@ -231,6 +285,7 @@ export function createPlayerInstance(options) {
         },
 
         emitState() {
+            syncWatchAccrual();
             onState?.(this);
             if (!shouldBroadcast()) return;
             window.dispatchEvent(new CustomEvent('tv:state_changed', {
@@ -915,6 +970,8 @@ export function createPlayerInstance(options) {
         },
 
         async dispose() {
+            flushWatchAccrual();
+            unregisterWatchAccrualFlusher(snapshotWatchAccrual);
             await this.stop({ clearChannel: true });
             if (this.video?.parentElement) {
                 this.video.parentElement.removeChild(this.video);

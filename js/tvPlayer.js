@@ -75,6 +75,47 @@ export const TvPlayer = {
 
     getFavorites() { return FavoritesRecents.getFavorites(); },
     getFavoritesMeta() { return FavoritesRecents.getFavoritesMeta(); },
+    getFavoriteFolders() { return FavoritesRecents.getFavoriteFolders(); },
+    getFavoritesRootOrder() { return FavoritesRecents.getFavoritesRootOrder(); },
+    getFavoriteFolder(id) { return FavoritesRecents.getFavoriteFolder(id); },
+    suggestFolderName() {
+        return FavoritesRecents.suggestFolderName();
+    },
+    createFavoriteFolder(name) {
+        const folder = FavoritesRecents.createFavoriteFolder(name);
+        this.emitState();
+        return folder;
+    },
+    renameFavoriteFolder(id, name) {
+        const changed = FavoritesRecents.renameFavoriteFolder(id, name);
+        if (changed) this.emitState();
+        return changed;
+    },
+    deleteFavoriteFolder(id) {
+        const removed = FavoritesRecents.deleteFavoriteFolder(id);
+        if (removed) this.emitState();
+        return removed;
+    },
+    reorderFavoritesRoot(orderedRefs) {
+        const changed = FavoritesRecents.reorderFavoritesRoot(orderedRefs);
+        if (changed) this.emitState();
+        return changed;
+    },
+    reorderFavoriteFolderItems(folderId, orderedKeys) {
+        const changed = FavoritesRecents.reorderFavoriteFolderItems(folderId, orderedKeys);
+        if (changed) this.emitState();
+        return changed;
+    },
+    moveFavoriteToFolder(channelKeyRef, folderId, options) {
+        const moved = FavoritesRecents.moveFavoriteToFolder(channelKeyRef, folderId, options);
+        if (moved) this.emitState();
+        return moved;
+    },
+    moveFavoriteToRoot(channelKeyRef, options) {
+        const moved = FavoritesRecents.moveFavoriteToRoot(channelKeyRef, options);
+        if (moved) this.emitState();
+        return moved;
+    },
     getRecents() { return FavoritesRecents.getRecents(); },
     getRecentsMeta() { return FavoritesRecents.getRecentsMeta(); },
 

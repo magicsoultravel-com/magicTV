@@ -389,6 +389,7 @@
     <div id="remote-module-staging" class="remote-module-staging" hidden aria-hidden="true">
         <div class="tv-module__actions tv-module__actions--start">
             <button type="button" id="play-favorites-mosaic-btn" class="tv-module__action is-hidden" title="Play favorites on multiple TVs" aria-label="Play favorites on multiple TVs"></button>
+            <button type="button" id="create-favorite-folder-btn" class="tv-module__action ui-icon-btn is-hidden" title="New folder" aria-label="New folder"></button>
         </div>
         <div class="tv-module__actions tv-module__actions--remote-end">
             <button type="button" id="remote-external-popout-btn" class="tv-module__action ui-icon-btn tv-module__action--echo is-hidden" title="Pop out remote" aria-label="Pop out remote" aria-pressed="false"></button>
@@ -747,6 +748,17 @@
                                                 <div id="visited-channels-container" class="channel-grid settings-hidden-grid is-hidden"></div>
                                             </div>
                                         </details>
+                                        <div class="settings-section" id="watch-stats-section">
+                                            <div class="settings-section__header">
+                                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.2a4.8 4.8 0 1 0 0 9.6A4.8 4.8 0 0 0 6 1.2z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 3.6v2.8l2 1.2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg> Most watched</h3>
+                                                <div class="watch-stats-actions">
+                                                    <button type="button" id="refresh-watch-stats-btn" class="settings-reset-btn" aria-label="Refresh watch stats" title="Refresh watch stats"></button>
+                                                    <button type="button" id="clear-watch-stats-btn" class="settings-reset-btn" aria-label="Clear watch stats" title="Clear watch stats"></button>
+                                                </div>
+                                            </div>
+                                            <div id="watch-stats-list" class="watch-stats-list" aria-live="polite"></div>
+                                            <p id="watch-stats-empty" class="watch-stats-empty" style="font-size: 0.85rem; margin: 0; color: var(--tv-text-secondary);">No watch time recorded yet.</p>
+                                        </div>
                                         <div class="settings-section">
                                             <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><ellipse cx="6" cy="3" rx="3.6" ry="1.3" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.4 3v6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3V3M2.4 6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3" fill="none" stroke="currentColor" stroke-width="1"/></svg> Storage</h3>
                                             <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">

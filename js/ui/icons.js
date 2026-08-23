@@ -10,6 +10,16 @@ export const CARD_ICONS = {
     tileEye: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4S10.8 6 10.8 6s-1.6 3.4-4.8 3.4S1.2 6 1.2 6z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.4" fill="none" stroke="currentColor" stroke-width="0.45"/></svg>',
     /** Large tile hover refresh — circular arrows (re-grab this tile only). */
     tileRefresh: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M9.4 4.2A3.5 3.5 0 1 0 9.1 8" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round"/><path d="M9.4 2.2v2.4H7" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Favorite folder tile icon. */
+    folder: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.8 3.4h3.1l1 1.2h4.3v4.2H1.8V3.4z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/></svg>',
+    /** Create favorite folder action. */
+    folderPlus: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M1.8 3.4h3.1l1 1.2h4.3v4.2H1.8V3.4z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6 5.2v3.2M4.4 6.8h3.2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+    /** Delete empty favorite folder. */
+    folderDelete: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M3.2 3.2h5.6M4.4 3.2V2.4h3.2v.8M4.8 5.2v4M7.2 5.2v4M3.8 3.2l.4 6.4h3.6l.4-6.4" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Move channel out of folder (two vertical dots). */
+    folderEscape: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><circle cx="6" cy="4.2" r="0.9" fill="currentColor"/><circle cx="6" cy="7.8" r="0.9" fill="currentColor"/></svg>',
+    /** Rename favorite folder — thin pencil matching other 20px tile hover icons. */
+    tileEdit: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M7.5 2.4 9.6 4.5 4.1 10H2v-2.1L7.5 2.4z" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linejoin="round"/><path d="M6.7 3.2 8.8 5.3" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round"/></svg>',
     /** Large tile unhide — eye with slash. */
     tileEyeOff: '<svg viewBox="0 0 12 12" width="20" height="20" focusable="false" aria-hidden="true"><path d="M1.2 6s1.6-3.4 4.8-3.4c1.1 0 2 .3 2.7.7M10.8 6s-1.6 3.4-4.8 3.4c-1.1 0-2-.3-2.7-.7M2.2 2.2l7.6 7.6" fill="none" stroke="currentColor" stroke-width="0.45" stroke-linecap="round"/></svg>',
     /** Large tile visited-list — checkmark with a slash (remove from visited). */
@@ -51,6 +61,8 @@ export const ACTION_ICONS = {
     fullscreenExit: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" vector-effect="non-scaling-stroke"><path d="M4.2 4.2H2.8M4.2 4.2V2.8M7.8 4.2h1.4M7.8 4.2V2.8M4.2 7.8H2.8M4.2 7.8v1.4M7.8 7.8h1.4M7.8 7.8v1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     /** Circular arrows — manual catalog refresh. */
     refresh: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M9.4 4.2A3.5 3.5 0 1 0 9.1 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M9.4 2.2v2.4H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Trash — clear accumulated stats. */
+    clearStats: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M3.2 3.2h5.6M4.4 3.2V2.4h3.2v.8M4.8 5.2v4M7.2 5.2v4M3.8 3.2l.4 6.4h3.6l.4-6.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     /** Up arrow icon for ascending sort direction */
     sortUp: '<svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,4.2 3.2,8 8.8,8" fill="currentColor"/></svg>',
     /** Down arrow icon for descending sort direction */

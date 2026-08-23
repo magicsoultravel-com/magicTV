@@ -2,6 +2,8 @@ import { forEachAppDocument } from '../appDocuments.js';
 import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
+import { clearWatchStats, formatWatchDuration, flushAllWatchAccruals, getTopWatched } from '../storage/watchStats.js';
+import { ACTION_ICONS } from './icons.js';
 import { copyThemeAttributes } from './popoutWindows.js';
 import { showAppToast } from './toast.js';
 import { RemoteModule } from './remoteModule.js';
@@ -374,6 +376,41 @@ export const Appearance = {
                 showAppToast('Appearance reset to defaults');
             });
         }
+
+        const refreshWatchStatsBtn = el('refresh-watch-stats-btn');
+        if (refreshWatchStatsBtn && refreshWatchStatsBtn.dataset.bound !== '1') {
+            refreshWatchStatsBtn.dataset.bound = '1';
+            refreshWatchStatsBtn.innerHTML = ACTION_ICONS.refresh;
+            refreshWatchStatsBtn.addEventListener('click', () => {
+                refreshWatchStatsBtn.classList.add('is-loading');
+                try {
+                    this.refreshWatchStats();
+                    showAppToast('Watch stats updated');
+                } finally {
+                    refreshWatchStatsBtn.classList.remove('is-loading');
+                }
+            });
+        }
+
+        const clearWatchStatsBtn = el('clear-watch-stats-btn');
+        if (clearWatchStatsBtn && clearWatchStatsBtn.dataset.bound !== '1') {
+            clearWatchStatsBtn.dataset.bound = '1';
+            clearWatchStatsBtn.innerHTML = ACTION_ICONS.clearStats;
+            clearWatchStatsBtn.addEventListener('click', () => {
+                const ok = window.confirm(
+                    'Clear all watch time stats?\n\nThis removes every channel\'s accumulated watch time and cannot be undone.'
+                );
+                if (!ok) return;
+                clearWatchStats();
+                this.updateWatchStats();
+                showAppToast('Watch stats cleared');
+            });
+        }
+    },
+
+    refreshWatchStats() {
+        flushAllWatchAccruals();
+        this.updateWatchStats();
     },
 
     applyStyles() {
@@ -590,5 +627,27 @@ export const Appearance = {
         } else {
             spans[5].textContent = 'Cache: —';
         }
+    },
+
+    updateWatchStats() {
+        const list = el('watch-stats-list');
+        const empty = el('watch-stats-empty');
+        if (!list || !empty) return;
+
+        const top = getTopWatched(20);
+        if (!top.length) {
+            list.innerHTML = '';
+            list.classList.add('is-hidden');
+            empty.classList.remove('is-hidden');
+            return;
+        }
+
+        list.innerHTML = top.map((entry, i) => {
+            const name = escapeHtml(entry.name || entry.key || 'Unknown');
+            const time = formatWatchDuration(entry.seconds);
+            return `<div class="watch-stats-row"><span class="watch-stats-row__rank">${i + 1}.</span> <span class="watch-stats-row__name">${name}</span><span class="watch-stats-row__time">${time}</span></div>`;
+        }).join('');
+        list.classList.remove('is-hidden');
+        empty.classList.add('is-hidden');
     }
 };

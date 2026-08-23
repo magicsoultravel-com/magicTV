@@ -8,6 +8,7 @@ import { CARD_ICONS } from './icons.js';
 import { TileFrames } from '../tileFrames.js';
 import { Appearance } from './appearance.js';
 import { FavoritesReorder } from './favoritesReorder.js';
+import { FavoritesFolders } from './favoritesFolders.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
 
@@ -175,29 +176,144 @@ function wireTiles(container, channels) {
     });
 }
 
-function renderTabGrid(tab) {
-    const appState = deps.appState;
-    const isFav = tab === 'favorites';
-    const grid = el(isFav ? 'favorites-grid' : 'recents-grid');
-    const empty = el(isFav ? 'favorites-empty' : 'recents-empty');
+function matchesFolderFilter(folder, q) {
+    if (!q) return true;
+    return (folder?.name || '').toLowerCase().includes(q);
+}
+
+function channelByKey(list, key) {
+    return (list || []).find((ch) => channelKey(ch) === key) || null;
+}
+
+function sortRootChannelRefs(rootChannelKeys, channels, sortBy, sortDir) {
+    if (sortBy === 'custom') return rootChannelKeys;
+    const channelsByKey = new Map((channels || []).map((ch) => [channelKey(ch), ch]));
+    const sortable = rootChannelKeys
+        .map((ref) => channelsByKey.get(ref))
+        .filter(Boolean);
+    return sortChannelList(sortable, sortBy, sortDir).map((ch) => channelKey(ch));
+}
+
+function renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir, categoryId) {
+    const folders = TvPlayer.getFavoriteFolders().filter((folder) => matchesFolderFilter(folder, filter));
+    let rootChannelKeys = TvPlayer.getFavoritesRootOrder();
+    rootChannelKeys = sortRootChannelRefs(rootChannelKeys, appState.favoritesList, sortBy, sortDir);
+
+    const parts = folders.map((folder) => ({ type: 'folder', folder }));
+    for (const ref of rootChannelKeys) {
+        const ch = channelByKey(appState.favoritesList, ref);
+        if (ch && matchesFilter(ch, filter) && channelHasCategory(ch, categoryId)) {
+            const visible = filterVisibleChannels([ch]);
+            if (visible.length) parts.push({ type: 'channel', channel: visible[0] });
+        }
+    }
+
+    if (!parts.length) {
+        grid.innerHTML = '<div class="empty-state"><p class="empty-state__text">No channels match</p></div>';
+        syncFavoritesReorder(sortBy === 'custom');
+        return;
+    }
+
+    const html = parts.map((part) => (
+        part.type === 'folder'
+            ? FavoritesFolders.folderTileHtml(part.folder)
+            : tileHtml(part.channel)
+    )).join('');
+    grid.innerHTML = html;
+    const channels = parts.filter((p) => p.type === 'channel').map((p) => p.channel);
+    wireTiles(grid, channels);
+    FavoritesFolders.wireFolderTiles(grid);
+    TileFrames.observe(grid, { viewKey: deps.getRefreshKey?.() || null });
+    Appearance.applyToTiles(grid);
+    ChannelGrid.syncPlayingTiles();
+    ChannelGrid.syncVisitedTiles();
+    syncFavoritesReorder(sortBy === 'custom');
+}
+
+function renderFavoritesFolderGrid(appState, grid, empty, folderId, filter, sortBy, sortDir, categoryId) {
+    const folder = TvPlayer.getFavoriteFolder(folderId);
+    if (!folder) {
+        appState.favoritesFolderId = null;
+        FavoritesFolders.syncBackButton();
+        renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir, categoryId);
+        return;
+    }
+
+    let list = folder.items
+        .map((key) => channelByKey(appState.favoritesList, key))
+        .filter(Boolean)
+        .filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
+    list = filterVisibleChannels(list);
+    list = sortChannelList(list, sortBy, sortDir);
+
+    const parentHtml = FavoritesFolders.folderParentTileHtml();
+    if (!list.length) {
+        grid.innerHTML = `${parentHtml}<div class="empty-state"><p class="empty-state__text">Folder is empty</p></div>`;
+        FavoritesFolders.wireFolderViewTiles(grid);
+        syncFavoritesReorder(sortBy === 'custom');
+        return;
+    }
+
+    grid.innerHTML = parentHtml + list.map((ch) => tileHtml(ch)).join('');
+    wireTiles(grid, list);
+    FavoritesFolders.wireFolderViewTiles(grid);
+    TileFrames.observe(grid, { viewKey: deps.getRefreshKey?.() || null });
+    Appearance.applyToTiles(grid);
+    ChannelGrid.syncPlayingTiles();
+    ChannelGrid.syncVisitedTiles();
+    syncFavoritesReorder(sortBy === 'custom');
+}
+
+function renderFavoritesGrid(appState) {
+    const grid = el('favorites-grid');
+    const empty = el('favorites-empty');
     if (!grid || !empty) return;
-    const source = isFav ? appState.favoritesList : appState.recentsList;
-    if (!source || source.length === 0) {
+
+    const favorites = TvPlayer.getFavorites();
+    const folders = TvPlayer.getFavoriteFolders();
+    if ((!favorites || favorites.length === 0) && folders.length === 0) {
         grid.innerHTML = '';
         empty.classList.remove('is-hidden');
         syncFavoritesReorder(false);
         return;
     }
     empty.classList.add('is-hidden');
-    const filter = isFav ? appState.favFilter : appState.recentsFilter;
+
+    const filter = appState.favFilter;
     const { sortBy, sortDir } = getSortPrefs(appState);
-    const categoryId = isFav
-        ? (appState.categoryFilter?.favorites || '')
-        : (appState.categoryFilter?.recents || '');
-    let list = source.filter(ch => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
+    const categoryId = appState.categoryFilter?.favorites || '';
+
+    if (appState.favoritesFolderId) {
+        renderFavoritesFolderGrid(
+            appState, grid, empty, appState.favoritesFolderId, filter, sortBy, sortDir, categoryId
+        );
+        return;
+    }
+    renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir, categoryId);
+}
+
+function renderTabGrid(tab) {
+    const appState = deps.appState;
+    if (tab === 'favorites') {
+        renderFavoritesGrid(appState);
+        return;
+    }
+    const grid = el('recents-grid');
+    const empty = el('recents-empty');
+    if (!grid || !empty) return;
+    const source = appState.recentsList;
+    if (!source || source.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    const filter = appState.recentsFilter;
+    const { sortBy, sortDir } = getSortPrefs(appState);
+    const categoryId = appState.categoryFilter?.recents || '';
+    let list = source.filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
     list = filterVisibleChannels(list);
     list = sortChannelList(list, sortBy, sortDir);
-    if (isFav) syncFavoritesReorder(sortBy === 'custom');
     if (!list.length) {
         grid.innerHTML = '<div class="empty-state"><p class="empty-state__text">No channels match</p></div>';
         return;
@@ -212,6 +328,10 @@ export const ChannelGrid = {
             getAppState: () => deps.appState,
             isReorderEnabled: () => getSortPrefs(deps.appState).sortBy === 'custom',
             onReordered: () => ChannelGrid.renderFavorites()
+        });
+        FavoritesFolders.init({
+            getAppState: () => deps.appState,
+            onChanged: () => ChannelGrid.renderFavorites()
         });
     },
 
@@ -322,7 +442,8 @@ export const ChannelGrid = {
         const empty = el('favorites-empty');
         if (!grid || !empty) return;
         const favorites = TvPlayer.getFavorites();
-        if (!favorites || favorites.length === 0) {
+        const folders = TvPlayer.getFavoriteFolders();
+        if ((!favorites || favorites.length === 0) && folders.length === 0) {
             appState.favoritesList = [];
             grid.innerHTML = '';
             empty.classList.remove('is-hidden');

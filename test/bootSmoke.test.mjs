@@ -36,7 +36,7 @@ const KNOWN_IDS = [
     'reset-appearance-btn', 'appearance-preview-tile',
     'mosaic-reset-btn', 'mosaic-mute-all-btn',
     'remote-reset-btn', 'remote-mute-all-btn', 'remote-play-btn', 'remote-mute-btn',
-    'add-screen-btn', 'play-favorites-mosaic-btn',
+    'add-screen-btn', 'play-favorites-mosaic-btn', 'create-favorite-folder-btn',
     'preview-avatar', 'preview-name', 'preview-flag',
     'volume-pct',
     'active-tile-select',

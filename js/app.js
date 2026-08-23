@@ -8,6 +8,7 @@ import { TvPip } from './tvPip.js';
 import { TileFrames } from './tileFrames.js';
 import { SettingsStore } from './storage/settingsStore.js';
 import { ChannelGrid } from './ui/channelGrid.js';
+import { FavoritesFolders } from './ui/favoritesFolders.js';
 import { BrowseView } from './browse/browseView.js';
 import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
@@ -21,7 +22,7 @@ import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
 import { GuidePanel } from './ui/guidePanel.js';
 import { warmGuideIndex } from './epg/epgService.js';
 
-import { ACTION_ICONS } from './ui/icons.js';
+import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
 import { loadPlayerState, DEFAULT_SORT_BY, DEFAULT_SORT_DIR, DEFAULT_CATEGORY_FILTER } from './storage/playerState.js';
 import {
@@ -51,6 +52,7 @@ let appState = {
     recentsFilter: '',
     favoritesList: [],
     recentsList: [],
+    favoritesFolderId: null,
     lastKey: null,
     lastName: '',
     lastCountry: '',
@@ -174,7 +176,15 @@ async function restoreLastChannelMeta() {
 function bindBackButton() {
     const back = el('back-btn');
     if (back) {
-        back.addEventListener('click', () => BrowseView.showCountriesView());
+        back.addEventListener('click', () => {
+            if (back.dataset.tab === 'back-to-favorites-root') {
+                FavoritesFolders.closeFavoriteFolder();
+                ChannelGrid.renderFavorites();
+                syncCreateFavoriteFolderBtn();
+                return;
+            }
+            BrowseView.showCountriesView();
+        });
     }
 }
 
@@ -239,6 +249,12 @@ function bindTabs() {
             if (!tabName) return;
             if (tabName === 'back-to-countries') {
                 BrowseView.showCountriesView();
+                return;
+            }
+            if (tabName === 'back-to-favorites-root') {
+                FavoritesFolders.closeFavoriteFolder();
+                ChannelGrid.renderFavorites();
+                syncCreateFavoriteFolderBtn();
                 return;
             }
             if (tabName === appState.activeTab) return;
@@ -358,6 +374,26 @@ function syncPlayFavoritesMosaicBtn() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn) return;
     btn.classList.toggle('is-hidden', appState.activeTab !== 'favorites');
+}
+
+function syncCreateFavoriteFolderBtn() {
+    const btn = el('create-favorite-folder-btn');
+    if (!btn) return;
+    const visible = appState.activeTab === 'favorites' && !appState.favoritesFolderId;
+    btn.classList.toggle('is-hidden', !visible);
+}
+
+function bindCreateFavoriteFolderBtn() {
+    const btn = el('create-favorite-folder-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.innerHTML = CARD_ICONS.folderPlus;
+    btn.title = 'New folder';
+    btn.setAttribute('aria-label', btn.title);
+    btn.addEventListener('click', () => {
+        FavoritesFolders.createFavoriteFolder();
+        syncCreateFavoriteFolderBtn();
+    });
 }
 
 const CHANNEL_TABS = ['browse', 'favorites', 'recents'];
@@ -485,7 +521,10 @@ async function handleManualRefresh() {
             if (grid) await TileFrames.refresh(grid, { viewKey: 'recents' });
         } else {
             TileFrames.clearLiveRefresh();
+            Appearance.refreshWatchStats();
             Appearance.updateStorageStats();
+            HiddenChannelsSettings.refresh();
+            VisitedChannelsSettings.refresh();
             stampRefreshView('settings');
         }
         showAppToast('✅ Refreshed');
@@ -534,10 +573,18 @@ function switchTab(tabName) {
         if (appState.browseCountry !== null && tabName === 'browse') {
             backBtn.classList.remove('is-hidden');
             backBtn.classList.add('is-active', 'is-pink-active');
+            backBtn.dataset.tab = 'back-to-countries';
+        } else if (tabName === 'favorites') {
+            FavoritesFolders.syncBackButton();
         } else {
             backBtn.classList.add('is-hidden');
             backBtn.classList.remove('is-active', 'is-pink-active');
+            backBtn.dataset.tab = 'back-to-countries';
         }
+    }
+
+    if (tabName !== 'favorites' && appState.favoritesFolderId) {
+        appState.favoritesFolderId = null;
     }
 
     syncRemoteTabChrome();
@@ -553,11 +600,13 @@ function switchTab(tabName) {
         const q = currentFilter();
         if (q !== appState.browseQuery) BrowseView.startChannelSearch(q);
     } else if (tabName === 'settings') {
+        Appearance.refreshWatchStats();
         Appearance.updateStorageStats();
         HiddenChannelsSettings.refresh();
         VisitedChannelsSettings.refresh();
     }
     syncPlayFavoritesMosaicBtn();
+    syncCreateFavoriteFolderBtn();
     syncCatalogLayoutBtn();
     RemoteExternalPopout.syncBtn();
     updateRefreshAge();
@@ -633,9 +682,11 @@ async function init() {
         bindViewTransitionSelect();
         bindTabs();
         bindPlayFavoritesMosaic();
+        bindCreateFavoriteFolderBtn();
         bindCatalogLayout();
         bindRefreshBtn();
         syncPlayFavoritesMosaicBtn();
+        syncCreateFavoriteFolderBtn();
         syncCatalogLayoutBtn();
         syncRemoteTabChrome();
         switchTab('remote');

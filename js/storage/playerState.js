@@ -116,6 +116,56 @@ function normalizeFavoritesMeta(favorites, favoritesMeta) {
         .filter((e) => e.key && favKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
+function normalizeFavoriteFolderEntry(entry, favKeys) {
+    if (!entry || typeof entry !== 'object') return null;
+    const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+    if (!id) return null;
+    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+    const seen = new Set();
+    const items = (Array.isArray(entry.items) ? entry.items : [])
+        .map(migrateFavoriteRef)
+        .filter((k) => k && favKeys.has(k) && !seen.has(k) && (seen.add(k), true));
+    return { id, name: name || 'Folder', items };
+}
+
+function normalizeFavoriteFolders(favorites, rawFolders) {
+    const favKeys = new Set(favorites);
+    const seen = new Set();
+    return (Array.isArray(rawFolders) ? rawFolders : [])
+        .map((e) => normalizeFavoriteFolderEntry(e, favKeys))
+        .filter((e) => e && !seen.has(e.id) && (seen.add(e.id), true));
+}
+
+/** Root-level channel key order only; folders live in favoriteFolders (always shown first). */
+function normalizeFavoritesRootOrder(favorites, favoriteFolders, rawRootOrder) {
+    const favKeys = new Set(favorites);
+    const folderIds = new Set(favoriteFolders.map((f) => f.id));
+    const keysInFolders = new Set(favoriteFolders.flatMap((f) => f.items));
+    const seen = new Set();
+    const out = [];
+
+    const pushChannel = (ref) => {
+        const key = migrateFavoriteRef(ref);
+        if (!key || seen.has(key) || folderIds.has(key)) return;
+        if (favKeys.has(key) && !keysInFolders.has(key)) {
+            seen.add(key);
+            out.push(key);
+        }
+    };
+
+    if (Array.isArray(rawRootOrder) && rawRootOrder.length) {
+        rawRootOrder.forEach(pushChannel);
+    } else {
+        favorites.forEach((k) => {
+            if (!keysInFolders.has(k)) pushChannel(k);
+        });
+    }
+    favorites.forEach((k) => {
+        if (!keysInFolders.has(k)) pushChannel(k);
+    });
+    return out;
+}
+
 function normalizeHiddenMeta(hiddenChannels, hiddenChannelsMeta) {
     const hiddenKeys = new Set(hiddenChannels);
     const seen = new Set();
@@ -140,6 +190,26 @@ function normalizeVisitedMeta(visitedChannels, visitedChannelsMeta) {
             countrycode: (e && e.countrycode) || ''
         }))
         .filter((e) => e.key && visitedKeys.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
+}
+
+export function normalizeWatchStatsMeta(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    return raw
+        .map((entry) => {
+            if (!entry || typeof entry !== 'object') return null;
+            const key = migrateFavoriteRef(entry.key);
+            if (!key || key.endsWith(':')) return null;
+            const seconds = Number(entry.seconds);
+            return {
+                key,
+                name: entry.name || '',
+                logo: entry.logo || '',
+                countrycode: entry.countrycode || '',
+                seconds: Number.isFinite(seconds) && seconds > 0 ? seconds : 0
+            };
+        })
+        .filter((e) => e && e.seconds > 0 && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
 const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
@@ -268,16 +338,26 @@ export function loadPlayerState() {
             ? raw.hiddenChannels.map(migrateFavoriteRef)
             : [];
         const hiddenChannelsMeta = normalizeHiddenMeta(hiddenChannels, raw.hiddenChannelsMeta);
+        const favoriteFolders = normalizeFavoriteFolders(favorites, raw.favoriteFolders);
+        const favoritesRootOrder = normalizeFavoritesRootOrder(
+            favorites,
+            favoriteFolders,
+            raw.favoritesRootOrder
+        );
+        const watchStatsMeta = normalizeWatchStatsMeta(raw.watchStatsMeta);
 
         return {
             favorites,
             favoritesMeta,
+            favoriteFolders,
+            favoritesRootOrder,
             recents,
             recentsMeta,
             visitedChannels,
             visitedChannelsMeta,
             hiddenChannels,
             hiddenChannelsMeta,
+            watchStatsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
             lastChannelKey: raw.lastChannelKey || null,
             lastChannelName: raw.lastChannelName || '',
@@ -297,12 +377,15 @@ export function loadPlayerState() {
         return {
             favorites: [],
             favoritesMeta: [],
+            favoriteFolders: [],
+            favoritesRootOrder: [],
             recents: [],
             recentsMeta: [],
             visitedChannels: [],
             visitedChannelsMeta: [],
             hiddenChannels: [],
             hiddenChannelsMeta: [],
+            watchStatsMeta: [],
             volume: 0.85,
             lastChannelKey: null,
             lastChannelName: '',
@@ -332,6 +415,14 @@ export function savePlayerState(patch) {
     if (merged.favorites) {
         merged.favoritesMeta = normalizeFavoritesMeta(merged.favorites, merged.favoritesMeta);
     }
+    if (merged.favorites || merged.favoriteFolders || merged.favoritesRootOrder) {
+        merged.favoriteFolders = normalizeFavoriteFolders(merged.favorites, merged.favoriteFolders);
+        merged.favoritesRootOrder = normalizeFavoritesRootOrder(
+            merged.favorites,
+            merged.favoriteFolders,
+            merged.favoritesRootOrder
+        );
+    }
     if (merged.hiddenChannels) {
         merged.hiddenChannelsMeta = normalizeHiddenMeta(merged.hiddenChannels, merged.hiddenChannelsMeta);
     }
@@ -342,9 +433,11 @@ export function savePlayerState(patch) {
     const sortBy = normalizeSortBy(merged.sortBy);
     const sortDir = normalizeSortDir(merged.sortDir);
     const categoryFilter = normalizeCategoryFilter(merged.categoryFilter);
-    return patchPersistedState({
+    const payload = {
         favorites: merged.favorites,
         favoritesMeta: merged.favoritesMeta,
+        favoriteFolders: merged.favoriteFolders,
+        favoritesRootOrder: merged.favoritesRootOrder,
         recents: merged.recents,
         recentsMeta: merged.recentsMeta,
         visitedChannels: merged.visitedChannels,
@@ -362,12 +455,19 @@ export function savePlayerState(patch) {
         channelPicker: normalizeChannelPicker(merged.channelPicker),
         sortBy,
         sortDir,
-        categoryFilter,
+        categoryFilter
+    };
+    if ('watchStatsMeta' in patch) {
+        payload.watchStatsMeta = normalizeWatchStatsMeta(merged.watchStatsMeta);
+    }
+    return patchPersistedState({
+        ...payload,
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
-                k === 'favorites' || k === 'favoritesMeta' || k === 'recents'
+                k === 'favorites' || k === 'favoritesMeta' || k === 'favoriteFolders'
+                || k === 'favoritesRootOrder' || k === 'recents'
                 || k === 'recentsMeta' || k === 'visitedChannels' || k === 'visitedChannelsMeta'
-                || k === 'hiddenChannels' || k === 'hiddenChannelsMeta'
+                || k === 'hiddenChannels' || k === 'hiddenChannelsMeta' || k === 'watchStatsMeta'
                 || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
                 || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'remoteModule' || k === 'channelPicker'

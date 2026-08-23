@@ -1,10 +1,14 @@
 import { TvPlayer } from '../tvPlayer.js';
-import { channelKey } from '../tvProviders/channelShape.js';
-import { mergeVisibleFavoriteOrder } from '../storage/favoritesRecents.js';
+import {
+    mergeVisibleFavoriteOrder,
+    mergeVisibleFolderItems
+} from '../storage/favoritesRecents.js';
 import { el } from '../tvUtils.js';
 
 const DRAG_THRESHOLD_PX = 6;
 const INSERT_HYSTERESIS_PX = 10;
+
+const GRID_ITEM_SELECTOR = '.channel-tile, .favorite-folder-tile, .favorite-folder-parent-tile';
 
 let deps = {
     getAppState: () => null,
@@ -18,18 +22,33 @@ let wired = false;
 let rafId = 0;
 let pendingPointer = null;
 
-function tilesOf(grid, exclude = null) {
-    return [...grid.querySelectorAll('.channel-tile')].filter((t) => t !== exclude);
+function isDraggableTile(tile) {
+    if (!tile) return false;
+    if (tile.classList.contains('favorite-folder-tile')) return false;
+    if (tile.classList.contains('favorite-folder-parent-tile')) return false;
+    if (tile.classList.contains('channel-tile--placeholder')) return false;
+    return tile.classList.contains('channel-tile');
 }
 
-function slotElements(grid, tile, placeholder) {
-    return [...grid.children].filter(
-        (node) => node === placeholder || (node.classList.contains('channel-tile') && node !== tile)
-    );
+function tilesOf(grid, exclude = null) {
+    return [...grid.querySelectorAll('.channel-tile')].filter((t) => t !== exclude && isDraggableTile(t));
+}
+
+function isInFolderView() {
+    return !!deps.getAppState()?.favoritesFolderId;
+}
+
+/** Reorder slots are channel tiles only — folders stay fixed above channels at root. */
+function channelSlotNodes(grid, draggedTile, placeholder) {
+    return [...grid.children].filter((node) => {
+        if (node === placeholder) return true;
+        if (node.classList.contains('favorite-folder-parent-tile')) return false;
+        return node.classList.contains('channel-tile') && node !== draggedTile;
+    });
 }
 
 function cacheSlotGeometry(s) {
-    const slots = slotElements(s.grid, s.tile, s.placeholder);
+    const slots = channelSlotNodes(s.grid, s.tile, s.placeholder);
     s.slotCache = slots.map((node) => {
         const r = node.getBoundingClientRect();
         return {
@@ -47,10 +66,6 @@ function cacheSlotGeometry(s) {
     if (s.insertIndex < 0) s.insertIndex = slots.length;
 }
 
-/**
- * Insert index from cached slot geometry (reading order), with hysteresis so
- * the placeholder does not flicker on mid-line boundaries.
- */
 function insertIndexFromCache(s, clientX, clientY) {
     const cache = s.slotCache || [];
     const h = INSERT_HYSTERESIS_PX;
@@ -66,7 +81,6 @@ function insertIndexFromCache(s, clientX, clientY) {
         }
     }
 
-    // Stay put unless the pointer clearly crossed into a new slot.
     if (s.insertIndex != null && next !== s.insertIndex) {
         const cur = cache[s.insertIndex];
         if (cur) {
@@ -81,11 +95,81 @@ function insertIndexFromCache(s, clientX, clientY) {
     return next;
 }
 
+function movePlaceholderToChannelIndex(s, index) {
+    const { grid, tile, placeholder } = s;
+    const slots = channelSlotNodes(grid, tile, placeholder).filter((node) => node !== placeholder);
+    const ref = slots[index] || null;
+    if (ref) {
+        grid.insertBefore(placeholder, ref);
+        return;
+    }
+    const lastChannel = slots[slots.length - 1];
+    if (lastChannel) {
+        lastChannel.after(placeholder);
+        return;
+    }
+    const lastFolder = grid.querySelector('.favorite-folder-tile:last-of-type');
+    if (lastFolder) {
+        lastFolder.after(placeholder);
+        return;
+    }
+    const parent = grid.querySelector('.favorite-folder-parent-tile');
+    if (parent) {
+        parent.after(placeholder);
+        return;
+    }
+    grid.appendChild(placeholder);
+}
+
+function clearDropTargets(grid) {
+    grid?.querySelectorAll?.('.is-drop-target').forEach((node) => {
+        node.classList.remove('is-drop-target');
+    });
+}
+
+function pointerOverFolderDropTarget(grid, clientX, clientY) {
+    if (isInFolderView()) return null;
+    const under = typeof document !== 'undefined'
+        ? document.elementFromPoint(clientX, clientY)
+        : null;
+    const folder = under?.closest?.('.favorite-folder-tile');
+    if (!folder || !grid.contains(folder)) return null;
+    return folder;
+}
+
+function pointerOverParentDropTarget(grid, clientX, clientY) {
+    if (!isInFolderView()) return null;
+    const under = typeof document !== 'undefined'
+        ? document.elementFromPoint(clientX, clientY)
+        : null;
+    const parent = under?.closest?.('.favorite-folder-parent-tile');
+    if (!parent || !grid.contains(parent)) return null;
+    return parent;
+}
+
+function updateDropTargetHighlight(s, clientX, clientY) {
+    const { grid, tile } = s;
+    if (!grid) return;
+    clearDropTargets(grid);
+
+    if (!tile?.dataset?.channel) return;
+
+    const folder = pointerOverFolderDropTarget(grid, clientX, clientY);
+    if (folder) {
+        folder.classList.add('is-drop-target');
+        return;
+    }
+
+    const parent = pointerOverParentDropTarget(grid, clientX, clientY);
+    if (parent) parent.classList.add('is-drop-target');
+}
+
 function beginDrag(s) {
     const { tile, grid } = s;
     s.dragged = true;
     grid.classList.add('is-reordering');
     tile.classList.add('is-dragging');
+    clearDropTargets(grid);
 
     const rect = tile.getBoundingClientRect();
     s.width = rect.width;
@@ -115,23 +199,24 @@ function beginDrag(s) {
 }
 
 function moveDrag(s, clientX, clientY) {
-    const { tile, grid, placeholder } = s;
+    const { tile, grid } = s;
     const dx = clientX - s.offsetX - s.originLeft;
     const dy = clientY - s.offsetY - s.originTop;
     tile.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    updateDropTargetHighlight(s, clientX, clientY);
+
+    // Over a folder/escape drop target: highlight only, never move placeholder into folder rows.
+    if (tile.dataset.channel && (
+        pointerOverFolderDropTarget(grid, clientX, clientY)
+        || pointerOverParentDropTarget(grid, clientX, clientY)
+    )) {
+        return;
+    }
 
     const index = insertIndexFromCache(s, clientX, clientY);
     if (index === s.insertIndex) return;
 
-    const slots = slotElements(grid, tile, placeholder);
-    const ref = slots[index] || null;
-    if (ref === placeholder) {
-        s.insertIndex = index;
-        return;
-    }
-    if (ref) grid.insertBefore(placeholder, ref);
-    else grid.appendChild(placeholder);
-
+    movePlaceholderToChannelIndex(s, index);
     cacheSlotGeometry(s);
 }
 
@@ -143,11 +228,58 @@ function cancelPendingFrame() {
     pendingPointer = null;
 }
 
-function endDrag(s) {
+function commitDrag(s, clientX, clientY) {
+    const { tile, grid, placeholder, dragged } = s;
+    if (!dragged || !placeholder?.parentNode) return false;
+
+    grid.insertBefore(tile, placeholder);
+    placeholder.remove();
+
+    const folderId = deps.getAppState()?.favoritesFolderId || null;
+    const folderTarget = pointerOverFolderDropTarget(grid, clientX, clientY);
+    const parentTarget = pointerOverParentDropTarget(grid, clientX, clientY);
+    const channelKeyRef = tile.dataset.channel;
+
+    if (channelKeyRef && folderTarget && !folderId) {
+        TvPlayer.moveFavoriteToFolder(channelKeyRef, folderTarget.dataset.folderId);
+        deps.onReordered();
+        return true;
+    }
+
+    if (channelKeyRef && parentTarget && folderId) {
+        TvPlayer.moveFavoriteToRoot(channelKeyRef);
+        deps.onReordered();
+        return true;
+    }
+
+    if (folderId) {
+        const visibleKeys = tilesOf(grid)
+            .map((t) => t.dataset.channel)
+            .filter(Boolean);
+        const folder = TvPlayer.getFavoriteFolder(folderId);
+        if (!folder) return false;
+        const merged = mergeVisibleFolderItems(folder.items, visibleKeys);
+        const changed = TvPlayer.reorderFavoriteFolderItems(folderId, merged);
+        if (changed) deps.onReordered();
+        return changed;
+    }
+
+    const visibleKeys = tilesOf(grid)
+        .map((t) => t.dataset.channel)
+        .filter(Boolean);
+    const fullKeys = TvPlayer.getFavoritesRootOrder();
+    const merged = mergeVisibleFavoriteOrder(fullKeys, visibleKeys);
+    const changed = TvPlayer.reorderFavoritesRoot(merged);
+    if (changed) deps.onReordered();
+    return changed;
+}
+
+function endDrag(s, clientX, clientY) {
     cancelPendingFrame();
-    const { tile, grid, placeholder, dragged, pointerId } = s;
+    const { tile, grid, pointerId, dragged } = s;
     try { tile.releasePointerCapture?.(pointerId); } catch { /* ignore */ }
 
+    clearDropTargets(grid);
     tile.classList.remove('is-dragging', 'is-drag-float');
     tile.style.left = '';
     tile.style.top = '';
@@ -156,26 +288,12 @@ function endDrag(s) {
     tile.style.transform = '';
     grid.classList.remove('is-reordering');
 
-    if (dragged && placeholder?.parentNode) {
-        grid.insertBefore(tile, placeholder);
-        placeholder.remove();
-
-        const visibleKeys = tilesOf(grid).map((t) => t.dataset.channel).filter(Boolean);
-        const fullKeys = TvPlayer.getFavorites();
-        const merged = mergeVisibleFavoriteOrder(fullKeys, visibleKeys);
-        const changed = TvPlayer.reorderFavorites(merged);
-        if (changed) {
-            const appState = deps.getAppState();
-            if (appState?.favoritesList) {
-                const byKey = new Map(appState.favoritesList.map((ch) => [channelKey(ch), ch]));
-                appState.favoritesList = merged.map((k) => byKey.get(k)).filter(Boolean);
-            }
-            deps.onReordered();
-        }
+    if (dragged) {
+        commitDrag(s, clientX, clientY);
         suppressClick = true;
         setTimeout(() => { suppressClick = false; }, 300);
-    } else if (placeholder) {
-        placeholder.remove();
+    } else if (s.placeholder) {
+        s.placeholder.remove();
     }
 }
 
@@ -184,13 +302,15 @@ function onPointerDown(e) {
     if (e.target.closest?.('.channel-tile__fav-btn')) return;
     if (e.target.closest?.('.channel-tile__hide-btn')) return;
     if (e.target.closest?.('.channel-tile__refresh-btn')) return;
+    if (e.target.closest?.('.favorite-folder-tile__delete-btn')) return;
+    if (e.target.closest?.('.favorite-folder-tile__edit-btn')) return;
     if (!deps.isReorderEnabled()) return;
 
     const grid = el('favorites-grid');
     if (!grid || e.currentTarget !== grid) return;
 
-    const tile = e.target.closest?.('.channel-tile');
-    if (!tile || !grid.contains(tile) || tile.classList.contains('channel-tile--placeholder')) return;
+    const tile = e.target.closest?.(GRID_ITEM_SELECTOR);
+    if (!tile || !grid.contains(tile) || !isDraggableTile(tile)) return;
 
     session = {
         grid,
@@ -198,6 +318,8 @@ function onPointerDown(e) {
         pointerId: e.pointerId,
         startX: e.clientX,
         startY: e.clientY,
+        lastX: e.clientX,
+        lastY: e.clientY,
         dragged: false,
         placeholder: null,
         width: 0,
@@ -212,6 +334,8 @@ function onPointerDown(e) {
 
     const onMove = (ev) => {
         if (!session || ev.pointerId !== session.pointerId) return;
+        session.lastX = ev.clientX;
+        session.lastY = ev.clientY;
         const dx = ev.clientX - session.startX;
         const dy = ev.clientY - session.startY;
         if (!session.dragged) {
@@ -237,12 +361,11 @@ function onPointerDown(e) {
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
-        // Apply last pending pointer before commit so drop index matches finger.
         if (session.dragged && pendingPointer) {
             moveDrag(session, pendingPointer.x, pendingPointer.y);
         }
         cancelPendingFrame();
-        endDrag(session);
+        endDrag(session, session.lastX, session.lastY);
         session = null;
     };
 
@@ -254,6 +377,7 @@ function onPointerDown(e) {
 function onClickCapture(e) {
     if (!suppressClick) return;
     if (!e.target.closest?.('.channel-tile')) return;
+    if (e.target.closest?.('.favorite-folder-tile, .favorite-folder-parent-tile')) return;
     e.preventDefault();
     e.stopPropagation();
     suppressClick = false;

@@ -18,6 +18,24 @@
     border-radius: var(--tv-radius-md);
 }
 
+/* Native <details> disclosure breaks when display:flex is applied to the element. */
+details.settings-section {
+    display: block;
+}
+
+details.settings-section > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--tv-spacing-sm);
+}
+
+details.settings-section > summary::-webkit-details-marker {
+    display: none;
+}
+
 .settings-section__title {
     display: flex;
     align-items: center;
@@ -74,6 +92,13 @@
 
 .settings-section--collapsible > summary::-webkit-details-marker {
     display: none;
+}
+
+.settings-section--collapsible[open] > :not(summary) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-spacing-sm);
+    padding-top: var(--tv-spacing-xs);
 }
 
 .settings-section--collapsible > summary .settings-section__title {
@@ -314,7 +339,9 @@
 }
 
 /* Channel tile width - controlled by appearance setting */
-.channel-tile {
+.channel-tile,
+.favorite-folder-tile,
+.favorite-folder-parent-tile {
     width: var(--tv-tile-width);
     min-width: var(--tv-tile-width);
     max-width: var(--tv-tile-width);
@@ -328,6 +355,8 @@ html[data-channel-layout="list"] .country-grid {
 }
 
 html[data-channel-layout="list"] .channel-grid .channel-tile,
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile,
+html[data-channel-layout="list"] .channel-grid .favorite-folder-parent-tile,
 html[data-channel-layout="list"] .country-grid .country-tile {
     width: var(--tv-list-width, 300px);
     min-width: var(--tv-list-width, 300px);
@@ -402,6 +431,48 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__refresh-btn svg {
     height: 14px;
 }
 
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__icon,
+html[data-channel-layout="list"] .channel-grid .favorite-folder-parent-tile__label {
+    width: 24px;
+    height: 24px;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__name {
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__body {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__count {
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__edit-btn,
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn {
+    width: 14px;
+    height: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn {
+    right: 0;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__edit-btn {
+    right: 14px;
+}
+
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__edit-btn svg,
+html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
 /* Channel tile body - with text clipping when narrow */
 .channel-tile__body {
     min-width: 0;
@@ -467,6 +538,26 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__refresh-btn svg {
     background: var(--tv-border-light);
     color: var(--tv-primary);
     border-color: var(--tv-border);
+}
+
+.settings-reset-btn.is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.settings-reset-btn.is-loading svg {
+    animation: settings-btn-spin 0.75s linear infinite;
+}
+
+@keyframes settings-btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+.watch-stats-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
 }
 
 /* Responsive adjustments */
@@ -677,5 +768,41 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__refresh-btn svg {
     .catalog-grain-overlay__canvas {
         opacity: 0.35;
     }
+}
+
+.watch-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--tv-text-secondary);
+}
+
+.watch-stats-list.is-hidden {
+    display: none;
+}
+
+.watch-stats-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.watch-stats-row__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--tv-text-primary);
+}
+
+.watch-stats-row__time {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.watch-stats-empty.is-hidden {
+    display: none;
 }
 
