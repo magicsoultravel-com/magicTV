@@ -965,7 +965,7 @@ export const MultiView = {
             const empty = tile.querySelector('.tv-player-tile__empty');
             const mediaPlaying = player?.playing === true;
             const intentPlaying = player?.wantPlaying === true || mediaPlaying;
-            const { uiPlaying, uiLoading, uiPaused, uiStopped } = classifyTilePlayback({
+            const { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback({
                 hasChannel,
                 playing: mediaPlaying,
                 posterDataUrl: player?.posterDataUrl,
@@ -973,7 +973,8 @@ export const MultiView = {
                 stopped: player?.stopped === true,
                 loading: player?.loading === true,
                 loadPhase: player?.loadPhase || 'idle',
-                wantPlaying: player?.wantPlaying === true
+                wantPlaying: player?.wantPlaying === true,
+                error: player?.error || null
             });
 
             tile.classList.toggle('is-empty', !hasChannel);
@@ -981,6 +982,19 @@ export const MultiView = {
             tile.classList.toggle('is-loading', uiLoading);
             tile.classList.toggle('is-paused', uiPaused);
             tile.classList.toggle('is-stopped', uiStopped);
+            tile.classList.toggle('is-disconnected', uiDisconnected);
+            const stateEl = tile.querySelector('.tv-player-tile__playback-state');
+            if (stateEl) {
+                if (uiDisconnected) {
+                    stateEl.setAttribute('aria-hidden', 'false');
+                    stateEl.setAttribute('role', 'img');
+                    stateEl.setAttribute('aria-label', 'Unable to connect');
+                } else {
+                    stateEl.setAttribute('aria-hidden', 'true');
+                    stateEl.removeAttribute('role');
+                    stateEl.removeAttribute('aria-label');
+                }
+            }
             // Never show “Pick a channel” for a remembered/saved assignment.
             if (empty) empty.classList.toggle('is-hidden', hasChannel);
 

@@ -176,6 +176,35 @@ test('playing suppresses loading overlay', () => {
     assert.equal(state.uiLoading, false);
 });
 
+test('stream error shows disconnected over loading/pause/stop', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        loading: true,
+        loadPhase: 'connecting',
+        wantPlaying: false,
+        stopped: true,
+        pausePhase: 'ready',
+        posterDataUrl: 'data:image/jpeg;base64,x',
+        error: 'Stream unavailable'
+    });
+    assert.equal(state.uiDisconnected, true);
+    assert.equal(state.uiLoading, false);
+    assert.equal(state.uiPaused, false);
+    assert.equal(state.uiStopped, false);
+    assert.equal(state.uiPlaying, false);
+});
+
+test('playing clears disconnected even if error string briefly present', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: true,
+        error: 'Stream unavailable'
+    });
+    assert.equal(state.uiPlaying, true);
+    assert.equal(state.uiDisconnected, false);
+});
+
 test('paused ready without loading shows pause, not loading', () => {
     const state = classifyTilePlayback({
         hasChannel: true,

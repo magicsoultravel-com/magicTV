@@ -55,6 +55,7 @@ export function shouldAcceptPauseEvent(wantPlaying) {
 
 /**
  * Tile overlay classes from player intent (not residual idle).
+ * Disconnected (stream unavailable) wins over loading/pause/stop.
  * Loading wins over pause/stop so only one status icon shows.
  * Between play click and first paint: wantPlaying without playing → loading.
  */
@@ -66,13 +67,20 @@ export function classifyTilePlayback({
     stopped = false,
     loading = false,
     loadPhase = 'idle',
-    wantPlaying = false
+    wantPlaying = false,
+    error = null
 } = {}) {
     const uiPlaying = playing === true;
+    const uiDisconnected = Boolean(
+        hasChannel
+        && !uiPlaying
+        && !!error
+    );
     const awaitingFirstPaint = wantPlaying === true && !uiPlaying;
     const uiLoading = Boolean(
         hasChannel
         && !uiPlaying
+        && !uiDisconnected
         && (
             loading === true
             || loadPhase === 'connecting'
@@ -83,17 +91,19 @@ export function classifyTilePlayback({
     const uiPaused = Boolean(
         hasChannel
         && !uiPlaying
+        && !uiDisconnected
         && !uiLoading
         && (posterDataUrl || (pausePhase && pausePhase !== 'idle'))
     );
     const uiStopped = Boolean(
         hasChannel
         && !uiPlaying
+        && !uiDisconnected
         && !uiLoading
         && !uiPaused
         && stopped === true
     );
-    return { uiPlaying, uiLoading, uiPaused, uiStopped };
+    return { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected };
 }
 
 /**

@@ -539,7 +539,7 @@
     z-index: 2;
 }
 
-/* Large outline pause / stop — visible only via is-paused / is-stopped. */
+/* Large outline pause / stop / loading / disconnect — one icon via tile class. */
 .tv-player-tile__playback-state {
     position: absolute;
     inset: 0;
@@ -562,12 +562,18 @@
 
 .tv-player-tile.is-paused .tv-player-tile__state-icon--pause,
 .tv-player-tile.is-stopped .tv-player-tile__state-icon--stop,
-.tv-player-tile.is-loading .tv-player-tile__state-icon--loading {
+.tv-player-tile.is-loading .tv-player-tile__state-icon--loading,
+.tv-player-tile.is-disconnected .tv-player-tile__state-icon--disconnect {
     display: block;
 }
 
 .tv-player-tile.is-loading .tv-player-tile__state-icon--loading {
     animation: spin 0.8s linear infinite;
+}
+
+/* Soft dark wash behind the same-weight outline glyph as pause/stop. */
+.tv-player-tile.is-disconnected .tv-player-tile__playback-state {
+    background: rgba(40, 40, 40, 0.5);
 }
 
 .tv-player-tile.is-playing .tv-player-tile__playback-state,
