@@ -6,6 +6,9 @@
     margin-left: auto;
     display: flex;
     align-items: center;
+    align-self: center;
+    min-height: 32px; /* match the 32px brand icon band so the clock text's
+                         vertical middle aligns with the logo/hero's middle */
     flex-shrink: 0;
 }
 

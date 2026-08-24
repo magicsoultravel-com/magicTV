@@ -242,10 +242,10 @@ export async function updateProgrammeHeader() {
     if (channelCacheKey(activeChannel()) !== channelCacheKey(channel)) return;
 
     if (result.status !== 'ok') {
-        const msg = statusMessage(result);
-        if (titleEl) titleEl.textContent = msg;
+        const fallback = 'guide not available';
+        if (titleEl) titleEl.textContent = fallback;
         if (nextEl) nextEl.textContent = '';
-        if (remoteTitle) remoteTitle.textContent = msg;
+        if (remoteTitle) remoteTitle.textContent = fallback;
         return;
     }
 
@@ -254,9 +254,9 @@ export async function updateProgrammeHeader() {
         ? `Next: ${result.next.title} at ${formatProgrammeTime(result.next.start)}`
         : '';
 
-    if (titleEl) titleEl.textContent = currentTitle;
+    if (titleEl) titleEl.textContent = currentTitle || 'guide not available';
     if (nextEl) nextEl.textContent = nextLine;
-    if (remoteTitle) remoteTitle.textContent = currentTitle;
+    if (remoteTitle) remoteTitle.textContent = currentTitle || 'guide not available';
 
     window.dispatchEvent(new CustomEvent('tv:epg_updated', { detail: result }));
 }
