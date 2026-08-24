@@ -870,16 +870,6 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     right: auto;
 }
 
-#remote-layout-toggle-cell,
-#browser-layout-toggle-cell {
-    grid-column: -1;
-}
-
-#remote-layout-toggle-cell.is-hidden,
-#browser-layout-toggle-cell.is-hidden {
-    display: none;
-}
-
 /* Remote control panel */
 .remote-panel {
     display: flex;

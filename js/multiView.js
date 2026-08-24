@@ -678,7 +678,8 @@ export const MultiView = {
         }
 
         if (action === 'stop-all') {
-            await this.stopAll();
+            if (this.isAnyPlaying()) await this.stopAll();
+            else await this.playAll();
             return;
         }
 

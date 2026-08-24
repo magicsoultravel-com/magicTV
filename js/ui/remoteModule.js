@@ -453,7 +453,8 @@ function syncLayoutToggleBtn(btn, { visible, split }) {
 function syncSplitChromeButtons() {
     const remoteOpen = mode !== 'hidden';
     const split = isSplit();
-    syncLayoutToggleBtn(el('remote-split-browser-btn'), { visible: remoteOpen && !split, split });
+    // Always show on remote when open, and on browser whenever split — both sides, both states.
+    syncLayoutToggleBtn(el('remote-split-browser-btn'), { visible: remoteOpen, split });
     syncLayoutToggleBtn(el('browser-split-browser-btn'), { visible: split, split });
     const remoteScreenFooter = el('remote-shell-screens-footer');
     if (remoteScreenFooter) {

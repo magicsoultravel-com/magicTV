@@ -7,13 +7,14 @@ import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
+import { STOP_ALL_SVG, PLAY_ALL_SVG } from './tileHoverControls.js';
 
 let deps = {
     switchTab: () => {},
     getRemoteModule: () => null
 };
 
-const BROWSER_NAV_TABS = new Set(['browse', 'favorites', 'recents', 'settings']);
+const REMOTE_KEYPAD_NAV_TABS = new Set(['remote', 'browse', 'favorites', 'recents', 'settings']);
 
 export function syncRemoteNav(tabName) {
     const split = isSplit();
@@ -22,13 +23,11 @@ export function syncRemoteNav(tabName) {
         const cell = btn.closest('.remote-panel__cell');
         const inRemoteNav = Boolean(btn.closest('#remote-panel-nav-group'));
 
-        if (inRemoteNav && split) {
-            const hide = nav === 'remote' || BROWSER_NAV_TABS.has(nav);
+        if (inRemoteNav) {
+            // Split: hide catalog tabs on the remote keypad; leave Split/Join in place.
+            const hide = split && REMOTE_KEYPAD_NAV_TABS.has(nav);
             btn.classList.toggle('is-hidden', hide);
             cell?.classList.toggle('is-hidden', hide);
-        } else if (inRemoteNav) {
-            btn.classList.remove('is-hidden');
-            cell?.classList.remove('is-hidden');
         } else if (nav === 'remote') {
             btn.classList.toggle('is-hidden', split);
             cell?.classList.toggle('is-hidden', split);
@@ -47,10 +46,10 @@ function syncNavPlacement(tabName) {
 
     const footerNavRow = el('remote-panel-footer-nav-row');
     const browserNav = el('browser-panel-nav-group');
-    const layoutToggleCell = el('remote-layout-toggle-cell');
-    const joined = !isSplit();
-    const remoteTab = tabName === 'remote';
-    const browserTab = !remoteTab;
+    const volumeCell = grid.querySelector('.remote-panel__cell--volume');
+    const split = isSplit();
+    const joined = !split;
+    const browserTab = tabName !== 'remote';
     const placeInFooter = joined && browserTab && footerNavRow;
 
     navGroup.classList.toggle('remote-panel__nav-group--footer', placeInFooter);
@@ -59,9 +58,6 @@ function syncNavPlacement(tabName) {
         if (navGroup.parentElement !== footerNavRow) {
             footerNavRow.insertBefore(navGroup, footerNavRow.firstChild);
         }
-        if (layoutToggleCell && layoutToggleCell.parentElement !== footerNavRow) {
-            footerNavRow.appendChild(layoutToggleCell);
-        }
         if (browserNav) {
             browserNav.classList.add('is-hidden');
             browserNav.setAttribute('aria-hidden', 'true');
@@ -69,25 +65,18 @@ function syncNavPlacement(tabName) {
         return;
     }
 
-    if (navGroup.parentElement !== grid) {
-        grid.insertBefore(navGroup, grid.firstChild);
-    } else if (grid.firstElementChild !== navGroup) {
-        grid.insertBefore(navGroup, grid.firstChild);
-    }
-
-    if (layoutToggleCell) {
-        const volumeCell = grid.querySelector('.remote-panel__cell--volume');
-        if (volumeCell && layoutToggleCell.nextElementSibling !== volumeCell) {
-            grid.insertBefore(layoutToggleCell, volumeCell);
-        } else if (!volumeCell && layoutToggleCell.parentElement !== grid) {
-            grid.appendChild(layoutToggleCell);
+    // Keep browser-related icons at end of remote keypad (before volume), never at start.
+    if (volumeCell) {
+        if (navGroup.parentElement !== grid || navGroup.nextElementSibling !== volumeCell) {
+            grid.insertBefore(navGroup, volumeCell);
         }
+    } else if (navGroup.parentElement !== grid) {
+        grid.appendChild(navGroup);
     }
 
     if (browserNav) {
-        const showBrowserNav = isSplit();
-        browserNav.classList.toggle('is-hidden', !showBrowserNav);
-        browserNav.setAttribute('aria-hidden', String(!showBrowserNav));
+        browserNav.classList.toggle('is-hidden', !split);
+        browserNav.setAttribute('aria-hidden', String(!split));
     }
 }
 
@@ -190,6 +179,16 @@ export function syncRemotePanel() {
         const slash = muteAllBtn.querySelector('.mosaic-mute-all-slash, .remote-mute-all-slash');
         if (wave) wave.style.opacity = muteAllActive ? '0' : '1';
         if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
+    }
+
+    const anyPlaying = MultiView.isAnyPlaying?.() ?? false;
+    const stopAllBtn = el('remote-stop-all-btn');
+    if (stopAllBtn) {
+        const label = anyPlaying ? 'Stop all' : 'Play all';
+        stopAllBtn.title = label;
+        stopAllBtn.setAttribute('aria-label', label);
+        stopAllBtn.setAttribute('aria-pressed', String(anyPlaying));
+        stopAllBtn.innerHTML = anyPlaying ? STOP_ALL_SVG : PLAY_ALL_SVG;
     }
 
     const mod = deps.getRemoteModule?.();
