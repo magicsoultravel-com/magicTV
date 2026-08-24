@@ -13,13 +13,27 @@ let deps = {
     getRemoteModule: () => null
 };
 
+const BROWSER_NAV_TABS = new Set(['browse', 'favorites', 'recents', 'settings']);
+
 export function syncRemoteNav(tabName) {
     const split = isSplit();
     queryAllInApp('[data-remote-nav]').forEach((btn) => {
         const nav = btn.getAttribute('data-remote-nav');
-        if (nav === 'remote') {
+        const cell = btn.closest('.remote-panel__cell');
+        const inRemoteNav = Boolean(btn.closest('#remote-panel-nav-group'));
+
+        if (inRemoteNav && split) {
+            const hide = nav === 'remote' || BROWSER_NAV_TABS.has(nav);
+            btn.classList.toggle('is-hidden', hide);
+            cell?.classList.toggle('is-hidden', hide);
+        } else if (inRemoteNav) {
+            btn.classList.remove('is-hidden');
+            cell?.classList.remove('is-hidden');
+        } else if (nav === 'remote') {
             btn.classList.toggle('is-hidden', split);
+            cell?.classList.toggle('is-hidden', split);
         }
+
         btn.classList.toggle('is-active', nav === tabName);
     });
     syncNavPlacement(tabName);
@@ -31,15 +45,27 @@ function syncNavPlacement(tabName) {
     if (!navGroup || !grid) return;
     if (typeof document?.querySelector !== 'function') return;
 
-    const footerChrome = document.querySelector('#remote-panel-footer .remote-panel__footer-chrome');
+    const footerNavRow = el('remote-panel-footer-nav-row');
+    const browserNav = el('browser-panel-nav-group');
+    const layoutToggleCell = el('remote-layout-toggle-cell');
     const joined = !isSplit();
     const remoteTab = tabName === 'remote';
-    const placeInFooter = joined && !remoteTab && footerChrome;
+    const browserTab = !remoteTab;
+    const placeInFooter = joined && browserTab && footerNavRow;
 
     navGroup.classList.toggle('remote-panel__nav-group--footer', placeInFooter);
 
     if (placeInFooter) {
-        if (navGroup.parentElement !== footerChrome) footerChrome.appendChild(navGroup);
+        if (navGroup.parentElement !== footerNavRow) {
+            footerNavRow.insertBefore(navGroup, footerNavRow.firstChild);
+        }
+        if (layoutToggleCell && layoutToggleCell.parentElement !== footerNavRow) {
+            footerNavRow.appendChild(layoutToggleCell);
+        }
+        if (browserNav) {
+            browserNav.classList.add('is-hidden');
+            browserNav.setAttribute('aria-hidden', 'true');
+        }
         return;
     }
 
@@ -48,25 +74,33 @@ function syncNavPlacement(tabName) {
     } else if (grid.firstElementChild !== navGroup) {
         grid.insertBefore(navGroup, grid.firstChild);
     }
+
+    if (layoutToggleCell) {
+        const volumeCell = grid.querySelector('.remote-panel__cell--volume');
+        if (volumeCell && layoutToggleCell.nextElementSibling !== volumeCell) {
+            grid.insertBefore(layoutToggleCell, volumeCell);
+        } else if (!volumeCell && layoutToggleCell.parentElement !== grid) {
+            grid.appendChild(layoutToggleCell);
+        }
+    }
+
+    if (browserNav) {
+        const showBrowserNav = isSplit();
+        browserNav.classList.toggle('is-hidden', !showBrowserNav);
+        browserNav.setAttribute('aria-hidden', String(!showBrowserNav));
+    }
 }
 
-export function syncRemoteChannelBar(tabName) {
+export function syncRemoteChannelBar(_tabName) {
     const bar = el('remote-channel-bar');
     const nameEl = el('remote-channel-name');
-    const show = tabName === 'browse' || tabName === 'favorites' || tabName === 'recents';
-    if (bar) bar.classList.toggle('is-hidden', !show);
-
     const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
     const channel = player?.channel;
     const name = channel?.name || TvPlayer.channel?.name || '';
+    const show = Boolean(name);
 
-    if (!show || !name) {
-        if (nameEl) nameEl.textContent = '';
-        if (bar && !show) bar.classList.add('is-hidden');
-        return;
-    }
-
-    if (nameEl) nameEl.textContent = name;
+    if (bar) bar.classList.toggle('is-hidden', !show);
+    if (nameEl) nameEl.textContent = show ? name : '';
 }
 
 async function handleRemoteAction(action) {

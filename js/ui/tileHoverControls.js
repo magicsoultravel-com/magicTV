@@ -10,9 +10,14 @@ export const CAST_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" focusab
 
 export const RESET_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.2 6a3.8 3.8 0 0 1 6.5-2.6M9.8 6a3.8 3.8 0 0 1-6.5 2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.2 1.8v2.2H10.4M3.8 10.2V8H1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-export const MUTE_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-mute-all-sigma" d="M1 2h5L4.8 6 6 10H1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 4.2H9.8l3.2-3.2v9.8l-3.2-3.2H7.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M12.4 5.1c.55.55.55 1.7 0 2.25M13.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="6.4" y1="1.3" x2="16.2" y2="10.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0"/></svg>`;
+/** Σ on the left, middle chevron pointing right toward the action glyph. */
+const ACTION_ALL_SIGMA = 'M6 2H1L4.8 6 1 10H6';
 
-export const STOP_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="M1 2h5L4.8 6 6 10H1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="7.4" y="3.8" width="4.4" height="4.4" fill="currentColor"/></svg>`;
+export const MUTE_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-mute-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 4.2H9.8l3.2-3.2v9.8l-3.2-3.2H7.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M12.4 5.1c.55.55.55 1.7 0 2.25M13.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="6.4" y1="1.3" x2="16.2" y2="10.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0"/></svg>`;
+
+export const STOP_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="7.4" y="3.8" width="4.4" height="4.4" fill="currentColor"/></svg>`;
+
+export const PLAY_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.6 3.2v5.6l5.2-2.8-5.2-2.8z" fill="currentColor"/></svg>`;
 
 export const VOL_DOWN_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
@@ -58,7 +63,7 @@ function centerExtras(target) {
     return [
         `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 mosaic-reset-btn is-hidden" id="mosaic-reset-btn" data-tile-action="reset" data-controls-target="${target}" title="Reset multi-TV layout" aria-label="Reset multi-TV layout" hidden>${RESET_SVG}</button>`,
         `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__volume-btn" id="mosaic-mute-all-btn" data-tile-action="mute-all" data-controls-target="${target}" title="Mute all" aria-label="Mute all" aria-pressed="false">${MUTE_ALL_SVG}</button>`,
-        `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__volume-btn" id="mosaic-stop-all-btn" data-tile-action="stop-all" data-controls-target="${target}" title="Stop all" aria-label="Stop all">${STOP_ALL_SVG}</button>`
+        `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__volume-btn" id="mosaic-stop-all-btn" data-tile-action="stop-all" data-controls-target="${target}" title="Stop all" aria-label="Stop all" aria-pressed="false">${STOP_ALL_SVG}</button>`
     ].join('');
 }
 

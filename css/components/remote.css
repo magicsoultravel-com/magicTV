@@ -461,6 +461,14 @@ body.browser-shell-split #remote-shell {
 
 .remote-panel__footer-chrome {
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+}
+
+.remote-panel__footer-tools-row {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
@@ -468,27 +476,49 @@ body.browser-shell-split #remote-shell {
     width: 100%;
 }
 
-.remote-panel__footer-chrome .remote-panel__nav-group--footer,
-.remote-panel__footer-chrome .browser-window-controls,
-.remote-panel__footer-chrome .layout-window-controls,
-.remote-panel__footer-chrome .remote-module__catalog-tools.is-visible {
+.remote-panel__footer-tools-row .remote-module__catalog-tools.is-visible,
+.remote-panel__footer-tools-row .browser-window-controls,
+.remote-panel__footer-tools-row .layout-window-controls {
     width: auto;
     flex: 0 0 auto;
+}
+
+.remote-panel__footer-nav-row {
+    display: grid;
+    grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
+    gap: var(--remote-grid-gap, 0.4rem);
+    justify-items: center;
+    width: min(100%, var(--remote-min-width, 260px));
+}
+
+.remote-panel__footer-nav-row .remote-panel__nav-group {
+    display: contents;
+}
+
+.remote-panel__footer-nav-row .remote-panel__cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--remote-btn-size, 40px);
+}
+
+.remote-panel__footer-nav-row .remote-panel__btn {
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.remote-panel__footer-nav-row .remote-panel__btn:hover {
+    border-radius: 50%;
 }
 
 .remote-panel__nav-group {
     display: contents;
-}
-
-.remote-panel__nav-group.remote-panel__nav-group--footer,
-#browser-panel-nav-group.remote-panel__nav-group--footer {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    width: auto;
-    flex: 0 0 auto;
 }
 
 .remote-panel__footer-screens {
@@ -499,8 +529,8 @@ body.browser-shell-split #remote-shell {
 .remote-dock-sheet__inner > .tv-module__actions--remote-end {
     position: absolute;
     top: 0.35rem;
-    right: var(--tv-spacing-sm, 0.5rem);
-    left: auto;
+    left: var(--tv-spacing-sm, 0.5rem);
+    right: auto;
     z-index: 6;
     pointer-events: auto;
     display: flex;
@@ -511,8 +541,8 @@ body.browser-shell-split #remote-shell {
 .remote-dock-sheet__inner > .tv-module__actions--browser-end {
     position: absolute;
     top: 0.35rem;
-    right: calc(var(--tv-spacing-sm, 0.5rem) + 5.75rem);
-    left: auto;
+    left: calc(var(--tv-spacing-sm, 0.5rem) + 5.75rem);
+    right: auto;
     z-index: 6;
     pointer-events: auto;
     display: flex;
@@ -521,7 +551,7 @@ body.browser-shell-split #remote-shell {
 
 .remote-module__host > .tv-module__actions--remote-end:only-of-type,
 .remote-dock-sheet__inner > .tv-module__actions--remote-end:only-of-type {
-    right: var(--tv-spacing-sm, 0.5rem);
+    left: var(--tv-spacing-sm, 0.5rem);
 }
 
 .remote-module__host > .tv-module__actions--start,
@@ -826,8 +856,28 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
 }
 
 .browser-dock-sheet__inner > .tv-module__actions--browser-end {
-    right: var(--tv-spacing-sm, 0.5rem);
-    left: auto;
+    left: var(--tv-spacing-sm, 0.5rem);
+    right: auto;
+}
+
+.browser-module .remote-module__host > .tv-module__actions--browser-end {
+    left: var(--tv-spacing-sm, 0.5rem);
+    right: auto;
+}
+
+.remote-dock-sheet__inner > .tv-module__actions--browser-end {
+    left: calc(var(--tv-spacing-sm, 0.5rem) + 5.75rem);
+    right: auto;
+}
+
+#remote-layout-toggle-cell,
+#browser-layout-toggle-cell {
+    grid-column: -1;
+}
+
+#remote-layout-toggle-cell.is-hidden,
+#browser-layout-toggle-cell.is-hidden {
+    display: none;
 }
 
 /* Remote control panel */

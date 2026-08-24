@@ -18,10 +18,32 @@ import {
     captureSwapPlaybackState,
     applySwapPlaybackContinuity
 } from './swapPlayback.js';
+import {
+    resolveChannelSwitchMode,
+    runTileContentTransition
+} from './tileTransition.js';
 
 const SWAP_DURATIONS = TILE_SWAP_DURATIONS;
 
 export const swapMethods = {
+    async withChannelSwitchTransition(slotId, onMidpoint, opts = {}) {
+        if (this.swapBusy) {
+            await onMidpoint?.();
+            return;
+        }
+        const tile = el(`player-tile-${slotId || 'center'}`);
+        const mode = resolveChannelSwitchMode(this);
+        this.swapBusy = true;
+        try {
+            await runTileContentTransition(tile, onMidpoint, {
+                mode,
+                skipOut: opts.skipOut === true
+            });
+        } finally {
+            this.swapBusy = false;
+        }
+    },
+
     swapWithCenter(sideId) {
         if (!CORNER_IDS.includes(sideId)) return;
         if (this.swapBusy) return;

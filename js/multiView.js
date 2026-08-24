@@ -40,7 +40,7 @@ function getScreenControlStrip() {
 import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
-import { hydrateTileHoverControls } from './ui/tileHoverControls.js';
+import { hydrateTileHoverControls, STOP_ALL_SVG, PLAY_ALL_SVG } from './ui/tileHoverControls.js';
 import { syncScreenBtnActions } from './ui/screenStripControls.js';
 import { ChromecastManager } from './cast/chromecastManager.js';
 
@@ -551,6 +551,15 @@ export const MultiView = {
         return true;
     },
 
+    isAnyPlaying() {
+        for (const id of SLOT_IDS) {
+            const slot = this.slots[id];
+            if (!slot?.enabled || !slot.player?.channel) continue;
+            if (slot.player.wantPlaying === true || slot.player.playing === true) return true;
+        }
+        return false;
+    },
+
     muteAll() {
         SLOT_IDS.forEach((id) => {
             const slot = this.slots[id];
@@ -582,10 +591,31 @@ export const MultiView = {
         await Promise.all(SLOT_IDS.map(async (id) => {
             const slot = this.slots[id];
             if (!slot?.enabled || !slot?.player?.channel) return;
-            await slot.player.stop({ clearChannel: true }).catch(() => {});
+            await slot.player.stop().catch(() => {});
         }));
         this.persistSlots();
         TileFrames.setPlaybackBusy(false);
+        this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
+    },
+
+    async playAll() {
+        await Promise.all(SLOT_IDS.map(async (id) => {
+            const slot = this.slots[id];
+            const player = slot?.player;
+            if (!slot?.enabled || !player?.channel) return;
+            if (player.wantPlaying === true || player.playing === true) return;
+            try {
+                if (player.channel.url_resolved && !player.stopped) {
+                    await player.resume();
+                } else {
+                    await player.playChannel(player.channel);
+                }
+            } catch {
+                /* ignore per-slot failures */
+            }
+        }));
+        this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
     },
@@ -607,6 +637,17 @@ export const MultiView = {
             if (wave) wave.style.opacity = muteAllActive ? '0' : '1';
             if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
         });
+
+        const anyPlaying = this.isAnyPlaying();
+        const stopAllBtns = [el('mosaic-stop-all-btn'), el('remote-stop-all-btn')].filter(Boolean);
+        stopAllBtns.forEach((btn) => {
+            const label = anyPlaying ? 'Stop all' : 'Play all';
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+            btn.setAttribute('aria-pressed', String(anyPlaying));
+            btn.innerHTML = anyPlaying ? STOP_ALL_SVG : PLAY_ALL_SVG;
+        });
+
         if (typeof document !== 'undefined') {
             import('./ui/remotePanel.js').then(({ RemotePanel }) => RemotePanel.syncRemotePanel?.()).catch(() => {});
         }
@@ -694,7 +735,12 @@ export const MultiView = {
                 if (useCast) {
                     await ChromecastManager.stopMedia();
                 } else {
-                    await player.stop();
+                    const shouldAnimate = player.playing || player.loading || player.pausePhase !== 'idle';
+                    if (shouldAnimate) {
+                        await this.withChannelSwitchTransition(slotId, () => player.stop());
+                    } else {
+                        await player.stop();
+                    }
                     this.persistSlots();
                 }
                 break;
@@ -891,10 +937,7 @@ export const MultiView = {
     },
 
     playOnPrimary(channel) {
-        const primary = this.getPrimary();
-        if (!primary) return Promise.reject(new Error('No primary player'));
-        this.mountAll();
-        return primary.playChannel(channel).finally(() => this.persistSlots());
+        return this.playOnSlot('center', channel);
     },
 
     /**
@@ -914,7 +957,15 @@ export const MultiView = {
         if (!player) return Promise.reject(new Error(`No player for slot ${id}`));
         const surface = el(`tv-playback-surface-${id}`);
         if (surface) player.mountVideo(surface);
-        return player.playChannel(channel).finally(async () => {
+        const hasVisibleContent = Boolean(
+            player.channel
+            && (player.playing || player.loading || player.pausePhase !== 'idle')
+        );
+        return this.withChannelSwitchTransition(
+            id,
+            () => player.playChannel(channel),
+            { skipOut: !hasVisibleContent }
+        ).finally(async () => {
             this.persistSlots();
             this.scheduleRefreshTiles();
             this.syncSettingsToggles();

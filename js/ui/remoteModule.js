@@ -434,6 +434,9 @@ function ensureShellsJoinedInRoot() {
 function syncLayoutToggleBtn(btn, { visible, split }) {
     if (!btn) return;
     btn.classList.toggle('is-hidden', !visible);
+    if (typeof btn.closest === 'function') {
+        btn.closest('.remote-panel__cell')?.classList.toggle('is-hidden', !visible);
+    }
     btn.innerHTML = CARD_ICONS.splitLayout;
     if (split) {
         btn.title = 'Join browser with remote';
@@ -448,15 +451,10 @@ function syncLayoutToggleBtn(btn, { visible, split }) {
 }
 
 function syncSplitChromeButtons() {
-    const navToggle = el('remote-split-browser-btn');
     const remoteOpen = mode !== 'hidden';
     const split = isSplit();
-    syncLayoutToggleBtn(navToggle, { visible: remoteOpen, split });
-    const browserNav = el('browser-panel-nav-group');
-    if (browserNav) {
-        browserNav.classList.toggle('is-hidden', !split);
-        browserNav.setAttribute('aria-hidden', String(!split));
-    }
+    syncLayoutToggleBtn(el('remote-split-browser-btn'), { visible: remoteOpen && !split, split });
+    syncLayoutToggleBtn(el('browser-split-browser-btn'), { visible: split, split });
     const remoteScreenFooter = el('remote-shell-screens-footer');
     if (remoteScreenFooter) {
         remoteScreenFooter.classList.toggle('is-hidden', !split);
