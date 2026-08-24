@@ -130,38 +130,82 @@
     margin-top: var(--tv-spacing-sm);
 }
 
-/* Header programme lines */
+/* Header programme lines — arranged along a single shared baseline. All header text
+   (wordmark + channel name + status texts) sits on the SAME text baseline,
+   so the header reads as one level. Only the wordmark and the channel name keep the
+   neon-gradient *colour*; programme text uses the subtle tonalities. */
 .tv-channel-info {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    white-space: nowrap;
+    min-width: 0;
+    flex-shrink: 1;
 }
 
 .tv-channel-info__row {
-    display: flex;
+    display: inline-flex;
     align-items: baseline;
     gap: 8px;
     min-width: 0;
-    max-width: min(420px, 50vw);
+    white-space: nowrap;
+    max-width: 45vw;
 }
 
-.tv-header-program-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--tv-text-primary);
+.tv-header-program-title,
+.tv-header-program-next,
+.tv-header-now-playing {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--tv-text-secondary);
+    align-self: auto;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    flex-shrink: 1;
 }
 
-.tv-header-program-next {
-    font-size: 12px;
-    color: var(--tv-text-muted);
+.tv-header-channel-name,
+.tv-header-channel-flag {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
+    max-width: 300px;
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    flex-shrink: 0;
+}
+
+/* Unify hero / channel name / clock onto the SAME text baseline and line metrics
+   as the rest of the header, so nothing drifts to a different vertical level.
+   Colours stay as intended: hero + channel name keep the neon gradient, all other
+   header text stays subtle. */
+.tv-brand h1 {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    letter-spacing: 0.05em;
+    padding-bottom: 0;
+}
+
+.tv-clock-zone,
+.tv-clock-display,
+.clock-chip {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.clock-chip--time {
+    font-weight: 600;
 }
 
 .remote-module__channel-bar {
