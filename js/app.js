@@ -211,10 +211,11 @@ function bindTabBarPopups() {
 
     // Click outside closes all popups
     document.addEventListener('click', (e) => {
-        if (e.target.closest('.tv-tab')) return;
+        if (e.target.closest('.tv-tab-popup')) return;
         if (e.target.closest('.tv-tab--filter-input')) return;
         if (e.target.closest('.tv-tab--category')) return;
         if (e.target.closest('.tv-tab--sort')) return;
+        if (e.target.closest('#sort-dir-btn')) return;
         closePopups();
     });
 
@@ -242,11 +243,10 @@ function bindTabBarPopups() {
 }
 
 function bindTabs() {
-    els('.tv-tab').forEach(tab => {
+    els('#remote-catalog-tools [data-tab], .tv-tab[data-tab]').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabName = tab.dataset.tab;
-            // Controls styled with `.tv-tab` that are not actual tabs (e.g. the
-            // ASC/DESC arrow) have no data-tab. Do not treat them as a tab switch.
+            // Controls with no data-tab are not tab switches.
             if (!tabName) return;
             if (tabName === 'back-to-countries') {
                 BrowseView.showCountriesView();

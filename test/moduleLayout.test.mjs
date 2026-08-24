@@ -43,20 +43,30 @@ describe('moduleLayout SSOT', () => {
         assert.equal(state.browser.left, 10);
     });
 
-    it('splitBrowser / joinBrowser preserve reconcile hook and mode', async () => {
-        const mod = await import('../js/ui/moduleLayout.js?layout=3');
-        let reconcileCount = 0;
-        mod.setReconcileHandler(() => { reconcileCount += 1; });
+    it('normalizeLayoutState accepts split + hidden browser dock tab', async () => {
+        const { normalizeLayoutState } = await import('../js/ui/moduleLayout.js?layout=hidden');
+        const state = normalizeLayoutState({
+            mode: 'split',
+            browserHostKind: 'hidden',
+            browserSheetWidth: 0.4
+        });
+        assert.equal(state.mode, 'split');
+        assert.equal(state.browserHostKind, 'hidden');
+        assert.equal(state.browserSheetWidth, 0.4);
+    });
 
-        // Avoid playerState persistence errors in node
-        const origPatch = mod.patchLayout;
-        assert.equal(typeof origPatch, 'function');
-
-        const split = mod.normalizeLayoutState({ mode: 'split', browserHostKind: 'undocked' });
-        assert.equal(split.mode, 'split');
-        const joined = mod.normalizeLayoutState({ mode: 'joined', browserHostKind: 'os' });
-        assert.equal(joined.mode, 'joined');
-        assert.equal(joined.browserHostKind, null);
+    it('bringModuleToFront bumps z-index', async () => {
+        const remote = { style: { zIndex: '' }, id: 'remote-module' };
+        const browser = { style: { zIndex: '' }, id: 'browser-module' };
+        globalThis.document = {
+            getElementById: (id) => (id === 'remote-module' ? remote : id === 'browser-module' ? browser : null)
+        };
+        const { bringModuleToFront, SHELL_REMOTE, SHELL_BROWSER } = await import('../js/ui/moduleLayout.js?layout=z');
+        bringModuleToFront(SHELL_REMOTE);
+        const z1 = Number(remote.style.zIndex);
+        bringModuleToFront(SHELL_BROWSER);
+        const z2 = Number(browser.style.zIndex);
+        assert.equal(z2 > z1, true);
     });
 });
 

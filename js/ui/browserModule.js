@@ -1,26 +1,32 @@
 /**
- * In-page floating window host for the Browser shell (split mode).
+ * In-page floating + right-dock hosts for the Browser shell (split mode).
  * Catalog tab state stays in appState; this only presents #browser-shell.
  */
 import { el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
-import { CARD_ICONS } from './icons.js';
+import { ACTION_ICONS, CARD_ICONS } from './icons.js';
+import { loadPlayerState } from '../storage/playerState.js';
 import {
     getLayoutState,
     patchLayout,
     joinBrowser,
     browserShellEl,
-    isSplit
+    isSplit,
+    bringModuleToFront,
+    SHELL_BROWSER
 } from './moduleLayout.js';
 import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
 
 const MIN_W = 260;
 const MIN_H = 480;
 const VIEW_PAD = 8;
+const DEFAULT_SHEET_HEIGHT_FALLBACK = 0.62;
 
 let bound = false;
 let pinned = false;
-/** @type {{ mode: 'drag'|'resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number } | null} */
+/** @type {'hidden'|'docked'|'undocked'} */
+let uiMode = 'hidden';
+/** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetW?: number } | null} */
 let gesture = null;
 
 let startDockParent = null;
@@ -38,8 +44,20 @@ function dialogEl() {
     return el('browser-module-dialog');
 }
 
-function hostEl() {
+function floatHostEl() {
     return el('browser-module-host');
+}
+
+function dockHostEl() {
+    return el('browser-dock-host');
+}
+
+function dockSheetEl() {
+    return el('browser-dock-sheet');
+}
+
+function dockTabEl() {
+    return el('browser-dock-tab');
 }
 
 function stagingEl() {
@@ -97,13 +115,79 @@ function setPinned(next, { persist = true } = {}) {
     }
 }
 
-function showUI(show) {
+function showFloatUI(show) {
     const modal = moduleEl();
     if (!modal) return;
     modal.classList.toggle('is-hidden', !show);
     modal.hidden = !show;
     modal.setAttribute('aria-hidden', String(!show));
     document.body.classList.toggle('browser-module-open', show);
+}
+
+function measureRemoteDockGeometry() {
+    const remoteSheet = el('remote-dock-sheet');
+    const remoteTab = el('remote-dock-tab');
+    const { w: vw, h: vh } = viewportSize();
+    let remoteW = remoteSheet?.offsetWidth || 0;
+    if (remoteW < 40) {
+        remoteW = remoteTab?.offsetWidth || 0;
+    }
+    if (remoteW < 40) {
+        const cssMin = getComputedStyle(document.documentElement)
+            .getPropertyValue('--remote-min-width')
+            .trim();
+        const parsed = parseFloat(cssMin);
+        remoteW = Number.isFinite(parsed) ? parsed : MIN_W;
+    }
+
+    let remoteH = 0;
+    if (remoteSheet?.classList.contains('is-expanded') && remoteSheet.offsetHeight > 40) {
+        remoteH = remoteSheet.offsetHeight;
+    } else {
+        const saved = loadPlayerState()?.remoteModule;
+        const ratio = Number(saved?.sheetHeight);
+        const r = Number.isFinite(ratio)
+            ? Math.min(0.85, Math.max(0.25, ratio))
+            : DEFAULT_SHEET_HEIGHT_FALLBACK;
+        remoteH = Math.round(vh * r);
+    }
+
+    return {
+        width: Math.round(Math.min(vw * 0.9, Math.max(MIN_W * 2, remoteW * 2))),
+        height: Math.round(Math.min(vh * 0.9, Math.max(MIN_H, remoteH)))
+    };
+}
+
+function applyDockGeometry(widthOverride = null) {
+    const sheet = dockSheetEl();
+    if (!sheet) return;
+    const base = measureRemoteDockGeometry();
+    const width = widthOverride != null
+        ? Math.round(Math.min(viewportSize().w * 0.9, Math.max(MIN_W * 2, widthOverride)))
+        : base.width;
+    const height = base.height;
+    sheet.style.width = `${width}px`;
+    sheet.style.height = `${height}px`;
+    sheet.style.top = 'auto';
+    sheet.style.bottom = '0';
+    sheet.style.maxHeight = '90vh';
+    const { w: vw } = viewportSize();
+    sheet.style.setProperty('--browser-sheet-width', String(width / Math.max(1, vw)));
+}
+
+function setDockExpanded(expanded) {
+    const sheet = dockSheetEl();
+    const tab = dockTabEl();
+    sheet?.classList.toggle('is-expanded', expanded);
+    sheet?.classList.toggle('is-collapsed', !expanded);
+    sheet?.setAttribute('aria-hidden', String(!expanded));
+    tab?.classList.toggle('is-active', expanded && uiMode === 'docked');
+    tab?.classList.toggle('is-hidden', uiMode === 'undocked' || !isSplit());
+    tab?.setAttribute('aria-expanded', String(expanded && uiMode === 'docked'));
+    tab?.classList.toggle('is-visible', isSplit() && uiMode !== 'undocked');
+    document.body.classList.toggle('browser-docked', uiMode === 'docked');
+    document.body.classList.toggle('browser-docked-expanded', uiMode === 'docked' && expanded);
+    document.body.classList.toggle('browser-dock-tab-visible', isSplit() && uiMode === 'hidden');
 }
 
 function rememberShellHome(shell) {
@@ -173,34 +257,19 @@ function mountShellToHost(host) {
     host.appendChild(shell);
 }
 
-function beginGesture(e, mode, edge) {
-    if (e.button != null && e.button !== 0) return;
-    const dialog = dialogEl();
-    if (!dialog) return;
-    const geom = readDialogGeometry();
-    gesture = {
-        mode,
-        edge,
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        originLeft: geom.left,
-        originTop: geom.top,
-        originW: geom.width,
-        originH: geom.height
-    };
-    try {
-        dialog.setPointerCapture(e.pointerId);
-    } catch {
-        /* ignore */
-    }
-    e.preventDefault();
-}
-
 function onPointerMove(e) {
     if (!gesture || e.pointerId !== gesture.pointerId) return;
     const dx = e.clientX - gesture.startX;
     const dy = e.clientY - gesture.startY;
+
+    if (gesture.mode === 'sheet') {
+        const originPx = gesture.originSheetW ?? measureRemoteDockGeometry().width;
+        // Dragging the left edge of a right sheet: moving left grows width.
+        const nextPx = Math.max(MIN_W * 2, originPx - dx);
+        applyDockGeometry(nextPx);
+        return;
+    }
+
     if (gesture.mode === 'drag') {
         applyGeometry({
             left: gesture.originLeft + dx,
@@ -210,6 +279,7 @@ function onPointerMove(e) {
         });
         return;
     }
+
     let { originLeft: left, originTop: top, originW: width, originH: height } = gesture;
     const edge = gesture.edge || '';
     if (edge.includes('e')) width = gesture.originW + dx;
@@ -222,54 +292,115 @@ function onPointerMove(e) {
         top = gesture.originTop + dy;
         height = gesture.originH - dy;
     }
+    if (width < MIN_W) {
+        if (edge.includes('w')) left = gesture.originLeft + gesture.originW - MIN_W;
+        width = MIN_W;
+    }
+    if (height < MIN_H) {
+        if (edge.includes('n')) top = gesture.originTop + gesture.originH - MIN_H;
+        height = MIN_H;
+    }
     applyGeometry({ left, top, width, height });
 }
 
-function endGesture(e) {
+function onPointerUp(e) {
     if (!gesture || (e && e.pointerId !== gesture.pointerId)) return;
+    try {
+        e?.currentTarget?.releasePointerCapture?.(e.pointerId);
+    } catch {
+        /* ignore */
+    }
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    dialogEl()?.classList.remove('is-dragging');
+    dockSheetEl()?.querySelector('[data-browser-dock-resize]')?.classList.remove('is-dragging');
+
+    const wasSheet = gesture.mode === 'sheet';
     gesture = null;
-    patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
+    if (wasSheet) {
+        const sheet = dockSheetEl();
+        const width = sheet?.getBoundingClientRect().width;
+        const { w: vw } = viewportSize();
+        if (Number.isFinite(width) && vw > 0) {
+            patchLayout({ browserSheetWidth: width / vw }, { reconcile: false });
+        }
+        applyDockGeometry(width);
+        return;
+    }
+    if (uiMode === 'undocked') {
+        patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
+    }
 }
 
-function bindOnce() {
-    if (bound) return;
-    bound = true;
-    const modal = moduleEl();
-    if (!modal) return;
+function beginGesture(e, mode, edge = '') {
+    if (e.button != null && e.button !== 0) return;
 
-    modal.addEventListener('pointerdown', (e) => {
-        const drag = e.target?.closest?.('[data-browser-module-drag]');
-        const resize = e.target?.closest?.('[data-browser-resize]');
-        if (resize) {
-            beginGesture(e, 'resize', resize.getAttribute('data-browser-resize') || 'se');
-            return;
-        }
-        if (drag) beginGesture(e, 'drag');
-    });
-    modal.addEventListener('pointermove', onPointerMove);
-    modal.addEventListener('pointerup', endGesture);
-    modal.addEventListener('pointercancel', endGesture);
+    if (mode === 'sheet') {
+        const sheet = dockSheetEl();
+        gesture = {
+            mode: 'sheet',
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            originLeft: 0,
+            originTop: 0,
+            originW: 0,
+            originH: 0,
+            originSheetW: sheet?.getBoundingClientRect().width ?? measureRemoteDockGeometry().width
+        };
+        sheet?.querySelector('[data-browser-dock-resize]')?.classList.add('is-dragging');
+    } else {
+        const dialog = dialogEl();
+        if (!dialog || uiMode !== 'undocked') return;
+        const geom = readDialogGeometry();
+        gesture = {
+            mode,
+            edge,
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            originLeft: geom.left,
+            originTop: geom.top,
+            originW: geom.width,
+            originH: geom.height
+        };
+        if (mode === 'drag') dialog.classList.add('is-dragging');
+    }
 
-    modal.querySelector('[data-browser-module-dismiss]')?.addEventListener('click', () => {
-        if (!pinned) joinBrowser();
-    });
+    try {
+        e.currentTarget?.setPointerCapture?.(e.pointerId);
+    } catch {
+        /* ignore */
+    }
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    e.preventDefault();
+}
 
-    el('browser-join-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        joinBrowser();
-    });
+function syncWindowControls() {
+    const strip = el('browser-window-controls');
+    const dockBtn = el('browser-dock-toggle');
+    const hideBtn = el('browser-hide-toggle');
+    const split = isSplit();
+    const kind = getLayoutState().browserHostKind;
 
-    el('browser-external-popout-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Step 1: in-page split is the supported Browser host; OS popout reuses remote path later.
-        showAppToast('Browser OS popout uses the remote Pop out control for now');
-    });
+    strip?.classList.toggle('is-hidden', !split);
 
-    window.addEventListener('resize', () => {
-        if (isSplit() && getLayoutState().browserHostKind === 'undocked') {
-            applyGeometry(readDialogGeometry());
-        }
-    });
+    if (dockBtn) {
+        dockBtn.classList.toggle('is-hidden', !split);
+        const undocked = kind === 'undocked';
+        dockBtn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
+        dockBtn.title = undocked ? 'Dock browser' : 'Undock browser';
+        dockBtn.setAttribute('aria-label', dockBtn.title);
+    }
+    if (hideBtn) {
+        hideBtn.classList.toggle('is-hidden', !split);
+        hideBtn.innerHTML = ACTION_ICONS.collapse;
+        hideBtn.title = kind === 'hidden' ? 'Show browser' : 'Hide browser';
+        hideBtn.setAttribute('aria-label', hideBtn.title);
+    }
 }
 
 function syncActionButtons() {
@@ -288,39 +419,196 @@ function syncActionButtons() {
         popBtn.title = 'Pop out browser';
         popBtn.setAttribute('aria-label', 'Pop out browser');
     }
+    syncWindowControls();
+}
+
+function bindOnce() {
+    if (bound) return;
+    bound = true;
+    const modal = moduleEl();
+    const dialog = dialogEl();
+
+    modal?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_BROWSER), true);
+    dockSheetEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_BROWSER), true);
+    dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_BROWSER), true);
+
+    dialog?.addEventListener('pointerdown', (e) => {
+        if (uiMode !== 'undocked') return;
+        if (e.target.closest?.('[data-browser-resize]')) {
+            beginGesture(e, 'resize', e.target.closest('[data-browser-resize]').getAttribute('data-browser-resize') || 'se');
+            return;
+        }
+        if (e.target.closest?.('[data-browser-module-drag]')) {
+            if (e.target.closest?.('button')) return;
+            beginGesture(e, 'drag');
+            return;
+        }
+        if (e.target.closest?.('button, input, select, textarea, a, .channel-tile, .country-tile, .tv-controls__screen-btn, .tv-controls__add-screen-btn, [data-browser-resize], [data-browser-window-action]')) {
+            return;
+        }
+        beginGesture(e, 'drag');
+    });
+
+    modal?.querySelectorAll('[data-browser-resize]').forEach((handle) => {
+        handle.addEventListener('pointerdown', (e) => {
+            beginGesture(e, 'resize', handle.getAttribute('data-browser-resize') || 'se');
+        });
+    });
+
+    dockSheetEl()?.querySelector('[data-browser-dock-resize]')?.addEventListener('pointerdown', (e) => {
+        beginGesture(e, 'sheet');
+    });
+
+    dockTabEl()?.addEventListener('click', () => {
+        if (!isSplit()) return;
+        if (uiMode === 'hidden') BrowserModule.show();
+        else if (uiMode === 'docked') BrowserModule.hide();
+    });
+
+    modal?.querySelector('[data-browser-module-dismiss]')?.addEventListener('click', () => {
+        if (!pinned && uiMode === 'undocked') BrowserModule.hide();
+    });
+
+    el('browser-join-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        joinBrowser();
+        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'joined' } }));
+    });
+
+    el('browser-external-popout-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAppToast('Browser OS popout uses the remote Pop out control for now');
+    });
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target?.closest?.('[data-browser-window-action]');
+        if (btn) {
+            e.preventDefault();
+            const action = btn.getAttribute('data-browser-window-action');
+            if (action === 'dock-toggle') {
+                if (getLayoutState().browserHostKind === 'undocked') BrowserModule.dock();
+                else BrowserModule.undock();
+            } else if (action === 'hide-toggle') {
+                if (getLayoutState().browserHostKind === 'hidden') BrowserModule.show();
+                else BrowserModule.hide();
+            }
+            return;
+        }
+        const brand = e.target?.closest?.('#browser-shell > .module-shell__chrome > .remote-module__brand');
+        if (!brand) return;
+        if (!isSplit() || uiMode === 'hidden') return;
+        if (dialogEl()?.classList.contains('is-dragging')) return;
+        e.preventDefault();
+        BrowserModule.hide();
+    });
+
+    window.addEventListener('resize', () => {
+        if (!isSplit()) return;
+        if (uiMode === 'undocked') applyGeometry(readDialogGeometry());
+        if (uiMode === 'docked') applyDockGeometry();
+    });
+}
+
+function tearDownHosts() {
+    const shell = browserShellEl();
+    restoreActions();
+    restoreShellToHome(shell);
+    showFloatUI(false);
+    setDockExpanded(false);
+    dockSheetEl()?.style.removeProperty('width');
+    dockTabEl()?.classList.add('is-hidden');
+    dockTabEl()?.classList.remove('is-visible');
+    uiMode = 'hidden';
+    document.body.classList.remove('browser-shell-split', 'browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible');
+    syncActionButtons();
 }
 
 export const BrowserModule = {
     init() {
         bindOnce();
         syncActionButtons();
+        setDockExpanded(false);
+        dockTabEl()?.classList.add('is-hidden');
     },
 
     isOpen() {
-        return isSplit() && getLayoutState().browserHostKind === 'undocked';
+        return isSplit() && (uiMode === 'undocked' || uiMode === 'docked');
+    },
+
+    getUiMode() {
+        return uiMode;
     },
 
     /** Show in-page float and mount browser shell into it. */
     openUndocked() {
         bindOnce();
-        const host = hostEl();
+        const host = floatHostEl();
         if (!host) return;
         const saved = getLayoutState().browser;
-        showUI(true);
+        setDockExpanded(false);
+        dockTabEl()?.classList.add('is-hidden');
+        showFloatUI(true);
+        uiMode = 'undocked';
         applyGeometry(saved, { pinned: saved.pinned === true });
         mountShellToHost(host);
-        syncActionButtons();
+        bringModuleToFront(SHELL_BROWSER);
         document.body.classList.add('browser-shell-split');
+        document.body.classList.remove('browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible');
+        syncActionButtons();
+        patchLayout({ browserHostKind: 'undocked' }, { reconcile: false });
     },
 
-    /** Tear down float UI and leave shell placement to reconcile (join path). */
-    close() {
-        const shell = browserShellEl();
-        restoreActions();
-        restoreShellToHome(shell);
-        showUI(false);
+    dock() {
+        if (!isSplit()) return;
+        bindOnce();
+        showFloatUI(false);
+        const host = dockHostEl();
+        if (!host) return;
+        uiMode = 'docked';
+        applyDockGeometry();
+        setDockExpanded(true);
+        dockTabEl()?.classList.remove('is-hidden');
+        mountShellToHost(host);
+        bringModuleToFront(SHELL_BROWSER);
+        document.body.classList.add('browser-shell-split', 'browser-docked', 'browser-docked-expanded');
+        document.body.classList.remove('browser-dock-tab-visible');
         syncActionButtons();
-        document.body.classList.remove('browser-shell-split');
+        patchLayout({ browserHostKind: 'docked' }, { reconcile: false });
+    },
+
+    undock() {
+        if (!isSplit()) return;
+        this.openUndocked();
+    },
+
+    hide() {
+        if (!isSplit()) return;
+        bindOnce();
+        // Keep shell mounted in dock host (collapsed) for fast restore.
+        if (uiMode === 'undocked') {
+            const host = dockHostEl();
+            if (host) mountShellToHost(host);
+        }
+        showFloatUI(false);
+        uiMode = 'hidden';
+        setDockExpanded(false);
+        dockTabEl()?.classList.remove('is-hidden');
+        dockTabEl()?.classList.add('is-visible');
+        document.body.classList.add('browser-shell-split', 'browser-dock-tab-visible');
+        document.body.classList.remove('browser-docked-expanded');
+        document.body.classList.toggle('browser-docked', false);
+        syncActionButtons();
+        patchLayout({ browserHostKind: 'hidden' }, { reconcile: false });
+    },
+
+    show() {
+        if (!isSplit()) return;
+        this.dock();
+    },
+
+    /** Tear down float/dock UI and leave shell placement to reconcile (join path). */
+    close() {
+        tearDownHosts();
     },
 
     mountTo(host) {
@@ -330,13 +618,15 @@ export const BrowserModule = {
     },
 
     getHost() {
-        return hostEl();
+        if (uiMode === 'docked' || uiMode === 'hidden') return dockHostEl();
+        return floatHostEl();
     },
 
     syncActionButtons,
+    syncWindowControls,
 
     persistGeometry() {
-        if (!this.isOpen()) return;
+        if (uiMode !== 'undocked') return;
         patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
     }
 };

@@ -158,7 +158,7 @@ export const BrowseView = {
         if (backBtn) {
             backBtn.classList.remove('is-hidden');
             backBtn.classList.add('is-active', 'is-pink-active');
-            els('.tv-tab[data-tab="browse"]').forEach(tab => {
+            els('[data-remote-nav="browse"]').forEach(tab => {
                 tab.classList.add('is-active');
                 tab.classList.remove('is-pink-active');
             });
@@ -297,7 +297,7 @@ export const BrowseView = {
             backBtn.classList.add('is-hidden');
             backBtn.classList.remove('is-active', 'is-pink-active');
         }
-        els('.tv-tab[data-tab="browse"]').forEach(tab => tab.classList.add('is-active'));
+        els('[data-remote-nav="browse"]').forEach(tab => tab.classList.add('is-active'));
         ListSort.syncSortControls();
         this.renderCountries();
         deps.updateRefreshAge();

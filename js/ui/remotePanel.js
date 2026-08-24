@@ -4,6 +4,8 @@ import { MultiView } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
+import { GuidePanel } from './guidePanel.js';
+import { isSplit } from './moduleLayout.js';
 
 let deps = {
     switchTab: () => {},
@@ -11,8 +13,13 @@ let deps = {
 };
 
 export function syncRemoteNav(tabName) {
+    const split = isSplit();
     queryAllInApp('[data-remote-nav]').forEach((btn) => {
-        btn.classList.toggle('is-active', btn.getAttribute('data-remote-nav') === tabName);
+        const nav = btn.getAttribute('data-remote-nav');
+        if (nav === 'remote') {
+            btn.classList.toggle('is-hidden', split);
+        }
+        btn.classList.toggle('is-active', nav === tabName);
     });
 }
 
@@ -53,7 +60,11 @@ async function handleRemoteAction(action) {
         }
         case 'collapse-toggle': {
             const mod = deps.getRemoteModule?.();
-            mod?.close?.();
+            mod?.hide?.() ?? mod?.close?.();
+            break;
+        }
+        case 'guide-toggle': {
+            GuidePanel.toggle();
             break;
         }
         default:
@@ -131,7 +142,7 @@ export function syncRemotePanel() {
     const dockBtn = el('remote-dock-toggle');
     if (dockBtn && mod) {
         const undocked = mod.getMode?.() === 'undocked';
-        dockBtn.innerHTML = undocked ? ACTION_ICONS.collapse : ACTION_ICONS.expand;
+        dockBtn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
         dockBtn.title = undocked ? 'Dock remote' : 'Undock remote';
         dockBtn.setAttribute('aria-label', dockBtn.title);
     }
@@ -141,6 +152,16 @@ export function syncRemotePanel() {
         collapseBtn.innerHTML = ACTION_ICONS.collapse;
         collapseBtn.title = 'Hide remote';
         collapseBtn.setAttribute('aria-label', collapseBtn.title);
+    }
+
+    const guideBtn = el('remote-guide-toggle');
+    if (guideBtn) {
+        const visible = GuidePanel.isVisible();
+        guideBtn.innerHTML = visible ? ACTION_ICONS.guideShow : ACTION_ICONS.guideHide;
+        guideBtn.classList.toggle('is-active', visible);
+        guideBtn.setAttribute('aria-pressed', String(visible));
+        guideBtn.title = visible ? 'Hide TV guide' : 'Show TV guide';
+        guideBtn.setAttribute('aria-label', guideBtn.title);
     }
 }
 
@@ -168,6 +189,10 @@ export const RemotePanel = {
     init({ switchTab, getRemoteModule } = {}) {
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
         if (typeof getRemoteModule === 'function') deps.getRemoteModule = getRemoteModule;
+        if (typeof window !== 'undefined' && !window.__remoteGuideVisBound) {
+            window.__remoteGuideVisBound = true;
+            window.addEventListener('guide:visibility_changed', () => syncRemotePanel());
+        }
     },
 
     bind() {

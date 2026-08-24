@@ -185,6 +185,10 @@ export const GuidePanel = {
     /** First-class Guide module API — panel stays hosted under Remote for now. */
     init() {
         this.bind();
+        // Default visible to match existing UX.
+        if (this.getPanelEl() && !this.getPanelEl().classList.contains('guide-panel--hidden')) {
+            this.setVisible(true, { silent: true });
+        }
     },
 
     bind() {
@@ -220,6 +224,30 @@ export const GuidePanel = {
         window.addEventListener('tv:epg_updated', () => {
             refreshGuide().catch(() => {});
         });
+    },
+
+    isVisible() {
+        const panel = this.getPanelEl();
+        if (!panel) return false;
+        return !panel.classList.contains('guide-panel--hidden');
+    },
+
+    setVisible(visible, { silent = false } = {}) {
+        const panel = this.getPanelEl();
+        if (!panel) return false;
+        const next = visible !== false;
+        panel.classList.toggle('guide-panel--hidden', !next);
+        panel.setAttribute('aria-hidden', String(!next));
+        if (!silent) {
+            window.dispatchEvent(new CustomEvent('guide:visibility_changed', {
+                detail: { visible: next }
+            }));
+        }
+        return next;
+    },
+
+    toggle() {
+        return this.setVisible(!this.isVisible());
     },
 
     refresh() {

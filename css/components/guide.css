@@ -8,6 +8,10 @@
     overflow: hidden;
 }
 
+.guide-panel.guide-panel--hidden {
+    display: none !important;
+}
+
 .guide-panel__toggle {
     display: flex;
     align-items: center;

@@ -182,17 +182,7 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     cursor: grab;
 }
 
-body.remote-idle-faded .remote-dock-tab,
-body.remote-idle-faded .remote-dock-sheet.is-expanded,
-body.remote-idle-faded .remote-module__dialog {
-    pointer-events: none;
-}
-
-body.remote-idle-faded.remote-idle-hover-preview .remote-dock-tab,
-body.remote-idle-faded.remote-idle-hover-preview .remote-dock-sheet.is-expanded,
-body.remote-idle-faded.remote-idle-hover-preview .remote-module__dialog {
-    pointer-events: auto;
-}
+/* Idle fade uses opacity only — keep hosts hittable so hover can pause fade. */
 
 .remote-module__header {
     display: flex;
@@ -319,6 +309,7 @@ body.browser-shell-split #remote-shell {
 .browser-module .remote-module__dialog {
     /* same chrome language as remote float */
     min-width: var(--remote-min-width, 260px);
+    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
 }
 
 #remote-program-bar .remote-program-title:empty {
@@ -393,11 +384,11 @@ body.browser-shell-split #remote-shell {
 
 .remote-module__catalog-tools {
     display: none;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
-    gap: var(--tv-spacing-sm);
-    padding: 0.35rem 0 0;
+    gap: 0.4rem;
+    padding: 0;
     background: transparent;
     border-top: none;
 }
@@ -410,6 +401,22 @@ body.browser-shell-split #remote-shell {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+}
+
+.remote-panel__footer-chrome {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem 0.65rem;
+    width: 100%;
+}
+
+.remote-panel__footer-chrome .remote-panel__footer-nav,
+.remote-panel__footer-chrome .browser-window-controls,
+.remote-panel__footer-chrome .remote-module__catalog-tools.is-visible {
+    width: auto;
+    flex: 0 0 auto;
 }
 
 .remote-panel__footer-nav,
@@ -576,6 +583,145 @@ body.browser-shell-split #remote-shell {
 .remote-module__resize[data-remote-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
 .remote-module__resize[data-remote-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
 
+.remote-module__resize[data-browser-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+.remote-module__resize[data-browser-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
+.remote-module__resize[data-browser-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+.remote-module__resize[data-browser-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+
+/* Browser window controls — same circular row as nav/tools when split */
+.browser-window-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    width: auto;
+    padding: 0;
+}
+
+.browser-window-controls.is-hidden {
+    display: none !important;
+}
+
+/* --- Right-edge browser dock --- */
+.browser-dock-tab {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    z-index: 8501;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    min-height: 7rem;
+    padding: 0.75rem 0.35rem;
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-right: none;
+    border-radius: 14px 0 0 14px;
+    background: var(--tv-bg-secondary, #141829);
+    color: var(--tv-text-primary);
+    cursor: pointer;
+    transform: translateY(-50%);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
+}
+
+body.browser-dock-tab-visible .browser-dock-tab:not(.is-hidden),
+.browser-dock-tab.is-visible:not(.is-hidden) {
+    display: flex;
+}
+
+.browser-dock-tab__brand {
+    background: linear-gradient(180deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    opacity: 0.7;
+    font-weight: 600;
+}
+
+.browser-dock-sheet {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    z-index: 8500;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    width: 0;
+    height: auto;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: transparent;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.browser-dock-sheet.is-expanded {
+    transform: translateX(0);
+    pointer-events: auto;
+    /* width/height set in px by browserModule.applyDockGeometry */
+}
+
+.browser-dock-sheet.is-collapsed:not(.is-expanded) {
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.browser-dock-sheet__resize {
+    flex: 0 0 6px;
+    cursor: col-resize;
+    touch-action: none;
+    align-self: stretch;
+}
+
+.browser-dock-sheet__resize.is-dragging {
+    background: color-mix(in srgb, var(--tv-main-1) 35%, transparent);
+}
+
+.browser-dock-sheet__inner {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--tv-bg-secondary, #141829);
+    border-radius: 18px 0 0 18px;
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-right: none;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.35);
+    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
+}
+
+.browser-dock-sheet__inner > .tv-module__actions--start,
+.browser-dock-sheet__inner > .tv-module__actions--browser-end {
+    position: absolute;
+    top: 0.35rem;
+    z-index: 6;
+    pointer-events: auto;
+}
+
+.browser-dock-sheet__inner > .tv-module__actions--start {
+    left: var(--tv-spacing-sm, 0.5rem);
+}
+
+.browser-dock-sheet__inner > .tv-module__actions--browser-end {
+    right: var(--tv-spacing-sm, 0.5rem);
+    left: auto;
+}
+
+body.browser-docked-expanded .browser-dock-tab {
+    display: none;
+}
+
 /* Remote control panel */
 .remote-panel {
     display: flex;
@@ -630,13 +776,15 @@ body.browser-shell-split #remote-shell {
 
 .remote-panel__footer-nav.remote-panel__cell--nav {
     display: flex;
-    justify-content: space-between;
-    width: 100%;
-    gap: 0.15rem;
+    justify-content: center;
+    width: auto;
+    gap: 0.4rem;
     flex-wrap: nowrap;
 }
 
-.remote-panel__footer-nav .remote-panel__nav-btn {
+.remote-panel__footer-nav .remote-panel__nav-btn,
+.remote-module__catalog-tools .remote-panel__nav-btn,
+.browser-window-controls .remote-panel__nav-btn {
     flex: 0 0 var(--remote-btn-size, 40px);
     width: var(--remote-btn-size, 40px);
     height: var(--remote-btn-size, 40px);
@@ -695,9 +843,35 @@ body.browser-shell-split #remote-shell {
     transform: scale(1.04);
 }
 
+.remote-panel__nav-btn.is-pink-active {
+    color: var(--tv-secondary, #e879a9);
+    background: color-mix(in srgb, var(--tv-secondary, #e879a9) 22%, transparent);
+    border-color: color-mix(in srgb, var(--tv-secondary, #e879a9) 45%, transparent);
+}
+
 .remote-module__catalog-tools .tv-tab-popup,
-.remote-module__catalog-tools #sort-dir-btn {
+.remote-module__catalog-tools #sort-dir-btn,
+.remote-module__catalog-tools #back-btn,
+.remote-module__catalog-tools #play-favorites-mosaic-btn,
+.remote-module__catalog-tools #create-favorite-folder-btn {
     display: inline-flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure circular chrome applies outside .remote-panel keypad too */
+.remote-panel__footer-chrome .remote-panel__nav-btn {
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 body.remote-docked-expanded .remote-dock-tab {

@@ -266,12 +266,13 @@ function normalizeModuleLayout(raw) {
         : null;
     let browserHostKind = raw.browserHostKind;
     if (mode === 'joined') browserHostKind = null;
-    else if (!['docked', 'undocked', 'os'].includes(browserHostKind)) browserHostKind = 'undocked';
+    else if (!['docked', 'undocked', 'hidden', 'os'].includes(browserHostKind)) browserHostKind = 'undocked';
     const b = raw.browser && typeof raw.browser === 'object' ? raw.browser : {};
     const bl = Number(b.left);
     const bt = Number(b.top);
     const bw = Number(b.width);
     const bh = Number(b.height);
+    const sheetW = Number(raw.browserSheetWidth);
     return {
         mode,
         remoteHostKind,
@@ -282,7 +283,10 @@ function normalizeModuleLayout(raw) {
             width: Number.isFinite(bw) && bw >= 240 ? bw : 320,
             height: Number.isFinite(bh) && bh >= 320 ? bh : 600,
             pinned: b.pinned === true
-        }
+        },
+        browserSheetWidth: Number.isFinite(sheetW)
+            ? Math.min(0.55, Math.max(0.22, sheetW))
+            : 0.36
     };
 }
 

@@ -7,10 +7,11 @@ import { showAppToast } from './toast.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
-import { RemotePanel } from './remotePanel.js';
+import { RemotePanel, syncRemoteNav } from './remotePanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
 import { BrowserModule } from './browserModule.js';
+import { ModuleIdleFade } from './moduleIdleFade.js';
 import {
     hydrateLayoutFromPlayerState,
     getLayoutState,
@@ -18,10 +19,11 @@ import {
     setReconcileHandler,
     syncCatalogRootClasses,
     splitBrowser,
-    joinBrowser,
     isSplit,
     remoteShellEl,
-    browserShellEl
+    browserShellEl,
+    bringModuleToFront,
+    SHELL_REMOTE
 } from './moduleLayout.js';
 
 const MIN_W = 260;
@@ -49,13 +51,7 @@ let sheetExpanded = false;
 /** @type {HTMLElement|null} External OS-window host; when set, mount prefers it over in-page hosts. */
 let externalHost = null;
 
-let idleDelayTimer = null;
-let fadeRafId = null;
 let idleActivityBound = false;
-/** @type {number} 0–1 multiplier applied on top of base remote opacity */
-let idleOpacityMult = 1;
-let idleHoverPreview = false;
-const IDLE_HOVER_PREVIEW_MULT = 0.55;
 
 /** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetH?: number } | null} */
 let gesture = null;
@@ -310,109 +306,10 @@ function applyOpacity() {
     document.documentElement.style.setProperty('--channel-picker-opacity', String(pct / 100));
 }
 
-function getIdleFadeSettings() {
-    return {
-        enabled: SettingsStore.getRemoteIdleFadeEnabled(),
-        delayMs: SettingsStore.getRemoteIdleDelaySec() * 1000,
-        fadeMs: SettingsStore.getRemoteIdleFadeSec() * 1000
-    };
-}
-
-function clearIdleTimers() {
-    if (idleDelayTimer) {
-        clearTimeout(idleDelayTimer);
-        idleDelayTimer = null;
-    }
-    if (fadeRafId) {
-        cancelAnimationFrame(fadeRafId);
-        fadeRafId = null;
-    }
-}
-
-function applyIdleOpacityMult(mult) {
-    idleOpacityMult = Math.max(0, Math.min(1, mult));
-    updateIdleOpacityCss();
-}
-
-function updateIdleOpacityCss() {
-    const effective = idleHoverPreview && idleOpacityMult <= 0.01
-        ? IDLE_HOVER_PREVIEW_MULT
-        : idleOpacityMult;
-    document.documentElement.style.setProperty('--remote-idle-opacity-mult', String(effective));
-    document.body.classList.toggle('remote-idle-faded', idleOpacityMult <= 0.01 && !idleHoverPreview);
-    document.body.classList.toggle('remote-idle-hover-preview', idleHoverPreview && idleOpacityMult <= 0.01);
-}
-
-function startIdleFadeOut(fadeMs) {
-    const start = performance.now();
-    const tick = (now) => {
-        const t = fadeMs <= 0 ? 1 : Math.min(1, (now - start) / fadeMs);
-        applyIdleOpacityMult(1 - t);
-        if (t < 1) {
-            fadeRafId = requestAnimationFrame(tick);
-        } else {
-            fadeRafId = null;
-        }
-    };
-    fadeRafId = requestAnimationFrame(tick);
-}
-
-function scheduleIdleFade() {
-    clearIdleTimers();
-    if (RemoteExternalPopout.isPoppedOut()) {
-        applyIdleOpacityMult(1);
-        return;
-    }
-    const { enabled, delayMs, fadeMs } = getIdleFadeSettings();
-    if (!enabled) {
-        applyIdleOpacityMult(1);
-        return;
-    }
-    applyIdleOpacityMult(1);
-    idleDelayTimer = setTimeout(() => startIdleFadeOut(fadeMs), delayMs);
-}
-
-function onUserActivity() {
-    idleHoverPreview = false;
-    if (fadeRafId || idleOpacityMult < 1) {
-        applyIdleOpacityMult(1);
-    } else {
-        updateIdleOpacityCss();
-    }
-    scheduleIdleFade();
-}
-
-function bindIdleHoverPreview() {
-    const selector = '.remote-dock-tab, .remote-dock-sheet.is-expanded, .remote-module__dialog';
-    document.addEventListener('pointerover', (e) => {
-        if (idleOpacityMult > 0.01) return;
-        if (!e.target.closest?.(selector)) return;
-        if (idleHoverPreview) return;
-        idleHoverPreview = true;
-        updateIdleOpacityCss();
-    }, true);
-    document.addEventListener('pointerout', (e) => {
-        if (idleOpacityMult > 0.01) return;
-        if (!e.target.closest?.(selector)) return;
-        const related = e.relatedTarget;
-        if (related && typeof related.closest === 'function' && related.closest(selector)) return;
-        if (!idleHoverPreview) return;
-        idleHoverPreview = false;
-        updateIdleOpacityCss();
-    }, true);
-}
-
 function bindIdleActivity() {
     if (idleActivityBound) return;
     idleActivityBound = true;
-    const events = ['pointerdown', 'keydown', 'touchstart', 'wheel'];
-    for (const ev of events) {
-        document.addEventListener(ev, onUserActivity, { capture: true, passive: true });
-    }
-    window.addEventListener('scroll', onUserActivity, { capture: true, passive: true });
-    bindIdleHoverPreview();
-    applyIdleOpacityMult(1);
-    scheduleIdleFade();
+    ModuleIdleFade.init();
 }
 
 function playIntoTarget(channel) {
@@ -514,6 +411,15 @@ function syncSplitChromeButtons() {
         splitBtn.setAttribute('aria-label', 'Split browser');
     }
     BrowserModule.syncActionButtons?.();
+    let activeNav = null;
+    try {
+        activeNav = typeof document?.querySelector === 'function'
+            ? document.querySelector('[data-remote-nav].is-active')?.getAttribute('data-remote-nav')
+            : null;
+    } catch {
+        activeNav = null;
+    }
+    syncRemoteNav(activeNav || (split ? 'browse' : 'remote'));
 }
 
 /**
@@ -543,6 +449,7 @@ function reconcileShells() {
         }
         document.body.classList.remove('browser-shell-split');
         syncSplitChromeButtons();
+        ModuleIdleFade.syncForLayout();
         return;
     }
 
@@ -558,14 +465,19 @@ function reconcileShells() {
     }
 
     const browserKind = layout.browserHostKind || 'undocked';
-    if (browserKind === 'undocked' || browserKind === 'docked' || browserKind === 'os') {
+    if (browserKind === 'docked') {
+        BrowserModule.dock();
+    } else if (browserKind === 'hidden') {
+        BrowserModule.hide();
+    } else if (browserKind === 'os') {
         BrowserModule.openUndocked();
-        if (browserKind === 'os') {
-            patchLayout({ browserHostKind: 'undocked' }, { persist: true, reconcile: false });
-        }
+        patchLayout({ browserHostKind: 'undocked' }, { persist: true, reconcile: false });
+    } else {
+        BrowserModule.openUndocked();
     }
     document.body.classList.add('browser-shell-split');
     syncSplitChromeButtons();
+    ModuleIdleFade.syncForLayout();
 }
 
 function teleportBodyTo(host) {
@@ -782,6 +694,10 @@ function bindOnce() {
     bound = true;
 
     const modal = moduleEl();
+    modal?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
+    dockSheetEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
+    dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
+
     el('remote-module-close')?.addEventListener('click', () => RemoteModule.close());
     el('remote-split-browser-btn')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -809,7 +725,24 @@ function bindOnce() {
     });
 
     dockTabEl()?.addEventListener('click', () => {
-        if (mode === 'hidden') RemoteModule.open({ mode: 'docked' });
+        if (mode === 'hidden') {
+            RemoteModule.open({
+                mode: 'docked',
+                slotId: targetSlotId || 'center',
+                tab: isSplit() ? null : 'remote',
+                focusClose: false
+            });
+        }
+    });
+
+    // Brand click → hide Remote (to dock tab when split).
+    document.addEventListener('click', (e) => {
+        const brand = e.target?.closest?.('#remote-shell > .module-shell__chrome > .remote-module__brand');
+        if (!brand) return;
+        if (mode === 'hidden') return;
+        if (dialogEl()?.classList.contains('is-dragging')) return;
+        e.preventDefault();
+        RemoteModule.hide();
     });
 
     dockSheetEl()?.querySelector('[data-dock-resize]')?.addEventListener('pointerdown', (e) => {
@@ -900,7 +833,7 @@ export const RemoteModule = {
         targetSlotId = slotId || 'center';
         MultiView.setStatusSlot(targetSlotId);
 
-        if (tab !== undefined) deps.switchTab(tab);
+        if (tab != null && tab !== undefined) deps.switchTab(tab);
 
         if (mode === 'hidden') {
             mode = openMode === 'undocked' ? 'undocked' : 'docked';
@@ -940,12 +873,14 @@ export const RemoteModule = {
     close() {
         if (mode === 'hidden') return;
 
-        if (RemoteExternalPopout.isPoppedOut()) {
-            RemoteExternalPopout.popIn();
+        // While split, "close/hide" must not rejoin Browser — only collapse Remote.
+        if (isSplit()) {
+            this.hide();
+            return;
         }
 
-        if (isSplit()) {
-            joinBrowser();
+        if (RemoteExternalPopout.isPoppedOut()) {
+            RemoteExternalPopout.popIn();
         }
 
         persistState({ open: false, mode: 'hidden' });
@@ -971,6 +906,52 @@ export const RemoteModule = {
         ChannelGrid.setOnPlay(deps.getDefaultOnPlay());
         syncBrowseButtons();
         RemoteExternalPopout.syncBtn();
+    },
+
+    /**
+     * Hide Remote to the bottom dock tab.
+     * When split, Browser stays open in its host (no join).
+     * When joined, fully closes the catalog module.
+     */
+    hide() {
+        if (mode === 'hidden') return;
+
+        if (!isSplit()) {
+            this.close();
+            return;
+        }
+
+        if (RemoteExternalPopout.isPoppedOut()) {
+            RemoteExternalPopout.popIn();
+        }
+
+        // Collapse Remote UI only — leave layout.mode === 'split' and Browser hosts alone.
+        externalHost = null;
+        showUndockedUI(false);
+        setSheetExpanded(false, { persist: false });
+
+        const body = catalogBody();
+        const staging = stagingEl();
+        const remoteEnd = moduleRemoteEndActions();
+        if (body && staging) {
+            if (remoteEnd) staging.appendChild(remoteEnd);
+            staging.appendChild(body);
+        }
+        dockParent = null;
+        nextSibling = null;
+        remoteEndActionsDockParent = null;
+        remoteEndActionsNextSibling = null;
+
+        mode = 'hidden';
+        persistState({ open: false, mode: 'hidden' });
+        // Keep targetSlotId so reopening still aims at the same TV.
+        updateBodyClasses();
+        syncSplitChromeButtons();
+        syncBrowseButtons();
+        RemoteExternalPopout.syncBtn();
+        RemotePanel.syncRemotePanel();
+        // Playback-from-browser still uses playIntoTarget while split.
+        ChannelGrid.setOnPlay(playIntoTarget);
     },
 
     dock() {
@@ -1104,6 +1085,6 @@ export const RemoteModule = {
     syncBrowseButtons,
     reconcileTargetIfDisabled,
     applyOpacity,
-    resetIdleFade: onUserActivity
+    resetIdleFade: () => ModuleIdleFade.resetAll()
 };
 

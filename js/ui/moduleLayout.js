@@ -17,17 +17,22 @@ const DEFAULT_BROWSER_GEOM = Object.freeze({
     height: 600
 });
 
+const BASE_MODULE_Z = 8510;
+let stackZ = BASE_MODULE_Z;
+
 /** @type {{
  *   mode: LayoutMode,
  *   remoteHostKind: HostKind,
  *   browserHostKind: HostKind | null,
  *   browser: { left: number, top: number, width: number, height: number, pinned: boolean },
+ *   browserSheetWidth: number,
  * }} */
 let layout = {
     mode: 'joined',
     remoteHostKind: 'hidden',
     browserHostKind: null,
-    browser: { ...DEFAULT_BROWSER_GEOM, pinned: false }
+    browser: { ...DEFAULT_BROWSER_GEOM, pinned: false },
+    browserSheetWidth: 0.36
 };
 
 /** @type {null | (() => void)} */
@@ -48,6 +53,12 @@ function clampBrowserGeom(raw) {
     };
 }
 
+function clampSheetWidth(raw) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return 0.36;
+    return Math.min(0.55, Math.max(0.22, n));
+}
+
 export function normalizeLayoutState(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const mode = src.mode === 'split' ? 'split' : 'joined';
@@ -56,12 +67,13 @@ export function normalizeLayoutState(raw) {
         : 'hidden';
     let browserHostKind = src.browserHostKind;
     if (mode === 'joined') browserHostKind = null;
-    else if (!['docked', 'undocked', 'os'].includes(browserHostKind)) browserHostKind = 'undocked';
+    else if (!['docked', 'undocked', 'hidden', 'os'].includes(browserHostKind)) browserHostKind = 'undocked';
     return {
         mode,
         remoteHostKind,
         browserHostKind,
-        browser: clampBrowserGeom(src.browser)
+        browser: clampBrowserGeom(src.browser),
+        browserSheetWidth: clampSheetWidth(src.browserSheetWidth)
     };
 }
 
@@ -88,7 +100,8 @@ export function getLayoutState() {
         mode: layout.mode,
         remoteHostKind: layout.remoteHostKind,
         browserHostKind: layout.browserHostKind,
-        browser: { ...layout.browser }
+        browser: { ...layout.browser },
+        browserSheetWidth: layout.browserSheetWidth
     };
 }
 
@@ -119,7 +132,7 @@ function persistLayoutSlice() {
 }
 
 /**
- * @param {Partial<{ mode: LayoutMode, remoteHostKind: HostKind, browserHostKind: HostKind | null, browser: object }>} patch
+ * @param {Partial<{ mode: LayoutMode, remoteHostKind: HostKind, browserHostKind: HostKind | null, browser: object, browserSheetWidth: number }>} patch
  * @param {{ persist?: boolean, reconcile?: boolean }} [opts]
  */
 export function patchLayout(patch = {}, { persist = true, reconcile = true } = {}) {
@@ -129,6 +142,9 @@ export function patchLayout(patch = {}, { persist = true, reconcile = true } = {
     if (patch.browser && typeof patch.browser === 'object') {
         layout.browser = clampBrowserGeom({ ...layout.browser, ...patch.browser });
     }
+    if (patch.browserSheetWidth != null) {
+        layout.browserSheetWidth = clampSheetWidth(patch.browserSheetWidth);
+    }
     if (layout.mode === 'joined') layout.browserHostKind = null;
     if (persist) persistLayoutSlice();
     if (reconcile) reconcileLayout();
@@ -137,7 +153,7 @@ export function patchLayout(patch = {}, { persist = true, reconcile = true } = {
 
 /** Split Browser into its own in-page (or later OS) host; catalog tab state unchanged. */
 export function splitBrowser({ hostKind = 'undocked' } = {}) {
-    const kind = ['docked', 'undocked', 'os'].includes(hostKind) ? hostKind : 'undocked';
+    const kind = ['docked', 'undocked', 'hidden', 'os'].includes(hostKind) ? hostKind : 'undocked';
     return patchLayout({
         mode: 'split',
         browserHostKind: kind
@@ -150,6 +166,15 @@ export function joinBrowser() {
         mode: 'joined',
         browserHostKind: null
     });
+}
+
+/** Raise a module shell above its sibling (last focused wins). */
+export function bringModuleToFront(shellId) {
+    if (typeof document === 'undefined') return;
+    stackZ += 1;
+    const id = shellId === SHELL_BROWSER ? 'browser-module' : 'remote-module';
+    const node = document.getElementById(id);
+    if (node) node.style.zIndex = String(stackZ);
 }
 
 export function remoteShellEl() {
