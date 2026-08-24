@@ -248,6 +248,10 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     width: var(--remote-min-width, 260px);
     min-width: var(--remote-min-width, 260px);
     max-width: var(--remote-min-width, 260px);
+    transition:
+        flex-basis var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        max-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
 .remote-module__shell {
@@ -280,7 +284,7 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     flex: 0 0 auto;
 }
 
-/* Joined: one window — hide inactive shell chrome/content; keep browser footer for nav */
+/* Joined: remote + browser shells share catalog; footer nav always reachable on remote tab */
 .catalog-root.module-layout--joined {
     display: flex;
     flex-direction: column;
@@ -299,19 +303,47 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     display: none;
 }
 
-/* Guide open — outer shell grows; remote column stays fixed width */
-body.remote-guide-open .remote-dock-sheet,
-body.remote-guide-open .remote-dock-tab {
-    width: calc(var(--remote-min-width) * 2);
-}
-
-body.remote-guide-open .remote-module__dialog {
-    min-width: calc(var(--remote-min-width) * 2);
-}
-
 .catalog-root.module-layout--joined:not(.is-remote-view) #browser-shell {
     flex: 1 1 auto;
     min-height: 0;
+}
+
+/* Browser tab — catalog grows to full 2× width */
+body.remote-wing-mode-browser .remote-module__host > #tv-catalog-body,
+body.remote-wing-mode-browser .remote-dock-sheet__inner > #tv-catalog-body {
+    flex: 0 0 calc(var(--remote-min-width) * 2);
+    width: calc(var(--remote-min-width) * 2);
+    min-width: calc(var(--remote-min-width) * 2);
+    max-width: calc(var(--remote-min-width) * 2);
+    transition:
+        flex-basis var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        max-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+body.remote-wing-mode-browser #browser-shell {
+    animation: browser-wing-reveal 0.5s var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+@keyframes browser-wing-reveal {
+    from {
+        opacity: 0;
+        transform: translateX(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Dock expanded to 2× when guide wing or browser tab is open */
+body.remote-dock-expanded .remote-dock-sheet,
+body.remote-dock-expanded .remote-dock-tab {
+    width: calc(var(--remote-min-width) * 2);
+}
+
+body.remote-dock-expanded .remote-module__dialog {
+    min-width: calc(var(--remote-min-width) * 2);
 }
 
 /* Split: each shell fills its own host window */

@@ -8,8 +8,10 @@ import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
 import { ACTION_ICONS } from './icons.js';
 import { channelKey } from '../tvProviders/channelShape.js';
+import { WingPanel } from './wingPanel.js';
 
 const GUIDE_REFRESH_ICON = ACTION_ICONS.refresh;
+const GUIDE_UNAVAILABLE_ICON = ACTION_ICONS.guideUnavailable;
 
 const GUIDE_SLOT_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
@@ -25,10 +27,6 @@ const slotDayOffsets = new Map();
 let lastSlotResults = [];
 /** @type {Map<string, { dayOffset: number, result: object|null }>} */
 const slotScheduleCache = new Map();
-
-function syncGuideOpenClass(open) {
-    document.body?.classList.toggle('remote-guide-open', open === true);
-}
 
 function enabledScreenSlots() {
     return GUIDE_SLOT_ORDER.filter((id) => {
@@ -130,6 +128,16 @@ function setLoading(loading) {
     if (panel) panel.classList.toggle('is-loading', loading);
 }
 
+function isGuideUnavailable(result, channel) {
+    if (!channel?.channelId && !channel?.id) return false;
+    if (!result) return false;
+    return result.status !== 'ok';
+}
+
+function unavailableHint(result, channel) {
+    return statusMessage(result, channel) || 'Guide not available';
+}
+
 function statusLine(result, channel) {
     if (!channel?.channelId && !channel?.id) {
         return { now: 'No channel tuned', next: '', meta: '' };
@@ -137,8 +145,8 @@ function statusLine(result, channel) {
     if (!result) {
         return { now: 'Loading guide…', next: '', meta: '' };
     }
-    if (result.status !== 'ok') {
-        return { now: 'guide not available', next: '', meta: statusMessage(result, channel) };
+    if (isGuideUnavailable(result, channel)) {
+        return { now: '', next: '', meta: '' };
     }
     const now = result.current?.title || 'guide not available';
     const next = result.next
@@ -168,9 +176,42 @@ function statusMessage(result, channel) {
 
 function scheduleMessage(result) {
     if (!result) return 'Loading schedule…';
-    if (result.status !== 'ok') return statusMessage(result, null) || 'Schedule unavailable';
+    if (result.status !== 'ok') return '';
     if (!result.dayProgrammes?.length) return 'No programmes listed';
     return '';
+}
+
+function noGuideIconHtml(hint) {
+    return `<span class="guide-screen__no-guide" title="${escapeHtml(hint)}" aria-label="${escapeHtml(hint)}">${GUIDE_UNAVAILABLE_ICON}</span>`;
+}
+
+function syncSlotAvailability(section, result, channel) {
+    if (!section) return;
+    const unavailable = isGuideUnavailable(result, channel);
+    section.classList.toggle('is-guide-unavailable', unavailable);
+
+    const headRow = section.querySelector('.guide-screen__head-row');
+    let iconEl = section.querySelector('.guide-screen__no-guide');
+    if (unavailable) {
+        const hint = unavailableHint(result, channel);
+        if (!iconEl && headRow) {
+            iconEl = document.createElement('span');
+            iconEl.className = 'guide-screen__no-guide';
+            headRow.insertBefore(iconEl, section.querySelector('.guide-screen__refresh'));
+        }
+        if (iconEl) {
+            iconEl.innerHTML = GUIDE_UNAVAILABLE_ICON;
+            iconEl.title = hint;
+            iconEl.setAttribute('aria-label', hint);
+        }
+        const nowEl = section.querySelector('.guide-screen__now');
+        const nextEl = section.querySelector('.guide-screen__next');
+        if (nowEl) nowEl.textContent = '';
+        if (nextEl) nextEl.textContent = '';
+        section.querySelector('.guide-screen__meta')?.remove();
+    } else if (iconEl) {
+        iconEl.remove();
+    }
 }
 
 function renderScheduleList(programmes, nowMs = Date.now()) {
@@ -202,18 +243,20 @@ function dayTabsHtml(slotId, dayOffset) {
 function renderScreenSection(slotId, { channel, result, scheduleResult = null, dayOffset = 0 }) {
     const label = SLOT_SCREEN_LABELS[slotId] || slotId;
     const channelName = channel?.name ? escapeHtml(channel.name) : '—';
+    const unavailable = isGuideUnavailable(result, channel);
     const { now, next, meta } = statusLine(result, channel);
-    const scheduleEmpty = scheduleMessage(scheduleResult);
-    const scheduleList = scheduleResult?.status === 'ok'
+    const scheduleEmpty = unavailable ? '' : scheduleMessage(scheduleResult);
+    const scheduleList = !unavailable && scheduleResult?.status === 'ok'
         ? renderScheduleList(scheduleResult.dayProgrammes)
         : '';
 
-    return `<section class="guide-screen" data-slot-id="${escapeHtml(slotId)}" aria-label="TV ${escapeHtml(label)} guide">
+    return `<section class="guide-screen${unavailable ? ' is-guide-unavailable' : ''}" data-slot-id="${escapeHtml(slotId)}" aria-label="TV ${escapeHtml(label)} guide">
         <div class="guide-screen__head-row">
             <button type="button" class="guide-screen__hit" data-guide-slot="${escapeHtml(slotId)}" aria-expanded="false">
                 <span class="guide-screen__badge">TV ${escapeHtml(label)}</span>
                 <span class="guide-screen__channel">${channelName}</span>
             </button>
+            ${unavailable ? noGuideIconHtml(unavailableHint(result, channel)) : ''}
             ${refreshButtonHtml(slotId, label)}
         </div>
         <div class="guide-screen__body">
@@ -226,7 +269,9 @@ function renderScreenSection(slotId, { channel, result, scheduleResult = null, d
                 <div class="guide-screen__schedule" role="region" aria-label="Programme schedule">
                     ${scheduleEmpty
                         ? `<p class="guide-screen__schedule-empty">${escapeHtml(scheduleEmpty)}</p>`
-                        : `<ul class="guide-screen__schedule-list">${scheduleList}</ul>`}
+                        : scheduleList
+                            ? `<ul class="guide-screen__schedule-list">${scheduleList}</ul>`
+                            : ''}
                 </div>
                 ${meta ? `<p class="guide-screen__meta">${escapeHtml(meta)}</p>` : ''}
             </div>
@@ -243,9 +288,10 @@ function patchSlotSection(section, slotId, { channel, result, scheduleResult, da
     let metaEl = section.querySelector('.guide-screen__meta');
 
     const { now, next, meta } = statusLine(result, channel);
+    syncSlotAvailability(section, result, channel);
     if (channelEl) channelEl.textContent = channel?.name || '—';
-    if (nowEl) nowEl.textContent = now;
-    if (nextEl) nextEl.textContent = next;
+    if (nowEl && !isGuideUnavailable(result, channel)) nowEl.textContent = now;
+    if (nextEl && !isGuideUnavailable(result, channel)) nextEl.textContent = next;
 
     if (meta) {
         if (!metaEl) {
@@ -281,8 +327,12 @@ function patchSlotSection(section, slotId, { channel, result, scheduleResult, da
 
 function scheduleSlotsToLoad() {
     const slots = enabledScreenSlots();
-    if (!expandedSlotId || slots.length <= 1) return slots;
-    return [expandedSlotId];
+    const visible = slots.filter((slotId) => {
+        const entry = lastSlotResults.find((r) => r.slotId === slotId);
+        return !isGuideUnavailable(entry?.result ?? null, entry?.channel ?? slotChannel(slotId));
+    });
+    if (!expandedSlotId || slots.length <= 1) return visible;
+    return visible.includes(expandedSlotId) ? [expandedSlotId] : visible;
 }
 
 async function loadSchedulesForVisibleSlots({ force = false } = {}) {
@@ -356,6 +406,14 @@ function syncExpandedLayout(slotResults = lastSlotResults) {
     if (!container) return;
 
     const slots = enabledScreenSlots();
+    const resultMap = new Map(slotResults.map((r) => [r.slotId, r]));
+
+    if (expandedSlotId) {
+        const expanded = resultMap.get(expandedSlotId);
+        if (isGuideUnavailable(expanded?.result ?? null, expanded?.channel ?? slotChannel(expandedSlotId))) {
+            expandedSlotId = null;
+        }
+    }
     if (expandedSlotId && !slots.includes(expandedSlotId)) {
         expandedSlotId = null;
     }
@@ -373,6 +431,8 @@ function syncExpandedLayout(slotResults = lastSlotResults) {
             return;
         }
         const expanded = !isEqual && slotId === expandedSlotId;
+        const data = resultMap.get(slotId);
+        syncSlotAvailability(section, data?.result ?? null, data?.channel ?? slotChannel(slotId));
         section.hidden = false;
         section.classList.toggle('is-expanded', expanded);
         section.classList.toggle('is-collapsed', !isEqual && !expanded);
@@ -384,6 +444,12 @@ function syncExpandedLayout(slotResults = lastSlotResults) {
 
 function setExpandedSlot(slotId, { focus = true } = {}) {
     const slots = enabledScreenSlots();
+    if (slotId && slots.includes(slotId)) {
+        const entry = lastSlotResults.find((r) => r.slotId === slotId);
+        if (isGuideUnavailable(entry?.result ?? null, entry?.channel ?? slotChannel(slotId))) {
+            return;
+        }
+    }
     if (!slotId || !slots.includes(slotId)) {
         expandedSlotId = null;
     } else if (expandedSlotId === slotId && slots.length > 1) {
@@ -438,7 +504,7 @@ function renderGuideScreens(slotResults) {
 }
 
 async function refreshGuide() {
-    if (!GuidePanel.isVisible()) return;
+    if (!WingPanel.isGuideMode()) return;
 
     const slots = enabledScreenSlots();
     const snapshot = guideSnapshot();
@@ -480,8 +546,8 @@ export const GuidePanel = {
     init() {
         const saved = loadPlayerState().remoteModule || {};
         expandedSlotId = saved.guideExpandedSlot || null;
+        WingPanel.init();
         this.bind();
-        this.setVisible(saved.guideOpen === true, { silent: true });
     },
 
     bind() {
@@ -540,29 +606,26 @@ export const GuidePanel = {
     },
 
     isVisible() {
-        return document.body?.classList.contains('remote-guide-open') === true;
+        return WingPanel.isGuideMode();
     },
 
     setVisible(visible, { silent = false } = {}) {
+        WingPanel.setGuideOpen(visible !== false, { silent });
         const panel = this.getPanelEl();
-        if (!panel) return false;
-        const next = visible !== false;
-        syncGuideOpenClass(next);
-        panel.setAttribute('aria-hidden', String(!next));
-        if (next) {
+        if (panel && WingPanel.isGuideMode()) {
             lastSnapshot = '';
             refreshGuide().catch(() => {});
         }
-        if (!silent) {
-            window.dispatchEvent(new CustomEvent('guide:visibility_changed', {
-                detail: { visible: next }
-            }));
-        }
-        return next;
+        return WingPanel.isGuideMode();
     },
 
     toggle() {
-        return this.setVisible(!this.isVisible());
+        const next = WingPanel.toggleGuide();
+        if (WingPanel.isGuideMode()) {
+            lastSnapshot = '';
+            refreshGuide().catch(() => {});
+        }
+        return next;
     },
 
     refresh() {

@@ -9,6 +9,7 @@ import { SettingsStore } from '../storage/settingsStore.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { RemotePanel, syncRemoteNav } from './remotePanel.js';
 import { GuidePanel } from './guidePanel.js';
+import { WingPanel } from './wingPanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
 import { BrowserModule } from './browserModule.js';
@@ -34,7 +35,7 @@ const VIEW_PAD = 8;
 const DEFAULT_SHEET_HEIGHT = 0.62;
 
 function minDialogWidth() {
-    return GuidePanel.isVisible?.() ? MIN_W * 2 : MIN_W;
+    return WingPanel.isOpen?.() ? MIN_W * 2 : MIN_W;
 }
 
 let deps = {
@@ -218,7 +219,7 @@ function persistState(overrides = {}) {
             targetSlotId: nextTarget,
             sheetHeight: parseFloat(sheetHeight) || DEFAULT_SHEET_HEIGHT,
             sheetExpanded: overrides.sheetExpanded != null ? overrides.sheetExpanded === true : sheetExpanded,
-            guideOpen: overrides.guideOpen != null ? overrides.guideOpen === true : GuidePanel.isVisible?.(),
+            guideOpen: overrides.guideOpen != null ? overrides.guideOpen === true : WingPanel.isGuidePreferred?.(),
             layout: {
                 ...layoutState,
                 remoteHostKind
@@ -832,16 +833,23 @@ function bindOnce() {
         if (mode !== 'hidden') persistState();
     });
 
-    window.addEventListener('guide:visibility_changed', (e) => {
-        const visible = e.detail?.visible === true;
+    window.addEventListener('wing:mode_changed', (e) => {
+        const open = e.detail?.open === true;
         if (mode === 'undocked') {
             const geom = readDialogGeometry();
-            if (visible && geom.width < MIN_W * 2) {
+            if (open && geom.width < MIN_W * 2) {
                 applyGeometry({ ...geom, width: MIN_W * 2 });
+            } else if (!open && geom.width >= MIN_W * 2) {
+                applyGeometry({ ...geom, width: MIN_W });
             } else {
                 applyGeometry(geom);
             }
         }
+        persistState({ guideOpen: WingPanel.isGuidePreferred?.() });
+    });
+
+    window.addEventListener('guide:visibility_changed', (e) => {
+        const visible = e.detail?.visible === true;
         persistState({ guideOpen: visible });
     });
 

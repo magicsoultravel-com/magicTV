@@ -57,6 +57,8 @@ export const ACTION_ICONS = {
     guideShow: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="2" y="1.8" width="8" height="8.4" rx="0.7" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M4 4.2h4M4 6h4M4 7.8h2.4" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
     /** Guide hidden — schedule with slash. */
     guideHide: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="2" y="1.8" width="8" height="8.4" rx="0.7" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M4 4.2h4M4 6h4M4 7.8h2.4M2.2 2.2l7.6 7.6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
+    /** No EPG / guide prohibited for this channel. */
+    guideUnavailable: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.8 3.8l4.4 4.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     /** Play top favorites across mosaic slots (multi-pane + play). */
     playMosaic: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.2" y="1.2" width="4" height="4" rx="0.4" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="6.8" y="1.2" width="4" height="4" rx="0.4" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="1.2" y="6.8" width="4" height="4" rx="0.4" fill="none" stroke="currentColor" stroke-width="0.85"/><path d="M7.2 7.4v3.2L10.2 9 7.2 7.4z" fill="currentColor"/></svg>',
     /** Grid of tiles — switch to tile layout. */

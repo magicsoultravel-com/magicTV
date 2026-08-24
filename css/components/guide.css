@@ -15,14 +15,14 @@
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-body.remote-guide-open .guide-wing {
+body.remote-wing-open .guide-wing {
     flex: 0 0 var(--remote-min-width);
     width: var(--remote-min-width);
     max-width: var(--remote-min-width);
     pointer-events: auto;
 }
 
-body.remote-undocked-open.remote-guide-open .guide-wing {
+body.remote-undocked-open.remote-wing-open .guide-wing {
     flex: 1 1 var(--remote-min-width);
     max-width: none;
 }
@@ -95,6 +95,26 @@ body.remote-undocked-open.remote-guide-open .guide-wing {
 .guide-wing__screens.is-slot-expanded .guide-screen.is-expanded {
     flex: 1 1 0;
     min-height: 0;
+}
+
+.guide-wing__screens.is-equal-split .guide-screen.is-guide-unavailable {
+    flex: 0 0 auto;
+}
+
+.guide-wing__screens.is-slot-expanded .guide-screen.is-guide-unavailable {
+    flex: 0 0 auto;
+}
+
+.guide-screen.is-guide-unavailable .guide-screen__body {
+    display: none;
+}
+
+.guide-screen.is-guide-unavailable .guide-screen__hit {
+    cursor: default;
+}
+
+.guide-screen.is-guide-unavailable .guide-screen__hit:hover .guide-screen__channel {
+    color: var(--tv-text-secondary);
 }
 
 .guide-screen {
@@ -341,6 +361,21 @@ body.remote-undocked-open.remote-guide-open .guide-wing {
     color: var(--tv-text-secondary);
 }
 
+.guide-screen__no-guide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: color-mix(in srgb, var(--tv-text-muted) 70%, #e55);
+    opacity: 0.95;
+}
+
+.guide-screen__no-guide svg {
+    display: block;
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
 .guide-screen__now {
     margin: 0;
     font-size: 0.8rem;
@@ -392,14 +427,6 @@ body.remote-undocked-open.remote-guide-open .guide-wing {
 
 .guide-panel.is-loading .guide-wing__screens {
     opacity: 0.65;
-}
-
-/* Hide guide column when browsing (remote shell hidden) */
-.catalog-root.module-layout--joined:not(.is-remote-view) ~ .guide-wing {
-    flex: 0 0 0 !important;
-    width: 0 !important;
-    max-width: 0 !important;
-    pointer-events: none !important;
 }
 
 /* Header programme lines — arranged along a single shared baseline. All header text

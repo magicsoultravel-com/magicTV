@@ -20,6 +20,7 @@ import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
 import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
 import { GuidePanel } from './ui/guidePanel.js';
+import { WingPanel } from './ui/wingPanel.js';
 import { isSplit } from './ui/moduleLayout.js';
 import { warmGuideIndex } from './epg/epgService.js';
 
@@ -557,6 +558,7 @@ function syncRemoteTabChrome() {
     }
     syncRemoteNav(tab);
     syncRemoteChannelBar(tab);
+    WingPanel.syncForTab(tab);
 }
 
 const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
