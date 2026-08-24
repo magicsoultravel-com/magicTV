@@ -36,7 +36,7 @@ export const PlayerChrome = {
             syncVolumeDial();
         });
         window.addEventListener('tv:state_changed', () => { ChannelGrid.syncFavButtons(); ChannelGrid.syncPlayingTiles(); ChannelGrid.syncVisitedTiles(); });
-        window.addEventListener('tv:state_changed', syncVolumeDial);
+        window.addEventListener('tv:state_changed', (e) => syncVolumeDial(e.detail));
         syncVolumeDial();
     },
 
@@ -109,7 +109,7 @@ export const PlayerChrome = {
             try { TvPlayer.mountVideo(); } catch { /* ignore */ }
         }
 
-        syncVolumeDial();
+        syncVolumeDial(state);
 
         this.updateBufferQuality();
         RemotePanel.syncRemotePanel?.();

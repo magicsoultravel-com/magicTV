@@ -168,6 +168,12 @@ export function joinBrowser() {
     });
 }
 
+/** Toggle between joined and split browser layout. */
+export function toggleSplitBrowser({ hostKind = 'undocked' } = {}) {
+    if (layout.mode === 'split') return joinBrowser();
+    return splitBrowser({ hostKind });
+}
+
 /** Raise a module shell above its sibling (last focused wins). */
 export function bringModuleToFront(shellId) {
     if (typeof document === 'undefined') return;

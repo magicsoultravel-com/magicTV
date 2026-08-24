@@ -316,7 +316,9 @@ function patchSlotSection(section, slotId, { channel, result, scheduleResult, da
         const scheduleEl = section.querySelector('.guide-screen__schedule');
         if (scheduleEl) {
             const empty = scheduleMessage(scheduleResult);
-            if (empty) {
+            if (scheduleResult?.status !== 'ok') {
+                scheduleEl.innerHTML = '';
+            } else if (empty) {
                 scheduleEl.innerHTML = `<p class="guide-screen__schedule-empty">${escapeHtml(empty)}</p>`;
             } else {
                 scheduleEl.innerHTML = `<ul class="guide-screen__schedule-list">${renderScheduleList(scheduleResult.dayProgrammes)}</ul>`;
@@ -503,8 +505,12 @@ function renderGuideScreens(slotResults) {
     syncExpandedLayout(filtered);
 }
 
+function shouldLoadGuide() {
+    return WingPanel.isGuideMode();
+}
+
 async function refreshGuide() {
-    if (!WingPanel.isGuideMode()) return;
+    if (!shouldLoadGuide()) return;
 
     const slots = enabledScreenSlots();
     const snapshot = guideSnapshot();
@@ -601,6 +607,12 @@ export const GuidePanel = {
         });
 
         window.addEventListener('tv:epg_updated', () => {
+            refreshGuide().catch(() => {});
+        });
+
+        window.addEventListener('wing:mode_changed', (e) => {
+            if (e.detail?.mode !== 'guide') return;
+            lastSnapshot = '';
             refreshGuide().catch(() => {});
         });
     },

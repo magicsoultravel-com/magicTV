@@ -284,7 +284,7 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     flex: 0 0 auto;
 }
 
-/* Joined: remote + browser shells share catalog; footer nav always reachable on remote tab */
+/* Joined: remote + browser shells share catalog; nav moves to footer on browser tabs */
 .catalog-root.module-layout--joined {
     display: flex;
     flex-direction: column;
@@ -468,7 +468,7 @@ body.browser-shell-split #remote-shell {
     width: 100%;
 }
 
-.remote-panel__footer-chrome .remote-panel__footer-nav,
+.remote-panel__footer-chrome .remote-panel__nav-group--footer,
 .remote-panel__footer-chrome .browser-window-controls,
 .remote-panel__footer-chrome .layout-window-controls,
 .remote-panel__footer-chrome .remote-module__catalog-tools.is-visible {
@@ -476,7 +476,21 @@ body.browser-shell-split #remote-shell {
     flex: 0 0 auto;
 }
 
-.remote-panel__footer-nav,
+.remote-panel__nav-group {
+    display: contents;
+}
+
+.remote-panel__nav-group.remote-panel__nav-group--footer,
+#browser-panel-nav-group.remote-panel__nav-group--footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: auto;
+    flex: 0 0 auto;
+}
+
 .remote-panel__footer-screens {
     width: 100%;
 }
@@ -959,20 +973,6 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     box-shadow: none;
 }
 
-.remote-shell__layout-controls {
-    display: flex;
-    justify-content: center;
-    padding-bottom: 0.35rem;
-}
-
-.remote-shell__layout-controls.is-hidden {
-    display: none !important;
-}
-
-#remote-shell .remote-shell__layout-controls:not(.is-hidden) {
-    display: flex;
-}
-
 .remote-panel__cell--nav {
     grid-column: 1 / -1;
     display: flex;
@@ -1096,11 +1096,6 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
 
 body.remote-docked-expanded .remote-dock-tab {
     display: none;
-}
-
-#remote-reset-btn.is-hidden,
-#remote-reset-btn[hidden] {
-    display: none !important;
 }
 
 /* --- Remote external popout (Document PiP / popup window) --- */

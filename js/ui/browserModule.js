@@ -10,7 +10,6 @@ import { MultiView } from '../multiView.js';
 import {
     getLayoutState,
     patchLayout,
-    joinBrowser,
     browserShellEl,
     isSplit,
     bringModuleToFront,
@@ -387,29 +386,12 @@ function beginGesture(e, mode, edge = '') {
 
 function syncWindowControls() {
     const strip = el('browser-window-controls');
-    const layoutStrip = el('layout-window-controls');
     const dockBtn = el('browser-dock-toggle');
     const hideBtn = el('browser-hide-toggle');
-    const splitBtn = el('remote-split-browser-btn');
-    const joinBtn = el('browser-join-btn');
     const split = isSplit();
     const kind = getLayoutState().browserHostKind;
 
     strip?.classList.toggle('is-hidden', !split);
-
-    if (splitBtn) {
-        splitBtn.classList.toggle('is-hidden', split);
-        splitBtn.innerHTML = CARD_ICONS.splitLayout;
-        splitBtn.title = 'Split browser';
-        splitBtn.setAttribute('aria-label', splitBtn.title);
-        splitBtn.setAttribute('aria-pressed', String(split));
-    }
-    if (joinBtn) {
-        joinBtn.classList.toggle('is-hidden', !split);
-        joinBtn.innerHTML = CARD_ICONS.popin;
-        joinBtn.title = 'Join browser with remote';
-        joinBtn.setAttribute('aria-label', joinBtn.title);
-    }
 
     if (dockBtn) {
         dockBtn.classList.toggle('is-hidden', !split);
@@ -495,12 +477,6 @@ function bindOnce() {
 
     modal?.querySelector('[data-browser-module-dismiss]')?.addEventListener('click', () => {
         if (!pinned && uiMode === 'undocked') BrowserModule.hide();
-    });
-
-    el('browser-join-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        joinBrowser();
-        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'joined' } }));
     });
 
     el('browser-external-popout-btn')?.addEventListener('click', (e) => {

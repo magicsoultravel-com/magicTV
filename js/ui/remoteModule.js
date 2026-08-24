@@ -22,6 +22,7 @@ import {
     syncCatalogRootClasses,
     splitBrowser,
     joinBrowser,
+    toggleSplitBrowser,
     isSplit,
     remoteShellEl,
     browserShellEl,
@@ -430,33 +431,32 @@ function ensureShellsJoinedInRoot() {
     syncCatalogRootClasses(root);
 }
 
+function syncLayoutToggleBtn(btn, { visible, split }) {
+    if (!btn) return;
+    btn.classList.toggle('is-hidden', !visible);
+    btn.innerHTML = CARD_ICONS.splitLayout;
+    if (split) {
+        btn.title = 'Join browser with remote';
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-pressed', 'true');
+    } else {
+        btn.title = 'Split browser';
+        btn.classList.remove('is-active');
+        btn.setAttribute('aria-pressed', 'false');
+    }
+    btn.setAttribute('aria-label', btn.title);
+}
+
 function syncSplitChromeButtons() {
-    const splitBtn = el('remote-split-browser-btn');
-    const joinBtn = el('browser-join-btn');
+    const navToggle = el('remote-split-browser-btn');
     const remoteOpen = mode !== 'hidden';
     const split = isSplit();
-    if (splitBtn) {
-        splitBtn.classList.toggle('is-hidden', !remoteOpen || split);
-        splitBtn.innerHTML = CARD_ICONS.splitLayout;
-        splitBtn.setAttribute('aria-pressed', String(split));
-        splitBtn.title = 'Split browser';
-        splitBtn.setAttribute('aria-label', 'Split browser');
+    syncLayoutToggleBtn(navToggle, { visible: remoteOpen, split });
+    const browserNav = el('browser-panel-nav-group');
+    if (browserNav) {
+        browserNav.classList.toggle('is-hidden', !split);
+        browserNav.setAttribute('aria-hidden', String(!split));
     }
-    if (joinBtn) {
-        joinBtn.classList.toggle('is-hidden', !split);
-        joinBtn.innerHTML = CARD_ICONS.popin;
-        joinBtn.title = 'Join browser with remote';
-        joinBtn.setAttribute('aria-label', joinBtn.title);
-    }
-    const remoteJoinBtn = el('remote-join-btn');
-    if (remoteJoinBtn) {
-        remoteJoinBtn.classList.toggle('is-hidden', !split);
-        remoteJoinBtn.innerHTML = CARD_ICONS.popin;
-        remoteJoinBtn.title = 'Join browser with remote';
-        remoteJoinBtn.setAttribute('aria-label', remoteJoinBtn.title);
-    }
-    const remoteLayoutControls = el('remote-layout-window-controls');
-    remoteLayoutControls?.classList.toggle('is-hidden', !split);
     const remoteScreenFooter = el('remote-shell-screens-footer');
     if (remoteScreenFooter) {
         remoteScreenFooter.classList.toggle('is-hidden', !split);
@@ -473,6 +473,26 @@ function syncSplitChromeButtons() {
         activeNav = null;
     }
     syncRemoteNav(activeNav || (split ? 'browse' : 'remote'));
+}
+
+function handleLayoutToggleClick(e) {
+    e.preventDefault();
+    if (mode === 'hidden') return;
+    const wasSplit = isSplit();
+    toggleSplitBrowser({ hostKind: 'undocked' });
+    if (!wasSplit) deps.switchTab?.('browse');
+    window.dispatchEvent(new CustomEvent('remote:layout_changed', {
+        detail: { mode: wasSplit ? 'joined' : 'split' }
+    }));
+}
+
+function bindLayoutToggleButtons() {
+    if (typeof document === 'undefined') return;
+    document.querySelectorAll('[data-layout-toggle="split"]').forEach((btn) => {
+        if (btn.dataset.bound === '1') return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', handleLayoutToggleClick);
+    });
 }
 
 /**
@@ -760,25 +780,7 @@ function bindOnce() {
     dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
 
     el('remote-module-close')?.addEventListener('click', () => RemoteModule.close());
-    el('remote-split-browser-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (mode === 'hidden') return;
-        splitBrowser({ hostKind: 'undocked' });
-        deps.switchTab?.('browse');
-        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'split' } }));
-    });
-
-    el('browser-join-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        joinBrowser();
-        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'joined' } }));
-    });
-
-    el('remote-join-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        joinBrowser();
-        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'joined' } }));
-    });
+    bindLayoutToggleButtons();
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
         if (e.target.closest?.('button')) return;
         beginGesture(e, 'drag');

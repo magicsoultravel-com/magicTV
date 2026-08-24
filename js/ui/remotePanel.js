@@ -6,6 +6,7 @@ import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
+import { syncVolumeDial } from './volumeDial.js';
 
 let deps = {
     switchTab: () => {},
@@ -21,6 +22,32 @@ export function syncRemoteNav(tabName) {
         }
         btn.classList.toggle('is-active', nav === tabName);
     });
+    syncNavPlacement(tabName);
+}
+
+function syncNavPlacement(tabName) {
+    const navGroup = el('remote-panel-nav-group');
+    const grid = el('remote-panel')?.querySelector('.remote-panel__grid');
+    if (!navGroup || !grid) return;
+    if (typeof document?.querySelector !== 'function') return;
+
+    const footerChrome = document.querySelector('#remote-panel-footer .remote-panel__footer-chrome');
+    const joined = !isSplit();
+    const remoteTab = tabName === 'remote';
+    const placeInFooter = joined && !remoteTab && footerChrome;
+
+    navGroup.classList.toggle('remote-panel__nav-group--footer', placeInFooter);
+
+    if (placeInFooter) {
+        if (navGroup.parentElement !== footerChrome) footerChrome.appendChild(navGroup);
+        return;
+    }
+
+    if (navGroup.parentElement !== grid) {
+        grid.insertBefore(navGroup, grid.firstChild);
+    } else if (grid.firstElementChild !== navGroup) {
+        grid.insertBefore(navGroup, grid.firstChild);
+    }
 }
 
 export function syncRemoteChannelBar(tabName) {
@@ -69,7 +96,7 @@ async function handleRemoteAction(action) {
         }
         default:
             await MultiView.handleTileAction(
-                action === 'reset' || action === 'mute-all' ? 'center' : slotId,
+                action === 'reset' || action === 'mute-all' || action === 'stop-all' ? 'center' : slotId,
                 action
             );
     }
@@ -131,13 +158,6 @@ export function syncRemotePanel() {
         if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
     }
 
-    const resetBtn = el('remote-reset-btn');
-    if (resetBtn) {
-        const custom = MultiView.hasCustomPlacement?.() ?? false;
-        resetBtn.classList.toggle('is-hidden', !custom);
-        resetBtn.hidden = !custom;
-    }
-
     const mod = deps.getRemoteModule?.();
     const dockBtn = el('remote-dock-toggle');
     if (dockBtn && mod) {
@@ -165,6 +185,8 @@ export function syncRemotePanel() {
         guideBtn.title = visible ? 'Hide TV guide' : 'Show TV guide';
         guideBtn.setAttribute('aria-label', guideBtn.title);
     }
+
+    syncVolumeDial();
 }
 
 function bindRemoteActions(root) {

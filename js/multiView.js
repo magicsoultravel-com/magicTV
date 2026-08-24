@@ -41,6 +41,7 @@ import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
 import { hydrateTileHoverControls } from './ui/tileHoverControls.js';
+import { syncScreenBtnActions } from './ui/screenStripControls.js';
 import { ChromecastManager } from './cast/chromecastManager.js';
 
 export { MAX_MOSAIC_SLOTS };
@@ -206,6 +207,12 @@ export const MultiView = {
                 const enabled = slotId === 'center' || this.slots[slotId]?.enabled;
                 btn.hidden = !enabled;
                 btn.classList.toggle('is-active', enabled && this.statusSlotId === slotId);
+                if (enabled && slotId) {
+                    const player = this.slots[slotId]?.player;
+                    const intentPlaying = player?.wantPlaying === true || player?.playing === true;
+                    const isMuted = player ? !this.isSlotAudible(player) : true;
+                    syncScreenBtnActions(btn, player, { intentPlaying, isMuted });
+                }
             });
             if (addBtn) {
                 const atMax = SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
@@ -571,6 +578,18 @@ export const MultiView = {
         this.syncMosaicChrome();
     },
 
+    async stopAll() {
+        await Promise.all(SLOT_IDS.map(async (id) => {
+            const slot = this.slots[id];
+            if (!slot?.enabled || !slot?.player?.channel) return;
+            await slot.player.stop({ clearChannel: true }).catch(() => {});
+        }));
+        this.persistSlots();
+        TileFrames.setPlaybackBusy(false);
+        this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
+    },
+
     syncMosaicChrome() {
         if (typeof document === 'undefined') return;
         const app = el('app-container') || document.body;
@@ -614,6 +633,11 @@ export const MultiView = {
         if (action === 'mute-all') {
             if (this.isMuteAllActive()) this.unmuteAll();
             else this.muteAll();
+            return;
+        }
+
+        if (action === 'stop-all') {
+            await this.stopAll();
             return;
         }
 
@@ -930,6 +954,7 @@ export const MultiView = {
         if (player.playing) {
             this.persistSlots();
             this.scheduleRefreshTiles();
+            player.emitState?.();
             return;
         }
 
@@ -946,7 +971,7 @@ export const MultiView = {
             this.persistSlots();
             this.scheduleRefreshTiles();
             this.syncSettingsToggles();
-            if (id === 'center') this.getPrimary()?.emitState();
+            player.emitState?.();
         }
     },
 
@@ -1320,6 +1345,22 @@ export const MultiView = {
                 e.preventDefault();
                 const slotId = removeBtn.closest('.tv-controls__screen-btn')?.dataset.screenSlot;
                 if (slotId) this.removeScreen(slotId);
+                return;
+            }
+            const actionBtn = e.target.closest('[data-screen-action]');
+            if (actionBtn && strip.contains(actionBtn)) {
+                e.stopPropagation();
+                e.preventDefault();
+                const slotId = actionBtn.closest('.tv-controls__screen-btn')?.dataset.screenSlot;
+                const action = actionBtn.dataset.screenAction;
+                if (slotId && action) {
+                    this.handleTileAction(slotId, action).then(() => {
+                        this.syncScreenControls();
+                        import('./ui/remotePanel.js')
+                            .then(({ syncRemotePanel }) => syncRemotePanel())
+                            .catch(() => {});
+                    }).catch(() => {});
+                }
                 return;
             }
             const screenBtn = e.target.closest('.tv-controls__screen-btn');

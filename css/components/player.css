@@ -1294,15 +1294,71 @@
     transition: var(--tv-transition);
     pointer-events: auto;
     cursor: pointer;
+    z-index: 2;
+}
+
+.tv-controls__screen-action {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.75rem;
+    height: 0.75rem;
+    padding: 0;
+    border: none;
+    background: color-mix(in srgb, var(--tv-text-muted) 85%, transparent);
+    color: var(--tv-bg);
+    border-radius: 50%;
+    font-size: 0;
+    line-height: 1;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: var(--tv-transition);
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.tv-controls__screen-action svg {
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+}
+
+.tv-controls__screen-action--mute {
+    top: -0.3rem;
+    left: -0.3rem;
+}
+
+.tv-controls__screen-action--play {
+    bottom: -0.3rem;
+    left: -0.3rem;
+}
+
+.tv-controls__screen-action--stop {
+    bottom: -0.3rem;
+    right: -0.3rem;
+}
+
+.tv-controls__screen-action:disabled {
+    opacity: 0;
+    pointer-events: none;
+    cursor: default;
 }
 
 .tv-controls__screen-btn:hover .tv-controls__screen-remove,
-.tv-controls__screen-btn:focus-within .tv-controls__screen-remove {
+.tv-controls__screen-btn:focus-within .tv-controls__screen-remove,
+.tv-controls__screen-btn:hover .tv-controls__screen-action:not(:disabled),
+.tv-controls__screen-btn:focus-within .tv-controls__screen-action:not(:disabled) {
     opacity: 0.85;
     transform: scale(1);
 }
 
 .tv-controls__screen-remove:hover {
+    background: var(--tv-text-secondary);
+}
+
+.tv-controls__screen-action:hover:not(:disabled) {
     background: var(--tv-text-secondary);
 }
 

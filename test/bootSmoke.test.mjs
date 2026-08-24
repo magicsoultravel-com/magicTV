@@ -19,9 +19,9 @@ const KNOWN_IDS = [
     'browser-module', 'browser-module-dialog', 'browser-module-host',
     'browser-dock-tab', 'browser-dock-sheet', 'browser-dock-host',
     'browser-window-controls', 'browser-dock-toggle', 'browser-hide-toggle',
-    'layout-window-controls', 'remote-shell-screens-footer', 'remote-join-btn', 'remote-layout-window-controls',
+    'remote-shell-screens-footer', 'remote-panel-nav-group', 'browser-panel-nav-group',
     'remote-guide-toggle',
-    'remote-external-popout-btn', 'remote-split-browser-btn', 'browser-join-btn', 'browser-external-popout-btn',
+    'remote-external-popout-btn', 'remote-split-browser-btn', 'browser-external-popout-btn',
     'remote-module-pin', 'remote-module-close', 'remote-back-btn',
     'player-tile-topLeft', 'player-tile-center', 'player-tile-topRight',
     'player-tile-bottomLeft', 'player-tile-bottomRight',
@@ -40,8 +40,8 @@ const KNOWN_IDS = [
     'remote-texture-select',
     'catalog-layout-btn',
     'reset-appearance-btn', 'appearance-preview-tile',
-    'mosaic-reset-btn', 'mosaic-mute-all-btn',
-    'remote-reset-btn', 'remote-mute-all-btn', 'remote-play-btn', 'remote-mute-btn',
+    'mosaic-reset-btn', 'mosaic-mute-all-btn', 'mosaic-stop-all-btn',
+    'remote-reset-btn', 'remote-mute-all-btn', 'remote-stop-all-btn', 'remote-play-btn', 'remote-mute-btn',
     'add-screen-btn', 'play-favorites-mosaic-btn', 'create-favorite-folder-btn',
     'preview-avatar', 'preview-name', 'preview-flag',
     'volume-pct',
@@ -60,7 +60,6 @@ const KNOWN_IDS = [
     'preview-list-flag',
     'resume-session-modal',
     'resume-session-dialog',
-    'resume-session-count',
     'resume-session-list'
 ];
 function makeEl(id = '') {

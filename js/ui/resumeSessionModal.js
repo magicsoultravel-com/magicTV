@@ -80,14 +80,8 @@ function channelInitial(name) {
  * @param {Map<string, string>} [posterMap]
  */
 function renderList(tiles, posterMap = new Map()) {
-    const countEl = el('resume-session-count');
     const listEl = el('resume-session-list');
     if (!listEl) return;
-
-    const count = tiles.length;
-    if (countEl) {
-        countEl.textContent = count === 1 ? '1 channel' : `${count} channels`;
-    }
 
     listEl.innerHTML = tiles.map(({ slotId, channelName, channelKey, isLastActive }) => {
         const screenNum = SLOT_SCREEN_LABELS[slotId] || slotId;

@@ -54,12 +54,25 @@ function makeEl(tag = 'div', id = '') {
         getAttribute(k) { return attrs[k] ?? null; },
         addEventListener() {},
         removeEventListener() {},
+        insertAdjacentHTML(_position, html) {
+            for (const action of html.matchAll(/data-screen-action="([^"]+)"/g)) {
+                const child = makeEl('button');
+                child.dataset.screenAction = action[1];
+                child.classList.add('tv-controls__screen-action');
+                child.innerHTML = '';
+                node.appendChild(child);
+            }
+        },
         querySelector(sel) {
             if (sel === '#add-screen-btn') {
                 return node.children.find((c) => c.id === 'add-screen-btn') || null;
             }
             if (sel === '.tv-controls__screen-btn') {
                 return node.children.find((c) => c.classList.contains('tv-controls__screen-btn')) || null;
+            }
+            const actionMatch = sel.match(/\[data-screen-action="([^"]+)"\]/);
+            if (actionMatch) {
+                return node.children.find((c) => c.dataset?.screenAction === actionMatch[1]) || null;
             }
             return null;
         },
@@ -71,9 +84,19 @@ function makeEl(tag = 'div', id = '') {
             if (sel === '.tv-player-tile.is-channel-picker-target') {
                 return node.ownerDocument?.highlightedTiles || [];
             }
+            const actionMatch = sel.match(/\[data-screen-action="([^"]+)"\]/);
+            if (actionMatch) {
+                return node.children.filter((c) => c.dataset?.screenAction === actionMatch[1]);
+            }
             return [];
         },
-        closest() { return null; },
+        closest(sel) {
+            if (sel === '.tv-controls__screen-btn' && node.classList.contains('tv-controls__screen-btn')) return node;
+            if (sel === '.tv-controls__screens' && node.className?.includes('tv-controls__screens')) return node;
+            if (sel === '[data-screen-action]' && node.dataset?.screenAction) return node;
+            if (sel === '.tv-controls__screen-remove' && node.classList?.contains('tv-controls__screen-remove')) return node;
+            return node.parentElement?.closest?.(sel) || null;
+        },
         getBoundingClientRect() { return { left: 0, top: 0, width: 280, height: 640 }; }
     };
     return node;
@@ -142,7 +165,7 @@ function buildDom() {
     const highlightedTiles = [];
 
     const doc = {
-        body: { classList: makeClassList(), appendChild() {} },
+        body: { classList: makeClassList(), dataset: {}, appendChild() {} },
         head: { querySelectorAll: () => [], prepend() {} },
         documentElement: { attributes: [], dataset: {}, style: { setProperty() {} } },
         highlightedTiles,
@@ -248,6 +271,41 @@ test('screen strip hover highlights matching mosaic tile on the page', () => {
 
     MultiView.clearScreenStripHover();
     assert.equal(tiles.topRight.classList.contains('is-screen-strip-hover'), false);
+});
+
+test('screen strip hydrates mute play stop mini controls', async () => {
+    const { hydrateScreenBtnActions, syncScreenBtnActions } = await import('../js/ui/screenStripControls.js');
+    const btn = makeScreenBtn('topLeft');
+    hydrateScreenBtnActions(btn);
+    assert.equal(btn.dataset.actionsHydrated, '1');
+    assert.ok(btn.querySelector('[data-screen-action="mute"]'));
+    assert.ok(btn.querySelector('[data-screen-action="play"]'));
+    assert.ok(btn.querySelector('[data-screen-action="stop"]'));
+
+    const player = makePlayer('A');
+    player.muted = true;
+    syncScreenBtnActions(btn, player, { intentPlaying: false, isMuted: true });
+    assert.ok(btn.querySelector('[data-screen-action="mute"]').classList.contains('is-muted'));
+});
+
+test('screen strip mute action toggles slot without removing screen', async () => {
+    const { doc, screenBtns } = buildDom();
+    globalThis.document = doc;
+
+    const player = makePlayer('A');
+    player.muted = true;
+    player.toggleMute = function toggleMute() {
+        this.muted = !this.muted;
+    };
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topLeft.player = player;
+
+    MultiView.syncScreenControls();
+    assert.ok(screenBtns.topLeft.querySelector('[data-screen-action="mute"]'));
+
+    await MultiView.handleTileAction('topLeft', 'mute');
+    assert.equal(player.muted, false);
+    assert.equal(MultiView.slots.topLeft.enabled, true);
 });
 
 test('disabling targeted screen reconciles remote target and strip highlight', async () => {

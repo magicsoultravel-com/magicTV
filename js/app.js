@@ -753,6 +753,9 @@ async function init() {
         syncCatalogLayoutBtn();
         syncRemoteTabChrome();
         switchTab('remote');
+        if (GuidePanel.isVisible()) {
+            GuidePanel.refresh().catch(() => {});
+        }
         TvClock.init();
 
         PlayerChrome.bindControls();
