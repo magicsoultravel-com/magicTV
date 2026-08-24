@@ -302,8 +302,8 @@ function onPointerDown(e) {
     if (e.target.closest?.('.channel-tile__fav-btn')) return;
     if (e.target.closest?.('.channel-tile__hide-btn')) return;
     if (e.target.closest?.('.channel-tile__refresh-btn')) return;
-    if (e.target.closest?.('.favorite-folder-tile__delete-btn')) return;
-    if (e.target.closest?.('.favorite-folder-tile__edit-btn')) return;
+    if (e.target.closest?.('.favorite-folder-tile')) return;
+    if (e.target.closest?.('.favorite-folder-parent-tile')) return;
     if (!deps.isReorderEnabled()) return;
 
     const grid = el('favorites-grid');

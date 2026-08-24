@@ -137,36 +137,71 @@ export function deleteFavoriteFolder(folderId) {
 
 function wireFolderTiles(container) {
     if (!container) return;
-    container.querySelectorAll('.favorite-folder-tile').forEach((tile) => {
+    if (container.dataset.folderWired === '1') return;
+    container.dataset.folderWired = '1';
+
+    container.addEventListener('click', (e) => {
+        if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
+        const tile = e.target.closest?.('.favorite-folder-tile');
+        if (!tile || !container.contains(tile)) return;
         const folderId = tile.dataset.folderId;
         if (!folderId) return;
 
-        tile.addEventListener('click', (e) => {
-            if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
-            e.preventDefault();
-            e.stopPropagation();
-            openFavoriteFolder(folderId);
-        });
-        tile.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
-            e.preventDefault();
-            openFavoriteFolder(folderId);
-        });
+        e.preventDefault();
+        e.stopPropagation();
+        openFavoriteFolder(folderId);
+    }, true);
+
+    container.addEventListener('pointerup', (e) => {
+        if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
+        const tile = e.target.closest?.('.favorite-folder-tile');
+        if (!tile || !container.contains(tile)) return;
+        const folderId = tile.dataset.folderId;
+        if (!folderId) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        openFavoriteFolder(folderId);
+    }, true);
+
+    container.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
+        const tile = e.target.closest?.('.favorite-folder-tile');
+        if (!tile || !container.contains(tile)) return;
+        const folderId = tile.dataset.folderId;
+        if (!folderId) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        openFavoriteFolder(folderId);
+    });
+
+    container.querySelectorAll('.favorite-folder-tile').forEach((tile) => {
+        const folderId = tile.dataset.folderId;
+        if (!folderId) return;
 
         const editBtn = tile.querySelector('.favorite-folder-tile__edit-btn');
         editBtn?.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             renameFavoriteFolder(folderId);
-        });
+        }, true);
+        editBtn?.addEventListener('pointerup', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, true);
 
         const deleteBtn = tile.querySelector('.favorite-folder-tile__delete-btn');
         deleteBtn?.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             deleteFavoriteFolder(folderId);
-        });
+        }, true);
+        deleteBtn?.addEventListener('pointerup', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, true);
     });
 }
 
