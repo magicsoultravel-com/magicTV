@@ -22,7 +22,7 @@
     gap: 0.5rem;
     font-family: inherit;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 32px; /* fixed 32px band = the hero icon height */
     color: var(--tv-text-primary, #fff);
     background: transparent;
     border: none;
@@ -35,7 +35,7 @@
     align-items: center;
     font-variant-numeric: tabular-nums;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 32px;
 }
 
 .clock-chip--date {
@@ -47,6 +47,19 @@
 .clock-chip--time {
     font-weight: 600;
     font-size: 13px;
+}
+
+/* The header icon shrinks to 24px below 768px, so the clock band follows it to
+   keep the text vertically centered on the (responsive) icon middle. */
+@media (max-width: 768px) {
+    .tv-clock-zone {
+        min-height: 24px;
+    }
+
+    .tv-clock-display,
+    .clock-chip {
+        line-height: 24px;
+    }
 }
 
 /* Analog clock style */

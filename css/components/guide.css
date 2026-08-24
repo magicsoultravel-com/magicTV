@@ -158,7 +158,7 @@
 .tv-header-now-playing {
     font-size: 13px;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 32px;
     color: var(--tv-text-secondary);
     align-self: auto;
     white-space: nowrap;
@@ -168,14 +168,14 @@
     flex-shrink: 1;
 }
 
-/* Channel identity stays the hero of the header: large, gradient, and baseline
-   aligned with the smaller supporting text (baseline alignment handles mixed
-   sizes, so the big name and the 13px labels share one text baseline). */
+/* Channel identity stays the hero of the header: large, gradient, and sharing
+   the 32px line band with the icon, so its vertical middle sits exactly on the
+   icon's middle. Baseline alignment keeps it on one line with the small labels. */
 .tv-header-channel-name,
 .tv-header-channel-flag {
     font-size: 24px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 32px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -202,17 +202,18 @@
 .tv-brand h1 {
     font-size: 24px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 32px;
     letter-spacing: 0.05em;
     padding-bottom: 0;
 }
 
+/* Clock metrics are owned by css/tv-clock.css (loaded last); this just keeps a
+   base size/weight for the zone so nothing inherits a stray default. */
 .tv-clock-zone,
 .tv-clock-display,
 .clock-chip {
     font-size: 13px;
     font-weight: 400;
-    line-height: 1.5;
 }
 
 .clock-chip--time {
@@ -228,7 +229,13 @@
     .tv-header-channel-name,
     .tv-header-channel-flag {
         font-size: 22px;
-        line-height: 1.3;
+        line-height: 24px; /* matches the 24px responsive icon band */
+    }
+
+    .tv-header-program-title,
+    .tv-header-program-next,
+    .tv-header-now-playing {
+        line-height: 24px;
     }
 }
 
@@ -237,7 +244,13 @@
     .tv-header-channel-name,
     .tv-header-channel-flag {
         font-size: 20px;
-        line-height: 1.3;
+        line-height: 24px;
+    }
+
+    .tv-header-program-title,
+    .tv-header-program-next,
+    .tv-header-now-playing {
+        line-height: 24px;
     }
 }
 
@@ -246,7 +259,13 @@
     .tv-header-channel-name,
     .tv-header-channel-flag {
         font-size: 18px;
-        line-height: 1.3;
+        line-height: 32px; /* icon stays 32px on short viewports */
+    }
+
+    .tv-header-program-title,
+    .tv-header-program-next,
+    .tv-header-now-playing {
+        line-height: 32px;
     }
 }
 

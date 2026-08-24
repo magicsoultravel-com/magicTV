@@ -287,6 +287,7 @@ body.remote-idle-faded.remote-idle-hover-preview .remote-module__dialog {
 
 .remote-module__channel-bar .tv-header-now-playing {
     font-size: 11px;
+    line-height: normal; /* re-zero the header's 32px band inside the remote panel */
     max-width: min(100%, 14rem);
     overflow: hidden;
     text-overflow: ellipsis;
