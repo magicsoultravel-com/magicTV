@@ -107,3 +107,14 @@ test('prunes to WATCH_STATS_CAP keeping highest totals', () => {
     assert.equal(top.length, WatchStats.WATCH_STATS_CAP);
     assert.equal(top[0].key, `iptv-org:Ch${WatchStats.WATCH_STATS_CAP + 4}.us`);
 });
+
+test('clearWatchStats aborts open accrual windows without crediting', () => {
+    let aborted = false;
+    const aborter = () => { aborted = true; };
+    WatchStats.registerWatchAccrualAborter(aborter);
+    WatchStats.addWatchSeconds('iptv-org:CNN.us', 40, CHANNEL);
+    WatchStats.clearWatchStats();
+    assert.equal(aborted, true);
+    assert.deepEqual(WatchStats.getTopWatched(), []);
+    WatchStats.unregisterWatchAccrualAborter(aborter);
+});

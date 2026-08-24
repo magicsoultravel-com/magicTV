@@ -108,12 +108,30 @@ export function classifyTilePlayback({
 
 /** True when playback is actively delivering media (not buffering, pause, stop, or error). */
 export function isHealthyWatchPlayback(state = {}) {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
     const { uiPlaying, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback(state);
     if (!state.hasChannel || !uiPlaying || uiPaused || uiStopped || uiDisconnected) return false;
     if (state.wantPlaying !== true) return false;
     if (state.loadPhase === 'connecting' || state.loadPhase === 'buffering') return false;
     if (state.loading === true) return false;
     return true;
+}
+
+/**
+ * Mid-stream hitch often leaves loading/buffering stuck because `playing` may not re-fire.
+ * A later `timeupdate` means media time advanced again — safe to clear those flags.
+ */
+export function shouldClearStaleBufferOnTimeupdate({
+    wantPlaying = false,
+    playing = false,
+    videoPaused = true,
+    loading = false,
+    loadPhase = 'idle'
+} = {}) {
+    return wantPlaying === true
+        && playing === true
+        && videoPaused !== true
+        && (loading === true || loadPhase === 'buffering');
 }
 
 /**

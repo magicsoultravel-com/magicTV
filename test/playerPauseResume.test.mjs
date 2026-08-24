@@ -20,6 +20,7 @@ import {
     isAutoplayNotAllowedError,
     shouldRetryPlayMuted,
     isHealthyWatchPlayback,
+    shouldClearStaleBufferOnTimeupdate,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -442,4 +443,52 @@ test('isHealthyWatchPlayback credits active play only', () => {
     assert.equal(isHealthyWatchPlayback({ ...base, loadPhase: 'buffering', loading: true }), false);
     assert.equal(isHealthyWatchPlayback({ ...base, loadPhase: 'connecting' }), false);
     assert.equal(isHealthyWatchPlayback({ ...base, playing: false, wantPlaying: true }), false);
+});
+
+test('isHealthyWatchPlayback is false while document is hidden', () => {
+    const base = {
+        hasChannel: true,
+        playing: true,
+        wantPlaying: true,
+        loading: false,
+        loadPhase: 'idle',
+        pausePhase: 'idle',
+        stopped: false,
+        error: null,
+        posterDataUrl: null
+    };
+    const prev = globalThis.document;
+    globalThis.document = { visibilityState: 'hidden' };
+    try {
+        assert.equal(isHealthyWatchPlayback(base), false);
+        globalThis.document.visibilityState = 'visible';
+        assert.equal(isHealthyWatchPlayback(base), true);
+    } finally {
+        if (prev === undefined) delete globalThis.document;
+        else globalThis.document = prev;
+    }
+});
+
+test('shouldClearStaleBufferOnTimeupdate recovers sticky hitch flags', () => {
+    assert.equal(shouldClearStaleBufferOnTimeupdate({
+        wantPlaying: true,
+        playing: true,
+        videoPaused: false,
+        loading: true,
+        loadPhase: 'buffering'
+    }), true);
+    assert.equal(shouldClearStaleBufferOnTimeupdate({
+        wantPlaying: true,
+        playing: true,
+        videoPaused: false,
+        loading: false,
+        loadPhase: 'idle'
+    }), false);
+    assert.equal(shouldClearStaleBufferOnTimeupdate({
+        wantPlaying: true,
+        playing: true,
+        videoPaused: true,
+        loading: true,
+        loadPhase: 'buffering'
+    }), false);
 });

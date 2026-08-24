@@ -13,6 +13,8 @@ let cache = null;
 let persistTimer = 0;
 /** @type {Set<() => void>} */
 const flushers = new Set();
+/** @type {Set<() => void>} */
+const aborters = new Set();
 
 function ensureCache() {
     if (!cache) {
@@ -64,11 +66,26 @@ export function unregisterWatchAccrualFlusher(fn) {
     flushers.delete(fn);
 }
 
+export function registerWatchAccrualAborter(fn) {
+    aborters.add(fn);
+}
+
+export function unregisterWatchAccrualAborter(fn) {
+    aborters.delete(fn);
+}
+
 export function flushAllWatchAccruals() {
     flushers.forEach((fn) => {
         try { fn(); } catch { /* ignore */ }
     });
     scheduleWatchStatsPersist(true);
+}
+
+/** Drop open accrual windows without crediting (used before Clear). */
+export function abortAllWatchAccruals() {
+    aborters.forEach((fn) => {
+        try { fn(); } catch { /* ignore */ }
+    });
 }
 
 export function addWatchSeconds(key, seconds, channel = null) {
@@ -105,6 +122,7 @@ export function getTopWatched(limit = 20) {
 }
 
 export function clearWatchStats() {
+    abortAllWatchAccruals();
     cache = new Map();
     if (persistTimer) {
         clearTimeout(persistTimer);
@@ -128,7 +146,7 @@ export function formatWatchDuration(totalSeconds) {
 
 if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') flushAllWatchAccruals();
+        flushAllWatchAccruals();
     });
 }
 if (typeof window !== 'undefined') {

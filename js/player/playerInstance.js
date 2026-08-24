@@ -15,7 +15,9 @@ import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import {
     addWatchSeconds,
     registerWatchAccrualFlusher,
-    unregisterWatchAccrualFlusher
+    unregisterWatchAccrualFlusher,
+    registerWatchAccrualAborter,
+    unregisterWatchAccrualAborter
 } from '../storage/watchStats.js';
 import {
     attachStream,
@@ -43,8 +45,12 @@ import {
     shouldBumpPlayGenerationOnPause,
     isAutoplayNotAllowedError,
     shouldRetryPlayMuted,
-    isHealthyWatchPlayback
+    isHealthyWatchPlayback,
+    shouldClearStaleBufferOnTimeupdate
 } from './pauseBuffer.js';
+
+/** Max wall-clock seconds credited in a single flush (guards hidden-tab / stuck windows). */
+const WATCH_ACCRUAL_FLUSH_CAP_SEC = 30;
 
 /**
  * Create an independent HLS player instance (one <video> + hls.js).
@@ -83,15 +89,24 @@ export function createPlayerInstance(options) {
         posterDataUrl: player.posterDataUrl
     });
 
-    const flushWatchAccrual = () => {
+    const endWatchAccrual = (credit = true) => {
         if (!player.watchAccrueStartedAt || !player.watchAccrueKey) return;
-        const elapsed = (Date.now() - player.watchAccrueStartedAt) / 1000;
-        if (elapsed > 0) {
-            addWatchSeconds(player.watchAccrueKey, elapsed, player.channel);
+        if (credit) {
+            const elapsed = Math.min(
+                (Date.now() - player.watchAccrueStartedAt) / 1000,
+                WATCH_ACCRUAL_FLUSH_CAP_SEC
+            );
+            if (elapsed > 0) {
+                addWatchSeconds(player.watchAccrueKey, elapsed, player.channel);
+            }
         }
         player.watchAccrueKey = null;
         player.watchAccrueStartedAt = null;
     };
+
+    const flushWatchAccrual = () => endWatchAccrual(true);
+
+    const abortWatchAccrual = () => endWatchAccrual(false);
 
     const syncWatchAccrual = () => {
         if (!shouldRecordRecents()) return;
@@ -101,7 +116,15 @@ export function createPlayerInstance(options) {
             return;
         }
         if (isHealthyWatchPlayback(watchPlaybackState())) {
-            if (player.watchAccrueKey === key && player.watchAccrueStartedAt) return;
+            if (player.watchAccrueKey === key && player.watchAccrueStartedAt) {
+                const openFor = (Date.now() - player.watchAccrueStartedAt) / 1000;
+                // Bank periodically so long sessions aren't lost to the per-flush safety cap.
+                if (openFor < WATCH_ACCRUAL_FLUSH_CAP_SEC) return;
+                flushWatchAccrual();
+                player.watchAccrueKey = key;
+                player.watchAccrueStartedAt = Date.now();
+                return;
+            }
             flushWatchAccrual();
             player.watchAccrueKey = key;
             player.watchAccrueStartedAt = Date.now();
@@ -112,6 +135,8 @@ export function createPlayerInstance(options) {
 
     const snapshotWatchAccrual = () => {
         flushWatchAccrual();
+        // Do not restart accrual while hidden — wall-clock would inflate in the background.
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
         syncWatchAccrual();
     };
 
@@ -158,6 +183,7 @@ export function createPlayerInstance(options) {
         init() {
             if (this.video) return;
             registerWatchAccrualFlusher(snapshotWatchAccrual);
+            registerWatchAccrualAborter(abortWatchAccrual);
 
             this.videoHolder = document.createElement('div');
             this.videoHolder.className = 'tv-video-holder is-hidden';
@@ -215,6 +241,18 @@ export function createPlayerInstance(options) {
             this.video.addEventListener('timeupdate', () => {
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
+                }
+                if (shouldClearStaleBufferOnTimeupdate({
+                    wantPlaying: this.wantPlaying,
+                    playing: this.playing,
+                    videoPaused: this.video?.paused !== false,
+                    loading: this.loading,
+                    loadPhase: this.loadPhase
+                })) {
+                    this.loading = false;
+                    this.loadPhase = 'idle';
+                    this.emitState();
+                    return;
                 }
                 syncWatchAccrual();
             });
@@ -972,6 +1010,7 @@ export function createPlayerInstance(options) {
         async dispose() {
             flushWatchAccrual();
             unregisterWatchAccrualFlusher(snapshotWatchAccrual);
+            unregisterWatchAccrualAborter(abortWatchAccrual);
             await this.stop({ clearChannel: true });
             if (this.video?.parentElement) {
                 this.video.parentElement.removeChild(this.video);
