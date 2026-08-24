@@ -153,7 +153,8 @@ describe('RemoteExternalPopout state', () => {
     it('exports syncActiveTab helper', async () => {
         const { RemoteExternalPopout } = await import('../js/ui/remoteExternalPopout.js?state=2');
         assert.equal(typeof RemoteExternalPopout.syncActiveTab, 'function');
-        assert.equal(RemoteExternalPopout.syncActiveTab('browse'), false);
+        // Unified path: syncs panels via el() even when not in an OS popout entry.
+        assert.equal(RemoteExternalPopout.syncActiveTab('browse'), true);
     });
 
     it('isUnifiedPopout is false when not popped out', async () => {

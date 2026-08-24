@@ -258,7 +258,35 @@ function normalizeMosaicPlacement(raw) {
     return out;
 }
 
-/** Floating remote module geometry (CSS px) + mode / pin / open / target. */
+function normalizeModuleLayout(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const mode = raw.mode === 'split' ? 'split' : 'joined';
+    const remoteHostKind = ['hidden', 'docked', 'undocked', 'os'].includes(raw.remoteHostKind)
+        ? raw.remoteHostKind
+        : null;
+    let browserHostKind = raw.browserHostKind;
+    if (mode === 'joined') browserHostKind = null;
+    else if (!['docked', 'undocked', 'os'].includes(browserHostKind)) browserHostKind = 'undocked';
+    const b = raw.browser && typeof raw.browser === 'object' ? raw.browser : {};
+    const bl = Number(b.left);
+    const bt = Number(b.top);
+    const bw = Number(b.width);
+    const bh = Number(b.height);
+    return {
+        mode,
+        remoteHostKind,
+        browserHostKind,
+        browser: {
+            left: Number.isFinite(bl) ? bl : 300,
+            top: Number.isFinite(bt) ? bt : 48,
+            width: Number.isFinite(bw) && bw >= 240 ? bw : 320,
+            height: Number.isFinite(bh) && bh >= 320 ? bh : 600,
+            pinned: b.pinned === true
+        }
+    };
+}
+
+/** Floating remote module geometry (CSS px) + mode / pin / open / target + shell layout. */
 function normalizeRemoteModule(raw, legacyPicker) {
     const src = raw && typeof raw === 'object' ? raw : legacyPicker;
     if (!src || typeof src !== 'object') return null;
@@ -277,6 +305,7 @@ function normalizeRemoteModule(raw, legacyPicker) {
     const sheetHeight = Number.isFinite(Number(src.sheetHeight))
         ? Math.min(0.85, Math.max(0.25, Number(src.sheetHeight)))
         : 0.45;
+    const layout = normalizeModuleLayout(src.layout);
     return {
         left,
         top,
@@ -287,7 +316,8 @@ function normalizeRemoteModule(raw, legacyPicker) {
         open: src.open === true,
         targetSlotId: target,
         sheetHeight,
-        sheetExpanded: src.sheetExpanded !== false
+        sheetExpanded: src.sheetExpanded !== false,
+        ...(layout ? { layout } : {})
     };
 }
 

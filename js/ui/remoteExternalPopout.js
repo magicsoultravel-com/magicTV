@@ -13,6 +13,7 @@ import {
     remotePopoutSize
 } from './popoutWindows.js';
 import { registerAppDocument, unregisterAppDocument } from '../appDocuments.js';
+import { browserShellEl } from './moduleLayout.js';
 
 const PLACEHOLDER_ID = 'remote-external-popout-placeholder';
 const EXTERNAL_HOST_ID = 'remote-external-host';
@@ -162,12 +163,13 @@ function clearBodyClasses() {
     );
 }
 
-/** Keep catalog panels in sync while the combined shell lives in the popout. */
+/** Keep catalog panels in sync (joined shell, split shells, and OS popout). */
 function syncActiveTab(tabName) {
-    if (!entry) return false;
-    catalogBody()?.querySelectorAll('.tv-panel').forEach((p) => p.classList.remove('is-active'));
-    el(`${tabName}-panel`)?.classList.add('is-active');
-    return true;
+    ['remote', 'browse', 'favorites', 'recents', 'settings'].forEach((name) => {
+        const panel = el(`${name}-panel`);
+        if (panel) panel.classList.toggle('is-active', name === tabName);
+    });
+    return Boolean(catalogBody() || browserShellEl());
 }
 
 async function popOut() {

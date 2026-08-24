@@ -252,6 +252,83 @@ body.remote-idle-faded.remote-idle-hover-preview .remote-module__dialog {
     overflow: hidden;
 }
 
+/* --- Module shells (Remote / Browser) --- */
+.module-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.module-shell__chrome {
+    flex: 0 0 auto;
+}
+
+.module-shell__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.module-shell__footer {
+    flex: 0 0 auto;
+}
+
+/* Joined: one window — hide inactive shell chrome/content; keep browser footer for nav */
+.catalog-root.module-layout--joined {
+    display: flex;
+    flex-direction: column;
+}
+
+.catalog-root.module-layout--joined.is-remote-view #browser-shell > .module-shell__chrome,
+.catalog-root.module-layout--joined.is-remote-view #browser-shell > .module-shell__scroll {
+    display: none;
+}
+
+.catalog-root.module-layout--joined.is-remote-view #browser-shell {
+    flex: 0 0 auto;
+}
+
+.catalog-root.module-layout--joined:not(.is-remote-view) #remote-shell {
+    display: none;
+}
+
+.catalog-root.module-layout--joined:not(.is-remote-view) #browser-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* Split: each shell fills its own host window */
+.catalog-root.module-layout--split,
+body.browser-shell-split #browser-module-host .module-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+body.browser-shell-split #remote-panel {
+    display: flex !important;
+}
+
+body.browser-shell-split #remote-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.browser-module .remote-module__dialog {
+    /* same chrome language as remote float */
+    min-width: var(--remote-min-width, 260px);
+}
+
+#remote-program-bar .remote-program-title:empty {
+    display: none;
+}
+
+#remote-program-bar:not(:has(.remote-program-title:not(:empty))) {
+    display: none;
+}
+
 .remote-module__chrome {
     flex: 0 0 auto;
     padding: 2.35rem var(--tv-spacing-md, 1rem) 0.35rem;

@@ -182,11 +182,18 @@ async function lookupFavorites() {
 }
 
 export const GuidePanel = {
+    /** First-class Guide module API — panel stays hosted under Remote for now. */
+    init() {
+        this.bind();
+    },
+
     bind() {
         const toggle = el('guide-panel-toggle');
         const body = el('guide-panel-body');
         const tomorrowDetails = el('guide-tomorrow');
         const favBtn = el('guide-favorites-btn');
+        const panel = el('guide-panel');
+        if (panel) panel.dataset.guideModule = '1';
 
         toggle?.addEventListener('click', () => {
             const open = body?.classList.toggle('is-open');
@@ -217,6 +224,10 @@ export const GuidePanel = {
 
     refresh() {
         return refreshGuide();
+    },
+
+    getPanelEl() {
+        return el('guide-panel');
     }
 };
 

@@ -11,7 +11,7 @@ let deps = {
 };
 
 export function syncRemoteNav(tabName) {
-    queryAllInApp('#tv-catalog-body [data-remote-nav]').forEach((btn) => {
+    queryAllInApp('[data-remote-nav]').forEach((btn) => {
         btn.classList.toggle('is-active', btn.getAttribute('data-remote-nav') === tabName);
     });
 }
@@ -171,10 +171,16 @@ export const RemotePanel = {
     },
 
     bind() {
-        const body = el('tv-catalog-body');
-        if (!body || body.dataset.remoteBound === '1') return;
-        body.dataset.remoteBound = '1';
-        bindRemoteActions(body);
+        const remote = el('remote-shell') || el('tv-catalog-body');
+        if (remote && remote.dataset.remoteBound !== '1') {
+            remote.dataset.remoteBound = '1';
+            bindRemoteActions(remote);
+        }
+        const browser = el('browser-shell');
+        if (browser && browser.dataset.remoteBound !== '1') {
+            browser.dataset.remoteBound = '1';
+            bindRemoteActions(browser);
+        }
         syncRemotePanel();
     },
 

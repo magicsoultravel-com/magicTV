@@ -392,6 +392,7 @@
             <button type="button" id="create-favorite-folder-btn" class="tv-module__action ui-icon-btn is-hidden" title="New folder" aria-label="New folder"></button>
         </div>
         <div class="tv-module__actions tv-module__actions--remote-end">
+            <button type="button" id="remote-split-browser-btn" class="tv-module__action ui-icon-btn is-hidden" title="Split browser" aria-label="Split browser" aria-pressed="false"></button>
             <button type="button" id="remote-external-popout-btn" class="tv-module__action ui-icon-btn tv-module__action--echo is-hidden" title="Pop out remote" aria-label="Pop out remote" aria-pressed="false"></button>
             <button type="button" id="remote-module-pin" class="tv-module__action remote-module__pin" title="Pin window" aria-label="Pin window" aria-pressed="false">
                 <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 1.8h3.6l.6 3.2 1.6.8v1.2H6.6V10l-.6.8-.6-.8V7H2V5.8l1.6-.8.6-3.2z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
@@ -401,19 +402,21 @@
             </button>
         </div>
         <div class="tv-module__actions tv-module__actions--browser-end">
+            <button type="button" id="browser-join-btn" class="tv-module__action ui-icon-btn is-hidden" title="Join with remote" aria-label="Join with remote"></button>
+            <button type="button" id="browser-external-popout-btn" class="tv-module__action ui-icon-btn is-hidden" title="Pop out browser" aria-label="Pop out browser" aria-pressed="false"></button>
             <button type="button" id="catalog-layout-btn" class="tv-module__action ui-icon-btn is-hidden" title="List view" aria-label="List view"></button>
             <button type="button" id="refresh-btn" class="tv-module__action ui-icon-btn" title="Refresh this tab" aria-label="Refresh this tab"></button>
         </div>
-        <div id="tv-catalog-body" class="tv-module__body remote-module__shell">
-            <header class="remote-module__chrome">
+        <div id="tv-catalog-body" class="tv-module__body remote-module__shell catalog-root module-layout--joined">
+            <div id="remote-shell" class="module-shell module-shell--remote">
+                <header class="remote-module__chrome module-shell__chrome">
                     <h2 class="remote-module__brand">magic remote</h2>
-                    <div id="remote-channel-bar" class="remote-module__channel-bar is-hidden">
-                        <span id="remote-channel-name" class="tv-header-now-playing"></span>
+                    <div id="remote-program-bar" class="remote-module__channel-bar">
                         <span id="remote-program-title" class="remote-program-title"></span>
                     </div>
                 </header>
-                        <div class="remote-module__scroll">
-                            <div id="guide-panel" class="guide-panel">
+                <div class="remote-module__scroll module-shell__scroll">
+                            <div id="guide-panel" class="guide-panel" data-guide-module>
                                 <button type="button" id="guide-panel-toggle" class="guide-panel__toggle" aria-expanded="false" aria-controls="guide-panel-body">Today's schedule</button>
                                 <div id="guide-panel-body" class="guide-panel__body">
                                     <div id="guide-status" class="guide-panel__status"></div>
@@ -465,6 +468,16 @@
                         </div>
                     </div>
                 </div>
+                </div>
+            </div>
+            <div id="browser-shell" class="module-shell module-shell--browser">
+                <header class="remote-module__chrome module-shell__chrome">
+                    <h2 class="remote-module__brand">magic browser</h2>
+                    <div id="remote-channel-bar" class="remote-module__channel-bar is-hidden">
+                        <span id="remote-channel-name" class="tv-header-now-playing"></span>
+                    </div>
+                </header>
+                <div class="remote-module__scroll module-shell__scroll">
             <div id="browse-panel" class="tv-panel">
                                     <div id="countries-container" class="country-grid"></div>
                                     <div id="channels-container" class="channel-grid is-hidden"></div>
@@ -776,8 +789,8 @@
                                         </div>
                                     </div>
                                 </div>
-                        </div>
-                        <footer class="remote-module__footer">
+                </div>
+                        <footer class="remote-module__footer module-shell__footer">
                             <div id="remote-catalog-tools" class="remote-module__catalog-tools tv-tabs" role="toolbar">
                                     <button id="back-btn" class="tv-tab is-hidden" data-tab="back-to-countries" title="Back to countries">&lt;</button>
                                     <div class="tv-tab-popup">
@@ -835,7 +848,7 @@
                     </div>
                 </footer>
                         </footer>
-        </div>
+            </div>
         </div>
     </div>
 
@@ -863,6 +876,25 @@
             <span class="remote-module__resize" data-remote-resize="ne" aria-hidden="true"></span>
             <span class="remote-module__resize" data-remote-resize="sw" aria-hidden="true"></span>
             <span class="remote-module__resize" data-remote-resize="se" aria-hidden="true"></span>
+        </div>
+    </div>
+
+    <div id="browser-module" class="remote-module browser-module is-hidden" hidden aria-hidden="true">
+        <div class="remote-module__backdrop" data-browser-module-dismiss tabindex="-1"></div>
+        <div
+            id="browser-module-dialog"
+            class="remote-module__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Browser"
+            tabindex="-1"
+        >
+            <div class="remote-module__header" data-browser-module-drag></div>
+            <div id="browser-module-host" class="remote-module__host"></div>
+            <span class="remote-module__resize" data-browser-resize="nw" aria-hidden="true"></span>
+            <span class="remote-module__resize" data-browser-resize="ne" aria-hidden="true"></span>
+            <span class="remote-module__resize" data-browser-resize="sw" aria-hidden="true"></span>
+            <span class="remote-module__resize" data-browser-resize="se" aria-hidden="true"></span>
         </div>
     </div>
     <div id="toast-container"></div>

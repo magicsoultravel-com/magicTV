@@ -6,10 +6,23 @@ import { TileFrames } from '../tileFrames.js';
 import { showAppToast } from './toast.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore } from '../storage/settingsStore.js';
-import { ACTION_ICONS } from './icons.js';
+import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { RemotePanel } from './remotePanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
+import { BrowserModule } from './browserModule.js';
+import {
+    hydrateLayoutFromPlayerState,
+    getLayoutState,
+    patchLayout,
+    setReconcileHandler,
+    syncCatalogRootClasses,
+    splitBrowser,
+    joinBrowser,
+    isSplit,
+    remoteShellEl,
+    browserShellEl
+} from './moduleLayout.js';
 
 const MIN_W = 260;
 const MIN_H = 560;
@@ -181,6 +194,11 @@ function persistState(overrides = {}) {
         ? overrides.sheetHeight
         : (sheet?.style.getPropertyValue('--remote-sheet-height') || prev.sheetHeight || DEFAULT_SHEET_HEIGHT);
 
+    const layoutState = getLayoutState();
+    const remoteHostKind = nextMode === 'hidden'
+        ? 'hidden'
+        : (externalHost ? 'os' : nextMode === 'undocked' ? 'undocked' : 'docked');
+
     savePlayerState({
         remoteModule: {
             ...geom,
@@ -189,7 +207,11 @@ function persistState(overrides = {}) {
             pinned: nextPinned,
             targetSlotId: nextTarget,
             sheetHeight: parseFloat(sheetHeight) || DEFAULT_SHEET_HEIGHT,
-            sheetExpanded: overrides.sheetExpanded != null ? overrides.sheetExpanded === true : sheetExpanded
+            sheetExpanded: overrides.sheetExpanded != null ? overrides.sheetExpanded === true : sheetExpanded,
+            layout: {
+                ...layoutState,
+                remoteHostKind
+            }
         }
     });
 }
@@ -469,6 +491,83 @@ function restoreBodyToStaging() {
     browserEndActionsNextSibling = null;
 }
 
+function ensureShellsJoinedInRoot() {
+    const root = catalogBody();
+    const remote = remoteShellEl();
+    const browser = browserShellEl();
+    if (!root) return;
+    if (remote && remote.parentElement !== root) root.appendChild(remote);
+    if (browser && browser.parentElement !== root) root.appendChild(browser);
+    syncCatalogRootClasses(root);
+}
+
+function syncSplitChromeButtons() {
+    const splitBtn = el('remote-split-browser-btn');
+    const remoteOpen = mode !== 'hidden';
+    const split = isSplit();
+    if (splitBtn) {
+        const show = remoteOpen && !split;
+        splitBtn.classList.toggle('is-hidden', !show);
+        splitBtn.innerHTML = CARD_ICONS.popout;
+        splitBtn.setAttribute('aria-pressed', String(split));
+        splitBtn.title = 'Split browser';
+        splitBtn.setAttribute('aria-label', 'Split browser');
+    }
+    BrowserModule.syncActionButtons?.();
+}
+
+/**
+ * Single remount path from layoutState + remote window mode.
+ * Joined: both shells in #tv-catalog-body, teleported as one unit.
+ * Split: remote catalog root (remote shell only) + BrowserModule host for browser shell.
+ */
+function reconcileShells() {
+    const root = catalogBody();
+    const remote = remoteShellEl();
+    const browser = browserShellEl();
+    if (!root || !remote) return;
+
+    const layout = getLayoutState();
+    syncCatalogRootClasses(root);
+
+    if (layout.mode === 'joined' || !browser) {
+        // Tear down browser float even when layout already flipped to joined
+        // (isOpen() would be false after patchLayout).
+        if (browser && (BrowserModule.isOpen?.() || browser.parentElement !== root)) {
+            BrowserModule.close();
+        }
+        ensureShellsJoinedInRoot();
+        const host = getActiveHost() || stagingEl();
+        if (host && (mode !== 'hidden' || externalHost || host === stagingEl())) {
+            teleportBodyTo(host);
+        }
+        document.body.classList.remove('browser-shell-split');
+        syncSplitChromeButtons();
+        return;
+    }
+
+    // Split: browser leaves catalog root before remote teleport.
+    if (browser.parentElement === root) {
+        stagingEl()?.appendChild(browser);
+    }
+    syncCatalogRootClasses(root);
+
+    const host = getActiveHost() || stagingEl();
+    if (host && (mode !== 'hidden' || externalHost || host === stagingEl())) {
+        teleportBodyTo(host);
+    }
+
+    const browserKind = layout.browserHostKind || 'undocked';
+    if (browserKind === 'undocked' || browserKind === 'docked' || browserKind === 'os') {
+        BrowserModule.openUndocked();
+        if (browserKind === 'os') {
+            patchLayout({ browserHostKind: 'undocked' }, { persist: true, reconcile: false });
+        }
+    }
+    document.body.classList.add('browser-shell-split');
+    syncSplitChromeButtons();
+}
+
 function teleportBodyTo(host) {
     const body = catalogBody();
     if (!body || !host) return;
@@ -476,6 +575,7 @@ function teleportBodyTo(host) {
     const remoteEndActions = moduleRemoteEndActions();
     const browserEndActions = moduleBrowserEndActions();
     const startActions = moduleStartActions();
+    const split = isSplit();
 
     if (!dockParent) {
         dockParent = body.parentElement;
@@ -485,19 +585,27 @@ function teleportBodyTo(host) {
         remoteEndActionsDockParent = remoteEndActions.parentElement;
         remoteEndActionsNextSibling = remoteEndActions.nextSibling;
     }
-    if (browserEndActions && !browserEndActionsDockParent) {
-        browserEndActionsDockParent = browserEndActions.parentElement;
-        browserEndActionsNextSibling = browserEndActions.nextSibling;
-    }
-    if (startActions && !startActionsDockParent) {
-        startActionsDockParent = startActions.parentElement;
-        startActionsNextSibling = startActions.nextSibling;
+    if (!split) {
+        if (browserEndActions && !browserEndActionsDockParent) {
+            browserEndActionsDockParent = browserEndActions.parentElement;
+            browserEndActionsNextSibling = browserEndActions.nextSibling;
+        }
+        if (startActions && !startActionsDockParent) {
+            startActionsDockParent = startActions.parentElement;
+            startActionsNextSibling = startActions.nextSibling;
+        }
     }
 
-    if (startActions) host.appendChild(startActions);
+    if (!split && startActions) host.appendChild(startActions);
     if (remoteEndActions) host.appendChild(remoteEndActions);
-    if (browserEndActions) host.appendChild(browserEndActions);
+    if (!split && browserEndActions) host.appendChild(browserEndActions);
     host.appendChild(body);
+    syncCatalogRootClasses(body);
+}
+
+function mountToActiveHost() {
+    reconcileShells();
+    updateBodyClasses();
 }
 
 function applySheetHeight(ratio) {
@@ -675,6 +783,14 @@ function bindOnce() {
 
     const modal = moduleEl();
     el('remote-module-close')?.addEventListener('click', () => RemoteModule.close());
+    el('remote-split-browser-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (mode === 'hidden') return;
+        splitBrowser({ hostKind: 'undocked' });
+        // Browser shell needs a catalog tab; keep keypad visible via CSS when split.
+        deps.switchTab?.('browse');
+        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'split' } }));
+    });
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
         if (e.target.closest?.('button')) return;
         beginGesture(e, 'drag');
@@ -732,22 +848,26 @@ function restoreFromState() {
     applySheetHeight(DEFAULT_SHEET_HEIGHT);
 }
 
-function mountToActiveHost() {
-    const host = getActiveHost();
-    if (!host) return;
-    teleportBodyTo(host);
-    updateBodyClasses();
-}
-
 export const RemoteModule = {
     init({ getDefaultOnPlay, switchTab } = {}) {
         if (typeof getDefaultOnPlay === 'function') deps.getDefaultOnPlay = getDefaultOnPlay;
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
+        hydrateLayoutFromPlayerState();
+        setReconcileHandler(() => {
+            reconcileShells();
+            updateBodyClasses();
+            RemotePanel.syncRemotePanel?.();
+            RemoteExternalPopout.syncBtn?.();
+            syncSplitChromeButtons();
+        });
         RemotePanel.init({ switchTab: deps.switchTab, getRemoteModule: () => RemoteModule });
+        BrowserModule.init();
         bindOnce();
         syncBrowseButtons();
+        syncSplitChromeButtons();
         applyOpacity();
         updateBodyClasses();
+        ensureShellsJoinedInRoot();
     },
 
     getMode() {
@@ -812,6 +932,7 @@ export const RemoteModule = {
         persistState({ open: true, mode, targetSlotId });
         syncTargetHighlight();
         syncBrowseButtons();
+        syncSplitChromeButtons();
         RemoteExternalPopout.syncBtn();
         RemotePanel.syncRemotePanel();
     },
@@ -823,10 +944,15 @@ export const RemoteModule = {
             RemoteExternalPopout.popIn();
         }
 
+        if (isSplit()) {
+            joinBrowser();
+        }
+
         persistState({ open: false, mode: 'hidden' });
 
         externalHost = null;
         restoreBodyToStaging();
+        ensureShellsJoinedInRoot();
         showUndockedUI(false);
         setSheetExpanded(false, { persist: false });
 
@@ -840,6 +966,7 @@ export const RemoteModule = {
         clearTargetHighlight();
         MultiView.syncTileStatusHighlight?.();
         updateBodyClasses();
+        syncSplitChromeButtons();
 
         ChannelGrid.setOnPlay(deps.getDefaultOnPlay());
         syncBrowseButtons();
@@ -954,6 +1081,23 @@ export const RemoteModule = {
         if (restoreMode === 'docked') {
             setSheetExpanded(true, { persist: false });
         }
+        const layout = saved.layout || getLayoutState();
+        if (layout?.mode === 'split') {
+            splitBrowser({ hostKind: layout.browserHostKind || 'undocked' });
+        }
+    },
+
+    reconcileShells,
+    syncSplitChromeButtons,
+    focusBrowserWindow() {
+        if (!isSplit()) return false;
+        const dialog = el('browser-module-dialog');
+        try {
+            dialog?.focus?.();
+        } catch {
+            /* ignore */
+        }
+        return true;
     },
 
     syncTargetHighlight,

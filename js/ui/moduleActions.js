@@ -9,6 +9,7 @@ function preferredHosts(extra = null) {
     return [
         extra,
         document.querySelector('#remote-external-host'),
+        document.querySelector('#browser-module-host'),
         document.querySelector('#remote-module-host'),
         document.querySelector('#remote-dock-host'),
         document.querySelector('#remote-module-staging')

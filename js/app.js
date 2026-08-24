@@ -20,6 +20,7 @@ import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
 import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
 import { GuidePanel } from './ui/guidePanel.js';
+import { isSplit } from './ui/moduleLayout.js';
 import { warmGuideIndex } from './epg/epgService.js';
 
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
@@ -556,16 +557,19 @@ function syncRemoteTabChrome() {
 }
 
 function activateTabPanels(tabName) {
-    if (RemoteExternalPopout.isPoppedOut()) {
-        RemoteExternalPopout.syncActiveTab(tabName);
-        return;
-    }
     els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
     el(`${tabName}-panel`)?.classList.add('is-active');
 }
 
 function switchTab(tabName) {
+    const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
     appState.activeTab = tabName;
+
+    // Remote is the door: when split, browser tabs focus the Browser window.
+    if (BROWSER_TABS.includes(tabName) && RemoteModule.isOpen?.() && isSplit()) {
+        RemoteModule.focusBrowserWindow?.();
+    }
+
     activateTabPanels(tabName);
 
     const backBtn = el('back-btn');
@@ -609,6 +613,7 @@ function switchTab(tabName) {
     syncCreateFavoriteFolderBtn();
     syncCatalogLayoutBtn();
     RemoteExternalPopout.syncBtn();
+    RemoteModule.syncSplitChromeButtons?.();
     updateRefreshAge();
     RemotePanel.syncRemotePanel();
 }
@@ -654,7 +659,7 @@ async function init() {
             switchTab
         });
         RemotePanel.bind();
-        GuidePanel.bind();
+        GuidePanel.init();
         BrowseView.init({
             appState,
             stampRefreshView,
@@ -742,13 +747,16 @@ async function init() {
         RemoteExternalPopout.syncBtn();
 
         window.addEventListener('remote:external_popout_changed', () => {
-            if (RemoteExternalPopout.isPoppedOut()) {
-                RemoteExternalPopout.syncActiveTab(appState.activeTab);
-            } else {
-                activateTabPanels(appState.activeTab);
-            }
+            activateTabPanels(appState.activeTab);
             syncRemoteTabChrome();
             RemoteExternalPopout.syncBtn();
+            RemoteModule.syncSplitChromeButtons?.();
+        });
+
+        window.addEventListener('remote:layout_changed', () => {
+            activateTabPanels(appState.activeTab);
+            syncRemoteTabChrome();
+            RemoteModule.syncSplitChromeButtons?.();
         });
 
         await reveal();
