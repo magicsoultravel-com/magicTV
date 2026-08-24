@@ -420,24 +420,8 @@
             <div id="remote-shell" class="module-shell module-shell--remote">
                 <header class="remote-module__chrome module-shell__chrome">
                     <h2 class="remote-module__brand">magic remote</h2>
-                    <div id="remote-program-bar" class="remote-module__channel-bar">
-                        <span id="remote-program-title" class="remote-program-title"></span>
-                    </div>
                 </header>
                 <div class="remote-module__scroll module-shell__scroll">
-                            <div id="guide-panel" class="guide-panel" data-guide-module>
-                                <button type="button" id="guide-panel-toggle" class="guide-panel__toggle" aria-expanded="false" aria-controls="guide-panel-body">Today's schedule</button>
-                                <div id="guide-panel-body" class="guide-panel__body">
-                                    <div id="guide-status" class="guide-panel__status"></div>
-                                    <ul id="guide-today-list" class="guide-panel__list"></ul>
-                                    <details id="guide-tomorrow" class="guide-panel__tomorrow">
-                                        <summary>Tomorrow</summary>
-                                        <ul id="guide-tomorrow-list" class="guide-panel__list"></ul>
-                                    </details>
-                                    <button type="button" id="guide-favorites-btn" class="guide-panel__fav-btn">Look up guides for favorites</button>
-                                    <div id="guide-favorites-results" class="guide-panel__fav-results"></div>
-                                </div>
-                            </div>
                             <div id="remote-panel" class="tv-panel remote-panel is-active">
                     <div class="remote-panel__grid">
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="vol-down" title="Volume down" aria-label="Volume down"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
@@ -909,6 +893,12 @@
                         </footer>
             </div>
         </div>
+        <aside id="guide-panel" class="guide-wing guide-panel" data-guide-module aria-hidden="true">
+            <div class="guide-wing__slab">
+                <div class="guide-wing__separator" aria-hidden="true"></div>
+                <div id="guide-screens" class="guide-wing__screens"></div>
+            </div>
+        </aside>
     </div>
 
     <button type="button" id="remote-dock-tab" class="remote-dock-tab" aria-expanded="false" aria-controls="remote-dock-sheet" title="Open remote" aria-label="Open remote">

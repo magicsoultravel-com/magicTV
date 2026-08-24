@@ -1,137 +1,405 @@
-/** Programme guide panel (remote module + header programme lines). */
+/** Programme guide wing — parallel slab beside the remote, one section per TV screen. */
 
-.guide-panel {
-    margin: 0 var(--tv-spacing-sm) var(--tv-spacing-sm);
-    border: 1px solid var(--tv-border);
-    border-radius: var(--tv-radius-md);
-    background: color-mix(in srgb, var(--tv-bg-secondary) 85%, transparent);
+.guide-wing {
+    position: relative;
+    flex: 0 0 0;
+    width: 0;
+    min-width: 0;
+    max-width: 0;
     overflow: hidden;
+    align-self: stretch;
+    pointer-events: none;
+    transition:
+        flex-basis var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        max-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-.guide-panel.guide-panel--hidden {
-    display: none !important;
+body.remote-guide-open .guide-wing {
+    flex: 0 0 var(--remote-min-width);
+    width: var(--remote-min-width);
+    max-width: var(--remote-min-width);
+    pointer-events: auto;
 }
 
-.guide-panel__toggle {
+body.remote-undocked-open.remote-guide-open .guide-wing {
+    flex: 1 1 var(--remote-min-width);
+    max-width: none;
+}
+
+.guide-wing__slab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: var(--remote-min-width);
+    min-width: var(--remote-min-width);
+    height: 100%;
+    min-height: 0;
+    background: var(--tv-bg-secondary, #141829);
+    border-radius: 0 18px 0 0;
+    box-shadow:
+        -14px 0 36px rgba(0, 0, 0, 0.42),
+        -3px 0 0 color-mix(in srgb, var(--tv-primary) 18%, var(--tv-border));
+}
+
+.guide-wing__separator {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--tv-border) 90%, #000),
+        color-mix(in srgb, var(--tv-primary) 22%, var(--tv-border)) 45%,
+        transparent
+    );
+    box-shadow:
+        1px 0 0 color-mix(in srgb, #fff 6%, transparent),
+        inset -1px 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.guide-wing__screens {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: var(--tv-spacing-sm) var(--tv-spacing-md) var(--tv-spacing-md);
+    padding-left: calc(var(--tv-spacing-md) + 4px);
+    gap: 0;
+}
+
+.guide-wing__screens.is-equal-split .guide-screen,
+.guide-wing__screens.is-slot-expanded .guide-screen {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-bottom: 1px solid color-mix(in srgb, var(--tv-border) 50%, transparent);
+    transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.guide-wing__screens .guide-screen:last-child {
+    border-bottom: none;
+}
+
+.guide-wing__screens.is-slot-expanded .guide-screen.is-collapsed {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+.guide-wing__screens.is-slot-expanded .guide-screen.is-expanded {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.guide-screen {
+    min-width: 0;
+}
+
+.guide-screen__head-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: var(--tv-spacing-sm) var(--tv-spacing-md);
+    gap: 0.25rem;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.guide-screen__hit {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
     border: none;
     background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.guide-screen__hit:hover .guide-screen__channel {
+    color: var(--tv-text-primary);
+}
+
+.guide-screen.is-expanded .guide-screen__hit:hover .guide-screen__badge,
+.guide-screen.is-expanded .guide-screen__badge {
+    color: var(--tv-primary);
+}
+
+.guide-screen__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-top: 0.2rem;
+    transition: opacity 0.3s ease, max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.guide-screen.is-collapsed .guide-screen__body {
+    flex: 0 0 auto;
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.guide-screen__summary {
+    flex: 0 0 auto;
+}
+
+.guide-screen__detail {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-top: 0.15rem;
+}
+
+.guide-screen__day-tabs {
+    display: none;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    margin-bottom: 0.35rem;
+}
+
+.guide-screen.is-expanded .guide-screen__day-tabs {
+    display: flex;
+}
+
+.guide-screen__day-tab {
+    flex: 1 1 0;
+    padding: 0.28rem 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--tv-border) 70%, transparent);
+    border-radius: var(--tv-radius-sm);
+    background: color-mix(in srgb, var(--tv-bg-secondary) 88%, transparent);
     color: var(--tv-text-secondary);
     font: inherit;
-    font-size: 0.85rem;
+    font-size: 0.68rem;
+    font-weight: 600;
     cursor: pointer;
-    text-align: left;
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease,
+        color 0.15s ease;
 }
 
-.guide-panel__toggle:hover {
+.guide-screen__day-tab:hover {
+    border-color: color-mix(in srgb, var(--tv-primary) 40%, var(--tv-border));
     color: var(--tv-text-primary);
-    background: color-mix(in srgb, var(--tv-primary) 6%, transparent);
 }
 
-.guide-panel__body {
-    display: none;
-    padding: 0 var(--tv-spacing-md) var(--tv-spacing-md);
-    max-height: 220px;
+.guide-screen__day-tab.is-active {
+    border-color: color-mix(in srgb, var(--tv-primary) 55%, var(--tv-border));
+    background: color-mix(in srgb, var(--tv-primary) 12%, var(--tv-bg-secondary));
+    color: var(--tv-primary);
+}
+
+.guide-screen__schedule {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
-.guide-panel__body.is-open {
-    display: block;
-}
-
-.guide-panel.is-loading .guide-panel__status {
+.guide-screen__schedule-empty {
+    margin: 0;
+    font-size: 0.72rem;
     color: var(--tv-text-muted);
-    font-style: italic;
 }
 
-.guide-panel__status {
-    font-size: 0.8rem;
-    color: var(--tv-text-muted);
-    margin-bottom: var(--tv-spacing-sm);
-    min-height: 1.2em;
-}
-
-.guide-panel__list {
+.guide-screen__schedule-list {
     list-style: none;
     margin: 0;
     padding: 0;
 }
 
-.guide-panel__row {
-    display: flex;
-    gap: var(--tv-spacing-sm);
-    padding: 0.35rem 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--tv-border) 60%, transparent);
-    font-size: 0.82rem;
-    line-height: 1.3;
+.guide-screen__prog {
+    display: grid;
+    grid-template-columns: 2.65rem minmax(0, 1fr);
+    gap: 0.15rem 0.45rem;
+    padding: 0.28rem 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--tv-border) 35%, transparent);
 }
 
-.guide-panel__row.is-current {
-    color: var(--tv-primary);
-    font-weight: 600;
+.guide-screen__prog:last-child {
+    border-bottom: none;
 }
 
-.guide-panel__row.is-past {
+.guide-screen__prog.is-now {
+    background: color-mix(in srgb, var(--tv-primary) 8%, transparent);
+    border-radius: var(--tv-radius-sm);
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+
+.guide-screen__prog.is-past {
     opacity: 0.55;
 }
 
-.guide-panel__time {
-    flex-shrink: 0;
-    width: 6.5rem;
+.guide-screen__prog-time {
+    font-size: 0.68rem;
+    font-weight: 600;
     color: var(--tv-text-muted);
-    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
 }
 
-.guide-panel__row.is-current .guide-panel__time {
+.guide-screen__prog.is-now .guide-screen__prog-time {
     color: var(--tv-primary);
 }
 
-.guide-panel__title {
-    min-width: 0;
+.guide-screen__prog-title {
+    grid-column: 2;
+    font-size: 0.74rem;
+    line-height: 1.35;
+    color: var(--tv-text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.guide-panel__empty {
-    font-size: 0.8rem;
+.guide-screen__prog.is-now .guide-screen__prog-title {
+    font-weight: 600;
+}
+
+.guide-screen__prog-desc {
+    grid-column: 2;
+    font-size: 0.66rem;
+    line-height: 1.3;
     color: var(--tv-text-muted);
-    padding: var(--tv-spacing-sm) 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
-.guide-panel__tomorrow {
-    margin-top: var(--tv-spacing-sm);
-    border-top: 1px solid var(--tv-border);
-    padding-top: var(--tv-spacing-sm);
-}
-
-.guide-panel__tomorrow summary {
+.guide-screen__refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--tv-radius-sm);
+    background: transparent;
+    color: var(--tv-text-muted);
     cursor: pointer;
-    font-size: 0.82rem;
-    color: var(--tv-text-secondary);
-    user-select: none;
-    list-style: none;
+    opacity: 0;
+    transition:
+        opacity 0.15s ease,
+        color 0.15s ease,
+        background 0.15s ease;
 }
 
-.guide-panel__tomorrow summary::-webkit-details-marker {
+.guide-screen:hover .guide-screen__refresh,
+.guide-screen:focus-within .guide-screen__refresh {
+    opacity: 1;
+}
+
+.guide-screen__refresh:hover {
+    color: var(--tv-primary);
+    background: color-mix(in srgb, var(--tv-primary) 12%, transparent);
+}
+
+.guide-screen__refresh.is-spinning svg {
+    animation: guide-refresh-spin 0.65s linear infinite;
+}
+
+@keyframes guide-refresh-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.guide-screen__badge {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tv-text-muted);
+}
+
+.guide-screen__channel {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--tv-text-secondary);
+}
+
+.guide-screen__now {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--tv-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.guide-screen__next {
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--tv-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.guide-screen__next:empty {
     display: none;
 }
 
-.guide-panel__tomorrow summary::before {
-    content: '▸ ';
-    display: inline-block;
-    transition: transform 0.15s ease;
+.guide-screen__meta {
+    flex: 0 0 auto;
+    margin: 0.25rem 0 0;
+    font-size: 0.66rem;
+    color: var(--tv-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.guide-panel__tomorrow[open] summary::before {
-    transform: rotate(90deg);
+.guide-screen__meta:empty {
+    display: none;
 }
 
-.guide-panel__tomorrow .guide-panel__list {
-    margin-top: var(--tv-spacing-sm);
+.guide-wing__empty {
+    margin: 0;
+    padding: var(--tv-spacing-md) 0;
+    font-size: 0.8rem;
+    color: var(--tv-text-muted);
+    text-align: center;
+}
+
+.guide-panel.is-loading .guide-wing__screens {
+    opacity: 0.65;
+}
+
+/* Hide guide column when browsing (remote shell hidden) */
+.catalog-root.module-layout--joined:not(.is-remote-view) ~ .guide-wing {
+    flex: 0 0 0 !important;
+    width: 0 !important;
+    max-width: 0 !important;
+    pointer-events: none !important;
 }
 
 /* Header programme lines — arranged along a single shared baseline. All header text
@@ -172,9 +440,6 @@
     flex-shrink: 1;
 }
 
-/* Channel identity stays the hero of the header: large, gradient, and sharing
-   the 32px line band with the icon, so its vertical middle sits exactly on the
-   icon's middle. Baseline alignment keeps it on one line with the small labels. */
 .tv-header-channel-name,
 .tv-header-channel-flag {
     font-size: 24px;
@@ -199,10 +464,6 @@
     filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tv-primary) 30%, transparent));
 }
 
-/* Unify hero / channel name / clock onto the SAME text level. The wordmark is
-   the same size and line metrics as the channel name, so its baseline lines up
-   across the whole header from logo to clock. Colours stay as intended:
-   hero + channel name keep the neon gradient, all other header text is subtle. */
 .tv-brand h1 {
     font-size: 24px;
     font-weight: 600;
@@ -211,8 +472,6 @@
     padding-bottom: 0;
 }
 
-/* Clock metrics are owned by css/tv-clock.css (loaded last); this just keeps a
-   base size/weight for the zone so nothing inherits a stray default. */
 .tv-clock-zone,
 .tv-clock-display,
 .clock-chip {
@@ -224,16 +483,12 @@
     font-weight: 600;
 }
 
-/* Responsive header sizing lives here (not settings.css) because guide.css is
-   last in the cascade — same-specificity font-size rules in earlier sheets
-   would otherwise be silently overridden. The wordmark always scales with the
-   channel name so they stay identical at every viewport. */
 @media (max-width: 768px) {
     .tv-brand h1,
     .tv-header-channel-name,
     .tv-header-channel-flag {
         font-size: 22px;
-        line-height: 24px; /* matches the 24px responsive icon band */
+        line-height: 24px;
     }
 
     .tv-header-program-title,
@@ -263,7 +518,7 @@
     .tv-header-channel-name,
     .tv-header-channel-flag {
         font-size: 18px;
-        line-height: 32px; /* icon stays 32px on short viewports */
+        line-height: 32px;
     }
 
     .tv-header-program-title,
@@ -277,58 +532,4 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
-}
-
-.guide-panel__tomorrow .guide-panel__list {
-    margin-top: var(--tv-spacing-sm);
-}
-
-.guide-panel__fav-btn {
-    display: block;
-    width: 100%;
-    margin-top: var(--tv-spacing-sm);
-    padding: 0.4rem var(--tv-spacing-sm);
-    border: 1px solid var(--tv-border);
-    border-radius: var(--tv-radius-sm);
-    background: color-mix(in srgb, var(--tv-primary) 8%, transparent);
-    color: var(--tv-text-secondary);
-    font: inherit;
-    font-size: 0.78rem;
-    cursor: pointer;
-}
-
-.guide-panel__fav-btn:hover:not(:disabled) {
-    color: var(--tv-text-primary);
-    border-color: var(--tv-primary);
-}
-
-.guide-panel__fav-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
-}
-
-.guide-panel__fav-results {
-    margin-top: var(--tv-spacing-sm);
-    font-size: 0.75rem;
-    color: var(--tv-text-muted);
-    max-height: 120px;
-    overflow-y: auto;
-}
-
-.guide-panel__fav-row {
-    padding: 0.2rem 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--tv-border) 50%, transparent);
-}
-
-.guide-panel__fav-row--ok {
-    color: var(--tv-primary);
-}
-
-.remote-program-title {
-    font-size: 0.75rem;
-    color: var(--tv-text-secondary);
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }

@@ -10,6 +10,8 @@
         + (var(--remote-grid-cols) - 1) * var(--remote-grid-gap)
         + 2 * var(--tv-spacing-md, 1rem)
     );
+    --guide-slide-duration: 0.55s;
+    --guide-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .remote-module-staging {
@@ -36,7 +38,10 @@
     cursor: pointer;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.28);
     pointer-events: auto;
-    transition: transform 0.25s ease, opacity 0.15s ease;
+    transition:
+        transform 0.25s ease,
+        opacity 0.15s ease,
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
     opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--remote-idle-opacity-mult, 1));
 }
 
@@ -79,7 +84,9 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     box-shadow: none;
     transform: translateY(100%);
     transform-origin: bottom left;
-    transition: transform 0.25s ease;
+    transition:
+        transform 0.25s ease,
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
     pointer-events: none;
     overflow: hidden;
 }
@@ -174,7 +181,10 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     overflow: hidden;
     pointer-events: auto;
     opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--remote-idle-opacity-mult, 1));
-    transition: opacity 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+        min-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
     cursor: grab;
 }
 
@@ -226,8 +236,18 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
     overflow: hidden;
+}
+
+.remote-module__host > #tv-catalog-body,
+.remote-dock-sheet__inner > #tv-catalog-body {
+    flex: 0 0 var(--remote-min-width, 260px);
+    width: var(--remote-min-width, 260px);
+    min-width: var(--remote-min-width, 260px);
+    max-width: var(--remote-min-width, 260px);
 }
 
 .remote-module__shell {
@@ -279,6 +299,16 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     display: none;
 }
 
+/* Guide open — outer shell grows; remote column stays fixed width */
+body.remote-guide-open .remote-dock-sheet,
+body.remote-guide-open .remote-dock-tab {
+    width: calc(var(--remote-min-width) * 2);
+}
+
+body.remote-guide-open .remote-module__dialog {
+    min-width: calc(var(--remote-min-width) * 2);
+}
+
 .catalog-root.module-layout--joined:not(.is-remote-view) #browser-shell {
     flex: 1 1 auto;
     min-height: 0;
@@ -306,14 +336,6 @@ body.browser-shell-split #remote-shell {
     /* same chrome language as remote float */
     min-width: var(--remote-min-width, 260px);
     opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
-}
-
-#remote-program-bar .remote-program-title:empty {
-    display: none;
-}
-
-#remote-program-bar:not(:has(.remote-program-title:not(:empty))) {
-    display: none;
 }
 
 .remote-module__chrome {

@@ -13,7 +13,7 @@ const KNOWN_IDS = [
     'tv-settings-btn', 'back-btn', 'search-countries', 'refresh-btn',
     'player-slot', 'player-mosaic',
     'remote-panel', 'remote-panel-footer', 'remote-catalog-tools', 'remote-channel-bar', 'remote-channel-name', 'tv-catalog-body', 'remote-module-staging',
-    'remote-shell', 'browser-shell', 'remote-program-bar', 'remote-program-title',
+    'remote-shell', 'browser-shell', 'guide-panel', 'guide-screens',
     'remote-dock-tab', 'remote-dock-sheet', 'remote-dock-host',
     'remote-module', 'remote-module-dialog', 'remote-module-host',
     'browser-module', 'browser-module-dialog', 'browser-module-host',

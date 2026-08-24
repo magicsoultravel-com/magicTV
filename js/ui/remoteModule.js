@@ -8,6 +8,7 @@ import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { RemotePanel, syncRemoteNav } from './remotePanel.js';
+import { GuidePanel } from './guidePanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
 import { BrowserModule } from './browserModule.js';
@@ -32,6 +33,10 @@ const MIN_H = 560;
 const VIEW_PAD = 8;
 const DEFAULT_SHEET_HEIGHT = 0.62;
 
+function minDialogWidth() {
+    return GuidePanel.isVisible?.() ? MIN_W * 2 : MIN_W;
+}
+
 let deps = {
     getDefaultOnPlay: () => () => {},
     switchTab: () => {},
@@ -47,6 +52,8 @@ let remoteEndActionsDockParent = null;
 let remoteEndActionsNextSibling = null;
 let browserEndActionsDockParent = null;
 let browserEndActionsNextSibling = null;
+let guideDockParent = null;
+let guideNextSibling = null;
 let bound = false;
 let pinned = false;
 let sheetExpanded = false;
@@ -80,6 +87,10 @@ function stagingEl() {
 
 function catalogBody() {
     return el('tv-catalog-body');
+}
+
+function guidePanelEl() {
+    return el('guide-panel');
 }
 
 function moduleStartActions() {
@@ -130,14 +141,15 @@ function defaultGeometry() {
 }
 
 function clampGeometry({ left, top, width, height }) {
+    const minW = minDialogWidth();
     const { w: vw, h: vh } = viewportSize();
-    let w = Math.max(MIN_W, Math.min(width, vw - VIEW_PAD * 2));
+    let w = Math.max(minW, Math.min(width, vw - VIEW_PAD * 2));
     let h = Math.max(MIN_H, Math.min(height, vh - VIEW_PAD * 2));
     let x = left;
     let y = top;
     x = Math.min(Math.max(VIEW_PAD, x), vw - VIEW_PAD - Math.min(w, 80));
     y = Math.min(Math.max(VIEW_PAD, y), vh - VIEW_PAD - 40);
-    if (x + w > vw - VIEW_PAD) w = Math.max(MIN_W, vw - VIEW_PAD - x);
+    if (x + w > vw - VIEW_PAD) w = Math.max(minW, vw - VIEW_PAD - x);
     if (y + h > vh - VIEW_PAD) h = Math.max(MIN_H, vh - VIEW_PAD - y);
     return { left: Math.round(x), top: Math.round(y), width: Math.round(w), height: Math.round(h) };
 }
@@ -206,6 +218,7 @@ function persistState(overrides = {}) {
             targetSlotId: nextTarget,
             sheetHeight: parseFloat(sheetHeight) || DEFAULT_SHEET_HEIGHT,
             sheetExpanded: overrides.sheetExpanded != null ? overrides.sheetExpanded === true : sheetExpanded,
+            guideOpen: overrides.guideOpen != null ? overrides.guideOpen === true : GuidePanel.isVisible?.(),
             layout: {
                 ...layoutState,
                 remoteHostKind
@@ -341,6 +354,7 @@ function getActiveHost() {
 
 function restoreBodyToStaging() {
     const body = catalogBody();
+    const guide = guidePanelEl();
     const staging = stagingEl();
     const remoteEndActions = moduleRemoteEndActions();
     const browserEndActions = moduleBrowserEndActions();
@@ -380,8 +394,23 @@ function restoreBodyToStaging() {
     } else {
         staging.appendChild(body);
     }
+
+    if (guide) {
+        if (guideDockParent) {
+            if (guideNextSibling && guideNextSibling.parentElement === guideDockParent) {
+                guideDockParent.insertBefore(guide, guideNextSibling);
+            } else {
+                guideDockParent.appendChild(guide);
+            }
+        } else {
+            staging.appendChild(guide);
+        }
+    }
+
     dockParent = null;
     nextSibling = null;
+    guideDockParent = null;
+    guideNextSibling = null;
     startActionsDockParent = null;
     startActionsNextSibling = null;
     remoteEndActionsDockParent = null;
@@ -506,6 +535,7 @@ function reconcileShells() {
 
 function teleportBodyTo(host) {
     const body = catalogBody();
+    const guide = guidePanelEl();
     if (!body || !host) return;
 
     const remoteEndActions = moduleRemoteEndActions();
@@ -516,6 +546,10 @@ function teleportBodyTo(host) {
     if (!dockParent) {
         dockParent = body.parentElement;
         nextSibling = body.nextSibling;
+    }
+    if (guide && !guideDockParent) {
+        guideDockParent = guide.parentElement;
+        guideNextSibling = guide.nextSibling;
     }
     if (remoteEndActions && !remoteEndActionsDockParent) {
         remoteEndActionsDockParent = remoteEndActions.parentElement;
@@ -536,6 +570,7 @@ function teleportBodyTo(host) {
     if (remoteEndActions) host.appendChild(remoteEndActions);
     if (!split && browserEndActions) host.appendChild(browserEndActions);
     host.appendChild(body);
+    if (guide) host.appendChild(guide);
     syncCatalogRootClasses(body);
 }
 
@@ -646,9 +681,10 @@ function onPointerMove(e) {
         top = gesture.originTop + dy;
     }
 
-    if (width < MIN_W) {
-        if (edge.includes('w')) left = gesture.originLeft + gesture.originW - MIN_W;
-        width = MIN_W;
+    if (width < minDialogWidth()) {
+        const minW = minDialogWidth();
+        if (edge.includes('w')) left = gesture.originLeft + gesture.originW - minW;
+        width = minW;
     }
     if (height < MIN_H) {
         if (edge.includes('n')) top = gesture.originTop + gesture.originH - MIN_H;
@@ -796,23 +832,38 @@ function bindOnce() {
         if (mode !== 'hidden') persistState();
     });
 
+    window.addEventListener('guide:visibility_changed', (e) => {
+        const visible = e.detail?.visible === true;
+        if (mode === 'undocked') {
+            const geom = readDialogGeometry();
+            if (visible && geom.width < MIN_W * 2) {
+                applyGeometry({ ...geom, width: MIN_W * 2 });
+            } else {
+                applyGeometry(geom);
+            }
+        }
+        persistState({ guideOpen: visible });
+    });
+
     bindIdleActivity();
 }
 
 function restoreFromState() {
     const saved = getSavedState();
     const geom = defaultGeometry();
+    const guideOpen = saved?.guideOpen === true;
+    const minW = guideOpen ? MIN_W * 2 : MIN_W;
     if (saved) {
         applyGeometry({
             left: Number.isFinite(saved.left) ? saved.left : geom.left,
             top: Number.isFinite(saved.top) ? saved.top : geom.top,
-            width: MIN_W,
+            width: Math.max(minW, Number.isFinite(saved.width) ? saved.width : minW),
             height: MIN_H
         }, { pinned: saved.pinned === true });
         applySheetHeight(saved.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
         return;
     }
-    applyGeometry(defaultGeometry(), { pinned: false });
+    applyGeometry({ ...defaultGeometry(), width: minW }, { pinned: false });
     applySheetHeight(DEFAULT_SHEET_HEIGHT);
 }
 
@@ -967,14 +1018,18 @@ export const RemoteModule = {
         setSheetExpanded(false, { persist: false });
 
         const body = catalogBody();
+        const guide = guidePanelEl();
         const staging = stagingEl();
         const remoteEnd = moduleRemoteEndActions();
         if (body && staging) {
             if (remoteEnd) staging.appendChild(remoteEnd);
             staging.appendChild(body);
+            if (guide) staging.appendChild(guide);
         }
         dockParent = null;
         nextSibling = null;
+        guideDockParent = null;
+        guideNextSibling = null;
         remoteEndActionsDockParent = null;
         remoteEndActionsNextSibling = null;
 

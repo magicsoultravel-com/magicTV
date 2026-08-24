@@ -1,34 +1,154 @@
-/** On-demand programme guide panel in the remote module. */
+/** Programme guide wing — one section per open TV screen, beside the remote. */
 import { el, escapeHtml } from '../tvUtils.js';
 import { TvPlayer } from '../tvPlayer.js';
-import { MultiView } from '../multiView.js';
-import { getNowNext, getSchedule, prefetchFavoritesGuides } from '../epg/epgService.js';
+import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
+import { getNowNext, getSchedule } from '../epg/epgService.js';
 import { formatProgrammeTime } from '../epg/xmltvParser.js';
-import { FavoritesRecents } from '../storage/favoritesRecents.js';
+import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
+import { SLOT_IDS } from '../mosaic/constants.js';
+import { ACTION_ICONS } from './icons.js';
+import { channelKey } from '../tvProviders/channelShape.js';
+
+const GUIDE_REFRESH_ICON = ACTION_ICONS.refresh;
+
+const GUIDE_SLOT_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
 let refreshTimer = null;
-let lastChannelKey = '';
+let lastSnapshot = '';
 /** @type {Promise<void>|null} */
 let loadPromise = null;
+/** @type {string|null} null = equal split across all screens */
+let expandedSlotId = null;
+/** @type {Map<string, number>} slotId -> dayOffset (0 today, 1 tomorrow) */
+const slotDayOffsets = new Map();
+/** @type {Array<{ slotId: string, channel: object|null, result: object|null }>} */
+let lastSlotResults = [];
+/** @type {Map<string, { dayOffset: number, result: object|null }>} */
+const slotScheduleCache = new Map();
 
-function activeChannel() {
-    const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
-    return player?.channel || TvPlayer.channel || null;
+function syncGuideOpenClass(open) {
+    document.body?.classList.toggle('remote-guide-open', open === true);
+}
+
+function enabledScreenSlots() {
+    return GUIDE_SLOT_ORDER.filter((id) => {
+        if (!SLOT_IDS.includes(id)) return false;
+        const slot = MultiView.slots[id];
+        return slot?.enabled === true;
+    });
+}
+
+function refreshButtonHtml(slotId, label) {
+    return `<button type="button" class="guide-screen__refresh" data-guide-refresh="${escapeHtml(slotId)}" aria-label="Refresh TV ${escapeHtml(label)} guide" title="Refresh guide">${GUIDE_REFRESH_ICON}</button>`;
+}
+
+function slotChannel(slotId) {
+    return MultiView.slots[slotId]?.player?.channel || null;
 }
 
 function channelCacheKey(channel) {
-    if (!channel) return '';
-    return `${channel.providerId || ''}:${channel.channelId || channel.id || ''}`;
+    return channelKey(channel);
+}
+
+function scheduleCacheKey(channel, dayOffset) {
+    const key = channelCacheKey(channel);
+    return key ? `${key}:${dayOffset}` : '';
+}
+
+function slotDayOffset(slotId) {
+    return slotDayOffsets.get(slotId) ?? 0;
+}
+
+async function fetchNowNextForChannel(channel, { force = false } = {}) {
+    if (!channel?.channelId && !channel?.id) return null;
+    return getNowNext(channel, Date.now(), { force });
+}
+
+async function fetchResultsForSlots(slots, { force = false } = {}) {
+    /** @type {Map<string, Promise<object|null>>} */
+    const byChannel = new Map();
+
+    for (const slotId of slots) {
+        const channel = slotChannel(slotId);
+        const key = channelCacheKey(channel);
+        if (!key || byChannel.has(key)) continue;
+        byChannel.set(key, fetchNowNextForChannel(channel, { force }));
+    }
+
+    const resolved = new Map();
+    await Promise.all([...byChannel.entries()].map(async ([key, promise]) => {
+        resolved.set(key, await promise);
+    }));
+
+    return slots.map((slotId) => {
+        const channel = slotChannel(slotId);
+        const key = channelCacheKey(channel);
+        if (!key) return { slotId, channel, result: null };
+        return { slotId, channel, result: resolved.get(key) ?? null };
+    });
+}
+
+async function fetchScheduleForChannel(channel, dayOffset, { force = false } = {}) {
+    if (!channel?.channelId && !channel?.id) return null;
+    return getSchedule(channel, { dayOffset, nowMs: Date.now() });
+}
+
+async function fetchSchedulesForSlots(slots, { force = false } = {}) {
+    /** @type {Map<string, Promise<object|null>>} */
+    const byKey = new Map();
+
+    for (const slotId of slots) {
+        const channel = slotChannel(slotId);
+        const dayOffset = slotDayOffset(slotId);
+        const key = scheduleCacheKey(channel, dayOffset);
+        if (!key || byKey.has(key)) continue;
+        byKey.set(key, fetchScheduleForChannel(channel, dayOffset, { force }));
+    }
+
+    const resolved = new Map();
+    await Promise.all([...byKey.entries()].map(async ([key, promise]) => {
+        resolved.set(key, await promise);
+    }));
+
+    return slots.map((slotId) => {
+        const channel = slotChannel(slotId);
+        const dayOffset = slotDayOffset(slotId);
+        const key = scheduleCacheKey(channel, dayOffset);
+        if (!key) return { slotId, channel, dayOffset, result: null };
+        return { slotId, channel, dayOffset, result: resolved.get(key) ?? null };
+    });
+}
+
+function guideSnapshot() {
+    const slots = enabledScreenSlots();
+    const keys = slots.map((id) => `${id}:${channelCacheKey(slotChannel(id))}:${slotDayOffset(id)}`).join('|');
+    return `${expandedSlotId || 'equal'}::${keys}`;
 }
 
 function setLoading(loading) {
     const panel = el('guide-panel');
     if (panel) panel.classList.toggle('is-loading', loading);
-    const status = el('guide-status');
-    if (status && loading) status.textContent = 'Loading guide…';
 }
 
-function statusMessage(result) {
+function statusLine(result, channel) {
+    if (!channel?.channelId && !channel?.id) {
+        return { now: 'No channel tuned', next: '', meta: '' };
+    }
+    if (!result) {
+        return { now: 'Loading guide…', next: '', meta: '' };
+    }
+    if (result.status !== 'ok') {
+        return { now: 'guide not available', next: '', meta: statusMessage(result, channel) };
+    }
+    const now = result.current?.title || 'guide not available';
+    const next = result.next
+        ? `Next: ${result.next.title} at ${formatProgrammeTime(result.next.start)}`
+        : '';
+    const meta = statusMessage(result, channel);
+    return { now, next, meta };
+}
+
+function statusMessage(result, channel) {
     if (!result) return '';
     if (result.status === 'ok') {
         const via = result.source
@@ -37,7 +157,7 @@ function statusMessage(result) {
         return via;
     }
     if (result.status === 'no-source') {
-        const cc = activeChannel()?.countrycode;
+        const cc = channel?.countrycode || channel?.country || '';
         return cc ? `No guide source for ${cc}` : 'No guide source for this country';
     }
     if (result.status === 'cors-blocked') return 'Guide source blocked (CORS)';
@@ -46,82 +166,295 @@ function statusMessage(result) {
     return '';
 }
 
-function renderProgrammeRow(prog, { isCurrent = false, isPast = false } = {}) {
-    const time = `${formatProgrammeTime(prog.start)} – ${formatProgrammeTime(prog.stop)}`;
-    const cls = [
-        'guide-panel__row',
-        isCurrent ? 'is-current' : '',
-        isPast ? 'is-past' : ''
-    ].filter(Boolean).join(' ');
-    return `<li class="${cls}"><span class="guide-panel__time">${escapeHtml(time)}</span><span class="guide-panel__title">${escapeHtml(prog.title)}</span></li>`;
+function scheduleMessage(result) {
+    if (!result) return 'Loading schedule…';
+    if (result.status !== 'ok') return statusMessage(result, null) || 'Schedule unavailable';
+    if (!result.dayProgrammes?.length) return 'No programmes listed';
+    return '';
 }
 
-function renderList(listEl, programmes, nowMs) {
-    if (!listEl) return;
-    if (!programmes?.length) {
-        listEl.innerHTML = '<li class="guide-panel__empty">No programmes</li>';
-        return;
-    }
-    listEl.innerHTML = programmes.map((p) => {
-        const isCurrent = p.start <= nowMs && p.stop > nowMs;
+function renderScheduleList(programmes, nowMs = Date.now()) {
+    if (!programmes?.length) return '';
+    return programmes.map((p) => {
+        const isNow = p.start <= nowMs && p.stop > nowMs;
         const isPast = p.stop <= nowMs;
-        return renderProgrammeRow(p, { isCurrent, isPast });
+        const classes = ['guide-screen__prog'];
+        if (isNow) classes.push('is-now');
+        if (isPast) classes.push('is-past');
+        const desc = p.desc
+            ? `<span class="guide-screen__prog-desc">${escapeHtml(p.desc)}</span>`
+            : '';
+        return `<li class="${classes.join(' ')}">
+            <span class="guide-screen__prog-time">${escapeHtml(formatProgrammeTime(p.start))}</span>
+            <span class="guide-screen__prog-title">${escapeHtml(p.title)}</span>
+            ${desc}
+        </li>`;
     }).join('');
 }
 
-async function loadTomorrow() {
-    const channel = activeChannel();
-    const listEl = el('guide-tomorrow-list');
-    if (!channel || !listEl) return;
-
-    listEl.innerHTML = '<li class="guide-panel__empty">Loading…</li>';
-    const result = await getSchedule(channel, { dayOffset: 1 });
-    renderList(listEl, result.dayProgrammes, Date.now());
+function dayTabsHtml(slotId, dayOffset) {
+    return `<div class="guide-screen__day-tabs" role="tablist" aria-label="Guide day">
+        <button type="button" class="guide-screen__day-tab${dayOffset === 0 ? ' is-active' : ''}" data-guide-day="0" data-guide-slot="${escapeHtml(slotId)}" role="tab" aria-selected="${dayOffset === 0}">Today</button>
+        <button type="button" class="guide-screen__day-tab${dayOffset === 1 ? ' is-active' : ''}" data-guide-day="1" data-guide-slot="${escapeHtml(slotId)}" role="tab" aria-selected="${dayOffset === 1}">Tomorrow</button>
+    </div>`;
 }
 
-async function refreshGuide() {
-    const channel = activeChannel();
-    const status = el('guide-status');
-    const todayList = el('guide-today-list');
-    const key = channelCacheKey(channel);
+function renderScreenSection(slotId, { channel, result, scheduleResult = null, dayOffset = 0 }) {
+    const label = SLOT_SCREEN_LABELS[slotId] || slotId;
+    const channelName = channel?.name ? escapeHtml(channel.name) : '—';
+    const { now, next, meta } = statusLine(result, channel);
+    const scheduleEmpty = scheduleMessage(scheduleResult);
+    const scheduleList = scheduleResult?.status === 'ok'
+        ? renderScheduleList(scheduleResult.dayProgrammes)
+        : '';
 
-    if (!channel?.channelId && !channel?.id) {
-        lastChannelKey = '';
-        if (status) status.textContent = 'Tune a channel to see its guide';
-        if (todayList) todayList.innerHTML = '';
-        const tomorrowList = el('guide-tomorrow-list');
-        if (tomorrowList) tomorrowList.innerHTML = '';
+    return `<section class="guide-screen" data-slot-id="${escapeHtml(slotId)}" aria-label="TV ${escapeHtml(label)} guide">
+        <div class="guide-screen__head-row">
+            <button type="button" class="guide-screen__hit" data-guide-slot="${escapeHtml(slotId)}" aria-expanded="false">
+                <span class="guide-screen__badge">TV ${escapeHtml(label)}</span>
+                <span class="guide-screen__channel">${channelName}</span>
+            </button>
+            ${refreshButtonHtml(slotId, label)}
+        </div>
+        <div class="guide-screen__body">
+            <div class="guide-screen__summary">
+                <p class="guide-screen__now">${escapeHtml(now)}</p>
+                <p class="guide-screen__next">${escapeHtml(next)}</p>
+            </div>
+            <div class="guide-screen__detail">
+                ${dayTabsHtml(slotId, dayOffset)}
+                <div class="guide-screen__schedule" role="region" aria-label="Programme schedule">
+                    ${scheduleEmpty
+                        ? `<p class="guide-screen__schedule-empty">${escapeHtml(scheduleEmpty)}</p>`
+                        : `<ul class="guide-screen__schedule-list">${scheduleList}</ul>`}
+                </div>
+                ${meta ? `<p class="guide-screen__meta">${escapeHtml(meta)}</p>` : ''}
+            </div>
+        </div>
+    </section>`;
+}
+
+function patchSlotSection(section, slotId, { channel, result, scheduleResult, dayOffset }) {
+    if (!section) return;
+
+    const channelEl = section.querySelector('.guide-screen__channel');
+    const nowEl = section.querySelector('.guide-screen__now');
+    const nextEl = section.querySelector('.guide-screen__next');
+    let metaEl = section.querySelector('.guide-screen__meta');
+
+    const { now, next, meta } = statusLine(result, channel);
+    if (channelEl) channelEl.textContent = channel?.name || '—';
+    if (nowEl) nowEl.textContent = now;
+    if (nextEl) nextEl.textContent = next;
+
+    if (meta) {
+        if (!metaEl) {
+            metaEl = document.createElement('p');
+            metaEl.className = 'guide-screen__meta';
+            section.querySelector('.guide-screen__detail')?.appendChild(metaEl);
+        }
+        metaEl.textContent = meta;
+    } else if (metaEl) {
+        metaEl.remove();
+    }
+
+    if (typeof dayOffset === 'number') {
+        section.querySelectorAll('.guide-screen__day-tab').forEach((tab) => {
+            const active = Number(tab.dataset.guideDay) === dayOffset;
+            tab.classList.toggle('is-active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+    }
+
+    if (scheduleResult !== undefined) {
+        const scheduleEl = section.querySelector('.guide-screen__schedule');
+        if (scheduleEl) {
+            const empty = scheduleMessage(scheduleResult);
+            if (empty) {
+                scheduleEl.innerHTML = `<p class="guide-screen__schedule-empty">${escapeHtml(empty)}</p>`;
+            } else {
+                scheduleEl.innerHTML = `<ul class="guide-screen__schedule-list">${renderScheduleList(scheduleResult.dayProgrammes)}</ul>`;
+            }
+        }
+    }
+}
+
+function scheduleSlotsToLoad() {
+    const slots = enabledScreenSlots();
+    if (!expandedSlotId || slots.length <= 1) return slots;
+    return [expandedSlotId];
+}
+
+async function loadSchedulesForVisibleSlots({ force = false } = {}) {
+    const slots = scheduleSlotsToLoad();
+    if (!slots.length) return;
+
+    const schedules = await fetchSchedulesForSlots(slots, { force });
+    for (const entry of schedules) {
+        slotScheduleCache.set(entry.slotId, { dayOffset: entry.dayOffset, result: entry.result });
+        const section = el('guide-screens')?.querySelector(`.guide-screen[data-slot-id="${entry.slotId}"]`);
+        patchSlotSection(section, entry.slotId, {
+            channel: entry.channel,
+            result: lastSlotResults.find((r) => r.slotId === entry.slotId)?.result ?? null,
+            scheduleResult: entry.result,
+            dayOffset: entry.dayOffset
+        });
+    }
+}
+
+async function refreshSlotGuide(slotId) {
+    if (!enabledScreenSlots().includes(slotId)) return;
+
+    const channel = slotChannel(slotId);
+    let result = null;
+    if (channel?.channelId || channel?.id) {
+        result = await getNowNext(channel, Date.now(), { force: true });
+    }
+
+    const idx = lastSlotResults.findIndex((r) => r.slotId === slotId);
+    const entry = { slotId, channel, result };
+    if (idx >= 0) lastSlotResults[idx] = entry;
+    else lastSlotResults.push(entry);
+
+    const section = el('guide-screens')?.querySelector(`.guide-screen[data-slot-id="${slotId}"]`);
+    patchSlotSection(section, slotId, { channel, result, dayOffset: slotDayOffset(slotId) });
+
+    slotScheduleCache.delete(slotId);
+    await loadSchedulesForVisibleSlots({ force: true });
+    lastSnapshot = guideSnapshot();
+}
+
+async function setSlotDayOffset(slotId, dayOffset) {
+    if (!enabledScreenSlots().includes(slotId)) return;
+    slotDayOffsets.set(slotId, dayOffset === 1 ? 1 : 0);
+    slotScheduleCache.delete(slotId);
+
+    const section = el('guide-screens')?.querySelector(`.guide-screen[data-slot-id="${slotId}"]`);
+    patchSlotSection(section, slotId, {
+        channel: slotChannel(slotId),
+        result: lastSlotResults.find((r) => r.slotId === slotId)?.result ?? null,
+        scheduleResult: null,
+        dayOffset
+    });
+
+    const schedules = await fetchSchedulesForSlots([slotId], { force: true });
+    const entry = schedules[0];
+    if (entry) {
+        slotScheduleCache.set(slotId, { dayOffset: entry.dayOffset, result: entry.result });
+        patchSlotSection(section, slotId, {
+            channel: entry.channel,
+            result: lastSlotResults.find((r) => r.slotId === slotId)?.result ?? null,
+            scheduleResult: entry.result,
+            dayOffset: entry.dayOffset
+        });
+    }
+    lastSnapshot = guideSnapshot();
+}
+
+function syncExpandedLayout(slotResults = lastSlotResults) {
+    const container = el('guide-screens');
+    if (!container) return;
+
+    const slots = enabledScreenSlots();
+    if (expandedSlotId && !slots.includes(expandedSlotId)) {
+        expandedSlotId = null;
+    }
+
+    const isEqual = !expandedSlotId || slots.length <= 1;
+
+    container.classList.toggle('is-equal-split', isEqual);
+    container.classList.toggle('is-slot-expanded', !isEqual);
+    container.dataset.screenCount = String(slots.length);
+
+    container.querySelectorAll('.guide-screen').forEach((section) => {
+        const slotId = section.dataset.slotId;
+        if (!slots.includes(slotId)) {
+            section.remove();
+            return;
+        }
+        const expanded = !isEqual && slotId === expandedSlotId;
+        section.hidden = false;
+        section.classList.toggle('is-expanded', expanded);
+        section.classList.toggle('is-collapsed', !isEqual && !expanded);
+        section.querySelector('.guide-screen__hit')?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    });
+
+    loadSchedulesForVisibleSlots().catch(() => {});
+}
+
+function setExpandedSlot(slotId, { focus = true } = {}) {
+    const slots = enabledScreenSlots();
+    if (!slotId || !slots.includes(slotId)) {
+        expandedSlotId = null;
+    } else if (expandedSlotId === slotId && slots.length > 1) {
+        expandedSlotId = null;
+    } else {
+        expandedSlotId = slotId;
+    }
+
+    const state = loadPlayerState();
+    savePlayerState({
+        remoteModule: {
+            ...(state.remoteModule || {}),
+            guideExpandedSlot: expandedSlotId
+        }
+    });
+
+    if (focus && expandedSlotId) {
+        MultiView.focusScreen?.(expandedSlotId);
+    }
+
+    syncExpandedLayout(lastSlotResults);
+}
+
+function renderGuideScreens(slotResults) {
+    const container = el('guide-screens');
+    if (!container) return;
+
+    const slots = enabledScreenSlots();
+    const filtered = slotResults.filter((r) => slots.includes(r.slotId));
+
+    if (!filtered.length) {
+        container.classList.remove('is-equal-split', 'is-slot-expanded');
+        container.removeAttribute('data-screen-count');
+        container.innerHTML = '<p class="guide-wing__empty">No screens open</p>';
+        lastSlotResults = [];
+        slotScheduleCache.clear();
         return;
     }
 
-    if (key === lastChannelKey && loadPromise) return loadPromise;
+    container.innerHTML = filtered.map(({ slotId, channel, result }) => {
+        const cached = slotScheduleCache.get(slotId);
+        return renderScreenSection(slotId, {
+            channel,
+            result,
+            scheduleResult: cached?.result ?? null,
+            dayOffset: slotDayOffset(slotId)
+        });
+    }).join('');
 
-    lastChannelKey = key;
+    lastSlotResults = filtered;
+    syncExpandedLayout(filtered);
+}
+
+async function refreshGuide() {
+    if (!GuidePanel.isVisible()) return;
+
+    const slots = enabledScreenSlots();
+    const snapshot = guideSnapshot();
+
+    if (snapshot === lastSnapshot && loadPromise) return loadPromise;
+
+    lastSnapshot = snapshot;
     setLoading(true);
 
     loadPromise = (async () => {
         try {
-            const nowMs = Date.now();
-            const todayResult = await getSchedule(channel, { dayOffset: 0, nowMs });
+            const results = await fetchResultsForSlots(slots);
 
-            if (channelCacheKey(activeChannel()) !== key) return;
+            if (guideSnapshot() !== snapshot) return;
 
-            const msg = statusMessage(todayResult);
-            if (status) status.textContent = msg;
-
-            if (todayResult.status === 'ok') {
-                renderList(todayList, todayResult.dayProgrammes, nowMs);
-            } else if (todayList) {
-                todayList.innerHTML = '';
-            }
-
-            const tomorrowDetails = el('guide-tomorrow');
-            const tomorrowList = el('guide-tomorrow-list');
-            if (tomorrowDetails && !tomorrowDetails.open) {
-                if (tomorrowList) tomorrowList.innerHTML = '';
-            } else if (tomorrowDetails?.open) {
-                await loadTomorrow();
-            }
+            renderGuideScreens(results);
         } finally {
             setLoading(false);
             loadPromise = null;
@@ -138,84 +471,64 @@ function scheduleBoundaryRefresh() {
     }, 60 * 1000);
 }
 
-async function lookupFavorites() {
-    const btn = el('guide-favorites-btn');
-    const resultsEl = el('guide-favorites-results');
-    if (!resultsEl) return;
-
-    const meta = FavoritesRecents.getFavoritesMeta();
-    if (!meta.length) {
-        resultsEl.textContent = 'No favorites to look up';
-        return;
-    }
-
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Looking up…';
-    }
-    resultsEl.innerHTML = '<div class="guide-panel__empty">Starting…</div>';
-
-    const results = await prefetchFavoritesGuides(meta, {
-        onProgress({ done, total, channel, result }) {
-            resultsEl.innerHTML = `<div class="guide-panel__empty">${done}/${total} — ${escapeHtml(channel.name || '')}…</div>`;
-            if (result?.status === 'ok') refreshGuide().catch(() => {});
-        }
-    });
-
-    resultsEl.innerHTML = results.map((r) => {
-        if (r.status === 'ok') {
-            return `<div class="guide-panel__fav-row guide-panel__fav-row--ok">✓ ${escapeHtml(r.name)} (${escapeHtml(r.country)}) — ${escapeHtml(r.source || '')}${r.matchedName ? ` · ${escapeHtml(r.matchedName)}` : ''}</div>`;
-        }
-        if (r.status === 'no-source') {
-            return `<div class="guide-panel__fav-row">— ${escapeHtml(r.name)} (${escapeHtml(r.country)}) — no source</div>`;
-        }
-        if (r.status === 'cors-blocked') {
-            return `<div class="guide-panel__fav-row">— ${escapeHtml(r.name)} (${escapeHtml(r.country)}) — CORS blocked</div>`;
-        }
-        return `<div class="guide-panel__fav-row">— ${escapeHtml(r.name)} (${escapeHtml(r.country)}) — no match</div>`;
-    }).join('');
-
-    if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Look up guides for favorites';
-    }
+function activeChannel() {
+    const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
+    return player?.channel || TvPlayer.channel || null;
 }
 
 export const GuidePanel = {
-    /** First-class Guide module API — panel stays hosted under Remote for now. */
     init() {
+        const saved = loadPlayerState().remoteModule || {};
+        expandedSlotId = saved.guideExpandedSlot || null;
         this.bind();
-        // Default visible to match existing UX.
-        if (this.getPanelEl() && !this.getPanelEl().classList.contains('guide-panel--hidden')) {
-            this.setVisible(true, { silent: true });
-        }
+        this.setVisible(saved.guideOpen === true, { silent: true });
     },
 
     bind() {
-        const toggle = el('guide-panel-toggle');
-        const body = el('guide-panel-body');
-        const tomorrowDetails = el('guide-tomorrow');
-        const favBtn = el('guide-favorites-btn');
         const panel = el('guide-panel');
         if (panel) panel.dataset.guideModule = '1';
 
-        toggle?.addEventListener('click', () => {
-            const open = body?.classList.toggle('is-open');
-            if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-            if (open) refreshGuide().catch(() => {});
-        });
+        el('guide-screens')?.addEventListener('click', (e) => {
+            const refreshBtn = e.target.closest?.('[data-guide-refresh]');
+            if (refreshBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const slotId = refreshBtn.getAttribute('data-guide-refresh');
+                if (slotId) {
+                    refreshBtn.classList.add('is-spinning');
+                    refreshSlotGuide(slotId)
+                        .catch(() => {})
+                        .finally(() => refreshBtn.classList.remove('is-spinning'));
+                }
+                return;
+            }
 
-        tomorrowDetails?.addEventListener('toggle', () => {
-            if (tomorrowDetails.open) loadTomorrow().catch(() => {});
-        });
+            const dayBtn = e.target.closest?.('[data-guide-day]');
+            if (dayBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const slotId = dayBtn.getAttribute('data-guide-slot');
+                const dayOffset = Number(dayBtn.getAttribute('data-guide-day'));
+                if (slotId) setSlotDayOffset(slotId, dayOffset).catch(() => {});
+                return;
+            }
 
-        favBtn?.addEventListener('click', () => {
-            lookupFavorites().catch(() => {});
+            const btn = e.target.closest?.('[data-guide-slot]');
+            if (!btn) return;
+            e.preventDefault();
+            const slotId = btn.getAttribute('data-guide-slot');
+            if (slotId) setExpandedSlot(slotId);
         });
 
         window.addEventListener('tv:state_changed', () => {
-            const key = channelCacheKey(activeChannel());
-            if (key !== lastChannelKey) {
+            const slots = enabledScreenSlots();
+            if (expandedSlotId && !slots.includes(expandedSlotId)) {
+                expandedSlotId = null;
+            }
+            const snap = guideSnapshot();
+            if (snap !== lastSnapshot) {
+                lastSnapshot = '';
+                slotScheduleCache.clear();
                 refreshGuide().catch(() => {});
             }
             scheduleBoundaryRefresh();
@@ -227,17 +540,19 @@ export const GuidePanel = {
     },
 
     isVisible() {
-        const panel = this.getPanelEl();
-        if (!panel) return false;
-        return !panel.classList.contains('guide-panel--hidden');
+        return document.body?.classList.contains('remote-guide-open') === true;
     },
 
     setVisible(visible, { silent = false } = {}) {
         const panel = this.getPanelEl();
         if (!panel) return false;
         const next = visible !== false;
-        panel.classList.toggle('guide-panel--hidden', !next);
+        syncGuideOpenClass(next);
         panel.setAttribute('aria-hidden', String(!next));
+        if (next) {
+            lastSnapshot = '';
+            refreshGuide().catch(() => {});
+        }
         if (!silent) {
             window.dispatchEvent(new CustomEvent('guide:visibility_changed', {
                 detail: { visible: next }
@@ -251,6 +566,8 @@ export const GuidePanel = {
     },
 
     refresh() {
+        lastSnapshot = '';
+        slotScheduleCache.clear();
         return refreshGuide();
     },
 
@@ -259,23 +576,21 @@ export const GuidePanel = {
     }
 };
 
-/** Header now/next line updates (shared with PlayerChrome). */
+/** Main header now/next (status TV only — guide wing has per-screen status). */
 export async function updateProgrammeHeader() {
     const titleEl = el('header-program-title');
     const nextEl = el('header-program-next');
-    const remoteTitle = el('remote-program-title');
     const channel = activeChannel();
 
     if (!channel?.channelId && !channel?.id) {
         if (titleEl) titleEl.textContent = '';
         if (nextEl) nextEl.textContent = '';
-        if (remoteTitle) remoteTitle.textContent = '';
+        if (GuidePanel.isVisible()) refreshGuide().catch(() => {});
         return;
     }
 
     if (titleEl) titleEl.textContent = 'Loading guide…';
     if (nextEl) nextEl.textContent = '';
-    if (remoteTitle) remoteTitle.textContent = '';
 
     const result = await getNowNext(channel);
     if (channelCacheKey(activeChannel()) !== channelCacheKey(channel)) return;
@@ -284,18 +599,15 @@ export async function updateProgrammeHeader() {
         const fallback = 'guide not available';
         if (titleEl) titleEl.textContent = fallback;
         if (nextEl) nextEl.textContent = '';
-        if (remoteTitle) remoteTitle.textContent = fallback;
-        return;
+    } else {
+        const currentTitle = result.current?.title || '';
+        const nextLine = result.next
+            ? `Next: ${result.next.title} at ${formatProgrammeTime(result.next.start)}`
+            : '';
+        if (titleEl) titleEl.textContent = currentTitle || 'guide not available';
+        if (nextEl) nextEl.textContent = nextLine;
     }
 
-    const currentTitle = result.current?.title || '';
-    const nextLine = result.next
-        ? `Next: ${result.next.title} at ${formatProgrammeTime(result.next.start)}`
-        : '';
-
-    if (titleEl) titleEl.textContent = currentTitle || 'guide not available';
-    if (nextEl) nextEl.textContent = nextLine;
-    if (remoteTitle) remoteTitle.textContent = currentTitle || 'guide not available';
-
     window.dispatchEvent(new CustomEvent('tv:epg_updated', { detail: result }));
+    if (GuidePanel.isVisible()) refreshGuide().catch(() => {});
 }
