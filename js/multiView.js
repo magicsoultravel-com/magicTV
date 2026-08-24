@@ -126,6 +126,8 @@ export const MultiView = {
     statusSlotId: 'center',
     /** Mosaic tile hovered from a bottom screen strip (remote / browser). */
     screenStripHoverSlotId: null,
+    /** Bottom multi-TV strip enlarged to show channel title + frame. */
+    screensStripExpanded: false,
 
     getPrimary() {
         return this.slots.center.player;
@@ -199,7 +201,21 @@ export const MultiView = {
         if (typeof document === 'undefined') return;
         const strips = getScreenControlStrips();
         if (!strips.length) return;
+        const expanded = this.screensStripExpanded === true;
+        const enabledCount = 1 + SCREEN_ADD_ORDER.filter((id) => this.slots[id]?.enabled).length;
         strips.forEach((strip) => {
+            const section = strip.closest('.remote-panel__footer-screens');
+            if (section) {
+                section.classList.toggle('is-screens-expanded', expanded);
+                section.dataset.screenCount = String(enabledCount);
+                const expandBtn = section.querySelector('.tv-controls__screens-expand');
+                if (expandBtn) {
+                    expandBtn.setAttribute('aria-expanded', String(expanded));
+                    const label = expanded ? 'Collapse multi-TV strip' : 'Expand multi-TV strip';
+                    expandBtn.title = label;
+                    expandBtn.setAttribute('aria-label', label);
+                }
+            }
             const buttons = strip.querySelectorAll('.tv-controls__screen-btn');
             const addBtn = strip.querySelector('.tv-controls__add-screen-btn, #add-screen-btn');
             buttons.forEach((btn) => {
@@ -212,6 +228,9 @@ export const MultiView = {
                     const intentPlaying = player?.wantPlaying === true || player?.playing === true;
                     const isMuted = player ? !this.isSlotAudible(player) : true;
                     syncScreenBtnActions(btn, player, { intentPlaying, isMuted });
+                    this.syncScreenBtnPreview(btn, player, expanded);
+                } else {
+                    this.syncScreenBtnPreview(btn, null, false);
                 }
             });
             if (addBtn) {
@@ -223,6 +242,47 @@ export const MultiView = {
             }
         });
         this.syncTileStatusHighlight();
+    },
+
+    /**
+     * Paint channel name + freeze-frame on an expanded screen-strip tile.
+     * @param {HTMLElement} btn
+     * @param {object|null} player
+     * @param {boolean} expanded
+     */
+    syncScreenBtnPreview(btn, player, expanded) {
+        if (!btn) return;
+        const nameEl = btn.querySelector('.tv-controls__screen-name');
+        const frameEl = btn.querySelector('.tv-controls__screen-frame');
+        const name = expanded ? (player?.channel?.name || '').trim() : '';
+        if (nameEl) {
+            nameEl.textContent = name;
+            if (name) nameEl.removeAttribute('hidden');
+            else nameEl.setAttribute('hidden', '');
+        }
+        if (frameEl) {
+            const poster = expanded ? (player?.posterDataUrl || '') : '';
+            if (poster) {
+                if (frameEl.dataset.frameSrc !== poster) {
+                    frameEl.dataset.frameSrc = poster;
+                    frameEl.style.backgroundImage = `url("${poster.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
+                }
+                frameEl.classList.add('has-frame');
+            } else {
+                if (frameEl.dataset.frameSrc) delete frameEl.dataset.frameSrc;
+                frameEl.style.backgroundImage = '';
+                frameEl.classList.remove('has-frame');
+            }
+        }
+    },
+
+    setScreensStripExpanded(expanded) {
+        this.screensStripExpanded = expanded === true;
+        this.syncScreenControls();
+    },
+
+    toggleScreensStripExpanded() {
+        this.setScreensStripExpanded(!this.screensStripExpanded);
     },
 
     /**
@@ -1197,6 +1257,7 @@ export const MultiView = {
             const audioEl = tile.querySelector('.tv-player-tile__audio');
         });
         this.syncMosaicChrome();
+        if (this.screensStripExpanded) this.syncScreenControls();
     },
 
     syncTileCastUi(tile, slotId, player) {
@@ -1381,6 +1442,14 @@ export const MultiView = {
         document.body.dataset.screenControlsBound = '1';
 
         document.body.addEventListener('click', (e) => {
+            const expandBtn = e.target.closest?.('.tv-controls__screens-expand');
+            if (expandBtn) {
+                e.stopPropagation();
+                e.preventDefault();
+                this.toggleScreensStripExpanded();
+                return;
+            }
+
             const strip = e.target.closest('.tv-controls__screens');
             if (!strip) return;
 

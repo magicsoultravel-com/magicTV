@@ -655,6 +655,15 @@
     line-height: 1.25;
     font-variant-numeric: tabular-nums;
     pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.tv-player-tile:hover .tv-player-tile__echo:not(.is-hidden),
+.tv-player-tile:focus-within .tv-player-tile__echo:not(.is-hidden),
+.tv-player-tile.is-selected .tv-player-tile__echo:not(.is-hidden),
+.tv-player-tile.is-channel-picker-target .tv-player-tile__echo:not(.is-hidden),
+.tv-player-tile.is-screen-strip-hover .tv-player-tile__echo:not(.is-hidden) {
     opacity: 0.92;
 }
 
@@ -967,6 +976,13 @@
         opacity: 1;
         pointer-events: auto;
     }
+
+    .tv-player-tile.is-primary .tv-player-tile__echo:not(.is-hidden),
+    .tv-player-tile.is-selected .tv-player-tile__echo:not(.is-hidden),
+    .tv-player-tile.is-channel-picker-target .tv-player-tile__echo:not(.is-hidden),
+    .tv-player-tile.is-screen-strip-hover .tv-player-tile__echo:not(.is-hidden) {
+        opacity: 0.92;
+    }
 }
 
 .tv-player-tile__hover,
@@ -1215,6 +1231,50 @@
     flex-direction: row-reverse;
 }
 
+.tv-controls__screens-expand {
+    position: absolute;
+    top: 0.1rem;
+    right: 0.15rem;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--tv-text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: var(--tv-transition);
+    pointer-events: none;
+}
+
+.remote-panel__footer-screens:hover .tv-controls__screens-expand,
+.remote-panel__footer-screens:focus-within .tv-controls__screens-expand,
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screens-expand {
+    opacity: 0.55;
+    pointer-events: auto;
+}
+
+.tv-controls__screens-expand:hover,
+.tv-controls__screens-expand:focus-visible {
+    opacity: 0.9;
+    color: var(--tv-text-secondary);
+    background: transparent;
+}
+
+.tv-controls__screens-expand svg {
+    display: block;
+    transition: transform 0.15s ease;
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screens-expand svg {
+    transform: rotate(180deg);
+}
+
 .tv-controls__screen-btn,
 .tv-controls__add-screen-btn {
     position: relative;
@@ -1260,6 +1320,10 @@
     inset: 0;
     border-radius: 2px;
     pointer-events: none;
+    background-color: transparent;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 .tv-controls__screen-label {
@@ -1269,10 +1333,88 @@
     line-height: 1;
     pointer-events: none;
     opacity: 0.55;
+    z-index: 1;
 }
 
 .tv-controls__screen-btn.is-active .tv-controls__screen-label {
     opacity: 0.8;
+}
+
+.tv-controls__screen-name {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    padding: 0.12rem 0.2rem;
+    font-size: 0.55rem;
+    font-weight: 500;
+    line-height: 1.15;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+    pointer-events: none;
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screens {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    gap: 0.55rem 0.5rem;
+    max-width: calc(3 * var(--strip-tile-w) + 1rem);
+    margin-inline: auto;
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="1"] .tv-controls__screens {
+    max-width: var(--strip-tile-w);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="2"] .tv-controls__screens,
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="3"] .tv-controls__screens,
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="4"] .tv-controls__screens {
+    max-width: calc(2 * var(--strip-tile-w) + 0.5rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="5"] .tv-controls__screens {
+    max-width: calc(3 * var(--strip-tile-w) + 1rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screen-btn,
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__add-screen-btn {
+    width: var(--strip-tile-w);
+    height: var(--strip-tile-h);
+    flex: 0 0 var(--strip-tile-w);
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screen-label {
+    position: absolute;
+    top: 0.2rem;
+    left: 0.25rem;
+    z-index: 1;
+    padding: 0.08rem 0.25rem;
+    border-radius: 2px;
+    font-size: 0.6rem;
+    opacity: 0.95;
+    background: color-mix(in srgb, #000 55%, transparent);
+    color: #fff;
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screen-name {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.62rem;
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__screen-name:not([hidden]) {
+    display: block;
+}
+
+.remote-panel__footer-screens.is-screens-expanded .tv-controls__add-screen-btn {
+    font-size: 2rem;
 }
 
 .tv-controls__screen-remove {
