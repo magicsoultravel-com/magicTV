@@ -29,9 +29,13 @@ import {
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
 
+function getScreenControlStrips() {
+    if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return [];
+    return Array.from(document.querySelectorAll('.tv-controls__screens'));
+}
+
 function getScreenControlStrip() {
-    if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
-    return document.querySelector('#remote-panel-footer .tv-controls__screens');
+    return getScreenControlStrips()[0] || null;
 }
 import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
@@ -71,6 +75,8 @@ const SCREEN_LABELS = {
     bottomLeft: '4',
     bottomRight: '5'
 };
+
+export const SLOT_SCREEN_LABELS = SCREEN_LABELS;
 
 function savedVolume() {
     return loadPlayerState().volume || 0.85;
@@ -115,8 +121,10 @@ export const MultiView = {
     _resizeBound: false,
     _hoverBound: false,
     _refreshTilesRaf: 0,
-    /** Slot whose buffer/quality the bottom bar reflects (last targeted screen). */
+    /** Slot used for channel-picker targeting / status highlight (last focused screen). */
     statusSlotId: 'center',
+    /** Mosaic tile hovered from a bottom screen strip (remote / browser). */
+    screenStripHoverSlotId: null,
 
     getPrimary() {
         return this.slots.center.player;
@@ -130,7 +138,7 @@ export const MultiView = {
     },
 
     /**
-     * Point the bottom Buffer/Quality readout at a mosaic slot.
+     * Point channel-picker / status highlight at a mosaic slot.
      * @param {string} slotId
      */
     setStatusSlot(slotId) {
@@ -188,23 +196,25 @@ export const MultiView = {
      */
     syncScreenControls() {
         if (typeof document === 'undefined') return;
-        const strip = getScreenControlStrip();
-        if (!strip) return;
-        const buttons = strip.querySelectorAll('.tv-controls__screen-btn');
-        const addBtn = strip.querySelector('#add-screen-btn');
-        buttons.forEach((btn) => {
-            const slotId = btn.dataset.screenSlot;
-            const enabled = slotId === 'center' || this.slots[slotId]?.enabled;
-            btn.hidden = !enabled;
-            btn.classList.toggle('is-active', enabled && this.statusSlotId === slotId);
+        const strips = getScreenControlStrips();
+        if (!strips.length) return;
+        strips.forEach((strip) => {
+            const buttons = strip.querySelectorAll('.tv-controls__screen-btn');
+            const addBtn = strip.querySelector('.tv-controls__add-screen-btn, #add-screen-btn');
+            buttons.forEach((btn) => {
+                const slotId = btn.dataset.screenSlot;
+                const enabled = slotId === 'center' || this.slots[slotId]?.enabled;
+                btn.hidden = !enabled;
+                btn.classList.toggle('is-active', enabled && this.statusSlotId === slotId);
+            });
+            if (addBtn) {
+                const atMax = SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
+                addBtn.hidden = atMax;
+                addBtn.classList.toggle('is-limit', atMax);
+                addBtn.title = 'Add screen';
+                addBtn.setAttribute('aria-label', 'Add screen');
+            }
         });
-        if (addBtn) {
-            const atMax = SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
-            addBtn.hidden = atMax;
-            addBtn.classList.toggle('is-limit', atMax);
-            addBtn.title = 'Add screen';
-            addBtn.setAttribute('aria-label', 'Add screen');
-        }
         this.syncTileStatusHighlight();
     },
 
@@ -223,6 +233,34 @@ export const MultiView = {
             if (!tile) return;
             const active = Boolean(this.slots[id]?.enabled && this.statusSlotId === id);
             tile.classList.toggle('is-channel-picker-target', active);
+        });
+    },
+
+    /** Highlight the mosaic tile matching a hovered screen-strip button. */
+    setScreenStripHover(slotId) {
+        if (!SLOT_IDS.includes(slotId)) return;
+        if (slotId !== 'center' && !this.slots[slotId]?.enabled) return;
+        if (this.screenStripHoverSlotId === slotId) return;
+        this.screenStripHoverSlotId = slotId;
+        this.syncScreenStripTileHighlight();
+    },
+
+    clearScreenStripHover() {
+        if (!this.screenStripHoverSlotId) return;
+        this.screenStripHoverSlotId = null;
+        this.syncScreenStripTileHighlight();
+    },
+
+    syncScreenStripTileHighlight() {
+        if (typeof document === 'undefined') return;
+        const hoverId = this.screenStripHoverSlotId;
+        SLOT_IDS.forEach((id) => {
+            const tile = el(`player-tile-${id}`);
+            if (!tile) return;
+            const hovered = hoverId === id
+                && (id === 'center' || this.slots[id]?.enabled)
+                && !tile.classList.contains('is-hidden');
+            tile.classList.toggle('is-screen-strip-hover', hovered);
         });
     },
 
@@ -304,11 +342,7 @@ export const MultiView = {
         }
         window.addEventListener('tv:popout_changed', () => this.scheduleRefreshTiles());
 
-        // If app never calls restoreSlots (nothing saved), allow persist to clear empties.
-        const savedSlots = loadPlayerState().mosaicSlots || {};
-        if (!Object.keys(savedSlots).length && !loadPlayerState().lastChannelKey) {
-            this.slotsHydrated = true;
-        }
+        this.slotsHydrated = true;
         this.syncScreenControls();
     },
 
@@ -870,6 +904,53 @@ export const MultiView = {
     },
 
     /**
+     * Pause other slots and start playback on one mosaic screen (resume modal).
+     * @param {string} slotId
+     */
+    async playExclusiveSlot(slotId) {
+        const id = slotId || 'center';
+        if (CORNER_IDS.includes(id) && !this.slots[id]?.enabled) {
+            this.setSideEnabled(id, true);
+        }
+
+        for (const otherId of SLOT_IDS) {
+            if (otherId === id) continue;
+            const player = this.slots[otherId]?.player;
+            if (!player) continue;
+            if (player.playing || player.wantPlaying) player.pause();
+        }
+
+        this.setStatusSlot(id);
+        this.mountAll();
+        const startMuted = id !== 'center';
+        const player = this.ensurePlayer(id, { startMuted });
+        if (!player?.channel) return;
+
+        TileFrames.setPlaybackBusy(true);
+        if (player.playing) {
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            return;
+        }
+
+        const surface = el(`tv-playback-surface-${id}`);
+        if (surface) player.mountVideo(surface);
+
+        try {
+            if (player.channel.url_resolved && !player.stopped) {
+                await player.resume();
+            } else {
+                await player.playChannel(player.channel);
+            }
+        } finally {
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            this.syncSettingsToggles();
+            if (id === 'center') this.getPrimary()?.emitState();
+        }
+    },
+
+    /**
      * Play channels across mosaic slots in display order (center first, then corners).
      * Enables only the slots needed for the list (capped at MAX_MOSAIC_SLOTS) and disables unused corners.
      * @param {object[]} channels
@@ -1219,20 +1300,22 @@ export const MultiView = {
 
     bindScreenControls() {
         if (typeof document === 'undefined') return;
-        const strip = getScreenControlStrip();
-        if (!strip || strip.dataset.bound === '1') return;
-        strip.dataset.bound = '1';
+        if (document.body?.dataset?.screenControlsBound === '1') return;
+        document.body.dataset.screenControlsBound = '1';
 
-        strip.addEventListener('click', (e) => {
-            const addBtn = e.target.closest('#add-screen-btn');
-            if (addBtn) {
+        document.body.addEventListener('click', (e) => {
+            const strip = e.target.closest('.tv-controls__screens');
+            if (!strip) return;
+
+            const addBtn = e.target.closest('.tv-controls__add-screen-btn, #add-screen-btn');
+            if (addBtn && strip.contains(addBtn)) {
                 e.stopPropagation();
                 e.preventDefault();
                 this.addNextScreen();
                 return;
             }
             const removeBtn = e.target.closest('.tv-controls__screen-remove');
-            if (removeBtn) {
+            if (removeBtn && strip.contains(removeBtn)) {
                 e.stopPropagation();
                 e.preventDefault();
                 const slotId = removeBtn.closest('.tv-controls__screen-btn')?.dataset.screenSlot;
@@ -1240,12 +1323,28 @@ export const MultiView = {
                 return;
             }
             const screenBtn = e.target.closest('.tv-controls__screen-btn');
-            if (screenBtn) {
+            if (screenBtn && strip.contains(screenBtn)) {
                 e.stopPropagation();
                 e.preventDefault();
                 const slotId = screenBtn.dataset.screenSlot;
                 if (slotId) this.focusScreen(slotId);
             }
+        });
+
+        document.body.addEventListener('mouseover', (e) => {
+            const btn = e.target.closest?.('.tv-controls__screen-btn');
+            if (!btn || btn.hidden || !btn.closest('.tv-controls__screens')) return;
+            if (btn.contains(e.relatedTarget)) return;
+            const slotId = btn.dataset.screenSlot;
+            if (slotId) this.setScreenStripHover(slotId);
+        });
+
+        document.body.addEventListener('mouseout', (e) => {
+            const btn = e.target.closest?.('.tv-controls__screen-btn');
+            if (!btn || btn.hidden) return;
+            if (btn.contains(e.relatedTarget)) return;
+            if (e.relatedTarget?.closest?.('.tv-controls__screen-btn')) return;
+            this.clearScreenStripHover();
         });
 
         this.syncScreenControls();

@@ -8,10 +8,9 @@ import {
 } from '../storage/playerState.js';
 import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
-import { PosterCache } from '../storage/posterCache.js';
-import { resolveRestorePlayMute } from '../player/pauseBuffer.js';
 import { el } from '../tvUtils.js';
 import { CORNER_IDS, SLOT_IDS } from './constants.js';
+import { fetchStoredFramesForMosaic, applyStoredFramesToSlots } from './frameLookup.js';
 
 /**
  * Prefer mosaicSlots; fall back to lastChannelKey as a center-only map.
@@ -83,6 +82,13 @@ export const persistMethods = {
             if (!player.channel) {
                 player.channel = stubChannelFromEntry(entry);
             }
+
+            player.stopped = true;
+            player.wantPlaying = false;
+            player.playing = false;
+            player.pausePhase = 'idle';
+            player.loading = false;
+            player.loadPhase = 'idle';
         });
 
         this.syncLayout();
@@ -91,19 +97,8 @@ export const persistMethods = {
         this.refreshTiles();
 
         if (!keys.length) return;
-        PosterCache.getPosters(keys).then((map) => {
-            let painted = false;
-            SLOT_IDS.forEach((id) => {
-                const key = this.rememberedSlotKeys[id];
-                const player = this.slots[id]?.player;
-                if (!key || !player) return;
-                const poster = map.get(key);
-                if (!poster) return;
-                if (!player.posterDataUrl) {
-                    player.posterDataUrl = poster;
-                    painted = true;
-                }
-            });
+        fetchStoredFramesForMosaic(mosaic, this.slots).then((cached) => {
+            const painted = applyStoredFramesToSlots(this.slots, cached);
             if (painted) this.scheduleRefreshTiles();
         }).catch(() => {});
     },
@@ -189,7 +184,7 @@ export const persistMethods = {
                 return stub;
             };
 
-            const restoreOne = async (id, { play } = {}) => {
+            const restoreOne = async (id) => {
                 const entry = mosaic[id];
                 if (!entry?.key) return;
                 if (id !== 'center' && !this.slots[id]?.enabled) return;
@@ -217,32 +212,12 @@ export const persistMethods = {
 
                 this.rememberedSlotKeys[id] = entry.key;
 
-                if (play) {
-                    // Muted-first autoplay (historical boot behavior); re-apply saved mute after.
-                    const mutePlan = resolveRestorePlayMute(entry.muted);
-                    player.muted = mutePlan.duringPlay;
-                    player.applyAudioToVideo();
-                    try {
-                        await player.playChannel(channel);
-                    } catch { /* autoplay may block */ }
-                    // Keep last poster until live video paints; do not force-clear.
-                    // Only unmute when playback actually started.
-                    if (player.playing === true && !player.resumeBlocked) {
-                        player.muted = mutePlan.afterPlay;
-                    }
-                } else {
-                    await player.loadChannelPaused(channel);
-                    player.muted = desiredMuted;
-                }
-
+                await player.loadChannelPaused(channel);
+                player.muted = desiredMuted;
                 player.applyAudioToVideo();
             };
 
-            const centerPlay = state.wasPlaying === true;
-            await Promise.all([
-                restoreOne('center', { play: centerPlay }),
-                ...CORNER_IDS.map((id) => restoreOne(id, { play: false }))
-            ]);
+            await Promise.all(SLOT_IDS.map((id) => restoreOne(id)));
 
             this.mountAll();
             // One sync flush after all slots attach.

@@ -1,11 +1,12 @@
 /**
- * In-page floating + right-dock hosts for the Browser shell (split mode).
+ * In-page floating + bottom-right dock hosts for the Browser shell (split mode).
  * Catalog tab state stays in appState; this only presents #browser-shell.
  */
 import { el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { loadPlayerState } from '../storage/playerState.js';
+import { MultiView } from '../multiView.js';
 import {
     getLayoutState,
     patchLayout,
@@ -24,9 +25,10 @@ const DEFAULT_SHEET_HEIGHT_FALLBACK = 0.62;
 
 let bound = false;
 let pinned = false;
+let ensureBrowserCatalog = () => {};
 /** @type {'hidden'|'docked'|'undocked'} */
 let uiMode = 'hidden';
-/** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetW?: number } | null} */
+/** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetH?: number } | null} */
 let gesture = null;
 
 let startDockParent = null;
@@ -158,21 +160,24 @@ function measureRemoteDockGeometry() {
     };
 }
 
-function applyDockGeometry(widthOverride = null) {
+function applyDockGeometry(heightOverride = null) {
     const sheet = dockSheetEl();
+    const tab = dockTabEl();
     if (!sheet) return;
     const base = measureRemoteDockGeometry();
-    const width = widthOverride != null
-        ? Math.round(Math.min(viewportSize().w * 0.9, Math.max(MIN_W * 2, widthOverride)))
-        : base.width;
-    const height = base.height;
+    const { h: vh } = viewportSize();
+    const height = heightOverride != null
+        ? Math.round(Math.min(vh * 0.85, Math.max(MIN_H, heightOverride)))
+        : base.height;
+    const width = base.width;
     sheet.style.width = `${width}px`;
     sheet.style.height = `${height}px`;
     sheet.style.top = 'auto';
+    sheet.style.right = '';
     sheet.style.bottom = '0';
-    sheet.style.maxHeight = '90vh';
-    const { w: vw } = viewportSize();
-    sheet.style.setProperty('--browser-sheet-width', String(width / Math.max(1, vw)));
+    sheet.style.maxHeight = '85vh';
+    sheet.style.setProperty('--browser-sheet-height', String(height / Math.max(1, vh)));
+    if (tab) tab.style.width = `${width}px`;
 }
 
 function setDockExpanded(expanded) {
@@ -184,10 +189,11 @@ function setDockExpanded(expanded) {
     tab?.classList.toggle('is-active', expanded && uiMode === 'docked');
     tab?.classList.toggle('is-hidden', uiMode === 'undocked' || !isSplit());
     tab?.setAttribute('aria-expanded', String(expanded && uiMode === 'docked'));
-    tab?.classList.toggle('is-visible', isSplit() && uiMode !== 'undocked');
+    tab?.classList.toggle('is-visible', isSplit() && uiMode === 'hidden');
     document.body.classList.toggle('browser-docked', uiMode === 'docked');
     document.body.classList.toggle('browser-docked-expanded', uiMode === 'docked' && expanded);
-    document.body.classList.toggle('browser-dock-tab-visible', isSplit() && uiMode === 'hidden');
+    document.body.classList.toggle('browser-hidden-tab', isSplit() && uiMode === 'hidden');
+    document.body.classList.remove('browser-dock-tab-visible');
 }
 
 function rememberShellHome(shell) {
@@ -263,9 +269,9 @@ function onPointerMove(e) {
     const dy = e.clientY - gesture.startY;
 
     if (gesture.mode === 'sheet') {
-        const originPx = gesture.originSheetW ?? measureRemoteDockGeometry().width;
-        // Dragging the left edge of a right sheet: moving left grows width.
-        const nextPx = Math.max(MIN_W * 2, originPx - dx);
+        const originPx = gesture.originSheetH ?? measureRemoteDockGeometry().height;
+        // Top-edge resize on a bottom sheet: dragging up grows height.
+        const nextPx = Math.max(MIN_H, originPx - dy);
         applyDockGeometry(nextPx);
         return;
     }
@@ -320,12 +326,12 @@ function onPointerUp(e) {
     gesture = null;
     if (wasSheet) {
         const sheet = dockSheetEl();
-        const width = sheet?.getBoundingClientRect().width;
-        const { w: vw } = viewportSize();
-        if (Number.isFinite(width) && vw > 0) {
-            patchLayout({ browserSheetWidth: width / vw }, { reconcile: false });
+        const height = sheet?.getBoundingClientRect().height;
+        const { h: vh } = viewportSize();
+        if (Number.isFinite(height) && vh > 0) {
+            patchLayout({ browserSheetHeight: height / vh }, { reconcile: false });
         }
-        applyDockGeometry(width);
+        applyDockGeometry(height);
         return;
     }
     if (uiMode === 'undocked') {
@@ -347,7 +353,7 @@ function beginGesture(e, mode, edge = '') {
             originTop: 0,
             originW: 0,
             originH: 0,
-            originSheetW: sheet?.getBoundingClientRect().width ?? measureRemoteDockGeometry().width
+            originSheetH: sheet?.getBoundingClientRect().height ?? measureRemoteDockGeometry().height
         };
         sheet?.querySelector('[data-browser-dock-resize]')?.classList.add('is-dragging');
     } else {
@@ -381,12 +387,29 @@ function beginGesture(e, mode, edge = '') {
 
 function syncWindowControls() {
     const strip = el('browser-window-controls');
+    const layoutStrip = el('layout-window-controls');
     const dockBtn = el('browser-dock-toggle');
     const hideBtn = el('browser-hide-toggle');
+    const splitBtn = el('remote-split-browser-btn');
+    const joinBtn = el('browser-join-btn');
     const split = isSplit();
     const kind = getLayoutState().browserHostKind;
 
     strip?.classList.toggle('is-hidden', !split);
+
+    if (splitBtn) {
+        splitBtn.classList.toggle('is-hidden', split);
+        splitBtn.innerHTML = CARD_ICONS.splitLayout;
+        splitBtn.title = 'Split browser';
+        splitBtn.setAttribute('aria-label', splitBtn.title);
+        splitBtn.setAttribute('aria-pressed', String(split));
+    }
+    if (joinBtn) {
+        joinBtn.classList.toggle('is-hidden', !split);
+        joinBtn.innerHTML = CARD_ICONS.popin;
+        joinBtn.title = 'Join browser with remote';
+        joinBtn.setAttribute('aria-label', joinBtn.title);
+    }
 
     if (dockBtn) {
         dockBtn.classList.toggle('is-hidden', !split);
@@ -398,21 +421,16 @@ function syncWindowControls() {
     if (hideBtn) {
         hideBtn.classList.toggle('is-hidden', !split);
         hideBtn.innerHTML = ACTION_ICONS.collapse;
-        hideBtn.title = kind === 'hidden' ? 'Show browser' : 'Hide browser';
+        const unhidden = kind !== 'hidden';
+        hideBtn.classList.toggle('is-module-unhidden', unhidden);
+        hideBtn.title = unhidden ? 'Hide browser' : 'Show browser';
         hideBtn.setAttribute('aria-label', hideBtn.title);
     }
 }
 
 function syncActionButtons() {
-    const joinBtn = el('browser-join-btn');
     const popBtn = el('browser-external-popout-btn');
     const split = isSplit();
-    if (joinBtn) {
-        joinBtn.classList.toggle('is-hidden', !split);
-        joinBtn.innerHTML = CARD_ICONS.popin;
-        joinBtn.title = 'Join with remote';
-        joinBtn.setAttribute('aria-label', 'Join with remote');
-    }
     if (popBtn) {
         popBtn.classList.toggle('is-hidden', !split);
         popBtn.innerHTML = CARD_ICONS.popout;
@@ -420,6 +438,16 @@ function syncActionButtons() {
         popBtn.setAttribute('aria-label', 'Pop out browser');
     }
     syncWindowControls();
+    syncRemoteScreenFooter();
+}
+
+function syncRemoteScreenFooter() {
+    const footer = el('remote-shell-screens-footer');
+    if (!footer) return;
+    const split = isSplit();
+    footer.classList.toggle('is-hidden', !split);
+    footer.setAttribute('aria-hidden', String(!split));
+    if (split) MultiView.syncScreenControls?.();
 }
 
 function bindOnce() {
@@ -519,12 +547,13 @@ function tearDownHosts() {
     dockTabEl()?.classList.add('is-hidden');
     dockTabEl()?.classList.remove('is-visible');
     uiMode = 'hidden';
-    document.body.classList.remove('browser-shell-split', 'browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible');
+    document.body.classList.remove('browser-shell-split', 'browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible', 'browser-hidden-tab');
     syncActionButtons();
 }
 
 export const BrowserModule = {
-    init() {
+    init({ ensureBrowserCatalog: ensureFn } = {}) {
+        if (typeof ensureFn === 'function') ensureBrowserCatalog = ensureFn;
         bindOnce();
         syncActionButtons();
         setDockExpanded(false);
@@ -553,9 +582,10 @@ export const BrowserModule = {
         mountShellToHost(host);
         bringModuleToFront(SHELL_BROWSER);
         document.body.classList.add('browser-shell-split');
-        document.body.classList.remove('browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible');
+        document.body.classList.remove('browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible', 'browser-hidden-tab');
         syncActionButtons();
         patchLayout({ browserHostKind: 'undocked' }, { reconcile: false });
+        ensureBrowserCatalog();
     },
 
     dock() {
@@ -571,9 +601,10 @@ export const BrowserModule = {
         mountShellToHost(host);
         bringModuleToFront(SHELL_BROWSER);
         document.body.classList.add('browser-shell-split', 'browser-docked', 'browser-docked-expanded');
-        document.body.classList.remove('browser-dock-tab-visible');
+        document.body.classList.remove('browser-dock-tab-visible', 'browser-hidden-tab');
         syncActionButtons();
         patchLayout({ browserHostKind: 'docked' }, { reconcile: false });
+        ensureBrowserCatalog();
     },
 
     undock() {
@@ -594,8 +625,8 @@ export const BrowserModule = {
         setDockExpanded(false);
         dockTabEl()?.classList.remove('is-hidden');
         dockTabEl()?.classList.add('is-visible');
-        document.body.classList.add('browser-shell-split', 'browser-dock-tab-visible');
-        document.body.classList.remove('browser-docked-expanded');
+        document.body.classList.add('browser-shell-split', 'browser-hidden-tab');
+        document.body.classList.remove('browser-docked-expanded', 'browser-dock-tab-visible');
         document.body.classList.toggle('browser-docked', false);
         syncActionButtons();
         patchLayout({ browserHostKind: 'hidden' }, { reconcile: false });
@@ -604,6 +635,7 @@ export const BrowserModule = {
     show() {
         if (!isSplit()) return;
         this.dock();
+        ensureBrowserCatalog();
     },
 
     /** Tear down float/dock UI and leave shell placement to reconcile (join path). */

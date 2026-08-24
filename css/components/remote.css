@@ -11,10 +11,6 @@
         + 2 * var(--tv-spacing-md, 1rem)
     );
 }
-.tv-player-controls--echo {
-    justify-content: center;
-    padding: var(--tv-spacing-xs) var(--tv-spacing-md);
-}
 
 .remote-module-staging {
     display: none !important;
@@ -336,8 +332,14 @@ body.browser-shell-split #remote-shell {
     letter-spacing: 0.05em;
     line-height: 1.2;
     text-transform: lowercase;
-    opacity: 0.55;
+    opacity: 0.72;
     font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.remote-module__brand:hover {
+    opacity: 1;
 }
 
 .remote-module__channel-bar {
@@ -414,6 +416,7 @@ body.browser-shell-split #remote-shell {
 
 .remote-panel__footer-chrome .remote-panel__footer-nav,
 .remote-panel__footer-chrome .browser-window-controls,
+.remote-panel__footer-chrome .layout-window-controls,
 .remote-panel__footer-chrome .remote-module__catalog-tools.is-visible {
     width: auto;
     flex: 0 0 auto;
@@ -588,8 +591,9 @@ body.browser-shell-split #remote-shell {
 .remote-module__resize[data-browser-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
 .remote-module__resize[data-browser-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
 
-/* Browser window controls — same circular row as nav/tools when split */
-.browser-window-controls {
+/* Browser window + layout controls — same circular row as nav/tools when split */
+.browser-window-controls,
+.layout-window-controls {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -598,91 +602,133 @@ body.browser-shell-split #remote-shell {
     padding: 0;
 }
 
-.browser-window-controls.is-hidden {
+.browser-window-controls.is-hidden,
+.layout-window-controls.is-hidden {
     display: none !important;
 }
 
-/* --- Right-edge browser dock --- */
+.catalog-root.module-layout--split #remote-shell.module-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#remote-shell .remote-shell__footer {
+    flex: 0 0 auto;
+    padding: 0 var(--tv-spacing-md, 1rem) var(--tv-spacing-md, 1rem);
+    border-top: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    background: color-mix(in srgb, var(--tv-bg-secondary) 92%, transparent);
+}
+
+/* --- Bottom-right browser dock (mirrors remote bottom-left) --- */
 .browser-dock-tab {
     position: fixed;
-    right: 0;
-    top: 50%;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    left: auto;
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    top: auto;
     z-index: 8501;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.4rem;
-    min-height: 7rem;
-    padding: 0.75rem 0.35rem;
+    width: calc(var(--remote-min-width, 260px) * 2);
+    max-width: calc(100vw - 1.5rem);
+    min-height: 0;
+    padding: 0.7rem 1rem;
     border: 1px solid var(--tv-border, #2A2E3A);
-    border-right: none;
-    border-radius: 14px 0 0 14px;
+    border-bottom: none;
+    border-right: 1px solid var(--tv-border, #2A2E3A);
+    border-radius: 18px 18px 0 0;
     background: var(--tv-bg-secondary, #141829);
     color: var(--tv-text-primary);
+    font-size: 0.875rem;
     cursor: pointer;
-    transform: translateY(-50%);
-    writing-mode: vertical-rl;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.28);
+    pointer-events: auto;
+    transform: none;
+    writing-mode: horizontal-tb;
     text-orientation: mixed;
+    transition: transform 0.25s ease, opacity 0.15s ease;
     opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
 }
 
-body.browser-dock-tab-visible .browser-dock-tab:not(.is-hidden),
-.browser-dock-tab.is-visible:not(.is-hidden) {
+body:not(.browser-hidden-tab) .browser-dock-tab,
+body.browser-docked-expanded .browser-dock-tab {
+    display: none;
+}
+
+body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     display: flex;
 }
 
 .browser-dock-tab__brand {
-    background: linear-gradient(180deg, var(--tv-primary), var(--tv-secondary));
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    font-size: 11px;
-    letter-spacing: 0.06em;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
     text-transform: lowercase;
-    opacity: 0.7;
+    opacity: 0.72;
     font-weight: 600;
+}
+
+.browser-dock-tab.is-active {
+    border-color: var(--tv-main-2, #00FF88);
+    color: var(--tv-main-2, #00FF88);
 }
 
 .browser-dock-sheet {
     position: fixed;
     top: auto;
-    right: 0;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    left: auto;
     bottom: 0;
     z-index: 8500;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: stretch;
-    width: 0;
-    height: auto;
-    max-width: 90vw;
-    max-height: 90vh;
+    width: calc(var(--remote-min-width, 260px) * 2);
+    height: 0;
+    max-width: calc(100vw - 1.5rem);
+    max-height: 85vh;
     background: transparent;
-    transform: translateX(100%);
+    transform: translateY(100%);
+    transform-origin: bottom right;
     transition: transform 0.25s ease;
     pointer-events: none;
     overflow: hidden;
 }
 
 .browser-dock-sheet.is-expanded {
-    transform: translateX(0);
+    transform: translateY(0);
     pointer-events: auto;
-    /* width/height set in px by browserModule.applyDockGeometry */
+}
+
+.browser-dock-sheet.is-expanded .browser-dock-sheet__inner {
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-bottom: none;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.35);
 }
 
 .browser-dock-sheet.is-collapsed:not(.is-expanded) {
-    width: 0 !important;
     height: 0 !important;
+    width: auto;
 }
 
 .browser-dock-sheet__resize {
     flex: 0 0 6px;
-    cursor: col-resize;
+    cursor: row-resize;
     touch-action: none;
     align-self: stretch;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tv-border) 60%, transparent));
 }
 
 .browser-dock-sheet__resize.is-dragging {
-    background: color-mix(in srgb, var(--tv-main-1) 35%, transparent);
+    background: var(--tv-main-2, #00FF88);
 }
 
 .browser-dock-sheet__inner {
@@ -694,10 +740,8 @@ body.browser-dock-tab-visible .browser-dock-tab:not(.is-hidden),
     flex-direction: column;
     overflow: hidden;
     background: var(--tv-bg-secondary, #141829);
-    border-radius: 18px 0 0 18px;
-    border: 1px solid var(--tv-border, #2A2E3A);
-    border-right: none;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.35);
+    border-radius: 18px 18px 0 0;
+    border: none;
     opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
 }
 
@@ -716,10 +760,6 @@ body.browser-dock-tab-visible .browser-dock-tab:not(.is-hidden),
 .browser-dock-sheet__inner > .tv-module__actions--browser-end {
     right: var(--tv-spacing-sm, 0.5rem);
     left: auto;
-}
-
-body.browser-docked-expanded .browser-dock-tab {
-    display: none;
 }
 
 /* Remote control panel */
@@ -762,9 +802,121 @@ body.browser-docked-expanded .browser-dock-tab {
     min-height: var(--remote-btn-size, 40px);
 }
 
-.remote-panel__cell--slider {
+.remote-panel__cell--slider,
+.remote-panel__cell--volume {
     grid-column: 1 / -1;
-    margin-top: 0.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: stretch;
+    min-height: var(--remote-btn-size, 40px);
+}
+
+.remote-volume-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--remote-btn-size, 40px);
+    min-height: var(--remote-btn-size, 40px);
+    border-radius: calc(var(--remote-btn-size, 40px) / 2);
+    border: 1px solid color-mix(in srgb, var(--tv-main-1, #00FF88) 22%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    cursor: pointer;
+    overflow: hidden;
+    --volume-fill: 0.85;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.remote-volume-bar:hover,
+.remote-volume-bar:focus-within {
+    border-color: color-mix(in srgb, var(--tv-main-1, #00FF88) 45%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tv-main-1, #00FF88) 18%, transparent);
+}
+
+.remote-volume-bar__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--volume-fill, 0) * 100%);
+    background: var(--tv-main-1, #00FF88);
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.remote-volume-bar__pct {
+    position: relative;
+    z-index: 1;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--tv-text-primary);
+    pointer-events: none;
+    text-shadow:
+        0 0 3px color-mix(in srgb, var(--tv-bg, #0d0f14) 85%, transparent),
+        0 0 3px color-mix(in srgb, var(--tv-bg, #0d0f14) 85%, transparent);
+}
+
+.remote-volume-bar__input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+.remote-volume-bar__input::-webkit-slider-runnable-track {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    height: 100%;
+}
+
+.remote-volume-bar__input::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.remote-volume-bar__input::-moz-range-track {
+    background: transparent;
+    border: none;
+    height: 100%;
+}
+
+.remote-volume-bar__input::-moz-range-thumb {
+    width: 0;
+    height: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.remote-shell__layout-controls {
+    display: flex;
+    justify-content: center;
+    padding-bottom: 0.35rem;
+}
+
+.remote-shell__layout-controls.is-hidden {
+    display: none !important;
+}
+
+#remote-shell .remote-shell__layout-controls:not(.is-hidden) {
+    display: flex;
 }
 
 .remote-panel__cell--nav {
@@ -784,7 +936,8 @@ body.browser-docked-expanded .browser-dock-tab {
 
 .remote-panel__footer-nav .remote-panel__nav-btn,
 .remote-module__catalog-tools .remote-panel__nav-btn,
-.browser-window-controls .remote-panel__nav-btn {
+.browser-window-controls .remote-panel__nav-btn,
+.layout-window-controls .remote-panel__nav-btn {
     flex: 0 0 var(--remote-btn-size, 40px);
     width: var(--remote-btn-size, 40px);
     height: var(--remote-btn-size, 40px);
@@ -837,6 +990,8 @@ body.browser-docked-expanded .browser-dock-tab {
     min-width: 0;
 }
 
+/* legacy volume row removed from remote keypad — dial uses .remote-volume-bar */
+
 .remote-panel__nav-btn.is-active {
     background: color-mix(in srgb, currentColor 24%, transparent);
     border-color: color-mix(in srgb, currentColor 45%, transparent);
@@ -847,6 +1002,17 @@ body.browser-docked-expanded .browser-dock-tab {
     color: var(--tv-secondary, #e879a9);
     background: color-mix(in srgb, var(--tv-secondary, #e879a9) 22%, transparent);
     border-color: color-mix(in srgb, var(--tv-secondary, #e879a9) 45%, transparent);
+}
+
+/* Hide/collapse chevron: point down when module is open, up when folded to tab */
+#remote-collapse-btn svg,
+#browser-hide-toggle svg {
+    transition: transform 0.2s ease;
+}
+
+#remote-collapse-btn.is-module-unhidden svg,
+#browser-hide-toggle.is-module-unhidden svg {
+    transform: rotate(180deg);
 }
 
 .remote-module__catalog-tools .tv-tab-popup,

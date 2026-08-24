@@ -6,7 +6,8 @@ import { el } from '../tvUtils.js';
 import {
     VIEW_MOTION,
     primeBootGrain,
-    revealBootWithGrain
+    revealBootWithGrain,
+    stopBootGrainPaint
 } from './viewTransitions.js';
 
 const BOOT_STYLE_KEY = 'magicTV_boot_style';
@@ -62,6 +63,8 @@ export function primeBootScreen(bootEl) {
 
 /**
  * Reveal themed GUI from the active boot cover (shared opacity morph-out).
+ * @param {HTMLElement} [bootEl]
+ * @param {HTMLElement} [appEl]
  */
 export async function revealBootScreen(bootEl, appEl) {
     const boot = bootEl || el('boot-screen');
@@ -71,17 +74,100 @@ export async function revealBootScreen(bootEl, appEl) {
         return revealBootWithGrain(boot, appEl);
     }
 
+    return revealAppFromBoot(boot, appEl, { revealApp: true });
+}
+
+/**
+ * Fade out the boot cover only — app stays hidden until revealAppBehind().
+ * @param {HTMLElement} [bootEl]
+ */
+export async function fadeOutBootCover(bootEl) {
+    const boot = bootEl || el('boot-screen');
+    const style = normalizeBootStyle(boot?.getAttribute('data-boot-style'));
+    if (style === 'grain') primeBootGrain(boot);
+    return revealAppFromBoot(boot, el('app-container'), { revealApp: false });
+}
+
+/**
+ * Fade in the app shell after boot (or resume modal) has taken focus.
+ * @param {HTMLElement} [appEl]
+ */
+export async function revealAppBehind(appEl) {
     const app = appEl || el('app-container');
     const root = document.documentElement;
 
     const finish = () => {
-        root.classList.remove('is-booting');
+        root.classList.remove('is-app-pending');
         if (app) {
+            app.style.opacity = '';
+            app.style.visibility = '';
+            app.style.pointerEvents = '';
+            app.style.filter = '';
+        }
+    };
+
+    if (!app) {
+        finish();
+        return;
+    }
+
+    if (prefersReducedMotion()) {
+        finish();
+        return;
+    }
+
+    const cfg = VIEW_MOTION.grain;
+    app.style.visibility = 'visible';
+    app.style.opacity = '0';
+    app.style.pointerEvents = 'none';
+
+    try {
+        const showAnim = app.animate(
+            [{ opacity: 0 }, { opacity: 1 }],
+            {
+                duration: cfg.duration,
+                easing: cfg.easing,
+                fill: 'forwards'
+            }
+        );
+        await showAnim.finished;
+        try {
+            showAnim.cancel();
+        } catch { /* ignore */ }
+    } catch {
+        /* fall through */
+    } finally {
+        finish();
+    }
+}
+
+/**
+ * Shared boot-out animation; optionally cross-fades the app in.
+ * @param {HTMLElement | null} boot
+ * @param {HTMLElement | null} app
+ * @param {{ revealApp?: boolean }} [opts]
+ */
+async function revealAppFromBoot(boot, app, { revealApp = true } = {}) {
+    const root = document.documentElement;
+
+    const finish = () => {
+        root.classList.remove('is-booting');
+        if (!revealApp) {
+            root.classList.add('is-app-pending');
+            if (app) {
+                app.style.visibility = 'hidden';
+                app.style.opacity = '0';
+                app.style.pointerEvents = 'none';
+            }
+        } else if (app) {
             app.style.opacity = '';
             app.style.visibility = '';
             app.style.filter = '';
         }
-        boot?.remove();
+        if (boot) {
+            stopBootGrainPaint();
+            boot.remove();
+        }
     };
 
     if (!boot || !app) {
@@ -101,8 +187,10 @@ export async function revealBootScreen(bootEl, appEl) {
         fill: 'forwards'
     };
 
-    app.style.visibility = 'visible';
-    app.style.opacity = '0';
+    if (revealApp) {
+        app.style.visibility = 'visible';
+    }
+    app.style.opacity = revealApp ? '0' : '0';
     boot.style.opacity = '1';
 
     try {
@@ -114,14 +202,13 @@ export async function revealBootScreen(bootEl, appEl) {
             ],
             half
         );
-        const showAnim = app.animate(
-            [{ opacity: 0 }, { opacity: 1 }],
-            half
-        );
-        await Promise.all([clearAnim.finished, showAnim.finished]);
+        const anims = [clearAnim];
+        if (revealApp) {
+            anims.push(app.animate([{ opacity: 0 }, { opacity: 1 }], half));
+        }
+        await Promise.all(anims.map((a) => a.finished));
         try {
-            clearAnim.cancel();
-            showAnim.cancel();
+            anims.forEach((a) => a.cancel());
         } catch { /* ignore */ }
     } catch {
         /* fall through */

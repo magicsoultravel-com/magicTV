@@ -151,6 +151,7 @@ function buildDom() {
         getElementById: (id) => els.get(id) || null,
         querySelector: (sel) => {
             if (sel === '#remote-panel-footer .tv-controls__screens') return strip;
+            if (sel === '.tv-controls__screens') return strip;
             if (sel === '#remote-dock-host') return dockHost;
             if (sel === '#remote-module-staging') return staging;
             if (sel === '#remote-module-host') return null;
@@ -158,6 +159,7 @@ function buildDom() {
             return null;
         },
         querySelectorAll: (sel) => {
+            if (sel === '.tv-controls__screens') return [strip];
             if (sel === '.tv-player-tile.is-channel-picker-target') {
                 return highlightedTiles.filter((t) => t.classList.contains('is-channel-picker-target'));
             }
@@ -167,6 +169,7 @@ function buildDom() {
     };
 
     doc.querySelectorAll = (sel) => {
+        if (sel === '.tv-controls__screens') return [strip];
         if (sel === '.tv-player-tile.is-channel-picker-target') {
             return Object.values(tiles).filter((t) => t.classList.contains('is-channel-picker-target'));
         }
@@ -213,6 +216,7 @@ beforeEach(() => {
     SettingsStore.setRemoteIdleFadeEnabled(false);
     MultiView.rememberedSlotKeys = {};
     MultiView.statusSlotId = 'center';
+    MultiView.screenStripHoverSlotId = null;
     for (const id of ['topLeft', 'topRight', 'bottomLeft', 'bottomRight']) {
         MultiView.slots[id].enabled = false;
         MultiView.slots[id].player = null;
@@ -221,9 +225,29 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-    if (RemoteModule.isOpen()) RemoteModule.close();
+    if (RemoteModule.isOpen())     RemoteModule.close();
     await new Promise((r) => setTimeout(r, 50));
     globalThis.document = undefined;
+});
+
+test('screen strip hover highlights matching mosaic tile on the page', () => {
+    const { doc, tiles } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topRight.enabled = true;
+
+    MultiView.setScreenStripHover('topLeft');
+    assert.ok(tiles.topLeft.classList.contains('is-screen-strip-hover'));
+    assert.equal(tiles.center.classList.contains('is-screen-strip-hover'), false);
+    assert.equal(tiles.topRight.classList.contains('is-screen-strip-hover'), false);
+
+    MultiView.setScreenStripHover('topRight');
+    assert.equal(tiles.topLeft.classList.contains('is-screen-strip-hover'), false);
+    assert.ok(tiles.topRight.classList.contains('is-screen-strip-hover'));
+
+    MultiView.clearScreenStripHover();
+    assert.equal(tiles.topRight.classList.contains('is-screen-strip-hover'), false);
 });
 
 test('disabling targeted screen reconciles remote target and strip highlight', async () => {

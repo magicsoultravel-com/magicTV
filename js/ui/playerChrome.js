@@ -8,6 +8,7 @@ import { MultiView } from '../multiView.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import { RemotePanel, syncRemoteChannelBar } from './remotePanel.js';
 import { updateProgrammeHeader } from './guidePanel.js';
+import { syncVolumeDial } from './volumeDial.js';
 
 let deps = {
     appState: null
@@ -27,21 +28,16 @@ export const PlayerChrome = {
         if (volume) {
             volume.addEventListener('input', (e) => {
                 TvPlayer.setVolume(parseFloat(e.target.value) / 100);
+                syncVolumeDial();
             });
         }
         window.addEventListener('tv:cast_volume_changed', () => {
             MultiView.scheduleRefreshTiles?.();
+            syncVolumeDial();
         });
         window.addEventListener('tv:state_changed', () => { ChannelGrid.syncFavButtons(); ChannelGrid.syncPlayingTiles(); ChannelGrid.syncVisitedTiles(); });
-        const volPct = el('volume-pct');
-        if (volPct) {
-            const updateVolPct = () => {
-                const shown = TvPlayer.muted ? 0 : TvPlayer.volume;
-                volPct.textContent = `${Math.round((shown || 0) * 100)}%`;
-            };
-            window.addEventListener('tv:state_changed', updateVolPct);
-            updateVolPct();
-        }
+        window.addEventListener('tv:state_changed', syncVolumeDial);
+        syncVolumeDial();
     },
 
     bindSettings() {
@@ -61,8 +57,7 @@ export const PlayerChrome = {
     syncSettingsFromState() {
         const buffer = el('buffer-size-select');
         if (buffer) buffer.value = String(TvPlayer.getBufferSize());
-        const volume = el('volume-slider');
-        if (volume) volume.value = String(Math.round((TvPlayer.volume || 0.85) * 100));
+        syncVolumeDial();
         Appearance.syncFromState();
         MultiView.syncSettingsToggles();
     },
@@ -114,10 +109,7 @@ export const PlayerChrome = {
             try { TvPlayer.mountVideo(); } catch { /* ignore */ }
         }
 
-        const volume = el('volume-slider');
-        if (volume && typeof state.volume === 'number') {
-            volume.value = String(Math.round(state.volume * 100));
-        }
+        syncVolumeDial();
 
         this.updateBufferQuality();
         RemotePanel.syncRemotePanel?.();
@@ -146,36 +138,44 @@ export const PlayerChrome = {
     },
 
     updateBufferQuality() {
-        const player = MultiView.getStatusPlayer() || MultiView.getPrimary();
-        const channel = player?.channel;
-        const loadPhase = player?.loadPhase;
+        const formatBuffer = (player) => {
+            const channel = player?.channel;
+            const loadPhase = player?.loadPhase;
+            if (!channel || loadPhase === 'idle') return 'Buffer: —';
+            const buf = player.getBufferInfo?.() || { buffered: 0 };
+            return `Buffer: ${(buf.buffered || 0).toFixed(1)}s`;
+        };
 
-        const bufferInfo = el('buffer-info');
-        if (bufferInfo) {
-            if (channel && loadPhase !== 'idle') {
-                const buf = player.getBufferInfo?.() || { buffered: 0 };
-                bufferInfo.textContent = `Buffer: ${(buf.buffered || 0).toFixed(1)}s`;
-            } else {
-                bufferInfo.textContent = 'Buffer: —';
-            }
-        }
-
-        const qualityInfo = el('quality-info');
-        if (qualityInfo) {
+        const formatQuality = (player) => {
+            const channel = player?.channel;
+            if (!channel) return 'Quality: —';
             let label = player?.qualityLabel || '—';
-            if (channel && (!label || label === '—')) {
+            if (!label || label === '—') {
                 const h = player?.video?.videoHeight;
                 if (h > 0) label = `${h}p`;
             }
-            if (!channel) {
-                qualityInfo.textContent = 'Quality: —';
-            } else if (player?.qualityMode === 'auto') {
-                qualityInfo.textContent = label && label !== '—'
+            if (player?.qualityMode === 'auto') {
+                return label && label !== '—'
                     ? `Quality: Auto (${label})`
                     : 'Quality: Auto';
-            } else {
-                qualityInfo.textContent = `Quality: ${label || '—'}`;
             }
+            return `Quality: ${label || '—'}`;
+        };
+
+        // Per-screen overlays on mosaic tiles.
+        for (const id of ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight']) {
+            const tile = el(`player-tile-${id}`);
+            if (!tile) continue;
+            const slot = MultiView.slots?.[id];
+            const enabled = id === 'center' || slot?.enabled;
+            const player = enabled ? (slot?.player || (id === 'center' ? MultiView.getPrimary?.() : null)) : null;
+            const echo = tile.querySelector('.tv-player-tile__echo');
+            const bufferEl = tile.querySelector('.tv-player-tile__buffer');
+            const qualityEl = tile.querySelector('.tv-player-tile__quality-echo');
+            const hasChannel = Boolean(player?.channel);
+            echo?.classList.toggle('is-hidden', !enabled || !hasChannel);
+            if (bufferEl) bufferEl.textContent = formatBuffer(player);
+            if (qualityEl) qualityEl.textContent = formatQuality(player);
         }
     }
 };

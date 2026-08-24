@@ -211,8 +211,11 @@ function startGrainPaint(canvas, hostEl) {
     };
 }
 
+export function stopBootGrainPaint() {
+    stopAllGrainPaint();
+}
+
 /**
- * Dissolve / grain wipe over one or more targets, swapping at the blackout peak.
  * @param {'dissolve'|'grain'} mode
  * @param {() => void} onSwap
  * @param {{

@@ -93,7 +93,7 @@ export function classifyTilePlayback({
         && !uiPlaying
         && !uiDisconnected
         && !uiLoading
-        && (posterDataUrl || (pausePhase && pausePhase !== 'idle'))
+        && pausePhase && pausePhase !== 'idle'
     );
     const uiStopped = Boolean(
         hasChannel

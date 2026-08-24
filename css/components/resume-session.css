@@ -1,0 +1,249 @@
+/** @css {slice}: Post-boot resume session modal */
+
+.resume-session {
+    position: fixed;
+    inset: 0;
+    z-index: 8520;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.resume-session.is-hidden,
+.resume-session[hidden] {
+    display: none !important;
+}
+
+.resume-session__backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in srgb, var(--tv-primary) 12%, transparent), transparent 70%),
+        rgba(0, 0, 0, 0.78);
+}
+
+.resume-session__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(100%, 46rem);
+    max-height: min(88vh, 40rem);
+    display: flex;
+    flex-direction: column;
+    padding: 1.35rem 1.35rem 1.15rem;
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--tv-primary) 10%, var(--tv-bg-secondary)) 0%,
+        var(--tv-bg-secondary) 52%,
+        color-mix(in srgb, var(--tv-secondary) 8%, var(--tv-bg-secondary)) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--tv-primary) 28%, var(--tv-border));
+    border-radius: var(--tv-radius-lg);
+    box-shadow:
+        0 10px 36px color-mix(in srgb, var(--tv-primary) 14%, rgba(0, 0, 0, 0.45)),
+        0 0 0 1px color-mix(in srgb, var(--tv-secondary) 8%, transparent) inset;
+    outline: none;
+}
+
+.resume-session__close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    background: color-mix(in srgb, var(--tv-primary) 6%, transparent);
+    color: var(--tv-text-secondary);
+    cursor: pointer;
+    transition: var(--tv-transition);
+}
+
+.resume-session__close:hover {
+    color: var(--tv-primary);
+    border-color: var(--tv-primary);
+    background: color-mix(in srgb, var(--tv-primary) 14%, transparent);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+}
+
+.resume-session__title {
+    margin: 0 2.25rem 0.25rem 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--tv-text);
+}
+
+.resume-session__count {
+    margin: 0 0 1rem;
+    font-size: 0.8125rem;
+    color: var(--tv-text-muted);
+}
+
+.resume-session__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+    gap: var(--tv-grid-gap);
+    align-content: start;
+}
+
+.resume-session__item {
+    min-width: 0;
+    display: flex;
+}
+
+.resume-session__tile {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.resume-session__tile:focus-visible {
+    outline: none;
+}
+
+.resume-session__tile:focus-visible .resume-session__tile-frame {
+    border-color: var(--tv-primary);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
+        0 6px 22px color-mix(in srgb, var(--tv-primary) 28%, transparent);
+}
+
+.resume-session__tile-frame {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    border-radius: var(--tv-radius-md);
+    overflow: hidden;
+    border: 1px solid var(--tv-border);
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 10%, #000) 0%, #000 55%, color-mix(in srgb, var(--tv-secondary) 8%, #000) 100%);
+    box-sizing: border-box;
+    transition: var(--tv-transition);
+}
+
+.resume-session__tile:hover .resume-session__tile-frame,
+.resume-session__item.is-last-active .resume-session__tile-frame {
+    border-color: var(--tv-primary);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
+        0 6px 22px color-mix(in srgb, var(--tv-primary) 28%, transparent);
+}
+
+.resume-session__tile-poster {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    pointer-events: none;
+}
+
+.resume-session__tile-poster.is-hidden {
+    display: none;
+}
+
+.resume-session__tile-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--tv-primary);
+    pointer-events: none;
+}
+
+.resume-session__tile-fallback.is-hidden {
+    display: none;
+}
+
+.resume-session__tile-screen {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.45rem;
+    z-index: 2;
+    padding: 0.18rem 0.45rem;
+    border-radius: var(--tv-radius-sm);
+    background: rgba(0, 0, 0, 0.78);
+    border: 1px solid color-mix(in srgb, var(--tv-primary) 35%, transparent);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--tv-primary);
+    pointer-events: none;
+}
+
+.resume-session__item.is-last-active .resume-session__tile-screen {
+    box-shadow: 0 0 10px color-mix(in srgb, var(--tv-primary) 35%, transparent);
+}
+
+.resume-session__tile-name {
+    position: absolute;
+    left: 0.45rem;
+    right: 0.45rem;
+    bottom: 0.4rem;
+    z-index: 2;
+    padding: 0.22rem 0.45rem;
+    border-radius: var(--tv-radius-sm);
+    background: rgba(0, 0, 0, 0.78);
+    color: #f2f2f2;
+    font-size: 0.72rem;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
+@media (min-width: 640px) {
+    .resume-session__list {
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    }
+}
+
+/* One saved screen — keep TV frame a sensible size, not full dialog width */
+.resume-session__list:has(> .resume-session__item:only-child) {
+    grid-template-columns: min(100%, 20rem);
+    justify-content: center;
+}
+
+/* Two screens — balanced pair */
+.resume-session__list:has(> .resume-session__item:nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 34rem;
+    margin-inline: auto;
+    width: 100%;
+}
+
+@media (max-width: 420px) {
+    .resume-session__list {
+        grid-template-columns: 1fr;
+    }
+
+    .resume-session__list:has(> .resume-session__item:nth-child(2):last-child) {
+        max-width: none;
+    }
+}

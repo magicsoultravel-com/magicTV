@@ -152,6 +152,7 @@ export const BrowseView = {
         const channels = el('channels-container');
         const browsePanel = el('browse-panel');
         const backBtn = el('back-btn');
+        this.saveScroll();
         if (browsePanel) browsePanel.scrollTop = 0;
         if (countries) countries.classList.add('is-hidden');
         if (channels) channels.classList.remove('is-hidden');
@@ -283,8 +284,76 @@ export const BrowseView = {
         await this.loadMoreChannels(true);
     },
 
+    saveScroll() {
+        const appState = deps.appState;
+        const panel = el('browse-panel');
+        if (!panel) return;
+        if (appState.browseCountry !== null) {
+            appState.scrollBrowseChannels = panel.scrollTop;
+        } else {
+            appState.scrollBrowseCountries = panel.scrollTop;
+        }
+    },
+
+    restoreScroll() {
+        const appState = deps.appState;
+        const panel = el('browse-panel');
+        if (!panel) return;
+        const scroll = appState.browseCountry !== null
+            ? appState.scrollBrowseChannels
+            : appState.scrollBrowseCountries;
+        if (Number.isFinite(scroll) && scroll > 0) {
+            panel.scrollTop = scroll;
+        }
+    },
+
+    restoreView() {
+        const appState = deps.appState;
+        const countries = el('countries-container');
+        const channels = el('channels-container');
+        const search = el('search-countries');
+        const backBtn = el('back-btn');
+
+        if (appState.browseCountry !== null) {
+            if (countries) countries.classList.add('is-hidden');
+            if (channels) channels.classList.remove('is-hidden');
+            if (search && appState.browseQuery) search.value = appState.browseQuery;
+            if (backBtn) {
+                backBtn.classList.remove('is-hidden');
+                backBtn.classList.add('is-active', 'is-pink-active');
+                backBtn.dataset.tab = 'back-to-countries';
+            }
+            const grid = channels;
+            if (appState.browseChannels.length > 0 && grid) {
+                ChannelGrid.render(grid, appState.browseChannels, { append: false });
+                setupScrollLoading();
+                this.restoreScroll();
+            } else {
+                this.loadMoreChannels();
+            }
+        } else {
+            if (countries) countries.classList.remove('is-hidden');
+            if (channels) channels.classList.add('is-hidden');
+            if (search && appState.countryFilter) search.value = appState.countryFilter;
+            if (backBtn) {
+                backBtn.classList.add('is-hidden');
+                backBtn.classList.remove('is-active', 'is-pink-active');
+            }
+            const hasTiles = countries?.querySelector('.country-tile');
+            if (!hasTiles) {
+                this.renderCountries();
+            } else {
+                Appearance.applyToTiles(countries);
+            }
+            this.restoreScroll();
+        }
+        ListSort.syncSortControls();
+        deps.updateRefreshAge();
+    },
+
     showCountriesView() {
         const appState = deps.appState;
+        this.saveScroll();
         appState.browseCountry = null;
         TileFrames.clearLiveRefresh();
         appState.countryFilter = deps.currentFilter();
@@ -300,6 +369,7 @@ export const BrowseView = {
         els('[data-remote-nav="browse"]').forEach(tab => tab.classList.add('is-active'));
         ListSort.syncSortControls();
         this.renderCountries();
+        this.restoreScroll();
         deps.updateRefreshAge();
     }
 };

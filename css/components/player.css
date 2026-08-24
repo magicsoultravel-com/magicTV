@@ -62,8 +62,9 @@
     z-index: 7500;
 }
 
-/* Mosaic tile highlight while browsing for a target screen. */
-.tv-player-tile.is-channel-picker-target {
+/* Mosaic tile highlight while browsing for a target screen or hovering the screen strip. */
+.tv-player-tile.is-channel-picker-target,
+.tv-player-tile.is-screen-strip-hover {
     border-color: var(--tv-primary);
     box-shadow:
         0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
@@ -637,6 +638,41 @@
     opacity: 1;
 }
 
+.tv-player-tile__echo {
+    position: absolute;
+    bottom: 0.4rem;
+    left: 0.4rem;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    max-width: calc(100% - 0.8rem);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #d8dbe6;
+    font-size: 0.65rem;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    opacity: 0.92;
+}
+
+.tv-player-tile__echo.is-hidden {
+    display: none;
+}
+
+.tv-player-tile.is-empty .tv-player-tile__echo {
+    display: none;
+}
+
+.tv-player-tile__buffer,
+.tv-player-tile__quality-echo {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .tv-player-tile__quality {
     position: absolute;
     top: 0.3rem;
@@ -917,7 +953,8 @@
 .tv-player-tile:hover .tv-player-tile__hover,
 .tv-player-tile:focus-within .tv-player-tile__hover,
 .tv-player-tile.is-selected .tv-player-tile__hover,
-.tv-player-tile.is-channel-picker-target .tv-player-tile__hover {
+.tv-player-tile.is-channel-picker-target .tv-player-tile__hover,
+.tv-player-tile.is-screen-strip-hover .tv-player-tile__hover {
     opacity: 1;
     pointer-events: auto;
 }
@@ -925,7 +962,8 @@
 @media (hover: none) {
     .tv-player-tile.is-primary .tv-player-tile__hover,
     .tv-player-tile.is-selected .tv-player-tile__hover,
-    .tv-player-tile.is-channel-picker-target .tv-player-tile__hover {
+    .tv-player-tile.is-channel-picker-target .tv-player-tile__hover,
+    .tv-player-tile.is-screen-strip-hover .tv-player-tile__hover {
         opacity: 1;
         pointer-events: auto;
     }

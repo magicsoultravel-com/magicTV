@@ -104,10 +104,10 @@ test('pausePhase or poster classifies as paused, not stopped', () => {
         playing: false,
         pausePhase: 'idle',
         posterDataUrl: 'data:image/jpeg;base64,x',
-        stopped: true // paused wins over stopped
+        stopped: true
     });
-    assert.equal(byPoster.uiPaused, true);
-    assert.equal(byPoster.uiStopped, false);
+    assert.equal(byPoster.uiPaused, false);
+    assert.equal(byPoster.uiStopped, true);
 });
 
 test('playing hides pause/stop overlays', () => {

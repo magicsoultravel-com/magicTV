@@ -19,6 +19,7 @@ const KNOWN_IDS = [
     'browser-module', 'browser-module-dialog', 'browser-module-host',
     'browser-dock-tab', 'browser-dock-sheet', 'browser-dock-host',
     'browser-window-controls', 'browser-dock-toggle', 'browser-hide-toggle',
+    'layout-window-controls', 'remote-shell-screens-footer', 'remote-join-btn', 'remote-layout-window-controls',
     'remote-guide-toggle',
     'remote-external-popout-btn', 'remote-split-browser-btn', 'browser-join-btn', 'browser-external-popout-btn',
     'remote-module-pin', 'remote-module-close', 'remote-back-btn',
@@ -26,7 +27,7 @@ const KNOWN_IDS = [
     'player-tile-bottomLeft', 'player-tile-bottomRight',
     'tv-playback-surface-topLeft', 'tv-playback-surface-center', 'tv-playback-surface-topRight',
     'tv-playback-surface-bottomLeft', 'tv-playback-surface-bottomRight',
-    'volume-slider', 'buffer-info', 'quality-info',
+    'volume-slider', 'volume-dial',
     'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select',
@@ -56,7 +57,11 @@ const KNOWN_IDS = [
     'appearance-preview-list',
     'preview-list-avatar',
     'preview-list-name',
-    'preview-list-flag'
+    'preview-list-flag',
+    'resume-session-modal',
+    'resume-session-dialog',
+    'resume-session-count',
+    'resume-session-list'
 ];
 function makeEl(id = '') {
     const el = {

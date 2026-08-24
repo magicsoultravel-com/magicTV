@@ -32,10 +32,8 @@ import {
     resolveViewTransition,
     runWipeTransition
 } from './ui/viewTransitions.js';
-import { primeBootScreen, revealBootScreen } from './ui/bootScreen.js';
-
-const DEFAULT_FIRST_CHANNEL_URL = 'https://channels.trace.plus/Traceprod/CARIBBEAN_hd/index.m3u8';
-const DEFAULT_FIRST_CHANNEL_NAME = 'CARIBBEAN';
+import { primeBootScreen, revealBootScreen, fadeOutBootCover, revealAppBehind } from './ui/bootScreen.js';
+import { ResumeSessionModal, collectSessionTiles } from './ui/resumeSessionModal.js';
 
 let appState = {
     countries: [],
@@ -54,6 +52,11 @@ let appState = {
     favoritesList: [],
     recentsList: [],
     favoritesFolderId: null,
+    lastBrowserTab: 'browse',
+    scrollBrowseCountries: 0,
+    scrollBrowseChannels: 0,
+    scrollFavorites: 0,
+    scrollRecents: 0,
     lastKey: null,
     lastName: '',
     lastCountry: '',
@@ -556,14 +559,63 @@ function syncRemoteTabChrome() {
     syncRemoteChannelBar(tab);
 }
 
+const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
+
+function saveActiveTabScroll() {
+    const tab = appState.activeTab;
+    const panel = el(`${tab}-panel`);
+    if (!panel) return;
+    if (tab === 'browse') {
+        BrowseView.saveScroll();
+    } else if (tab === 'favorites') {
+        appState.scrollFavorites = panel.scrollTop;
+    } else if (tab === 'recents') {
+        appState.scrollRecents = panel.scrollTop;
+    }
+}
+
+function restoreActiveTabScroll(tabName) {
+    const panel = el(`${tabName}-panel`);
+    if (!panel) return;
+    if (tabName === 'browse') {
+        BrowseView.restoreScroll();
+    } else if (tabName === 'favorites' && appState.scrollFavorites > 0) {
+        panel.scrollTop = appState.scrollFavorites;
+    } else if (tabName === 'recents' && appState.scrollRecents > 0) {
+        panel.scrollTop = appState.scrollRecents;
+    }
+}
+
+/** When split, Browser window must show a catalog tab — never leave panels blank. */
+function ensureBrowserCatalogVisible() {
+    if (!isSplit()) return;
+    let tab = appState.activeTab;
+    if (tab === 'remote' || !BROWSER_TABS.includes(tab)) {
+        tab = appState.lastBrowserTab || 'browse';
+    }
+    if (tab !== appState.activeTab) {
+        switchTab(tab);
+        return;
+    }
+    activateTabPanels(tab);
+    if (tab === 'browse') BrowseView.restoreView();
+    else if (tab === 'favorites') ChannelGrid.refreshFavorites();
+    else if (tab === 'recents') ChannelGrid.refreshRecents();
+}
+
 function activateTabPanels(tabName) {
     els('.tv-panel').forEach((panel) => panel.classList.remove('is-active'));
     el(`${tabName}-panel`)?.classList.add('is-active');
 }
 
 function switchTab(tabName) {
-    const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
+    if (BROWSER_TABS.includes(appState.activeTab) && tabName !== appState.activeTab) {
+        saveActiveTabScroll();
+    }
     appState.activeTab = tabName;
+    if (BROWSER_TABS.includes(tabName)) {
+        appState.lastBrowserTab = tabName;
+    }
 
     // Remote is the door: when split, browser tabs focus the Browser window.
     if (BROWSER_TABS.includes(tabName) && RemoteModule.isOpen?.() && isSplit()) {
@@ -587,22 +639,19 @@ function switchTab(tabName) {
         }
     }
 
-    if (tabName !== 'favorites' && appState.favoritesFolderId) {
-        appState.favoritesFolderId = null;
-    }
-
     syncRemoteTabChrome();
     TileFrames.syncLiveRefresh(currentRefreshKey());
     ListSort.syncSortControls();
     if (tabName === 'favorites') {
         appState.favFilter = currentFilter();
         ChannelGrid.refreshFavorites();
+        restoreActiveTabScroll('favorites');
     } else if (tabName === 'recents') {
         appState.recentsFilter = currentFilter();
         ChannelGrid.refreshRecents();
-    } else if (tabName === 'browse' && appState.browseCountry !== null) {
-        const q = currentFilter();
-        if (q !== appState.browseQuery) BrowseView.startChannelSearch(q);
+        restoreActiveTabScroll('recents');
+    } else if (tabName === 'browse') {
+        BrowseView.restoreView();
     } else if (tabName === 'settings') {
         Appearance.refreshWatchStats();
         Appearance.updateStorageStats();
@@ -618,7 +667,7 @@ function switchTab(tabName) {
     RemotePanel.syncRemotePanel();
 }
 
-export { switchTab };
+export { switchTab, ensureBrowserCatalogVisible };
 
 function bindViewTransitionSelect() {
     const select = el('catalog-transition-select');
@@ -634,13 +683,19 @@ function bindViewTransitionSelect() {
 
 async function init() {
     let revealed = false;
+    const hasSession = collectSessionTiles().length > 0;
     const reveal = async () => {
         if (revealed) return;
         revealed = true;
         try {
-            await revealBootScreen();
+            if (hasSession) {
+                await fadeOutBootCover();
+            } else {
+                await revealBootScreen();
+            }
         } catch {
             document.documentElement.classList.remove('is-booting');
+            document.documentElement.classList.remove('is-app-pending');
             el('boot-screen')?.remove();
         }
     };
@@ -656,7 +711,8 @@ async function init() {
         });
         RemoteModule.init({
             getDefaultOnPlay: () => startPlayback,
-            switchTab
+            switchTab,
+            ensureBrowserCatalog: ensureBrowserCatalogVisible
         });
         RemotePanel.bind();
         GuidePanel.init();
@@ -712,37 +768,11 @@ async function init() {
         window.addEventListener('tv:state_changed', (e) => PlayerChrome.onPlayerStateChanged(e));
 
         await restoreLastChannelMeta();
+        PlayerChrome.updateNowPlayingHeader();
 
-        // Mosaic stubs already painted in MultiView.init; attach streams under cover.
-        // Catalog/countries can be slow on cold cache — kick off but do not gate reveal.
-        const restorePromise = MultiView.restoreSlots().catch(() => false);
+        // Mosaic stubs already painted in MultiView.init; streams attach on user play.
         const countriesPromise = BrowseView.refreshCountries().catch(() => {});
 
-        const restored = await restorePromise;
-        if (restored) {
-            if (TvPlayer.channel) {
-                appState.lastKey = channelKey(TvPlayer.channel);
-                appState.lastName = TvPlayer.channel.name || appState.lastName;
-                appState.lastCountry = TvPlayer.channel.countrycode || '';
-            }
-            PlayerChrome.updateNowPlayingHeader();
-        } else if (!TvPlayer.channel && !appState.lastKey) {
-            const firstChannel = {
-                name: DEFAULT_FIRST_CHANNEL_NAME,
-                url_resolved: DEFAULT_FIRST_CHANNEL_URL,
-                channelId: 'trace-CARIBBEAN_hd',
-                providerId: 'trace',
-                countrycode: '',
-                lastcheckok: 1
-            };
-            TvPlayer.channel = firstChannel;
-            startPlayback(firstChannel);
-        } else if (TvPlayer.channel) {
-            TvPlayer.resumeIfWasPlaying().catch(() => {});
-        }
-
-        // Docked → modal teleport finishes under the boot cover.
-        RemoteModule.restoreOpenIfNeeded();
         bindRemoteExternalPopoutBtn();
         RemoteExternalPopout.syncBtn();
 
@@ -757,9 +787,18 @@ async function init() {
             activateTabPanels(appState.activeTab);
             syncRemoteTabChrome();
             RemoteModule.syncSplitChromeButtons?.();
+            if (isSplit()) ensureBrowserCatalogVisible();
         });
 
         await reveal();
+
+        if (hasSession) {
+            const modalDone = ResumeSessionModal.maybeShow();
+            await revealAppBehind();
+            await modalDone;
+        }
+
+        RemoteModule.restoreOpenIfNeeded();
 
         await countriesPromise;
         warmGuideIndex().catch(() => {});

@@ -12,5 +12,6 @@
 @import "./components/player.css";
 @import "./components/settings.css";
 @import "./components/modals.css";
+@import "./components/resume-session.css";
 @import "./components/remote.css";
 @import "./components/guide.css";

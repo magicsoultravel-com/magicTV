@@ -36,6 +36,12 @@ html.is-booting #app-container {
     pointer-events: none;
 }
 
+html.is-app-pending #app-container {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .boot-screen {
     position: fixed;
     inset: 0;

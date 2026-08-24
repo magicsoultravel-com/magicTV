@@ -150,7 +150,9 @@ export function syncRemotePanel() {
     const collapseBtn = el('remote-collapse-btn');
     if (collapseBtn && mod) {
         collapseBtn.innerHTML = ACTION_ICONS.collapse;
-        collapseBtn.title = 'Hide remote';
+        const unhidden = mod.getMode?.() !== 'hidden';
+        collapseBtn.classList.toggle('is-module-unhidden', unhidden);
+        collapseBtn.title = unhidden ? 'Hide remote' : 'Show remote';
         collapseBtn.setAttribute('aria-label', collapseBtn.title);
     }
 

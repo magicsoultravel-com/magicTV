@@ -19,6 +19,7 @@ import {
     setReconcileHandler,
     syncCatalogRootClasses,
     splitBrowser,
+    joinBrowser,
     isSplit,
     remoteShellEl,
     browserShellEl,
@@ -33,7 +34,8 @@ const DEFAULT_SHEET_HEIGHT = 0.62;
 
 let deps = {
     getDefaultOnPlay: () => () => {},
-    switchTab: () => {}
+    switchTab: () => {},
+    ensureBrowserCatalog: () => {}
 };
 
 /** @type {'hidden'|'docked'|'undocked'} */
@@ -400,17 +402,38 @@ function ensureShellsJoinedInRoot() {
 
 function syncSplitChromeButtons() {
     const splitBtn = el('remote-split-browser-btn');
+    const joinBtn = el('browser-join-btn');
     const remoteOpen = mode !== 'hidden';
     const split = isSplit();
     if (splitBtn) {
-        const show = remoteOpen && !split;
-        splitBtn.classList.toggle('is-hidden', !show);
-        splitBtn.innerHTML = CARD_ICONS.popout;
+        splitBtn.classList.toggle('is-hidden', !remoteOpen || split);
+        splitBtn.innerHTML = CARD_ICONS.splitLayout;
         splitBtn.setAttribute('aria-pressed', String(split));
         splitBtn.title = 'Split browser';
         splitBtn.setAttribute('aria-label', 'Split browser');
     }
+    if (joinBtn) {
+        joinBtn.classList.toggle('is-hidden', !split);
+        joinBtn.innerHTML = CARD_ICONS.popin;
+        joinBtn.title = 'Join browser with remote';
+        joinBtn.setAttribute('aria-label', joinBtn.title);
+    }
+    const remoteJoinBtn = el('remote-join-btn');
+    if (remoteJoinBtn) {
+        remoteJoinBtn.classList.toggle('is-hidden', !split);
+        remoteJoinBtn.innerHTML = CARD_ICONS.popin;
+        remoteJoinBtn.title = 'Join browser with remote';
+        remoteJoinBtn.setAttribute('aria-label', remoteJoinBtn.title);
+    }
+    const remoteLayoutControls = el('remote-layout-window-controls');
+    remoteLayoutControls?.classList.toggle('is-hidden', !split);
+    const remoteScreenFooter = el('remote-shell-screens-footer');
+    if (remoteScreenFooter) {
+        remoteScreenFooter.classList.toggle('is-hidden', !split);
+        remoteScreenFooter.setAttribute('aria-hidden', String(!split));
+    }
     BrowserModule.syncActionButtons?.();
+    if (split) MultiView.syncScreenControls?.();
     let activeNav = null;
     try {
         activeNav = typeof document?.querySelector === 'function'
@@ -478,6 +501,7 @@ function reconcileShells() {
     document.body.classList.add('browser-shell-split');
     syncSplitChromeButtons();
     ModuleIdleFade.syncForLayout();
+    deps.ensureBrowserCatalog?.();
 }
 
 function teleportBodyTo(host) {
@@ -703,9 +727,20 @@ function bindOnce() {
         e.preventDefault();
         if (mode === 'hidden') return;
         splitBrowser({ hostKind: 'undocked' });
-        // Browser shell needs a catalog tab; keep keypad visible via CSS when split.
         deps.switchTab?.('browse');
         window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'split' } }));
+    });
+
+    el('browser-join-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        joinBrowser();
+        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'joined' } }));
+    });
+
+    el('remote-join-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        joinBrowser();
+        window.dispatchEvent(new CustomEvent('remote:layout_changed', { detail: { mode: 'joined' } }));
     });
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
         if (e.target.closest?.('button')) return;
@@ -782,9 +817,10 @@ function restoreFromState() {
 }
 
 export const RemoteModule = {
-    init({ getDefaultOnPlay, switchTab } = {}) {
+    init({ getDefaultOnPlay, switchTab, ensureBrowserCatalog } = {}) {
         if (typeof getDefaultOnPlay === 'function') deps.getDefaultOnPlay = getDefaultOnPlay;
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
+        if (typeof ensureBrowserCatalog === 'function') deps.ensureBrowserCatalog = ensureBrowserCatalog;
         hydrateLayoutFromPlayerState();
         setReconcileHandler(() => {
             reconcileShells();
@@ -794,7 +830,7 @@ export const RemoteModule = {
             syncSplitChromeButtons();
         });
         RemotePanel.init({ switchTab: deps.switchTab, getRemoteModule: () => RemoteModule });
-        BrowserModule.init();
+        BrowserModule.init({ ensureBrowserCatalog: deps.ensureBrowserCatalog });
         bindOnce();
         syncBrowseButtons();
         syncSplitChromeButtons();
@@ -1065,6 +1101,7 @@ export const RemoteModule = {
         const layout = saved.layout || getLayoutState();
         if (layout?.mode === 'split') {
             splitBrowser({ hostKind: layout.browserHostKind || 'undocked' });
+            deps.ensureBrowserCatalog?.();
         }
     },
 
