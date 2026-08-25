@@ -29,7 +29,10 @@
 }
 
 .tv-player-mosaic.is-free-layout {
-    /* Absolute tiles leave the grid; keep floor height via JS minHeight. */
+    /* Absolute tiles leave the grid; keep floor height via JS minHeight.
+       Zero inset so top/left 0 matches the visual board edge under the header. */
+    padding: 0;
+    gap: 0;
     align-content: start;
 }
 
@@ -506,6 +509,11 @@
 
 .tv-player-mosaic.has-corners .tv-player-tile.is-primary {
     align-self: stretch;
+}
+
+.tv-player-mosaic.is-free-layout.has-corners .tv-player-tile.is-primary,
+.tv-player-mosaic.is-free-layout .tv-player-tile.is-primary {
+    align-self: auto;
 }
 
 .tv-player-mosaic.has-corners .tv-player-tile.is-primary .tv-playback-surface,

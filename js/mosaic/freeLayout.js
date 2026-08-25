@@ -26,6 +26,24 @@ function resolveFreeBoardHeight(mosaic) {
     return Math.max(Math.ceil(mosaic.clientHeight || 0), 240);
 }
 
+/** Integer box clamped so a near-full tile can always sit at top/left 0. */
+function clampFreeTileBox(left, top, w, h, mw, baseH) {
+    let width = Math.min(Math.max(RESIZE_MIN_W, Math.round(w)), Math.max(RESIZE_MIN_W, mw));
+    let height = Math.min(Math.max(RESIZE_MIN_H, Math.round(h)), Math.max(RESIZE_MIN_H, baseH));
+    let x = Math.round(left);
+    let y = Math.round(top);
+    // Snap hairline insets to a board edge (prefer top/left when both are within 1px).
+    if (x <= 1) x = 0;
+    else if (x + width >= mw - 1) x = Math.max(0, mw - width);
+    if (y <= 1) y = 0;
+    else if (y + height >= baseH - 1) y = Math.max(0, baseH - height);
+    x = Math.min(Math.max(0, x), Math.max(0, mw - width));
+    y = Math.min(Math.max(0, y), Math.max(0, baseH - height));
+    width = Math.min(width, Math.max(RESIZE_MIN_W, mw - x));
+    height = Math.min(height, Math.max(RESIZE_MIN_H, baseH - y));
+    return { left: x, top: y, w: width, h: height };
+}
+
 export const freeLayoutMethods = {
     beginFreePlacementGesture(session) {
         if (!this.hasCustomPlacement()) {
@@ -38,10 +56,20 @@ export const freeLayoutMethods = {
         if (!mosaic || !session?.tile) return;
         const mosaicRect = mosaic.getBoundingClientRect();
         const tileRect = session.tile.getBoundingClientRect();
-        session.originLeft = tileRect.left - mosaicRect.left;
-        session.originTop = tileRect.top - mosaicRect.top;
-        session.width = tileRect.width;
-        session.height = tileRect.height;
+        const mw = mosaic.clientWidth;
+        const baseH = resolveFreeBoardHeight(mosaic);
+        const box = clampFreeTileBox(
+            tileRect.left - mosaicRect.left,
+            tileRect.top - mosaicRect.top,
+            tileRect.width,
+            tileRect.height,
+            mw,
+            baseH
+        );
+        session.originLeft = box.left;
+        session.originTop = box.top;
+        session.width = box.w;
+        session.height = box.h;
         session.dragOriginClientX = session.startX;
         session.dragOriginClientY = session.startY;
     },
@@ -217,30 +245,31 @@ export const freeLayoutMethods = {
         mosaic.dataset.freeBaseHeight = String(baseH);
         const dx = clientX - (session.dragOriginClientX ?? session.startX);
         const dy = clientY - (session.dragOriginClientY ?? session.startY);
-        let left = (session.dragOriginLeft ?? session.originLeft) + dx;
-        let top = (session.dragOriginTop ?? session.originTop) + dy;
-        const w = session.width;
-        const h = session.height;
+        const box = clampFreeTileBox(
+            (session.dragOriginLeft ?? session.originLeft) + dx,
+            (session.dragOriginTop ?? session.originTop) + dy,
+            session.width,
+            session.height,
+            mw,
+            baseH
+        );
 
-        left = Math.min(Math.max(0, left), Math.max(0, mw - w));
-        top = Math.min(Math.max(0, top), Math.max(0, baseH - h));
-
-        session.tile.style.left = `${left}px`;
-        session.tile.style.top = `${top}px`;
-        session.tile.style.width = `${w}px`;
-        session.tile.style.height = `${h}px`;
+        session.tile.style.left = `${box.left}px`;
+        session.tile.style.top = `${box.top}px`;
+        session.tile.style.width = `${box.w}px`;
+        session.tile.style.height = `${box.h}px`;
 
         if (mw > 0 && baseH > 0) {
             this.mosaicPlacement[session.slotId] = {
-                x: left / mw,
-                y: top / baseH,
-                w: w / mw,
-                h: h / baseH,
+                x: box.left / mw,
+                y: box.top / baseH,
+                w: box.w / mw,
+                h: box.h / baseH,
                 z: this.placementZForSlot(session.slotId)
             };
         }
 
-        const maxBottom = top + h;
+        const maxBottom = box.top + box.h;
         mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, maxBottom + 8))}px`;
     },
 
@@ -316,27 +345,24 @@ export const freeLayoutMethods = {
             top = nextTop;
         }
 
-        left = Math.min(Math.max(0, left), Math.max(0, mw - w));
-        top = Math.min(Math.max(0, top), Math.max(0, baseH - h));
-        w = Math.max(RESIZE_MIN_W, Math.min(w, mw - left));
-        h = Math.max(RESIZE_MIN_H, Math.min(h, baseH - top));
+        const box = clampFreeTileBox(left, top, w, h, mw, baseH);
 
-        session.tile.style.left = `${left}px`;
-        session.tile.style.top = `${top}px`;
-        session.tile.style.width = `${w}px`;
-        session.tile.style.height = `${h}px`;
+        session.tile.style.left = `${box.left}px`;
+        session.tile.style.top = `${box.top}px`;
+        session.tile.style.width = `${box.w}px`;
+        session.tile.style.height = `${box.h}px`;
 
         if (mw > 0 && baseH > 0) {
             this.mosaicPlacement[session.slotId] = {
-                x: left / mw,
-                y: top / baseH,
-                w: w / mw,
-                h: h / baseH,
+                x: box.left / mw,
+                y: box.top / baseH,
+                w: box.w / mw,
+                h: box.h / baseH,
                 z: this.placementZForSlot(session.slotId)
             };
         }
 
-        mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, top + h + 8))}px`;
+        mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, box.top + box.h + 8))}px`;
     },
 
     endTileResize(session) {
@@ -352,39 +378,55 @@ export const freeLayoutMethods = {
     captureGridAsPlacement() {
         const mosaic = el('player-mosaic');
         if (!mosaic) return;
+
+        // Enter free-layout board metrics (padding/gap 0) before measuring so
+        // TV 1 is not baked with the padded-grid top inset.
+        mosaic.classList.add('is-free-layout');
+        void mosaic.offsetWidth;
+
         const mosaicRect = mosaic.getBoundingClientRect();
         const mw = mosaicRect.width || mosaic.clientWidth;
         const mh = mosaicRect.height || mosaic.clientHeight;
-        if (mw <= 0 || mh <= 0) return;
+        if (mw <= 0 || mh <= 0) {
+            mosaic.classList.remove('is-free-layout');
+            return;
+        }
 
         const next = {};
         let z = 1;
-        // Measure every visible tile before absolutizing into free-layout.
+        // Measure every visible tile after padding/gap are zeroed, then absolutize.
         SLOT_IDS.forEach((id) => {
             if (!this.slots[id]?.enabled) return;
             const tile = el(`player-tile-${id}`);
             if (!tile || tile.classList.contains('is-hidden')) return;
             const r = tile.getBoundingClientRect();
-            const left = r.left - mosaicRect.left;
-            const top = r.top - mosaicRect.top;
-            const width = Math.max(48, r.width);
-            const height = Math.max(36, r.height);
+            const box = clampFreeTileBox(
+                r.left - mosaicRect.left,
+                r.top - mosaicRect.top,
+                Math.max(48, r.width),
+                Math.max(36, r.height),
+                mw,
+                mh
+            );
             next[id] = {
-                x: left / mw,
-                y: top / mh,
-                w: width / mw,
-                h: height / mh,
+                x: box.left / mw,
+                y: box.top / mh,
+                w: box.w / mw,
+                h: box.h / mh,
                 z: z++
             };
-            tile.style.left = `${left}px`;
-            tile.style.top = `${top}px`;
-            tile.style.width = `${width}px`;
-            tile.style.height = `${height}px`;
+            tile.style.left = `${box.left}px`;
+            tile.style.top = `${box.top}px`;
+            tile.style.width = `${box.w}px`;
+            tile.style.height = `${box.h}px`;
             tile.style.zIndex = String(next[id].z);
             tile.classList.add('is-placed');
         });
 
-        if (!Object.keys(next).length) return;
+        if (!Object.keys(next).length) {
+            mosaic.classList.remove('is-free-layout');
+            return;
+        }
 
         this.mosaicPlacement = next;
         this.placementZTop = Object.values(next).reduce((max, p) => Math.max(max, p.z || 1), 1);
@@ -395,7 +437,6 @@ export const freeLayoutMethods = {
         }
         mosaic.dataset.freeBaseHeight = String(Math.ceil(mh));
         mosaic.style.minHeight = `${Math.ceil(mh)}px`;
-        mosaic.classList.add('is-free-layout');
         this.syncLayout();
         this.syncPlacementChrome();
     },
@@ -438,17 +479,21 @@ export const freeLayoutMethods = {
                 clearTilePlacementStyle(tile);
                 return;
             }
-            const left = p.x * mw;
-            const top = p.y * baseH;
-            const width = Math.max(RESIZE_MIN_W, p.w * mw);
-            const height = Math.max(RESIZE_MIN_H, p.h * baseH);
-            tile.style.left = `${left}px`;
-            tile.style.top = `${top}px`;
-            tile.style.width = `${width}px`;
-            tile.style.height = `${height}px`;
+            const box = clampFreeTileBox(
+                p.x * mw,
+                p.y * baseH,
+                Math.max(RESIZE_MIN_W, p.w * mw),
+                Math.max(RESIZE_MIN_H, p.h * baseH),
+                mw,
+                baseH
+            );
+            tile.style.left = `${box.left}px`;
+            tile.style.top = `${box.top}px`;
+            tile.style.width = `${box.w}px`;
+            tile.style.height = `${box.h}px`;
             tile.style.zIndex = String(p.z || 1);
             tile.classList.add('is-placed');
-            maxBottom = Math.max(maxBottom, top + height);
+            maxBottom = Math.max(maxBottom, box.top + box.h);
         });
 
         mosaic.style.minHeight = `${Math.ceil(Math.max(baseH, maxBottom + 8))}px`;
