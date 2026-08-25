@@ -28,13 +28,13 @@ import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
 import { loadPlayerState, DEFAULT_SORT_BY, DEFAULT_SORT_DIR, DEFAULT_CATEGORY_FILTER } from './storage/playerState.js';
 import {
-    VIEW_MOTION,
     fillViewTransitionSelect,
     resolveViewTransition,
-    runWipeTransition
+    runCatalogPanelTransition
 } from './ui/viewTransitions.js';
 import { primeBootScreen, revealBootScreen, fadeOutBootCover, revealAppBehind } from './ui/bootScreen.js';
 import { ResumeSessionModal, collectSessionTiles } from './ui/resumeSessionModal.js';
+import { initHeaderCollapse } from './ui/headerCollapse.js';
 
 let appState = {
     countries: [],
@@ -288,103 +288,9 @@ async function withCatalogViewTransition(mutate) {
     }
 
     const surface = el('browser-shell') || el('tv-catalog-body');
-
-    if (mode === 'dissolve' || mode === 'grain') {
-        screenWipeBusy = true;
-        try {
-            await runWipeTransition(mode, mutate, {
-                scope: 'catalog',
-                fadeTarget: surface || undefined,
-                grainHost: surface || undefined
-            });
-        } finally {
-            screenWipeBusy = false;
-        }
-        return true;
-    }
-
-    if (!surface || typeof surface.animate !== 'function') {
-        mutate();
-        return true;
-    }
-
     screenWipeBusy = true;
-    const cfg = VIEW_MOTION[mode] || VIEW_MOTION.fade;
-    const opts = { duration: Math.round(cfg.duration * 0.55), easing: cfg.easing, fill: 'forwards' };
     try {
-        let outFrames = [{ opacity: 1 }, { opacity: 0 }];
-        let inFrames = [{ opacity: 0 }, { opacity: 1 }];
-        if (mode === 'slide') {
-            outFrames = [
-                { opacity: 1, transform: 'translateY(0)' },
-                { opacity: 0, transform: 'translateY(16px)' }
-            ];
-            inFrames = [
-                { opacity: 0, transform: 'translateY(-16px)' },
-                { opacity: 1, transform: 'translateY(0)' }
-            ];
-        } else if (mode === 'spring') {
-            outFrames = [
-                { opacity: 1, transform: 'scale(1)' },
-                { opacity: 0, transform: 'scale(0.96)' }
-            ];
-            inFrames = [
-                { opacity: 0, transform: 'scale(1.03)' },
-                { opacity: 1, transform: 'scale(1)' }
-            ];
-        } else if (mode === 'flip') {
-            outFrames = [
-                { opacity: 1, transform: 'rotateY(0deg)' },
-                { opacity: 0, transform: 'rotateY(90deg)' }
-            ];
-            inFrames = [
-                { opacity: 0, transform: 'rotateY(-90deg)' },
-                { opacity: 1, transform: 'rotateY(0deg)' }
-            ];
-        } else if (mode === 'smooth') {
-            outFrames = [
-                { opacity: 1, transform: 'scale(1)' },
-                { opacity: 0, transform: 'scale(0.97)' }
-            ];
-            inFrames = [
-                { opacity: 0, transform: 'scale(1.03)' },
-                { opacity: 1, transform: 'scale(1)' }
-            ];
-        } else if (mode === 'slideleft') {
-            outFrames = [
-                { opacity: 1, transform: 'translateX(0)' },
-                { opacity: 0, transform: 'translateX(-24px)' }
-            ];
-            inFrames = [
-                { opacity: 0, transform: 'translateX(24px)' },
-                { opacity: 1, transform: 'translateX(0)' }
-            ];
-        } else if (mode === 'slideright') {
-            outFrames = [
-                { opacity: 1, transform: 'translateX(0)' },
-                { opacity: 0, transform: 'translateX(24px)' }
-            ];
-            inFrames = [
-                { opacity: 0, transform: 'translateX(-24px)' },
-                { opacity: 1, transform: 'translateX(0)' }
-            ];
-        }
-        // fade + crossfade + remaining modes share simple opacity unless matched above
-        const out = surface.animate(outFrames, opts);
-        await out.finished;
-        mutate();
-        const inn = surface.animate(inFrames, opts);
-        await inn.finished;
-        try {
-            out.cancel();
-            inn.cancel();
-        } catch { /* ignore */ }
-        surface.style.opacity = '';
-        surface.style.transform = '';
-    } catch {
-        mutate();
-        surface.style.opacity = '';
-        surface.style.transform = '';
+        await runCatalogPanelTransition(surface, mode, mutate);
     } finally {
         screenWipeBusy = false;
     }
@@ -797,6 +703,7 @@ async function init() {
             GuidePanel.refresh().catch(() => {});
         }
         TvClock.init();
+        initHeaderCollapse();
 
         PlayerChrome.bindControls();
         PlayerChrome.bindSettings();

@@ -457,5 +457,16 @@ export const SettingsStore = {
             lastName: raw.lastChannelName || 'Last channel',
             lastCountry: ''
         };
+    },
+
+    getHeaderCollapsed() {
+        const raw = readPersistedState();
+        return raw.headerCollapsed === true;
+    },
+
+    setHeaderCollapsed(value) {
+        const next = value === true;
+        patchPersistedState({ headerCollapsed: next });
+        return next;
     }
 };

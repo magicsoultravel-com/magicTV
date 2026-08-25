@@ -22,6 +22,16 @@
     align-items: center;
     gap: 16px;
     flex-shrink: 0;
+    cursor: pointer;
+    border-radius: var(--tv-radius-sm);
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transform-origin: top left;
+}
+
+.tv-brand:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tv-primary) 70%, transparent);
 }
 
 .tv-icon {
@@ -52,6 +62,86 @@
     gap: 8px;
     min-width: 0;
     margin-left: 0;
+}
+
+/* Collapsible header: brand stays; channel/clock fade; bar height frees mosaic space */
+.tv-header {
+    --tv-header-collapse-ms: 380ms;
+    --tv-header-collapse-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 280px;
+    transition:
+        max-height var(--tv-header-collapse-ms) var(--tv-header-collapse-ease),
+        padding var(--tv-header-collapse-ms) var(--tv-header-collapse-ease),
+        border-color var(--tv-header-collapse-ms) var(--tv-header-collapse-ease),
+        background var(--tv-header-collapse-ms) var(--tv-header-collapse-ease);
+}
+
+.tv-channel-info,
+.tv-clock-zone {
+    transition:
+        opacity 280ms var(--tv-header-collapse-ease, cubic-bezier(0.4, 0, 0.2, 1)),
+        visibility 280ms var(--tv-header-collapse-ease, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+body.is-header-collapsed .tv-header,
+#app-container.is-header-collapsed .tv-header {
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-bottom-color: transparent;
+    background: transparent;
+    overflow: visible;
+    pointer-events: none;
+    gap: 0;
+}
+
+body.is-header-collapsed .tv-channel-info,
+body.is-header-collapsed .tv-clock-zone,
+#app-container.is-header-collapsed .tv-channel-info,
+#app-container.is-header-collapsed .tv-clock-zone {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+body.is-header-collapsed .tv-brand,
+#app-container.is-header-collapsed .tv-brand {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    left: auto;
+    z-index: 50;
+    gap: 8px;
+    pointer-events: auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+body.is-header-collapsed .tv-icon,
+#app-container.is-header-collapsed .tv-icon {
+    width: 20px;
+    height: 20px;
+    padding: 1px;
+    border-radius: 3px;
+}
+
+body.is-header-collapsed .tv-brand h1,
+#app-container.is-header-collapsed .tv-brand h1 {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+    padding-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tv-header,
+    .tv-channel-info,
+    .tv-clock-zone {
+        transition: none;
+    }
 }
 
 .tv-header-now-playing {

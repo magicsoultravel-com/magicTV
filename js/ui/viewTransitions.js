@@ -42,8 +42,10 @@ export const VIEW_TRANSITION_LABELS = {
 
 export const DEFAULT_VIEW_TRANSITION = 'random';
 
-/** Concrete effects used by Random (everything except Random itself). */
-export const VIEW_TRANSITION_POOL = VIEW_TRANSITIONS.filter((id) => id !== 'random');
+/** Concrete effects used by Random (visible modes only — no instant/random). */
+export const VIEW_TRANSITION_POOL = VIEW_TRANSITIONS.filter(
+    (id) => id !== 'random' && id !== 'instant'
+);
 
 /** Per-mode timing used by wipe / height / tile animations. */
 export const VIEW_MOTION = {
@@ -110,7 +112,7 @@ export function resolveViewTransition(mode, bag = 'default') {
         deck = shuffleInPlace(VIEW_TRANSITION_POOL.slice());
         randomDecks[bag] = deck;
     }
-    return deck.pop() || DEFAULT_VIEW_TRANSITION;
+    return deck.pop() || 'fade';
 }
 
 export function fillViewTransitionSelect(select, selected) {
@@ -120,6 +122,191 @@ export function fillViewTransitionSelect(select, selected) {
         `<option value="${id}">${VIEW_TRANSITION_LABELS[id] || id}</option>`
     )).join('');
     select.value = current;
+}
+
+/** WAAPI keyframes for browser-catalog panel swaps (#browser-shell). */
+export function getCatalogViewTransitionFrames(mode) {
+    const fadeOut = [{ opacity: 1 }, { opacity: 0 }];
+    const fadeIn = [{ opacity: 0 }, { opacity: 1 }];
+
+    switch (mode) {
+        case 'fade':
+        case 'crossfade':
+            return { outFrames: fadeOut, inFrames: fadeIn, needsPerspective: false };
+        case 'slide':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'translateY(0)' },
+                    { opacity: 0, transform: 'translateY(40px)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'translateY(-40px)' },
+                    { opacity: 1, transform: 'translateY(0)' }
+                ],
+                needsPerspective: false
+            };
+        case 'slideleft':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'translateX(0)' },
+                    { opacity: 0, transform: 'translateX(-15%)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'translateX(15%)' },
+                    { opacity: 1, transform: 'translateX(0)' }
+                ],
+                needsPerspective: false
+            };
+        case 'slideright':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'translateX(0)' },
+                    { opacity: 0, transform: 'translateX(15%)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'translateX(-15%)' },
+                    { opacity: 1, transform: 'translateX(0)' }
+                ],
+                needsPerspective: false
+            };
+        case 'smooth':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'scale(1)' },
+                    { opacity: 0, transform: 'scale(0.92)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'scale(1.06)' },
+                    { opacity: 1, transform: 'scale(1)' }
+                ],
+                needsPerspective: false
+            };
+        case 'spring':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'scale(1)' },
+                    { opacity: 0, transform: 'scale(0.88)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'scale(1.08)' },
+                    { opacity: 1, transform: 'scale(1)' }
+                ],
+                needsPerspective: false
+            };
+        case 'flip':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'rotateY(0deg)' },
+                    { opacity: 0, transform: 'rotateY(90deg)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'rotateY(-90deg)' },
+                    { opacity: 1, transform: 'rotateY(0deg)' }
+                ],
+                needsPerspective: true
+            };
+        case 'glitch':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'scale(1) translateX(0) skewY(0deg)', filter: 'hue-rotate(0deg) contrast(1) saturate(1)' },
+                    { opacity: 0.8, transform: 'scale(1.05) translateX(-10%) skewY(5deg)', filter: 'hue-rotate(90deg) contrast(1.5) saturate(2)', offset: 0.2 },
+                    { opacity: 0.6, transform: 'scale(0.95) translateX(10%) skewY(-5deg)', filter: 'hue-rotate(180deg) contrast(0.5) saturate(0.5)', offset: 0.4 },
+                    { opacity: 0.4, transform: 'scale(1.1) translateX(-15%) skewY(10deg)', filter: 'hue-rotate(270deg) contrast(2) saturate(3)', offset: 0.6 },
+                    { opacity: 0.2, transform: 'scale(0.9) translateX(15%) skewY(-10deg)', filter: 'hue-rotate(360deg) contrast(0.7) saturate(0.7)', offset: 0.8 },
+                    { opacity: 0, transform: 'scale(1.2) translateX(0) skewY(0deg)', filter: 'hue-rotate(0deg) contrast(1) saturate(1)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'scale(1.2) translateX(0) skewY(0deg)', filter: 'hue-rotate(0deg) contrast(1) saturate(1)' },
+                    { opacity: 0.2, transform: 'scale(0.9) translateX(-15%) skewY(10deg)', filter: 'hue-rotate(360deg) contrast(0.7) saturate(0.7)', offset: 0.2 },
+                    { opacity: 0.4, transform: 'scale(1.1) translateX(15%) skewY(-10deg)', filter: 'hue-rotate(270deg) contrast(2) saturate(3)', offset: 0.4 },
+                    { opacity: 0.6, transform: 'scale(0.95) translateX(-10%) skewY(5deg)', filter: 'hue-rotate(180deg) contrast(0.5) saturate(0.5)', offset: 0.6 },
+                    { opacity: 0.8, transform: 'scale(1.05) translateX(10%) skewY(-5deg)', filter: 'hue-rotate(90deg) contrast(1.5) saturate(2)', offset: 0.8 },
+                    { opacity: 1, transform: 'scale(1) translateX(0) skewY(0deg)', filter: 'hue-rotate(0deg) contrast(1) saturate(1)' }
+                ],
+                needsPerspective: false
+            };
+        case 'spiralin':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'scale(1) rotate(0deg)' },
+                    { opacity: 0, transform: 'scale(0.5) rotate(180deg)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'scale(0.5) rotate(-180deg)' },
+                    { opacity: 1, transform: 'scale(1) rotate(0deg)' }
+                ],
+                needsPerspective: false
+            };
+        case 'spiralout':
+            return {
+                outFrames: [
+                    { opacity: 1, transform: 'scale(1) rotate(0deg)' },
+                    { opacity: 0, transform: 'scale(1.5) rotate(180deg)' }
+                ],
+                inFrames: [
+                    { opacity: 0, transform: 'scale(1.5) rotate(-180deg)' },
+                    { opacity: 1, transform: 'scale(1) rotate(0deg)' }
+                ],
+                needsPerspective: false
+            };
+        default:
+            return { outFrames: fadeOut, inFrames: fadeIn, needsPerspective: false };
+    }
+}
+
+function clearCatalogSurfaceStyles(surface, perspectiveParent) {
+    if (!surface) return;
+    surface.style.opacity = '';
+    surface.style.transform = '';
+    surface.style.filter = '';
+    if (perspectiveParent) perspectiveParent.style.perspective = '';
+}
+
+/**
+ * Animate a browser-catalog panel swap on #browser-shell (or fallback surface).
+ * @param {HTMLElement | null} surface
+ * @param {string} mode resolved transition id
+ * @param {() => void} mutate DOM update at midpoint
+ */
+export async function runCatalogPanelTransition(surface, mode, mutate) {
+    if (!surface || typeof surface.animate !== 'function') {
+        mutate?.();
+        return;
+    }
+
+    if (mode === 'dissolve' || mode === 'grain') {
+        await runWipeTransition(mode, mutate, {
+            scope: 'catalog',
+            fadeTarget: surface,
+            grainHost: surface
+        });
+        return;
+    }
+
+    const cfg = VIEW_MOTION[mode] || VIEW_MOTION.fade;
+    const opts = { duration: cfg.duration, easing: cfg.easing, fill: 'forwards' };
+    const { outFrames, inFrames, needsPerspective } = getCatalogViewTransitionFrames(mode);
+    const perspectiveParent = needsPerspective ? surface.parentElement : null;
+
+    if (needsPerspective && perspectiveParent) {
+        perspectiveParent.style.perspective = '1200px';
+    }
+
+    try {
+        const out = surface.animate(outFrames, opts);
+        await out.finished;
+        mutate?.();
+        const inn = surface.animate(inFrames, opts);
+        await inn.finished;
+        try {
+            out.cancel();
+            inn.cancel();
+        } catch { /* ignore */ }
+    } catch {
+        mutate?.();
+    } finally {
+        clearCatalogSurfaceStyles(surface, perspectiveParent);
+    }
 }
 
 let grainPaintStops = [];
