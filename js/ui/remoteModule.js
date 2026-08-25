@@ -42,6 +42,7 @@ function minDialogWidth() {
 let deps = {
     getDefaultOnPlay: () => () => {},
     switchTab: () => {},
+    switchTabNav: null,
     ensureBrowserCatalog: () => {}
 };
 
@@ -876,9 +877,10 @@ function restoreFromState() {
 }
 
 export const RemoteModule = {
-    init({ getDefaultOnPlay, switchTab, ensureBrowserCatalog } = {}) {
+    init({ getDefaultOnPlay, switchTab, switchTabNav, ensureBrowserCatalog } = {}) {
         if (typeof getDefaultOnPlay === 'function') deps.getDefaultOnPlay = getDefaultOnPlay;
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
+        if (typeof switchTabNav === 'function') deps.switchTabNav = switchTabNav;
         if (typeof ensureBrowserCatalog === 'function') deps.ensureBrowserCatalog = ensureBrowserCatalog;
         hydrateLayoutFromPlayerState();
         setReconcileHandler(() => {
@@ -888,7 +890,10 @@ export const RemoteModule = {
             RemoteExternalPopout.syncBtn?.();
             syncSplitChromeButtons();
         });
-        RemotePanel.init({ switchTab: deps.switchTab, getRemoteModule: () => RemoteModule });
+        RemotePanel.init({
+            switchTab: deps.switchTabNav || deps.switchTab,
+            getRemoteModule: () => RemoteModule
+        });
         BrowserModule.init({ ensureBrowserCatalog: deps.ensureBrowserCatalog });
         bindOnce();
         syncBrowseButtons();

@@ -238,7 +238,9 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
     const fadeTargets = (opts.fadeTargets || (opts.fadeTarget ? [opts.fadeTarget] : []))
         .filter(Boolean);
     if (!fadeTargets.length) {
-        const fallback = (scope === 'catalog' ? el('tv-catalog-body') : null)
+        const fallback = (scope === 'catalog'
+            ? (el('browser-shell') || el('tv-catalog-body'))
+            : null)
             || (scope === 'mosaic' ? el('player-mosaic') : null)
             || el('app-container')
             || document.body;
@@ -253,7 +255,7 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
         .filter(Boolean);
     if (!grainHosts.length) {
         if (scope === 'catalog') {
-            const host = el('tv-catalog-body') || el('remote-dock-sheet');
+            const host = el('browser-shell') || el('tv-catalog-body') || el('remote-dock-sheet');
             if (host) grainHosts.push(host);
         } else if (scope === 'tiles') {
             grainHosts.push(...fadeTargets);

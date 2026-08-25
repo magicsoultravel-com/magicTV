@@ -263,7 +263,7 @@ function bindTabs() {
                 return;
             }
             if (tabName === appState.activeTab) return;
-            withCatalogViewTransition(() => switchTab(tabName));
+            switchTabAnimated(tabName);
         });
     });
 }
@@ -276,8 +276,8 @@ function prefersReducedCatalogMotion() {
 }
 
 /**
- * Apply the selected view transition around a catalog UI swap (tab change).
- * Scoped to the browse module so the player does not flash.
+ * Apply the selected view transition around a browser-catalog panel swap.
+ * Targets #browser-shell so remote keypad chrome is not faded.
  */
 async function withCatalogViewTransition(mutate) {
     if (screenWipeBusy) return false;
@@ -286,18 +286,24 @@ async function withCatalogViewTransition(mutate) {
         mutate();
         return true;
     }
+
+    const surface = el('browser-shell') || el('tv-catalog-body');
+
     if (mode === 'dissolve' || mode === 'grain') {
         screenWipeBusy = true;
         try {
-            await runWipeTransition(mode, mutate, { scope: 'catalog' });
+            await runWipeTransition(mode, mutate, {
+                scope: 'catalog',
+                fadeTarget: surface || undefined,
+                grainHost: surface || undefined
+            });
         } finally {
             screenWipeBusy = false;
         }
         return true;
     }
 
-    const body = el('tv-catalog-body');
-    if (!body || typeof body.animate !== 'function') {
+    if (!surface || typeof surface.animate !== 'function') {
         mutate();
         return true;
     }
@@ -344,23 +350,41 @@ async function withCatalogViewTransition(mutate) {
                 { opacity: 0, transform: 'scale(1.03)' },
                 { opacity: 1, transform: 'scale(1)' }
             ];
+        } else if (mode === 'slideleft') {
+            outFrames = [
+                { opacity: 1, transform: 'translateX(0)' },
+                { opacity: 0, transform: 'translateX(-24px)' }
+            ];
+            inFrames = [
+                { opacity: 0, transform: 'translateX(24px)' },
+                { opacity: 1, transform: 'translateX(0)' }
+            ];
+        } else if (mode === 'slideright') {
+            outFrames = [
+                { opacity: 1, transform: 'translateX(0)' },
+                { opacity: 0, transform: 'translateX(24px)' }
+            ];
+            inFrames = [
+                { opacity: 0, transform: 'translateX(-24px)' },
+                { opacity: 1, transform: 'translateX(0)' }
+            ];
         }
-        // fade + crossfade share simple opacity
-        const out = body.animate(outFrames, opts);
+        // fade + crossfade + remaining modes share simple opacity unless matched above
+        const out = surface.animate(outFrames, opts);
         await out.finished;
         mutate();
-        const inn = body.animate(inFrames, opts);
+        const inn = surface.animate(inFrames, opts);
         await inn.finished;
         try {
             out.cancel();
             inn.cancel();
         } catch { /* ignore */ }
-        body.style.opacity = '';
-        body.style.transform = '';
+        surface.style.opacity = '';
+        surface.style.transform = '';
     } catch {
         mutate();
-        body.style.opacity = '';
-        body.style.transform = '';
+        surface.style.opacity = '';
+        surface.style.transform = '';
     } finally {
         screenWipeBusy = false;
     }
@@ -669,6 +693,21 @@ function switchTab(tabName) {
     RemotePanel.syncRemotePanel();
 }
 
+/**
+ * User-facing nav among browser catalog tabs — runs View transition when applicable.
+ * Navigating to/from remote (or same tab) stays instant.
+ */
+function switchTabAnimated(tabName) {
+    if (!tabName || tabName === appState.activeTab) return;
+    const fromBrowser = BROWSER_TABS.includes(appState.activeTab);
+    const toBrowser = BROWSER_TABS.includes(tabName);
+    if (fromBrowser && toBrowser) {
+        withCatalogViewTransition(() => switchTab(tabName));
+        return;
+    }
+    switchTab(tabName);
+}
+
 export { switchTab, ensureBrowserCatalogVisible };
 
 function bindViewTransitionSelect() {
@@ -714,6 +753,7 @@ async function init() {
         RemoteModule.init({
             getDefaultOnPlay: () => startPlayback,
             switchTab,
+            switchTabNav: switchTabAnimated,
             ensureBrowserCatalog: ensureBrowserCatalogVisible
         });
         RemotePanel.bind();
