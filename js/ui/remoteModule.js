@@ -318,9 +318,8 @@ function syncBrowseButtons() {
 }
 
 function applyOpacity() {
-    const pct = SettingsStore.getChannelPickerOpacity();
+    const pct = SettingsStore.getRemoteModuleOpacity();
     document.documentElement.style.setProperty('--remote-module-opacity', String(pct / 100));
-    document.documentElement.style.setProperty('--channel-picker-opacity', String(pct / 100));
 }
 
 function bindIdleActivity() {

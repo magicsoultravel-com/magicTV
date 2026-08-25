@@ -57,16 +57,6 @@ export const TvProviderRegistry = {
         }
     },
 
-    getHideOffline() {
-        // Offline health is not available from the iptv-org catalog shape we use;
-        // channels without a stream URL are already dropped during normalize.
-        return true;
-    },
-
-    setHideOffline() {
-        // No-op: kept for API compatibility with older callers/tests.
-    },
-
     async getCountries(opts = {}) {
         return this.getActiveProvider().getCountries(opts);
     },

@@ -470,10 +470,10 @@ export function applyThemeColorsToRoot(colors, root = document.documentElement) 
         const cssVar = THEME_CSS_VARS[key];
         root.style.setProperty(cssVar, map[key]);
     }
-    // Keep legacy aliases in sync for any remaining consumers
-    root.style.setProperty('--tv-primary', map['main-1']);
-    root.style.setProperty('--tv-accent', map['main-2']);
-    root.style.setProperty('--tv-secondary', map['main-3']);
+    // Prefer stylesheet aliases (--tv-primary → --tv-main-1); drop any stale inline copies.
+    root.style.removeProperty('--tv-primary');
+    root.style.removeProperty('--tv-accent');
+    root.style.removeProperty('--tv-secondary');
 }
 
 export function getPresetFontId(themeId) {

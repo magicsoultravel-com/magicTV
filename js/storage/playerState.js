@@ -6,11 +6,11 @@ import { readPersistedState, patchPersistedState } from './persistedState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
 export const DEFAULT_RECENTS_CAP = 20;
-export const RECENTS_CAP_MIN = 1;
+export const RECENTS_CAP_MIN = 0;
 export const RECENTS_CAP_MAX = 100;
 
 
-export const DEFAULT_VISITED_STYLE = 'undistinguished';
+export const DEFAULT_VISITED_STYLE = 'accent-2';
 export const VISITED_STYLES = ['undistinguished', 'accent-1', 'accent-2', 'accent-3'];
 export const DEFAULT_NON_VISITED_STYLE = 'undistinguished';
 
@@ -329,11 +329,11 @@ function normalizeChannelPicker(raw) {
     return normalizeRemoteModule(null, raw);
 }
 
-export function normalizeVisitedStyle(value) {
-    return VISITED_STYLES.includes(value) ? value : DEFAULT_VISITED_STYLE;
+export function normalizeVisitedStyle(value, fallback = DEFAULT_VISITED_STYLE) {
+    return VISITED_STYLES.includes(value) ? value : fallback;
 }
 
-/** Recents history cap, clamped to the 1..100 range enforced in settings. */
+/** Recents history cap, clamped to the 0..100 range enforced in settings. */
 export function getRecentsCap() {
     const raw = readPersistedState().recentsCap;
     if (raw == null || raw === '') return DEFAULT_RECENTS_CAP;

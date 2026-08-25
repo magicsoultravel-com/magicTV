@@ -7,10 +7,10 @@
 - **🌍 Browse Channels** — Filter by country, search, infinite scroll
 - **❤️ Favorites** — Heart channels for quick access
 - **📺 Recents** — Auto-tracked watch history
-- **⚙️ Settings** — Buffer size, offline channel filter, volume control, text size, tile width
+- **⚙️ Settings** — Buffer, multi-screen layout, appearance (themes/fonts/colors), hidden/visited browsers, watch stats
 - **📱 Responsive** — Works on mobile, tablet, TV browser, desktop
-- **🎨 Neon Design** — Cyan/magenta cyberpunk aesthetics
-- **🔊 Full Controls** — Play, pause, volume, quality, Picture-in-Picture, fullscreen
+- **🎨 Themes** — Preset themes with customizable accent, background, border, and text colors
+- **🔊 Full Controls** — Play, pause, volume, quality, Picture-in-Picture, fullscreen, Chromecast
 - **💾 Persistent** — localStorage saves favorites, recents, settings
 - **🚀 No Build** — Pure JavaScript modules, runs directly in browser
 
@@ -116,12 +116,18 @@ magicTV/
 - **Persistent** — Data saved to localStorage
 
 ### Settings
-- **Buffer Size** — Adjust for your network (5-30 seconds)
-- **Volume** — Per-session or system audio control
-- **Appearance** (🎨):
-  - **Text Size** — Scales UI text everywhere (50%–112% of default; rem-based)
-  - **Tile Width** — Adjust channel card width (100px–300px)
-  - **↺** — Reset text size and tile width to defaults
+Open via the remote/browser **Settings** tab (`#settings-panel`):
+
+- **Clock** — Clock style
+- **Playback** — Buffer size (5–120s), max recents (0–100)
+- **Transitions** — Channel-switch and catalog view transitions (default: Random)
+- **Appearance** — Theme, font, color groups, text size (default 75%), tile/list width (default 120px), active-tile (default Wave), visited accents (default Accent 2 / undistinguished), remote opacity & idle fade, remote texture, live preview; **Reset to defaults** under the preview
+- **Hidden / Visited Channels** — Browse and restore/remove entries by country
+- **Most watched** — Collapsible watch-time stats with refresh/clear
+- **Storage** — Counts and quota estimate
+- **About** — Version
+
+Volume and catalog layout (tiles/list) live on the player chrome / catalog toolbar, not in this panel. Screen add/remove is on the remote mosaic controls.
 
 ## 🔌 Data Source
 
@@ -139,10 +145,10 @@ magicTV/
 
 | Variable | Color | Use |
 |----------|-------|-----|
-| `--tv-primary` | `#00FFFF` | Cyan neon accents |
-| `--tv-secondary` | `#FF00FF` | Magenta accents |
+| `--tv-main-1` / `--tv-primary` | `#00FFFF` | Primary accent (alias kept) |
+| `--tv-main-2` / `--tv-accent` | `#00FF88` | Secondary accent |
+| `--tv-main-3` / `--tv-secondary` | `#FF00FF` | Tertiary accent |
 | `--tv-bg` | `#0a0e27` | Dark navy background |
-| `--tv-accent` | `#00FF88` | Neon green (future use) |
 
 ## ⌨️ Keyboard Shortcuts
 
@@ -160,7 +166,7 @@ import { TvProviderRegistry } from './js/tvProviders/registry.js';
 ```
 (Or inspect `TvPlayer` / network activity from the Sources panel — there is no global `window.magicTV`.)
 
-## 🚧 Known Limitations (MVP)
+## 🚧 Known Limitations
 
 - Player inline in page (no auto-fullscreen on play — user must click fullscreen manually)
 - No HLS stream stats dashboard yet
@@ -168,14 +174,10 @@ import { TvProviderRegistry } from './js/tvProviders/registry.js';
 - Catalog has no real offline-health signal (channels without a URL are simply omitted)
 - Mobile volume control hidden on small screens
 
-## 📦 Next Steps (Post-MVP)
+## 📦 Next Steps
 
-- [ ] Search channels by name within country
 - [ ] Playlist (.m3u) import
-- [ ] Chromecast support
-- [ ] Dark/Light theme toggle
 - [ ] Keyboard navigation (d-pad emulation for TVs)
-- [ ] EPG (Electronic Program Guide)
 - [ ] Custom provider import
 - [ ] PWA installation
 

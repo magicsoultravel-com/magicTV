@@ -10,7 +10,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 const KNOWN_IDS = [
-    'tv-settings-btn', 'back-btn', 'search-countries', 'refresh-btn',
+    'settings-panel', 'back-btn', 'search-countries', 'refresh-btn',
     'player-slot', 'player-mosaic',
     'remote-panel', 'remote-panel-footer', 'remote-catalog-tools', 'remote-channel-bar', 'remote-channel-name', 'tv-catalog-body', 'remote-module-staging',
     'remote-shell', 'browser-shell', 'guide-panel', 'guide-screens',
@@ -32,11 +32,10 @@ const KNOWN_IDS = [
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select',
     'swap-transition-select',
-    'screen-top-left-toggle', 'screen-top-right-toggle',
-    'screen-bottom-left-toggle', 'screen-bottom-right-toggle',
     'text-size-slider', 'text-size-value',
     'tile-width-slider', 'tile-width-value',
     'list-width-slider', 'list-width-value',
+    'remote-module-opacity-slider', 'remote-module-opacity-value',
     'remote-texture-select',
     'catalog-layout-btn',
     'reset-appearance-btn', 'appearance-preview-tile',

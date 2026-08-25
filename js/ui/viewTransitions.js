@@ -40,7 +40,7 @@ export const VIEW_TRANSITION_LABELS = {
     random: 'Random'
 };
 
-export const DEFAULT_VIEW_TRANSITION = 'instant';
+export const DEFAULT_VIEW_TRANSITION = 'random';
 
 /** Concrete effects used by Random (everything except Random itself). */
 export const VIEW_TRANSITION_POOL = VIEW_TRANSITIONS.filter((id) => id !== 'random');

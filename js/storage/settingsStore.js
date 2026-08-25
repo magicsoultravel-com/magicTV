@@ -11,11 +11,7 @@ import {
     normalizeFontId,
     sanitizeThemeColors
 } from '../ui/themes.js';
-import {
-    VIEW_TRANSITIONS,
-    DEFAULT_VIEW_TRANSITION,
-    normalizeViewTransition
-} from '../ui/viewTransitions.js';
+import { normalizeViewTransition } from '../ui/viewTransitions.js';
 import { normalizeRemoteTexture } from '../ui/remoteTextures.js';
 import {
     DEFAULT_RECENTS_CAP,
@@ -23,7 +19,6 @@ import {
     RECENTS_CAP_MAX,
     DEFAULT_VISITED_STYLE,
     DEFAULT_NON_VISITED_STYLE,
-    VISITED_STYLES,
     normalizeVisitedStyle,
     getRecentsCap,
     loadPlayerState,
@@ -36,11 +31,11 @@ export {
     normalizeViewTransition
 } from '../ui/viewTransitions.js';
 
-const DEFAULT_TEXT_SIZE = 16;
-const DEFAULT_TILE_WIDTH = 180;
-const DEFAULT_LIST_WIDTH = 300;
+const DEFAULT_TEXT_SIZE = 12;
+const DEFAULT_TILE_WIDTH = 120;
+const DEFAULT_LIST_WIDTH = 120;
 const DEFAULT_CATALOG_LAYOUT = 'tiles';
-const DEFAULT_CHANNEL_PICKER_OPACITY = 100;
+const DEFAULT_REMOTE_MODULE_OPACITY = 100;
 const TEXT_SIZE_MIN = 8;
 const TEXT_SIZE_MAX = 18;
 const TILE_WIDTH_MIN = 100;
@@ -49,8 +44,8 @@ const TILE_WIDTH_STEP = 10;
 const LIST_WIDTH_MIN = 100;
 const LIST_WIDTH_MAX = 300;
 const LIST_WIDTH_STEP = 10;
-const CHANNEL_PICKER_OPACITY_MIN = 33;
-const CHANNEL_PICKER_OPACITY_MAX = 100;
+const REMOTE_MODULE_OPACITY_MIN = 33;
+const REMOTE_MODULE_OPACITY_MAX = 100;
 const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
 const DEFAULT_REMOTE_IDLE_DELAY_SEC = 10;
 const DEFAULT_REMOTE_IDLE_FADE_SEC = 10;
@@ -60,7 +55,7 @@ const REMOTE_IDLE_FADE_MIN = 1;
 const REMOTE_IDLE_FADE_MAX = 120;
 const DEFAULT_REMOTE_TEXTURE = 'none';
 const CATALOG_LAYOUTS = ['tiles', 'list'];
-const DEFAULT_ACTIVE_TILE_STYLE = 'none';
+const DEFAULT_ACTIVE_TILE_STYLE = 'wave';
 const ACTIVE_TILE_STYLES = ['none', 'wave', 'pulse', 'visualizer'];
 
 function clampTextSize(value) {
@@ -83,12 +78,12 @@ function clampListWidth(value) {
     return Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, rounded));
 }
 
-function clampChannelPickerOpacity(value) {
+function clampRemoteModuleOpacity(value) {
     const n = Number(value);
-    if (!Number.isFinite(n)) return DEFAULT_CHANNEL_PICKER_OPACITY;
+    if (!Number.isFinite(n)) return DEFAULT_REMOTE_MODULE_OPACITY;
     return Math.min(
-        CHANNEL_PICKER_OPACITY_MAX,
-        Math.max(CHANNEL_PICKER_OPACITY_MIN, Math.round(n))
+        REMOTE_MODULE_OPACITY_MAX,
+        Math.max(REMOTE_MODULE_OPACITY_MIN, Math.round(n))
     );
 }
 
@@ -123,14 +118,16 @@ function normalizeThemeId(value) {
     return DEFAULT_THEME_ID;
 }
 
-/** Read a screen flag with legacy left/right migration into topLeft/topRight. */
+/** Read a screen flag; migrate legacy left/right keys into topLeft/topRight once. */
 function readScreenFlag(primaryKey, legacyKey) {
     const raw = readPersistedState();
     if (Object.prototype.hasOwnProperty.call(raw, primaryKey)) {
         return Boolean(raw[primaryKey]);
     }
     if (legacyKey && Object.prototype.hasOwnProperty.call(raw, legacyKey)) {
-        return Boolean(raw[legacyKey]);
+        const value = Boolean(raw[legacyKey]);
+        patchPersistedState({ [primaryKey]: value, [legacyKey]: undefined });
+        return value;
     }
     return false;
 }
@@ -147,13 +144,6 @@ export const SettingsStore = {
         return clampedValue;
     },
 
-    getTextSizeOptions() {
-        return Array.from(
-            { length: TEXT_SIZE_MAX - TEXT_SIZE_MIN + 1 },
-            (_, i) => TEXT_SIZE_MIN + i
-        );
-    },
-
     getTileWidth() {
         const raw = readPersistedState();
         return raw.tileWidth != null ? clampTileWidth(raw.tileWidth) : DEFAULT_TILE_WIDTH;
@@ -163,13 +153,6 @@ export const SettingsStore = {
         const clampedValue = clampTileWidth(value);
         patchPersistedState({ tileWidth: clampedValue });
         return clampedValue;
-    },
-
-    getTileWidthOptions() {
-        return Array.from(
-            { length: (TILE_WIDTH_MAX - TILE_WIDTH_MIN) / TILE_WIDTH_STEP + 1 },
-            (_, i) => TILE_WIDTH_MIN + i * TILE_WIDTH_STEP
-        );
     },
 
     getListWidth() {
@@ -183,23 +166,28 @@ export const SettingsStore = {
         return clampedValue;
     },
 
-    getListWidthOptions() {
-        return Array.from(
-            { length: (LIST_WIDTH_MAX - LIST_WIDTH_MIN) / LIST_WIDTH_STEP + 1 },
-            (_, i) => LIST_WIDTH_MIN + i * LIST_WIDTH_STEP
-        );
-    },
-
-    getChannelPickerOpacity() {
+    getRemoteModuleOpacity() {
         const raw = readPersistedState();
-        return raw.channelPickerOpacity != null
-            ? clampChannelPickerOpacity(raw.channelPickerOpacity)
-            : DEFAULT_CHANNEL_PICKER_OPACITY;
+        if (raw.remoteModuleOpacity != null) {
+            return clampRemoteModuleOpacity(raw.remoteModuleOpacity);
+        }
+        if (raw.channelPickerOpacity != null) {
+            const migrated = clampRemoteModuleOpacity(raw.channelPickerOpacity);
+            patchPersistedState({
+                remoteModuleOpacity: migrated,
+                channelPickerOpacity: undefined
+            });
+            return migrated;
+        }
+        return DEFAULT_REMOTE_MODULE_OPACITY;
     },
 
-    setChannelPickerOpacity(value) {
-        const clampedValue = clampChannelPickerOpacity(value);
-        patchPersistedState({ channelPickerOpacity: clampedValue });
+    setRemoteModuleOpacity(value) {
+        const clampedValue = clampRemoteModuleOpacity(value);
+        patchPersistedState({
+            remoteModuleOpacity: clampedValue,
+            channelPickerOpacity: undefined
+        });
         return clampedValue;
     },
 
@@ -323,7 +311,7 @@ export const SettingsStore = {
         const textSize = this.setTextSize(DEFAULT_TEXT_SIZE);
         const tileWidth = this.setTileWidth(DEFAULT_TILE_WIDTH);
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
-        const channelPickerOpacity = this.setChannelPickerOpacity(DEFAULT_CHANNEL_PICKER_OPACITY);
+        const remoteModuleOpacity = this.setRemoteModuleOpacity(DEFAULT_REMOTE_MODULE_OPACITY);
         const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
         const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
         const remoteIdleFadeSec = this.setRemoteIdleFadeSec(DEFAULT_REMOTE_IDLE_FADE_SEC);
@@ -339,7 +327,7 @@ export const SettingsStore = {
             textSize,
             tileWidth,
             listWidth,
-            channelPickerOpacity,
+            remoteModuleOpacity,
             remoteIdleFadeEnabled,
             remoteIdleDelaySec,
             remoteIdleFadeSec,
@@ -359,7 +347,7 @@ export const SettingsStore = {
 
     setScreenTopLeft(enabled) {
         const next = Boolean(enabled);
-        patchPersistedState({ screenTopLeft: next, screenLeft: next });
+        patchPersistedState({ screenTopLeft: next, screenLeft: undefined });
         return next;
     },
 
@@ -369,7 +357,7 @@ export const SettingsStore = {
 
     setScreenTopRight(enabled) {
         const next = Boolean(enabled);
-        patchPersistedState({ screenTopRight: next, screenRight: next });
+        patchPersistedState({ screenTopRight: next, screenRight: undefined });
         return next;
     },
 
@@ -403,10 +391,6 @@ export const SettingsStore = {
         return next;
     },
 
-    getSwapTransitionOptions() {
-        return VIEW_TRANSITIONS.slice();
-    },
-
     getCatalogTransition() {
         return normalizeViewTransition(readPersistedState().catalogTransition);
     },
@@ -415,10 +399,6 @@ export const SettingsStore = {
         const next = normalizeViewTransition(value);
         patchPersistedState({ catalogTransition: next });
         return next;
-    },
-
-    getCatalogTransitionOptions() {
-        return VIEW_TRANSITIONS.slice();
     },
 
     getActiveTileStyle() {
@@ -446,36 +426,24 @@ export const SettingsStore = {
         return next;
     },
 
-    getRecentsCapOptions() {
-        return { min: RECENTS_CAP_MIN, max: RECENTS_CAP_MAX, default: DEFAULT_RECENTS_CAP };
-    },
-
     getVisitedStyle() {
-        return normalizeVisitedStyle(readPersistedState().visitedStyle);
+        return normalizeVisitedStyle(readPersistedState().visitedStyle, DEFAULT_VISITED_STYLE);
     },
 
     setVisitedStyle(value) {
-        const next = normalizeVisitedStyle(value);
+        const next = normalizeVisitedStyle(value, DEFAULT_VISITED_STYLE);
         patchPersistedState({ visitedStyle: next });
         return next;
     },
 
-    getVisitedStyleOptions() {
-        return VISITED_STYLES.slice();
-    },
-
     getNonVisitedStyle() {
-        return normalizeVisitedStyle(readPersistedState().nonVisitedStyle);
+        return normalizeVisitedStyle(readPersistedState().nonVisitedStyle, DEFAULT_NON_VISITED_STYLE);
     },
 
     setNonVisitedStyle(value) {
-        const next = normalizeVisitedStyle(value);
+        const next = normalizeVisitedStyle(value, DEFAULT_NON_VISITED_STYLE);
         patchPersistedState({ nonVisitedStyle: next });
         return next;
-    },
-
-    getNonVisitedStyleOptions() {
-        return VISITED_STYLES.slice();
     },
 
     /** Last-channel fields used by the shell header / resume path. */

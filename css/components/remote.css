@@ -42,7 +42,7 @@
         transform 0.25s ease,
         opacity 0.15s ease,
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--remote-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
 }
 
 .remote-dock-tab__brand {
@@ -130,7 +130,7 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     overflow: hidden;
     background: var(--tv-bg-secondary, #141829);
     border-radius: 18px 18px 0 0;
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--remote-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
     transition: opacity 0.15s ease;
 }
 
@@ -180,7 +180,7 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
     overflow: hidden;
     pointer-events: auto;
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--remote-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
     transition:
         opacity 0.15s ease,
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
@@ -367,7 +367,7 @@ body.browser-shell-split #remote-shell {
 .browser-module .remote-module__dialog {
     /* same chrome language as remote float */
     min-width: var(--remote-min-width, 260px);
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
 }
 
 .remote-module__chrome {
@@ -786,7 +786,7 @@ body.browser-shell-split #remote-shell {
     writing-mode: horizontal-tb;
     text-orientation: mixed;
     transition: transform 0.25s ease, opacity 0.15s ease;
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
 }
 
 body:not(.browser-hidden-tab) .browser-dock-tab,
@@ -878,7 +878,7 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     background: var(--tv-bg-secondary, #141829);
     border-radius: 18px 18px 0 0;
     border: none;
-    opacity: calc(var(--remote-module-opacity, var(--channel-picker-opacity, 1)) * var(--browser-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
 }
 
 .browser-dock-sheet__inner > .tv-module__actions--start,
@@ -1307,7 +1307,7 @@ body.remote-undocked-open .remote-dock-tab {
     isolation: isolate;
 }
 
-.remote-module__shell::before::before {
+.remote-module__shell::before {
     content: "";
     position: absolute;
     inset: 0;

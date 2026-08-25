@@ -322,9 +322,10 @@ test('recents cap defaults to 20 entries', () => {
     assert.equal(SettingsStore.getRecentsCap(), 20);
 });
 
-test('recents cap clamps to the 1..100 range', () => {
-    assert.equal(SettingsStore.setRecentsCap(0), 1, 'below min clamps to 1');
+test('recents cap clamps to the 0..100 range', () => {
+    assert.equal(SettingsStore.setRecentsCap(-1), 0, 'below min clamps to 0');
     assert.equal(SettingsStore.setRecentsCap(500), 100, 'above max clamps to 100');
+    assert.equal(SettingsStore.setRecentsCap(0), 0, 'zero is allowed');
     assert.equal(SettingsStore.setRecentsCap(42), 42);
     assert.equal(SettingsStore.setRecentsCap('nope'), 20, 'non-number falls back to default');
 });
@@ -356,8 +357,8 @@ test('recents cap persists in localStorage', () => {
 
 // ----- Visited style setting -----
 
-test('visited style defaults to undistinguished', () => {
-    assert.equal(SettingsStore.getVisitedStyle(), 'undistinguished');
+test('visited style defaults to accent-2', () => {
+    assert.equal(SettingsStore.getVisitedStyle(), 'accent-2');
 });
 
 test('visited style accepts the accent options and falls back', () => {
@@ -366,7 +367,7 @@ test('visited style accepts the accent options and falls back', () => {
     SettingsStore.setVisitedStyle('accent-1');
     assert.equal(SettingsStore.getVisitedStyle(), 'accent-1');
     SettingsStore.setVisitedStyle('bogus');
-    assert.equal(SettingsStore.getVisitedStyle(), 'undistinguished', 'invalid falls back to default');
+    assert.equal(SettingsStore.getVisitedStyle(), 'accent-2', 'invalid falls back to default');
 });
 
 test('visited style persists in localStorage', () => {
@@ -423,12 +424,6 @@ test('volume clamps to 0..1 and persists', () => {
 
 // ----- Registry settings -----
 
-test('hide-offline API is a no-op (catalog has no offline health)', () => {
-    assert.equal(Registry.getHideOffline(), true);
-    Registry.setHideOffline(false);
-    assert.equal(Registry.getHideOffline(), true, 'offline filter is not configurable');
-});
-
 test('registry reports the iptv-org provider', () => {
     const providers = Registry.listProviders();
     assert.ok(providers.some((p) => p.id === 'iptv-org'));
@@ -437,8 +432,8 @@ test('registry reports the iptv-org provider', () => {
 
 // ----- Appearance Settings (SettingsStore) -----
 
-test('textSize defaults to 16 and can be set and retrieved', () => {
-    assert.equal(SettingsStore.getTextSize(), 16, 'defaults to 16px');
+test('textSize defaults to 12 (75%) and can be set and retrieved', () => {
+    assert.equal(SettingsStore.getTextSize(), 12, 'defaults to 12px (75%)');
     SettingsStore.setTextSize(14);
     assert.equal(SettingsStore.getTextSize(), 14);
     SettingsStore.setTextSize(18);
@@ -451,7 +446,7 @@ test('textSize clamps to range', () => {
     SettingsStore.setTextSize(3);
     assert.equal(SettingsStore.getTextSize(), 8, 'below min clamps to 8');
     SettingsStore.setTextSize('invalid');
-    assert.equal(SettingsStore.getTextSize(), 16, 'non-number falls back to default');
+    assert.equal(SettingsStore.getTextSize(), 12, 'non-number falls back to default');
 });
 
 test('textSize persists in localStorage', () => {
@@ -460,8 +455,8 @@ test('textSize persists in localStorage', () => {
     assert.equal(raw.textSize, 14);
 });
 
-test('tileWidth defaults to 180 and can be set and retrieved', () => {
-    assert.equal(SettingsStore.getTileWidth(), 180, 'defaults to 180px');
+test('tileWidth defaults to 120 and can be set and retrieved', () => {
+    assert.equal(SettingsStore.getTileWidth(), 120, 'defaults to 120px');
     SettingsStore.setTileWidth(150);
     assert.equal(SettingsStore.getTileWidth(), 150);
     SettingsStore.setTileWidth(220);
@@ -474,7 +469,7 @@ test('tileWidth clamps to range', () => {
     SettingsStore.setTileWidth(40);
     assert.equal(SettingsStore.getTileWidth(), 100, 'below min clamps to 100');
     SettingsStore.setTileWidth('invalid');
-    assert.equal(SettingsStore.getTileWidth(), 180, 'non-number falls back to default');
+    assert.equal(SettingsStore.getTileWidth(), 120, 'non-number falls back to default');
 });
 
 test('tileWidth persists in localStorage', () => {
@@ -483,8 +478,8 @@ test('tileWidth persists in localStorage', () => {
     assert.equal(raw.tileWidth, 150);
 });
 
-test('listWidth defaults to 300 and can be set and retrieved', () => {
-    assert.equal(SettingsStore.getListWidth(), 300, 'defaults to 300px');
+test('listWidth defaults to 120 and can be set and retrieved', () => {
+    assert.equal(SettingsStore.getListWidth(), 120, 'defaults to 120px');
     SettingsStore.setListWidth(150);
     assert.equal(SettingsStore.getListWidth(), 150);
     SettingsStore.setListWidth(220);
@@ -497,7 +492,7 @@ test('listWidth clamps to range', () => {
     SettingsStore.setListWidth(40);
     assert.equal(SettingsStore.getListWidth(), 100, 'below min clamps to 100');
     SettingsStore.setListWidth('invalid');
-    assert.equal(SettingsStore.getListWidth(), 300, 'non-number falls back to default');
+    assert.equal(SettingsStore.getListWidth(), 120, 'non-number falls back to default');
 });
 
 test('listWidth persists in localStorage', () => {
@@ -514,21 +509,28 @@ test('catalogLayout defaults to tiles and toggles', () => {
     assert.equal(SettingsStore.getCatalogLayout(), 'tiles', 'invalid falls back to tiles');
 });
 
-test('textSizeOptions and tileWidthOptions return valid arrays', () => {
-    const textOptions = SettingsStore.getTextSizeOptions();
-    assert.ok(Array.isArray(textOptions));
-    assert.ok(textOptions.includes(16));
-    assert.equal(textOptions[0], 8);
-    assert.equal(textOptions[textOptions.length - 1], 18);
-
-    const tileOptions = SettingsStore.getTileWidthOptions();
-    assert.ok(Array.isArray(tileOptions));
-    assert.ok(tileOptions.includes(180));
-
-    const listOptions = SettingsStore.getListWidthOptions();
-    assert.ok(Array.isArray(listOptions));
-    assert.ok(listOptions.includes(300));
+test('activeTileStyle defaults to wave', () => {
+    assert.equal(SettingsStore.getActiveTileStyle(), 'wave');
 });
+
+test('visitedStyle defaults to accent-2; nonVisited to undistinguished', () => {
+    assert.equal(SettingsStore.getVisitedStyle(), 'accent-2');
+    assert.equal(SettingsStore.getNonVisitedStyle(), 'undistinguished');
+});
+
+test('view transitions default to random', () => {
+    assert.equal(SettingsStore.getSwapTransition(), 'random');
+    assert.equal(SettingsStore.getCatalogTransition(), 'random');
+});
+
+test('remoteModuleOpacity migrates from channelPickerOpacity', () => {
+    store.set('matrix_tv_state', JSON.stringify({ channelPickerOpacity: 55 }));
+    assert.equal(SettingsStore.getRemoteModuleOpacity(), 55);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.remoteModuleOpacity, 55);
+    assert.equal(raw.channelPickerOpacity, undefined);
+});
+
 test('screen toggles persist and retrieve correctly', () => {
     assert.equal(SettingsStore.getScreenTopLeft(), false, 'defaults to false');
     SettingsStore.setScreenTopLeft(true);
@@ -568,7 +570,7 @@ test('dismissing or disabling a screen clears it from mosaicSlots and settings',
     assert.equal(SettingsStore.getScreenTopLeft(), false);
     state = JSON.parse(store.get('matrix_tv_state'));
     assert.equal(state.screenTopLeft, false);
-    assert.equal(state.screenLeft, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(state, 'screenLeft'), false);
     assert.equal(state.mosaicSlots.topLeft, undefined);
     globalThis.document = undefined;
 });

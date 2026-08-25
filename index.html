@@ -574,33 +574,19 @@
                                                     <option value="5">5s (Fast)</option>
                                                     <option value="15" selected>15s (Stable)</option>
                                                     <option value="30">30s (Very Stable)</option>
+                                                    <option value="60">60s</option>
+                                                    <option value="120">120s (Max)</option>
                                                 </select>
                                             </div>
                                             <div class="settings-section__item">
-                                                <label class="settings-section__label" for="recents-cap-input">Max recents</label>
+                                                <label class="settings-section__label" for="recents-cap-input">Max recents (0–100)</label>
                                                 <div class="settings-section__control">
-                                                    <input type="number" id="recents-cap-input" min="1" max="100" step="1" value="20" aria-label="Recent channels limit">
+                                                    <input type="number" id="recents-cap-input" min="0" max="100" step="1" value="20" aria-label="Recent channels limit (0 to 100)">
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="settings-section">
-                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Screens</h3>
-                                            <div class="settings-section__item">
-                                                <label class="settings-section__label" for="screen-top-left-toggle">Add screen top left</label>
-                                                <button type="button" id="screen-top-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top left" title="Add screen top left"></button>
-                                            </div>
-                                            <div class="settings-section__item">
-                                                <label class="settings-section__label" for="screen-top-right-toggle">Add screen top right</label>
-                                                <button type="button" id="screen-top-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen top right" title="Add screen top right"></button>
-                                            </div>
-                                            <div class="settings-section__item">
-                                                <label class="settings-section__label" for="screen-bottom-left-toggle">Add screen bottom left</label>
-                                                <button type="button" id="screen-bottom-left-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom left" title="Add screen bottom left"></button>
-                                            </div>
-                                            <div class="settings-section__item">
-                                                <label class="settings-section__label" for="screen-bottom-right-toggle">Add screen bottom right</label>
-                                                <button type="button" id="screen-bottom-right-toggle" class="settings-toggle" aria-pressed="false" aria-label="Add screen bottom right" title="Add screen bottom right"></button>
-                                            </div>
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg> Transitions</h3>
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="swap-transition-select">Channel switch</label>
                                                 <select id="swap-transition-select" aria-label="Channel switch transition"></select>
@@ -611,10 +597,7 @@
                                             </div>
                                         </div>
                                         <div class="settings-section">
-                                            <div class="settings-section__header">
-                                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.8a4.2 4.2 0 1 0 0 8.4c.7 0 1-.4 1-1 0-.4-.2-.7-.2-1.1 0-.8.7-1.5 1.5-1.5H9a2.2 2.2 0 0 0 0-4.4 4.1 4.1 0 0 0-3 0z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="4.2" cy="5" r="0.7" fill="currentColor"/><circle cx="6" cy="3.8" r="0.7" fill="currentColor"/><circle cx="7.8" cy="5" r="0.7" fill="currentColor"/></svg> Appearance</h3>
-                                                <button type="button" id="reset-appearance-btn" class="settings-reset-btn" aria-label="Reset to defaults" title="Reset to defaults">↺</button>
-                                            </div>
+                                            <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.8a4.2 4.2 0 1 0 0 8.4c.7 0 1-.4 1-1 0-.4-.2-.7-.2-1.1 0-.8.7-1.5 1.5-1.5H9a2.2 2.2 0 0 0 0-4.4 4.1 4.1 0 0 0-3 0z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/><circle cx="4.2" cy="5" r="0.7" fill="currentColor"/><circle cx="6" cy="3.8" r="0.7" fill="currentColor"/><circle cx="7.8" cy="5" r="0.7" fill="currentColor"/></svg> Appearance</h3>
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="theme-select">Theme</label>
                                                 <div class="settings-section__control">
@@ -686,22 +669,22 @@
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="text-size-slider">Text Size</label>
                                                 <div class="settings-section__control">
-                                                    <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="16" aria-valuetext="100%">
-                                                    <span class="settings-value" id="text-size-value">100%</span>
+                                                    <input type="range" class="settings-slider" id="text-size-slider" min="8" max="18" step="1" value="12" aria-valuetext="75%">
+                                                    <span class="settings-value" id="text-size-value">75%</span>
                                                 </div>
                                             </div>
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="tile-width-slider">Tile Width</label>
                                                 <div class="settings-section__control">
-                                                    <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="180" aria-valuetext="180px">
-                                                    <span class="settings-value" id="tile-width-value">180px</span>
+                                                    <input type="range" class="settings-slider" id="tile-width-slider" min="100" max="300" step="10" value="120" aria-valuetext="120px">
+                                                    <span class="settings-value" id="tile-width-value">120px</span>
                                                 </div>
                                             </div>
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="active-tile-select">Active Tile</label>
                                                 <select id="active-tile-select" aria-label="Active tile indicator style">
                                                     <option value="none">None</option>
-                                                    <option value="wave">Scrolling wave</option>
+                                                    <option value="wave" selected>Scrolling wave</option>
                                                     <option value="pulse">Pulse</option>
                                                     <option value="visualizer">Visualizer</option>
                                                 </select>
@@ -711,14 +694,14 @@
                                                 <select id="visited-style-select" aria-label="Visited channel accent style">
                                                     <option value="undistinguished">Undistinguished</option>
                                                     <option value="accent-1">Accent 1</option>
-                                                    <option value="accent-2">Accent 2</option>
+                                                    <option value="accent-2" selected>Accent 2</option>
                                                     <option value="accent-3">Accent 3</option>
                                                 </select>
                                             </div>
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="non-visited-style-select">Non-visited accent</label>
                                                 <select id="non-visited-style-select" aria-label="Non-visited channel accent style">
-                                                    <option value="undistinguished">Undistinguished</option>
+                                                    <option value="undistinguished" selected>Undistinguished</option>
                                                     <option value="accent-1">Accent 1</option>
                                                     <option value="accent-2">Accent 2</option>
                                                     <option value="accent-3">Accent 3</option>
@@ -727,15 +710,15 @@
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="list-width-slider">List Width</label>
                                                 <div class="settings-section__control">
-                                                    <input type="range" class="settings-slider" id="list-width-slider" min="100" max="300" step="10" value="300" aria-valuetext="300px">
-                                                    <span class="settings-value" id="list-width-value">300px</span>
+                                                    <input type="range" class="settings-slider" id="list-width-slider" min="100" max="300" step="10" value="120" aria-valuetext="120px">
+                                                    <span class="settings-value" id="list-width-value">120px</span>
                                                 </div>
                                             </div>
                                             <div class="settings-section__item">
-                                                <label class="settings-section__label" for="channel-picker-opacity-slider">Remote module opacity</label>
+                                                <label class="settings-section__label" for="remote-module-opacity-slider">Remote module opacity</label>
                                                 <div class="settings-section__control">
-                                                    <input type="range" class="settings-slider" id="channel-picker-opacity-slider" min="33" max="100" step="1" value="100" aria-valuetext="100%">
-                                                    <span class="settings-value" id="channel-picker-opacity-value">100%</span>
+                                                    <input type="range" class="settings-slider" id="remote-module-opacity-slider" min="33" max="100" step="1" value="100" aria-valuetext="100%">
+                                                    <span class="settings-value" id="remote-module-opacity-value">100%</span>
                                                 </div>
                                             </div>
                                             <div class="settings-section__item">
@@ -747,14 +730,14 @@
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="remote-idle-delay-slider">Idle delay before fade</label>
                                                 <div class="settings-section__control">
-                                                    <input type="range" class="settings-slider" id="remote-idle-delay-slider" min="0" max="120" step="1" value="10" aria-valuetext="10s">
+                                                    <input type="range" class="settings-slider" id="remote-idle-delay-slider" min="0" max="300" step="1" value="10" aria-valuetext="10s">
                                                     <span class="settings-value" id="remote-idle-delay-value">10s</span>
                                                 </div>
                                             </div>
                                             <div class="settings-section__item">
                                                 <label class="settings-section__label" for="remote-idle-fade-slider">Idle fade duration</label>
                                                 <div class="settings-section__control">
-                                                    <input type="range" class="settings-slider" id="remote-idle-fade-slider" min="1" max="60" step="1" value="10" aria-valuetext="10s">
+                                                    <input type="range" class="settings-slider" id="remote-idle-fade-slider" min="1" max="120" step="1" value="10" aria-valuetext="10s">
                                                     <span class="settings-value" id="remote-idle-fade-value">10s</span>
                                                 </div>
                                             </div>
@@ -800,6 +783,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <button type="button" id="reset-appearance-btn" class="settings-reset-defaults-btn" aria-label="Reset appearance to defaults">Reset to defaults</button>
                                             </div>
                                         </div>
                                         <details class="settings-section settings-section--collapsible" id="hidden-channels-section">
@@ -824,17 +808,18 @@
                                                 <div id="visited-channels-container" class="channel-grid settings-hidden-grid is-hidden"></div>
                                             </div>
                                         </details>
-                                        <div class="settings-section" id="watch-stats-section">
-                                            <div class="settings-section__header">
-                                                <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.2a4.8 4.8 0 1 0 0 9.6A4.8 4.8 0 0 0 6 1.2z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 3.6v2.8l2 1.2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg> Most watched</h3>
-                                                <div class="watch-stats-actions">
-                                                    <button type="button" id="refresh-watch-stats-btn" class="settings-reset-btn" aria-label="Refresh watch stats" title="Refresh watch stats"></button>
-                                                    <button type="button" id="clear-watch-stats-btn" class="settings-reset-btn" aria-label="Clear watch stats" title="Clear watch stats"></button>
-                                                </div>
+                                        <details class="settings-section settings-section--collapsible" id="watch-stats-section">
+                                            <summary class="settings-section__summary">
+                                                <span class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 1.2a4.8 4.8 0 1 0 0 9.6A4.8 4.8 0 0 0 6 1.2z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 3.6v2.8l2 1.2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg> Most watched</span>
+                                                <span class="settings-section__chevron" aria-hidden="true"><svg viewBox="0 0 12 12" width="10" height="10" focusable="false"><path d="M3.2 4.8 6 7.6 8.8 4.8" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                            </summary>
+                                            <div class="watch-stats-actions">
+                                                <button type="button" id="refresh-watch-stats-btn" class="settings-reset-btn" aria-label="Refresh watch stats" title="Refresh watch stats"></button>
+                                                <button type="button" id="clear-watch-stats-btn" class="settings-reset-btn" aria-label="Clear watch stats" title="Clear watch stats"></button>
                                             </div>
                                             <div id="watch-stats-list" class="watch-stats-list" aria-live="polite"></div>
                                             <p id="watch-stats-empty" class="watch-stats-empty" style="font-size: 0.85rem; margin: 0; color: var(--tv-text-secondary);">No watch time recorded yet.</p>
-                                        </div>
+                                        </details>
                                         <div class="settings-section">
                                             <h3 class="settings-section__title"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><ellipse cx="6" cy="3" rx="3.6" ry="1.3" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.4 3v6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3V3M2.4 6c0 .7 1.6 1.3 3.6 1.3s3.6-.6 3.6-1.3" fill="none" stroke="currentColor" stroke-width="1"/></svg> Storage</h3>
                                             <div id="storage-stats" class="settings-section__item" style="flex-direction:column;align-items:flex-start;gap:0.25rem;font-size:0.85rem;padding:0;color:var(--tv-text-secondary);">

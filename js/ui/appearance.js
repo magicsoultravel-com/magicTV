@@ -22,6 +22,18 @@ function formatTextSizeLabel(size) {
     return `${Math.round((size / 16) * 100)}%`;
 }
 
+function syncCatalogLayoutBtnChrome() {
+    const btn = el('catalog-layout-btn');
+    if (!btn) return;
+    const layout = SettingsStore.getCatalogLayout();
+    const toList = layout !== 'list';
+    btn.innerHTML = toList ? ACTION_ICONS.list : ACTION_ICONS.tiles;
+    const label = toList ? 'List view' : 'Tiles view';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', layout === 'list' ? 'true' : 'false');
+}
+
 function syncRemoteIdleFadeUi({ enabled, delaySec, fadeSec }) {
     const idleFadeEnabled = el('remote-idle-fade-enabled');
     const idleDelaySlider = el('remote-idle-delay-slider');
@@ -124,8 +136,8 @@ export const Appearance = {
         const tileValue = el('tile-width-value');
         const listSlider = el('list-width-slider');
         const listValue = el('list-width-value');
-        const pickerOpacitySlider = el('channel-picker-opacity-slider');
-        const pickerOpacityValue = el('channel-picker-opacity-value');
+        const pickerOpacitySlider = el('remote-module-opacity-slider');
+        const pickerOpacityValue = el('remote-module-opacity-value');
         const idleFadeEnabled = el('remote-idle-fade-enabled');
         const idleDelaySlider = el('remote-idle-delay-slider');
         const idleDelayValue = el('remote-idle-delay-value');
@@ -241,7 +253,7 @@ export const Appearance = {
 
         if (pickerOpacitySlider) {
             pickerOpacitySlider.addEventListener('input', () => {
-                const pct = SettingsStore.setChannelPickerOpacity(Number(pickerOpacitySlider.value));
+                const pct = SettingsStore.setRemoteModuleOpacity(Number(pickerOpacitySlider.value));
                 syncPickerOpacityUi(pct);
                 this.applyStyles();
             });
@@ -345,10 +357,11 @@ export const Appearance = {
                     textSize,
                     tileWidth,
                     listWidth,
-                    channelPickerOpacity,
+                    remoteModuleOpacity,
                     remoteIdleFadeEnabled,
                     remoteIdleDelaySec,
                     remoteIdleFadeSec,
+                    remoteTexture,
                     activeTileStyle,
                     visitedStyle,
                     nonVisitedStyle,
@@ -359,12 +372,13 @@ export const Appearance = {
                 syncTextUi(textSize);
                 syncTileUi(tileWidth);
                 syncListUi(listWidth);
-                syncPickerOpacityUi(channelPickerOpacity);
+                syncPickerOpacityUi(remoteModuleOpacity);
                 syncIdleFadeUi({
                     enabled: remoteIdleFadeEnabled,
                     delaySec: remoteIdleDelaySec,
                     fadeSec: remoteIdleFadeSec
                 });
+                if (remoteTextureSelect) remoteTextureSelect.value = remoteTexture;
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
                 if (nonVisitedStyleSelect) nonVisitedStyleSelect.value = nonVisitedStyle;
@@ -372,6 +386,7 @@ export const Appearance = {
                 syncColorInputs(colors);
                 document.documentElement.setAttribute('data-theme', themeId);
                 this.applyStyles();
+                syncCatalogLayoutBtnChrome();
                 RemoteModule.resetIdleFade();
                 showAppToast('Appearance reset to defaults');
             });
@@ -406,6 +421,14 @@ export const Appearance = {
                 showAppToast('Watch stats cleared');
             });
         }
+
+        const watchStatsSection = el('watch-stats-section');
+        if (watchStatsSection && watchStatsSection.dataset.bound !== '1') {
+            watchStatsSection.dataset.bound = '1';
+            watchStatsSection.addEventListener('toggle', () => {
+                if (watchStatsSection.open) this.refreshWatchStats();
+            });
+        }
     },
 
     refreshWatchStats() {
@@ -420,7 +443,7 @@ export const Appearance = {
         const textSize = SettingsStore.getTextSize();
         const tileWidth = SettingsStore.getTileWidth();
         const listWidth = SettingsStore.getListWidth();
-        const channelPickerOpacity = SettingsStore.getChannelPickerOpacity();
+        const remoteModuleOpacity = SettingsStore.getRemoteModuleOpacity();
         const catalogLayout = SettingsStore.getCatalogLayout();
         const themeId = SettingsStore.getThemeId();
         const colors = SettingsStore.getThemeColors();
@@ -429,8 +452,7 @@ export const Appearance = {
         root.style.fontSize = `${textSize}px`;
         root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
         root.style.setProperty('--tv-list-width', `${listWidth}px`);
-        root.style.setProperty('--remote-module-opacity', String(channelPickerOpacity / 100));
-        root.style.setProperty('--channel-picker-opacity', String(channelPickerOpacity / 100));
+        root.style.setProperty('--remote-module-opacity', String(remoteModuleOpacity / 100));
         root.setAttribute('data-remote-texture', SettingsStore.getRemoteTexture());
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
@@ -528,9 +550,9 @@ export const Appearance = {
         if (listWidth) listWidth.textContent = `${listWidthPx}px`;
         if (listSlider) listSlider.setAttribute('aria-valuetext', `${listWidthPx}px`);
 
-        const pickerOpacity = SettingsStore.getChannelPickerOpacity();
-        const pickerOpacitySlider = el('channel-picker-opacity-slider');
-        const pickerOpacityValue = el('channel-picker-opacity-value');
+        const pickerOpacity = SettingsStore.getRemoteModuleOpacity();
+        const pickerOpacitySlider = el('remote-module-opacity-slider');
+        const pickerOpacityValue = el('remote-module-opacity-value');
         if (pickerOpacitySlider) pickerOpacitySlider.value = String(pickerOpacity);
         if (pickerOpacityValue) pickerOpacityValue.textContent = `${pickerOpacity}%`;
         if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pickerOpacity}%`);

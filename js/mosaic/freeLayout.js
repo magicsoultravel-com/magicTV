@@ -14,6 +14,18 @@ import {
     clearTilePlacementStyle
 } from './constants.js';
 
+/**
+ * Live free-layout board height (parity with clientWidth).
+ * Prefer the parent pane — mosaic minHeight + absolute tiles make self-measure circular.
+ */
+function resolveFreeBoardHeight(mosaic) {
+    const parentH = mosaic.parentElement?.clientHeight || 0;
+    if (parentH > 0) return Math.max(Math.ceil(parentH), 240);
+    const stored = Number(mosaic.dataset.freeBaseHeight);
+    if (Number.isFinite(stored) && stored >= 120) return Math.ceil(stored);
+    return Math.max(Math.ceil(mosaic.clientHeight || 0), 240);
+}
+
 export const freeLayoutMethods = {
     beginFreePlacementGesture(session) {
         if (!this.hasCustomPlacement()) {
@@ -201,10 +213,8 @@ export const freeLayoutMethods = {
         if (!mosaic || !session?.tile) return;
 
         const mw = mosaic.clientWidth;
-        let baseH = Number(mosaic.dataset.freeBaseHeight);
-        if (!Number.isFinite(baseH) || baseH <= 0) {
-            baseH = mosaic.clientHeight || 1;
-        }
+        const baseH = resolveFreeBoardHeight(mosaic);
+        mosaic.dataset.freeBaseHeight = String(baseH);
         const dx = clientX - (session.dragOriginClientX ?? session.startX);
         const dy = clientY - (session.dragOriginClientY ?? session.startY);
         let left = (session.dragOriginLeft ?? session.originLeft) + dx;
@@ -273,10 +283,8 @@ export const freeLayoutMethods = {
         if (!mosaic || !session?.tile) return;
 
         const mw = mosaic.clientWidth;
-        let baseH = Number(mosaic.dataset.freeBaseHeight);
-        if (!Number.isFinite(baseH) || baseH <= 0) {
-            baseH = mosaic.clientHeight || 1;
-        }
+        const baseH = resolveFreeBoardHeight(mosaic);
+        mosaic.dataset.freeBaseHeight = String(baseH);
 
         const dx = clientX - (session.dragOriginClientX ?? session.startX);
         const dy = clientY - (session.dragOriginClientY ?? session.startY);
@@ -411,14 +419,8 @@ export const freeLayoutMethods = {
         const mw = mosaic.clientWidth;
         if (mw <= 0) return;
 
-        let baseH = Number(mosaic.dataset.freeBaseHeight);
-        if (!Number.isFinite(baseH) || baseH < 120) {
-            const measured = mosaic.classList.contains('is-free-layout')
-                ? 0
-                : mosaic.clientHeight;
-            baseH = Math.max(measured, 240);
-            mosaic.dataset.freeBaseHeight = String(Math.ceil(baseH));
-        }
+        const baseH = resolveFreeBoardHeight(mosaic);
+        mosaic.dataset.freeBaseHeight = String(baseH);
 
         mosaic.classList.add('is-free-layout');
 

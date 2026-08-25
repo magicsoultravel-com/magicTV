@@ -540,6 +540,27 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     border-color: var(--tv-border);
 }
 
+.settings-reset-defaults-btn {
+    align-self: center;
+    margin-top: var(--tv-spacing-md);
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    background: transparent;
+    color: var(--tv-text-secondary);
+    border: 1px solid var(--tv-border);
+    border-radius: var(--tv-radius-sm);
+    cursor: pointer;
+    transition: var(--tv-transition);
+    font-family: inherit;
+}
+
+.settings-reset-defaults-btn:hover {
+    background: var(--tv-border-light);
+    color: var(--tv-primary);
+    border-color: var(--tv-border-light);
+}
+
 .settings-reset-btn.is-loading {
     pointer-events: none;
     opacity: 0.7;
@@ -558,6 +579,7 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     align-items: center;
     gap: 0.25rem;
     flex-shrink: 0;
+    margin: var(--tv-spacing-sm) 0;
 }
 
 /* Responsive adjustments */

@@ -543,6 +543,8 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
 
 /* ===== SETTINGS PREVIEW TILE ===== */
 .settings-preview {
+    display: flex;
+    flex-direction: column;
     margin: var(--tv-spacing-sm) 0 var(--tv-spacing-md);
     border: 1px dashed var(--tv-border-light);
     border-radius: var(--tv-radius-md);

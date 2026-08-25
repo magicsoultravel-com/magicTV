@@ -60,13 +60,6 @@ const SCREEN_SETTERS = {
     bottomRight: (v) => SettingsStore.setScreenBottomRight(v)
 };
 
-const TOGGLE_IDS = {
-    topLeft: 'screen-top-left-toggle',
-    topRight: 'screen-top-right-toggle',
-    bottomLeft: 'screen-bottom-left-toggle',
-    bottomRight: 'screen-bottom-right-toggle'
-};
-
 const SCREEN_ADD_ORDER = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
 const SCREEN_LABELS = {
@@ -1422,13 +1415,6 @@ export const MultiView = {
 
     syncSettingsToggles() {
         if (typeof document === 'undefined') return;
-        CORNER_IDS.forEach((id) => {
-            const btn = el(TOGGLE_IDS[id]);
-            if (!btn) return;
-            const on = this.slots[id].enabled;
-            btn.classList.toggle('is-active', on);
-            btn.setAttribute('aria-pressed', String(on));
-        });
         const swapSelect = el('swap-transition-select');
         if (swapSelect) {
             fillViewTransitionSelect(swapSelect, SettingsStore.getSwapTransition());
@@ -1514,14 +1500,6 @@ export const MultiView = {
 
     bindSettings() {
         if (typeof document === 'undefined') return;
-        CORNER_IDS.forEach((id) => {
-            const btn = el(TOGGLE_IDS[id]);
-            if (!btn || btn.dataset.bound === '1') return;
-            btn.dataset.bound = '1';
-            btn.addEventListener('click', () => {
-                this.setSideEnabled(id, !this.slots[id].enabled);
-            });
-        });
         const swapSelect = el('swap-transition-select');
         if (swapSelect && swapSelect.dataset.bound !== '1') {
             swapSelect.dataset.bound = '1';
