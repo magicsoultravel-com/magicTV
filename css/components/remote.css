@@ -397,27 +397,49 @@ body.browser-shell-split #remote-shell {
 }
 
 .remote-module__channel-bar {
-    display: flex;
-    align-items: center;
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: baseline;
     justify-content: center;
+    gap: 0.3rem;
     margin-top: 0.25rem;
     min-width: 0;
+    max-width: 100%;
     padding: 0 0.25rem;
+}
+
+.remote-module__channel-bar .tv-header-now-playing,
+.remote-module__channel-bar .tv-header-channel-flag {
+    font-weight: 300;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+    color: color-mix(in srgb, var(--tv-text-secondary) 82%, transparent);
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.remote-module__channel-bar .tv-header-now-playing {
+    font-size: 10px;
+    max-width: min(100%, 14rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 0;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.remote-module__channel-bar .tv-header-channel-flag {
+    flex-shrink: 0;
+    font-size: 9px;
+    filter: none;
+    opacity: 0.9;
 }
 
 .remote-module__channel-bar.is-hidden {
     display: none;
-}
-
-.remote-module__channel-bar .tv-header-now-playing {
-    font-size: 11px;
-    line-height: normal; /* re-zero the header's 32px band inside the remote panel */
-    max-width: min(100%, 14rem);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-transform: none;
-    margin-right: 0;
 }
 
 .remote-module__scroll {

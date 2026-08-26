@@ -12,7 +12,7 @@ import { channelKey } from './tvProviders/channelShape.js';
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { showAppToast } from './ui/toast.js';
 import { TvPopoutWindows } from './tvPopoutWindows.js';
-import { el } from './tvUtils.js';
+import { countryFlagEmoji, el } from './tvUtils.js';
 import { TileFrames } from './tileFrames.js';
 import {
     fillViewTransitionSelect,
@@ -1212,11 +1212,20 @@ export const MultiView = {
             const nameEl = tile.querySelector('.tv-player-tile__name');
             if (nameEl) {
                 const name = (player?.channel?.name || '').trim();
+                const nameTextEl = nameEl.querySelector('.tv-player-tile__name-text');
+                const flagEl = nameEl.querySelector('.tv-player-tile__flag');
                 if (hasChannel && name) {
-                    nameEl.textContent = name;
+                    if (nameTextEl) nameTextEl.textContent = name;
+                    else nameEl.textContent = name;
+                    if (flagEl) {
+                        const code = player?.channel?.countrycode || '';
+                        flagEl.textContent = code ? countryFlagEmoji(code) : '';
+                    }
                     nameEl.classList.remove('is-hidden');
                 } else {
-                    nameEl.textContent = '';
+                    if (nameTextEl) nameTextEl.textContent = '';
+                    else nameEl.textContent = '';
+                    if (flagEl) flagEl.textContent = '';
                     nameEl.classList.add('is-hidden');
                 }
             }

@@ -13,7 +13,11 @@ let deps = {
     appState: null,
     stampRefreshView: () => {},
     updateRefreshAge: () => {},
-    currentFilter: () => ''
+    currentFilter: () => '',
+    runBrowseTransition: (mutate) => {
+        mutate?.();
+        return Promise.resolve();
+    }
 };
 
 let scrollLoadingBound = false;
@@ -60,8 +64,16 @@ function setupScrollLoading() {
 }
 
 export const BrowseView = {
-    init({ appState, stampRefreshView, updateRefreshAge, currentFilter }) {
-        deps = { appState, stampRefreshView, updateRefreshAge, currentFilter };
+    init({ appState, stampRefreshView, updateRefreshAge, currentFilter, runBrowseTransition }) {
+        deps = {
+            appState,
+            stampRefreshView,
+            updateRefreshAge,
+            currentFilter,
+            runBrowseTransition: typeof runBrowseTransition === 'function'
+                ? runBrowseTransition
+                : deps.runBrowseTransition
+        };
     },
 
     bind() {
@@ -148,25 +160,28 @@ export const BrowseView = {
         appState.browseSortDirty = false;
         appState.browseQuery = deps.currentFilter();
 
-        const countries = el('countries-container');
-        const channels = el('channels-container');
         const browsePanel = el('browse-panel');
-        const backBtn = el('back-btn');
         this.saveScroll();
         if (browsePanel) browsePanel.scrollTop = 0;
-        if (countries) countries.classList.add('is-hidden');
-        if (channels) channels.classList.remove('is-hidden');
-        if (backBtn) {
-            backBtn.classList.remove('is-hidden');
-            backBtn.classList.add('is-active', 'is-pink-active');
-            els('[data-remote-nav="browse"]').forEach(tab => {
-                tab.classList.add('is-active');
-                tab.classList.remove('is-pink-active');
-            });
-        }
-        if (channels) channels.innerHTML = catalogStatusHtml('Loading channels…');
-        deps.updateRefreshAge();
-        ListSort.syncSortControls();
+
+        await deps.runBrowseTransition(() => {
+            const countries = el('countries-container');
+            const channels = el('channels-container');
+            const backBtn = el('back-btn');
+            if (countries) countries.classList.add('is-hidden');
+            if (channels) channels.classList.remove('is-hidden');
+            if (backBtn) {
+                backBtn.classList.remove('is-hidden');
+                backBtn.classList.add('is-active', 'is-pink-active');
+                els('[data-remote-nav="browse"]').forEach(tab => {
+                    tab.classList.add('is-active');
+                    tab.classList.remove('is-pink-active');
+                });
+            }
+            if (channels) channels.innerHTML = catalogStatusHtml('Loading channels…');
+            deps.updateRefreshAge();
+            ListSort.syncSortControls();
+        });
 
         await this.loadMoreChannels();
         setupScrollLoading();
@@ -354,22 +369,24 @@ export const BrowseView = {
     showCountriesView() {
         const appState = deps.appState;
         this.saveScroll();
-        appState.browseCountry = null;
-        TileFrames.clearLiveRefresh();
-        appState.countryFilter = deps.currentFilter();
-        const countries = el('countries-container');
-        const channels = el('channels-container');
-        const backBtn = el('back-btn');
-        if (countries) countries.classList.remove('is-hidden');
-        if (channels) channels.classList.add('is-hidden');
-        if (backBtn) {
-            backBtn.classList.add('is-hidden');
-            backBtn.classList.remove('is-active', 'is-pink-active');
-        }
-        els('[data-remote-nav="browse"]').forEach(tab => tab.classList.add('is-active'));
-        ListSort.syncSortControls();
-        this.renderCountries();
-        this.restoreScroll();
-        deps.updateRefreshAge();
+        void deps.runBrowseTransition(() => {
+            appState.browseCountry = null;
+            TileFrames.clearLiveRefresh();
+            appState.countryFilter = deps.currentFilter();
+            const countries = el('countries-container');
+            const channels = el('channels-container');
+            const backBtn = el('back-btn');
+            if (countries) countries.classList.remove('is-hidden');
+            if (channels) channels.classList.add('is-hidden');
+            if (backBtn) {
+                backBtn.classList.add('is-hidden');
+                backBtn.classList.remove('is-active', 'is-pink-active');
+            }
+            els('[data-remote-nav="browse"]').forEach(tab => tab.classList.add('is-active'));
+            ListSort.syncSortControls();
+            this.renderCountries();
+            this.restoreScroll();
+            deps.updateRefreshAge();
+        });
     }
 };

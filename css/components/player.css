@@ -626,6 +626,9 @@
     top: 0.35rem;
     left: 0.4rem;
     z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     max-width: calc(100% - 3.25rem);
     padding: 0.15rem 0.35rem;
     border-radius: 4px;
@@ -633,12 +636,23 @@
     color: #f2f2f2;
     font-size: 0.7rem;
     line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
+}
+
+.tv-player-tile__name-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.tv-player-tile__flag {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tv-primary) 30%, transparent));
 }
 
 .tv-player-tile:hover .tv-player-tile__name:not(.is-hidden),
@@ -668,10 +682,7 @@
 }
 
 .tv-player-tile:hover .tv-player-tile__echo:not(.is-hidden),
-.tv-player-tile:focus-within .tv-player-tile__echo:not(.is-hidden),
-.tv-player-tile.is-selected .tv-player-tile__echo:not(.is-hidden),
-.tv-player-tile.is-channel-picker-target .tv-player-tile__echo:not(.is-hidden),
-.tv-player-tile.is-screen-strip-hover .tv-player-tile__echo:not(.is-hidden) {
+.tv-player-tile:focus-within .tv-player-tile__echo:not(.is-hidden) {
     opacity: 0.92;
 }
 
@@ -983,13 +994,6 @@
     .tv-player-tile.is-screen-strip-hover .tv-player-tile__hover {
         opacity: 1;
         pointer-events: auto;
-    }
-
-    .tv-player-tile.is-primary .tv-player-tile__echo:not(.is-hidden),
-    .tv-player-tile.is-selected .tv-player-tile__echo:not(.is-hidden),
-    .tv-player-tile.is-channel-picker-target .tv-player-tile__echo:not(.is-hidden),
-    .tv-player-tile.is-screen-strip-hover .tv-player-tile__echo:not(.is-hidden) {
-        opacity: 0.92;
     }
 }
 

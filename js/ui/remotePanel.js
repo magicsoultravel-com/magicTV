@@ -1,5 +1,5 @@
 /** Remote control panel — default view inside the remote module. */
-import { el, queryAllInApp } from '../tvUtils.js';
+import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
 import { MultiView } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
@@ -83,13 +83,16 @@ function syncNavPlacement(tabName) {
 export function syncRemoteChannelBar(_tabName) {
     const bar = el('remote-channel-bar');
     const nameEl = el('remote-channel-name');
+    const flagEl = el('remote-channel-flag');
     const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
     const channel = player?.channel;
     const name = channel?.name || TvPlayer.channel?.name || '';
+    const country = channel?.countrycode || TvPlayer.channel?.countrycode || '';
     const show = Boolean(name);
 
     if (bar) bar.classList.toggle('is-hidden', !show);
     if (nameEl) nameEl.textContent = show ? name : '';
+    if (flagEl) flagEl.textContent = show && country ? countryFlagEmoji(country) : '';
 }
 
 async function handleRemoteAction(action) {

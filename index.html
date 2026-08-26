@@ -68,7 +68,7 @@
                     <div id="player-tile-topLeft" class="tv-player-tile is-hidden" data-slot="topLeft" role="button" tabindex="0" aria-label="Top left screen" aria-hidden="true">
                         <div id="tv-playback-surface-topLeft" class="tv-playback-surface"></div>
                         <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
-                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
                         <div class="tv-player-tile__echo" aria-hidden="true">
                             <span class="tv-player-tile__buffer">Buffer: —</span>
                             <span class="tv-player-tile__quality-echo">Quality: —</span>
@@ -134,7 +134,7 @@
                     <div id="player-tile-center" class="tv-player-tile is-primary" data-slot="center" aria-label="Main screen">
                         <div id="tv-playback-surface-center" class="tv-playback-surface"></div>
                         <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
-                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
                         <div class="tv-player-tile__echo" aria-hidden="true">
                             <span class="tv-player-tile__buffer">Buffer: —</span>
                             <span class="tv-player-tile__quality-echo">Quality: —</span>
@@ -206,7 +206,7 @@
                     <div id="player-tile-topRight" class="tv-player-tile is-hidden" data-slot="topRight" role="button" tabindex="0" aria-label="Top right screen" aria-hidden="true">
                         <div id="tv-playback-surface-topRight" class="tv-playback-surface"></div>
                         <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
-                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
                         <div class="tv-player-tile__echo" aria-hidden="true">
                             <span class="tv-player-tile__buffer">Buffer: —</span>
                             <span class="tv-player-tile__quality-echo">Quality: —</span>
@@ -272,7 +272,7 @@
                     <div id="player-tile-bottomLeft" class="tv-player-tile is-hidden" data-slot="bottomLeft" role="button" tabindex="0" aria-label="Bottom left screen" aria-hidden="true">
                         <div id="tv-playback-surface-bottomLeft" class="tv-playback-surface"></div>
                         <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
-                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
                         <div class="tv-player-tile__echo" aria-hidden="true">
                             <span class="tv-player-tile__buffer">Buffer: —</span>
                             <span class="tv-player-tile__quality-echo">Quality: —</span>
@@ -338,7 +338,7 @@
                     <div id="player-tile-bottomRight" class="tv-player-tile is-hidden" data-slot="bottomRight" role="button" tabindex="0" aria-label="Bottom right screen" aria-hidden="true">
                         <div id="tv-playback-surface-bottomRight" class="tv-playback-surface"></div>
                         <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
-                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"></span>
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
                         <div class="tv-player-tile__echo" aria-hidden="true">
                             <span class="tv-player-tile__buffer">Buffer: —</span>
                             <span class="tv-player-tile__quality-echo">Quality: —</span>
@@ -428,6 +428,7 @@
                     <h2 class="remote-module__brand">magic remote</h2>
                     <div id="remote-channel-bar" class="remote-module__channel-bar is-hidden">
                         <span id="remote-channel-name" class="tv-header-now-playing"></span>
+                        <span id="remote-channel-flag" class="tv-header-channel-flag"></span>
                     </div>
                 </header>
                 <div class="remote-module__scroll module-shell__scroll">

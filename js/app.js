@@ -279,7 +279,7 @@ function prefersReducedCatalogMotion() {
  * Apply the selected view transition around a browser-catalog panel swap.
  * Targets #browser-shell so remote keypad chrome is not faded.
  */
-async function withCatalogViewTransition(mutate) {
+async function withCatalogViewTransition(mutate, surfaceOverride = null) {
     if (screenWipeBusy) return false;
     const mode = resolveViewTransition(SettingsStore.getCatalogTransition(), 'catalog');
     if (prefersReducedCatalogMotion() || mode === 'instant') {
@@ -287,7 +287,7 @@ async function withCatalogViewTransition(mutate) {
         return true;
     }
 
-    const surface = el('browser-shell') || el('tv-catalog-body');
+    const surface = surfaceOverride || el('browser-shell') || el('tv-catalog-body');
     screenWipeBusy = true;
     try {
         await runCatalogPanelTransition(surface, mode, mutate);
@@ -295,6 +295,11 @@ async function withCatalogViewTransition(mutate) {
         screenWipeBusy = false;
     }
     return true;
+}
+
+/** View transition scoped to the browse list panel (countries ↔ channels). */
+function withBrowseDrillTransition(mutate) {
+    return withCatalogViewTransition(mutate, el('browse-panel'));
 }
 
 
@@ -668,7 +673,8 @@ async function init() {
             appState,
             stampRefreshView,
             updateRefreshAge,
-            currentFilter
+            currentFilter,
+            runBrowseTransition: withBrowseDrillTransition
         });
         PlayerChrome.init({ appState });
         HiddenChannelsSettings.init({ appState, onPlay: startPlayback });
