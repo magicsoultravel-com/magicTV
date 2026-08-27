@@ -1,6 +1,6 @@
 /** Remote control panel — default view inside the remote module. */
 import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
-import { MultiView } from '../multiView.js';
+import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
@@ -84,14 +84,18 @@ export function syncRemoteChannelBar(_tabName) {
     const bar = el('remote-channel-bar');
     const nameEl = el('remote-channel-name');
     const flagEl = el('remote-channel-flag');
-    const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
+    const slotId = MultiView.statusSlotId || 'center';
+    // Use the focused slot only — do not fall back to center's channel (would mislabel TV N).
+    const slot = MultiView.slots?.[slotId];
+    const player = slot?.player || (slotId === 'center' ? MultiView.getPrimary?.() : null);
     const channel = player?.channel;
-    const name = channel?.name || TvPlayer.channel?.name || '';
-    const country = channel?.countrycode || TvPlayer.channel?.countrycode || '';
+    const name = (channel?.name || '').trim();
+    const country = channel?.countrycode || '';
     const show = Boolean(name);
+    const tvLabel = SLOT_SCREEN_LABELS[slotId] || '1';
 
     if (bar) bar.classList.toggle('is-hidden', !show);
-    if (nameEl) nameEl.textContent = show ? name : '';
+    if (nameEl) nameEl.textContent = show ? `TV ${tvLabel} · ${name}` : '';
     if (flagEl) flagEl.textContent = show && country ? countryFlagEmoji(country) : '';
 }
 
@@ -131,7 +135,8 @@ async function handleRemoteAction(action) {
 
 export function syncRemotePanel() {
     const slotId = MultiView.statusSlotId || 'center';
-    const player = MultiView.getStatusPlayer?.() || MultiView.slots?.[slotId]?.player;
+    const player = MultiView.slots?.[slotId]?.player
+        || (slotId === 'center' ? MultiView.getPrimary?.() : null);
     const intentPlaying = player?.wantPlaying === true || player?.playing === true;
 
     const playBtn = el('remote-play-btn');

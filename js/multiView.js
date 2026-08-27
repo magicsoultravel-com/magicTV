@@ -144,12 +144,27 @@ export const MultiView = {
         const changed = this.statusSlotId !== next;
         this.statusSlotId = next;
         if (changed) {
-            const player = this.getStatusPlayer();
-            if (player) player.emitState();
+            this.clearScreenStripHover();
+            // Prefer the focused slot's own player so chrome does not briefly show another TV.
+            const slotPlayer = this.slots[next]?.player;
+            if (slotPlayer) slotPlayer.emitState();
             else this.getPrimary()?.emitState();
+            this.syncStatusChrome();
         }
         this.syncScreenControls();
         this.syncTileStatusHighlight();
+    },
+
+    /** Refresh remote bar / panel + page header for the focused screen (no broadcast required). */
+    syncStatusChrome() {
+        if (typeof document === 'undefined') return;
+        import('./ui/remotePanel.js').then(({ syncRemotePanel, syncRemoteChannelBar }) => {
+            syncRemotePanel?.();
+            syncRemoteChannelBar?.();
+        }).catch(() => {});
+        import('./ui/playerChrome.js').then(({ PlayerChrome }) => {
+            PlayerChrome.updateNowPlayingHeader?.();
+        }).catch(() => {});
     },
 
     /**
@@ -280,18 +295,15 @@ export const MultiView = {
 
     /**
      * Keep the selected mosaic tile highlighted with the channel-picker target style.
-     * Skipped while the picker is open so that modal owns the same class.
+     * Single owner for `is-channel-picker-target` (remote open or closed).
      */
     syncTileStatusHighlight() {
         if (typeof document === 'undefined') return;
-        if (typeof document.body?.classList?.contains === 'function'
-            && document.body.classList.contains('has-remote-module')) {
-            return;
-        }
         SLOT_IDS.forEach((id) => {
             const tile = el(`player-tile-${id}`);
             if (!tile) return;
-            const active = Boolean(this.slots[id]?.enabled && this.statusSlotId === id);
+            const active = Boolean(this.slots[id]?.enabled && this.statusSlotId === id)
+                && !tile.classList.contains('is-hidden');
             tile.classList.toggle('is-channel-picker-target', active);
         });
     },
@@ -422,7 +434,11 @@ export const MultiView = {
                 savePlayerState({ volume });
                 this.applyVolumeToAll();
             },
-            shouldBroadcast: () => this.slots.center.player === player,
+            shouldBroadcast: () => {
+                // Status screen drives header/remote chrome; center also broadcasts so
+                // primary HLS ticks keep mosaic buffer overlays fresh when another TV is focused.
+                return player === this.getStatusPlayer() || player === this.slots.center.player;
+            },
             onState: () => {
                 this.scheduleRefreshTiles();
                 this.noteSlotPlayingForTiles(player);

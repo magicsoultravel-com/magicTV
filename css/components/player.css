@@ -682,7 +682,8 @@
 }
 
 .tv-player-tile:hover .tv-player-tile__echo:not(.is-hidden),
-.tv-player-tile:focus-within .tv-player-tile__echo:not(.is-hidden) {
+.tv-player-tile:focus-within .tv-player-tile__echo:not(.is-hidden),
+.tv-player-tile.is-channel-picker-target .tv-player-tile__echo:not(.is-hidden) {
     opacity: 0.92;
 }
 

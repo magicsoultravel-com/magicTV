@@ -554,11 +554,3 @@ body.remote-undocked-open.remote-wing-open .guide-wing {
         line-height: 32px;
     }
 }
-
-.remote-module__channel-bar {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: baseline;
-    justify-content: center;
-    gap: 0.3rem;
-}

@@ -63,9 +63,14 @@ export const PlayerChrome = {
     },
 
     updateNowPlayingHeader() {
-        const channel = TvPlayer.channel;
-        const name = channel?.name || deps.appState.lastName;
-        const country = channel?.countrycode || deps.appState.lastCountry;
+        const slotId = MultiView.statusSlotId || 'center';
+        const slotPlayer = MultiView.slots?.[slotId]?.player;
+        const channel = slotPlayer?.channel
+            || (slotId === 'center' ? TvPlayer.channel : null)
+            || null;
+        const name = channel?.name || (slotId === 'center' ? deps.appState.lastName : '');
+        const country = channel?.countrycode
+            || (slotId === 'center' ? deps.appState.lastCountry : '');
 
         const headerInfo = els('.tv-channel-info')[0];
         const headerName = el('header-channel-name');

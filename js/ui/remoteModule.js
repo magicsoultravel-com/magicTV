@@ -300,12 +300,6 @@ function setPinned(next, { persist = true } = {}) {
     if (persist) persistState({ pinned });
 }
 
-function clearTargetHighlight() {
-    document.querySelectorAll('.tv-player-tile.is-channel-picker-target').forEach((tile) => {
-        tile.classList.remove('is-channel-picker-target');
-    });
-}
-
 function isSlotHighlightable(slotId) {
     if (!slotId) return false;
     if (slotId !== 'center' && !MultiView.slots?.[slotId]?.enabled) return false;
@@ -324,6 +318,7 @@ function resolveEffectiveTarget(preferred) {
     return 'center';
 }
 
+/** Reconcile persisted remote target with MultiView.statusSlotId; MultiView owns the tile ring. */
 function syncTargetHighlight() {
     if (mode !== 'hidden' && targetSlotId) {
         const effective = resolveEffectiveTarget(targetSlotId);
@@ -331,15 +326,10 @@ function syncTargetHighlight() {
             targetSlotId = effective;
             persistState({ targetSlotId: effective, open: true, mode });
         }
-        clearTargetHighlight();
-        const mosaic = el('player-mosaic');
-        if (!mosaic?.classList.contains('has-corners')) {
-            syncBrowseButtons();
-            return;
-        }
-        const tile = el(`player-tile-${effective}`);
-        if (tile && !tile.classList.contains('is-hidden')) {
-            tile.classList.add('is-channel-picker-target');
+        if (MultiView.statusSlotId !== effective) {
+            MultiView.setStatusSlot(effective);
+        } else {
+            MultiView.syncTileStatusHighlight?.();
         }
         syncBrowseButtons();
         return;
@@ -1055,7 +1045,6 @@ export const RemoteModule = {
         browserEndActionsDockParent = null;
         browserEndActionsNextSibling = null;
 
-        clearTargetHighlight();
         MultiView.syncTileStatusHighlight?.();
         updateBodyClasses();
         syncSplitChromeButtons();

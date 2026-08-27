@@ -148,6 +148,12 @@ function buildDom() {
     const dockSheet = makeEl('div', 'remote-dock-sheet');
     const dockTab = makeEl('button', 'remote-dock-tab');
     const staging = makeEl('div', 'remote-module-staging');
+    const channelBar = makeEl('div', 'remote-channel-bar');
+    channelBar.classList.add('is-hidden');
+    const channelName = makeEl('span', 'remote-channel-name');
+    const channelFlag = makeEl('span', 'remote-channel-flag');
+    channelBar.appendChild(channelName);
+    channelBar.appendChild(channelFlag);
 
     const els = new Map([
         ['player-mosaic', mosaic],
@@ -156,7 +162,10 @@ function buildDom() {
         ['remote-dock-host', dockHost],
         ['remote-dock-sheet', dockSheet],
         ['remote-dock-tab', dockTab],
-        ['remote-module-staging', staging]
+        ['remote-module-staging', staging],
+        ['remote-channel-bar', channelBar],
+        ['remote-channel-name', channelName],
+        ['remote-channel-flag', channelFlag]
     ]);
     for (const tile of Object.values(tiles)) {
         els.set(tile.id, tile);
@@ -200,7 +209,7 @@ function buildDom() {
         return [];
     };
 
-    return { doc, mosaic, tiles, screenBtns, strip };
+    return { doc, mosaic, tiles, screenBtns, strip, channelBar, channelName, channelFlag };
 }
 
 let MultiView;
@@ -375,4 +384,79 @@ test('syncTargetHighlight falls back when stored target tile is hidden', async (
 
     RemoteModule.close();
     await new Promise((r) => setTimeout(r, 50));
+});
+
+test('setStatusSlot clears strip hover so only one tile stays lit', () => {
+    const { doc, tiles } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topRight.enabled = true;
+    MultiView.slots.center.player = MultiView.slots.center.player || makePlayer('Main');
+
+    MultiView.setScreenStripHover('topLeft');
+    assert.ok(tiles.topLeft.classList.contains('is-screen-strip-hover'));
+
+    MultiView.setStatusSlot('topRight');
+    assert.equal(MultiView.statusSlotId, 'topRight');
+    assert.equal(MultiView.screenStripHoverSlotId, null);
+    assert.equal(tiles.topLeft.classList.contains('is-screen-strip-hover'), false);
+    assert.ok(tiles.topRight.classList.contains('is-channel-picker-target'));
+    assert.equal(tiles.topLeft.classList.contains('is-channel-picker-target'), false);
+    assert.equal(tiles.center.classList.contains('is-channel-picker-target'), false);
+});
+
+test('retarget with remote open keeps a single channel-picker target', async () => {
+    const { doc, tiles } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topRight.enabled = true;
+    MultiView.slots.topLeft.player = makePlayer('A');
+    MultiView.slots.topRight.player = makePlayer('B');
+    MultiView.slots.center.player = MultiView.slots.center.player || makePlayer('Main');
+
+    RemoteModule.init({ switchTab: () => {} });
+    RemoteModule.open({ slotId: 'topLeft', mode: 'docked', focusClose: false });
+    assert.ok(tiles.topLeft.classList.contains('is-channel-picker-target'));
+
+    MultiView.setScreenStripHover('topRight');
+    RemoteModule.retarget('topRight');
+
+    assert.equal(RemoteModule.getTargetSlotId(), 'topRight');
+    assert.equal(MultiView.statusSlotId, 'topRight');
+    assert.equal(MultiView.screenStripHoverSlotId, null);
+    assert.ok(tiles.topRight.classList.contains('is-channel-picker-target'));
+    assert.equal(tiles.topLeft.classList.contains('is-channel-picker-target'), false);
+    assert.equal(tiles.center.classList.contains('is-channel-picker-target'), false);
+
+    RemoteModule.close();
+    await new Promise((r) => setTimeout(r, 50));
+});
+
+test('remote channel bar labels the focused TV without falling back to center', async () => {
+    const { doc, channelBar, channelName } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.center.player = makePlayer('CenterCh');
+    MultiView.slots.center.player.channel.countrycode = 'US';
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topLeft.player = makePlayer('CornerCh');
+    MultiView.slots.topLeft.player.channel.countrycode = 'GB';
+
+    const { syncRemoteChannelBar } = await import('../js/ui/remotePanel.js');
+
+    MultiView.statusSlotId = 'topLeft';
+    syncRemoteChannelBar();
+    assert.equal(channelName.textContent, 'TV 2 · CornerCh');
+    assert.equal(channelBar.classList.contains('is-hidden'), false);
+
+    MultiView.statusSlotId = 'topRight';
+    MultiView.slots.topRight.enabled = true;
+    MultiView.slots.topRight.player = makePlayer('Emptyish');
+    MultiView.slots.topRight.player.channel = null;
+    syncRemoteChannelBar();
+    // Focused TV has no channel — do not show center's name under TV 3.
+    assert.equal(channelName.textContent, '');
+    assert.ok(channelBar.classList.contains('is-hidden'));
 });
