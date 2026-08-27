@@ -26,6 +26,10 @@ export const VOL_DOWN_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" foc
 
 export const VOL_UP_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
+const VOL_CHEVRON_UP = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 8 6 4l3.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const VOL_CHEVRON_DOWN = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4 6 8l3.5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 const HOST_VIDEO_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
 function controlBtn(action, label, content, target, extraClass = '') {
@@ -43,6 +47,15 @@ function muteWrap(target) {
         <div class="tv-controls__mute-popout" aria-hidden="true">
             <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="mute-solo" data-controls-target="${target}" title="Mute other TVs" aria-label="Mute other TVs">${MUTE_SOLO_SVG}</button>
         </div>
+    </div>`;
+}
+
+/** Vertical rocker outside the bottom strip — left mid-height of the tile. */
+export function buildTileVolRockerHtml(target = 'local') {
+    return `<div class="tv-player-tile__vol-rocker" data-tile-vol-rocker>
+        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="vol-up" data-controls-target="${target}" title="Volume up" aria-label="Volume up">${VOL_CHEVRON_UP}</button>
+        <span class="tv-player-tile__vol-rocker-pct" data-tile-vol-pct aria-hidden="true">100</span>
+        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="vol-down" data-controls-target="${target}" title="Volume down" aria-label="Volume down">${VOL_CHEVRON_DOWN}</button>
     </div>`;
 }
 
@@ -103,7 +116,7 @@ export function buildTileHoverHtml(variant) {
 }
 
 /**
- * Inject dual-row hover controls into all mosaic tiles (once).
+ * Inject dual-row hover controls + outside-strip vol rocker into all mosaic tiles (once).
  */
 export function hydrateTileHoverControls() {
     if (typeof document === 'undefined') return;
@@ -117,5 +130,9 @@ export function hydrateTileHoverControls() {
         const slotId = tile.getAttribute('data-slot');
         const variant = slotId === 'center' ? 'center' : 'corner';
         hover.innerHTML = buildTileHoverHtml(variant);
+
+        if (!tile.querySelector('[data-tile-vol-rocker]')) {
+            hover.insertAdjacentHTML('beforebegin', buildTileVolRockerHtml('local'));
+        }
     });
 }

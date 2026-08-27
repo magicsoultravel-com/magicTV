@@ -77,6 +77,11 @@ export const persistMethods = {
             const player = this.ensurePlayer(id, { startMuted });
             if (!player) return;
             player.muted = startMuted;
+            const slotVol = Number.isFinite(Number(entry.volume))
+                ? Math.min(1, Math.max(0, Number(entry.volume)))
+                : 1;
+            player.volume = slotVol;
+            if (slotVol > 0) player.lastVolume = slotVol;
             player.applyAudioToVideo();
 
             if (!player.channel) {
@@ -133,6 +138,7 @@ export const persistMethods = {
                 key,
                 name: slot.player.channel.name || '',
                 muted: slot.player.muted !== false,
+                volume: Math.min(1, Math.max(0, Number.isFinite(slot.player.volume) ? slot.player.volume : 1)),
                 url: slot.player.channel.url_resolved || slot.player.channel.url || ''
             };
         });
@@ -192,6 +198,11 @@ export const persistMethods = {
                 const desiredMuted = entry.muted !== false;
                 const player = this.ensurePlayer(id, { startMuted: desiredMuted });
                 player.muted = desiredMuted;
+                const slotVol = Number.isFinite(Number(entry.volume))
+                    ? Math.min(1, Math.max(0, Number(entry.volume)))
+                    : 1;
+                player.volume = slotVol;
+                if (slotVol > 0) player.lastVolume = slotVol;
                 player.applyAudioToVideo();
 
                 const surface = el(`tv-playback-surface-${id}`);
@@ -214,6 +225,8 @@ export const persistMethods = {
 
                 await player.loadChannelPaused(channel);
                 player.muted = desiredMuted;
+                player.volume = slotVol;
+                if (slotVol > 0) player.lastVolume = slotVol;
                 player.applyAudioToVideo();
             };
 

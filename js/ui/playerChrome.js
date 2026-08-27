@@ -24,10 +24,18 @@ export const PlayerChrome = {
 
     bindControls() {
         const volume = el('volume-slider');
+        const tvVolume = el('tv-volume-slider');
 
         if (volume) {
             volume.addEventListener('input', (e) => {
                 TvPlayer.setVolume(parseFloat(e.target.value) / 100);
+                syncVolumeDial();
+            });
+        }
+        if (tvVolume) {
+            tvVolume.addEventListener('input', (e) => {
+                const slotId = MultiView.statusSlotId || 'center';
+                MultiView.setSlotVolume?.(slotId, parseFloat(e.target.value) / 100);
                 syncVolumeDial();
             });
         }

@@ -165,6 +165,9 @@ export const MultiView = {
         import('./ui/playerChrome.js').then(({ PlayerChrome }) => {
             PlayerChrome.updateNowPlayingHeader?.();
         }).catch(() => {});
+        import('./ui/volumeDial.js').then(({ syncVolumeDial }) => {
+            syncVolumeDial?.();
+        }).catch(() => {});
     },
 
     /**
@@ -607,6 +610,7 @@ export const MultiView = {
             player?.channel
             && player.muted === false
             && this.sharedVolume > 0
+            && (player.volume ?? 1) > 0
         );
     },
 
@@ -842,6 +846,16 @@ export const MultiView = {
                 } else if (player.channel) {
                     player.toggleMute();
                     this.persistSlots();
+                }
+                break;
+            case 'vol-up':
+                if (!useCast && player.channel) {
+                    this.setSlotVolume(slotId, (player.volume ?? 1) + 0.05);
+                }
+                break;
+            case 'vol-down':
+                if (!useCast && player.channel) {
+                    this.setSlotVolume(slotId, (player.volume ?? 1) - 0.05);
                 }
                 break;
             case 'cast-vol-down':
@@ -1180,6 +1194,16 @@ export const MultiView = {
         return clamped;
     },
 
+    /** Per-TV gain 0..1 (heard = master × slot). */
+    setSlotVolume(slotId, value) {
+        const player = this.slots[slotId]?.player;
+        if (!player?.setVolume) return 0;
+        const clamped = player.setVolume(value);
+        this.persistSlots();
+        this.scheduleRefreshTiles();
+        return clamped;
+    },
+
     applyVolumeToAll() {
         SLOT_IDS.forEach((id) => {
             this.slots[id].player?.applyAudioToVideo();
@@ -1355,6 +1379,12 @@ export const MultiView = {
                 target: 'local'
             });
         });
+
+        const volPct = tile.querySelector('[data-tile-vol-pct]');
+        if (volPct) {
+            const slotVol = Math.min(1, Math.max(0, Number.isFinite(player?.volume) ? player.volume : 1));
+            volPct.textContent = String(Math.round(slotVol * 100));
+        }
 
         if (isCasting && isActiveCastSlot) {
             const castPlaying = ChromecastManager.isCastPlaying();

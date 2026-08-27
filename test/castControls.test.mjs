@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveCastPlaying } from '../js/cast/chromecastManager.js';
-import { buildTileHoverHtml, hydrateTileHoverControls } from '../js/ui/tileHoverControls.js';
+import { buildTileHoverHtml, buildTileVolRockerHtml, hydrateTileHoverControls } from '../js/ui/tileHoverControls.js';
 
 test('buildTileHoverHtml includes cast and dual rows', () => {
     const html = buildTileHoverHtml('corner');
@@ -33,6 +33,18 @@ test('buildTileHoverHtml includes cast and dual rows', () => {
     const localRow = html.slice(html.indexOf('data-controls-row="local"'));
     assert.doesNotMatch(localRow, /data-tile-action="cast-vol-down"/);
     assert.doesNotMatch(localRow, /data-tile-action="cast-vol-up"/);
+    assert.doesNotMatch(localRow, /data-tile-action="vol-up"/);
+    assert.doesNotMatch(localRow, /data-tile-action="vol-down"/);
+    assert.doesNotMatch(localRow, /data-tile-vol-pct/);
+});
+
+test('buildTileVolRockerHtml is outside the hover strip', () => {
+    const html = buildTileVolRockerHtml('local');
+    assert.match(html, /tv-player-tile__vol-rocker/);
+    assert.match(html, /data-tile-action="vol-up"/);
+    assert.match(html, /data-tile-action="vol-down"/);
+    assert.match(html, /data-tile-vol-pct/);
+    assert.doesNotMatch(html, /data-controls-row/);
 });
 
 test('buildTileHoverHtml center variant includes mosaic controls', () => {

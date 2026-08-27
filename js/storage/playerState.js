@@ -222,10 +222,12 @@ function normalizeMosaicSlots(raw) {
         if (!entry) return;
         const key = migrateFavoriteRef(typeof entry === 'string' ? entry : entry.key);
         if (!key) return;
+        const rawVol = typeof entry === 'object' ? Number(entry.volume) : NaN;
         out[id] = {
             key,
             name: (typeof entry === 'object' && entry.name) || '',
             muted: typeof entry === 'object' ? entry.muted !== false : true,
+            volume: Number.isFinite(rawVol) ? Math.min(1, Math.max(0, rawVol)) : 1,
             url: (typeof entry === 'object' && (entry.url || entry.url_resolved)) || ''
         };
     });

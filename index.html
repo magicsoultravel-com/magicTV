@@ -490,11 +490,20 @@
                         </div>
 
                         <div class="remote-panel__cell remote-panel__cell--volume">
-                            <label class="remote-volume-bar" id="volume-dial" for="volume-slider" aria-label="Volume">
-                                <span class="remote-volume-bar__fill" aria-hidden="true"></span>
-                                <span class="remote-volume-bar__pct" id="volume-pct" aria-hidden="true">85</span>
-                                <input type="range" class="remote-volume-bar__input" id="volume-slider" min="0" max="100" value="85" aria-label="Volume">
-                            </label>
+                            <div class="remote-panel__volume-stack">
+                                <label class="remote-volume-bar" id="volume-dial" for="volume-slider" aria-label="Master volume">
+                                    <span class="remote-volume-bar__fill" aria-hidden="true"></span>
+                                    <span class="remote-volume-bar__role" aria-hidden="true">Master</span>
+                                    <span class="remote-volume-bar__pct" id="volume-pct" aria-hidden="true">85</span>
+                                    <input type="range" class="remote-volume-bar__input" id="volume-slider" min="0" max="100" value="85" aria-label="Master volume">
+                                </label>
+                                <label class="remote-volume-bar" id="tv-volume-dial" for="tv-volume-slider" aria-label="TV volume">
+                                    <span class="remote-volume-bar__fill" aria-hidden="true"></span>
+                                    <span class="remote-volume-bar__role" aria-hidden="true">TV</span>
+                                    <span class="remote-volume-bar__pct" id="tv-volume-pct" aria-hidden="true">100</span>
+                                    <input type="range" class="remote-volume-bar__input" id="tv-volume-slider" min="0" max="100" value="100" aria-label="TV volume">
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

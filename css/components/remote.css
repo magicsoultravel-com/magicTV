@@ -994,6 +994,14 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     min-height: var(--remote-btn-size, 40px);
 }
 
+.remote-panel__volume-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+    min-width: 0;
+}
+
 .remote-volume-bar {
     position: relative;
     display: flex;
@@ -1026,18 +1034,26 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     border-radius: inherit;
 }
 
+.remote-volume-bar__role,
 .remote-volume-bar__pct {
     position: relative;
     z-index: 1;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    color: var(--tv-text-primary);
+    color: var(--tv-text-secondary);
     pointer-events: none;
-    text-shadow:
-        0 0 3px color-mix(in srgb, var(--tv-bg, #0d0f14) 85%, transparent),
-        0 0 3px color-mix(in srgb, var(--tv-bg, #0d0f14) 85%, transparent);
+}
+
+.remote-volume-bar__role {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--tv-text-muted, var(--tv-text-secondary));
 }
 
 .remote-volume-bar__input {

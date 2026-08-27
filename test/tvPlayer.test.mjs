@@ -422,6 +422,25 @@ test('volume clamps to 0..1 and persists', () => {
     assert.equal(JSON.parse(store.get('matrix_tv_state')).volume, 0.42);
 });
 
+test('mosaicSlots per-TV volume normalizes and defaults to 1', async () => {
+    const { savePlayerState, loadPlayerState } = await import('../js/storage/playerState.js');
+    savePlayerState({
+        mosaicSlots: {
+            center: { key: 'iptv-org:a', name: 'A', muted: false, volume: 1.7 },
+            topLeft: { key: 'iptv-org:b', name: 'B', muted: true }
+        }
+    });
+    const slots = loadPlayerState().mosaicSlots;
+    assert.equal(slots.center.volume, 1);
+    assert.equal(slots.topLeft.volume, 1);
+    savePlayerState({
+        mosaicSlots: {
+            center: { key: 'iptv-org:a', name: 'A', muted: false, volume: 0.35 }
+        }
+    });
+    assert.equal(loadPlayerState().mosaicSlots.center.volume, 0.35);
+});
+
 // ----- Registry settings -----
 
 test('registry reports the iptv-org provider', () => {
@@ -553,7 +572,14 @@ test('screen toggles persist and retrieve correctly', () => {
 
 test('dismissing or disabling a screen clears it from mosaicSlots and settings', () => {
     globalThis.document = {
-        getElementById: () => ({ style: {}, dataset: {}, classList: { toggle() {}, remove() {} }, setAttribute() {}, querySelector: () => null, querySelectorAll: () => [] }),
+        getElementById: () => ({
+            style: {},
+            dataset: {},
+            classList: { toggle() {}, remove() {}, contains() { return false; } },
+            setAttribute() {},
+            querySelector: () => null,
+            querySelectorAll: () => []
+        }),
         querySelector: () => null,
         body: { classList: { toggle() {} } }
     };

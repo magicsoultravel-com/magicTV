@@ -28,6 +28,7 @@ const KNOWN_IDS = [
     'tv-playback-surface-topLeft', 'tv-playback-surface-center', 'tv-playback-surface-topRight',
     'tv-playback-surface-bottomLeft', 'tv-playback-surface-bottomRight',
     'volume-slider', 'volume-dial',
+    'tv-volume-slider', 'tv-volume-dial', 'tv-volume-pct',
     'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select',
@@ -132,6 +133,7 @@ before(async () => {
         documentElement: makeEl('html'),
         createElement: (tag) => makeEl(tag),
         getElementById: (id) => els.get(id) || null,
+        querySelector: () => null,
         querySelectorAll: () => [],
         addEventListener: () => {}
     };

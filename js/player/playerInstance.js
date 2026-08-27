@@ -153,6 +153,9 @@ export function createPlayerInstance(options) {
         resumeBlocked: false,
         recentRecordedForKey: null,
         muted: startMuted,
+        /** Per-slot gain 0..1; heard level = master × volume. */
+        volume: 1,
+        lastVolume: 1,
         videoMount: null,
         posterDataUrl: null,
 
@@ -306,9 +309,24 @@ export function createPlayerInstance(options) {
 
         applyAudioToVideo() {
             if (!this.video) return;
-            const volume = getSharedVolume();
-            this.video.volume = volume;
-            this.video.muted = this.muted || volume === 0;
+            const master = getSharedVolume();
+            const slot = Number.isFinite(this.volume) ? this.volume : 1;
+            const heard = Math.min(1, Math.max(0, master * slot));
+            this.video.volume = heard;
+            this.video.muted = this.muted || heard === 0;
+        },
+
+        /** Set this slot’s gain (0..1). Master volume is unchanged. */
+        setVolume(value) {
+            const clamped = Math.min(1, Math.max(0, Number(value) || 0));
+            this.volume = clamped;
+            if (clamped > 0) {
+                this.lastVolume = clamped;
+                this.muted = false;
+            }
+            this.applyAudioToVideo();
+            this.emitState();
+            return clamped;
         },
 
         mountVideo(targetEl) {
@@ -356,17 +374,21 @@ export function createPlayerInstance(options) {
 
         unmute() {
             this.muted = false;
-            const volume = getSharedVolume();
-            if (volume <= 0) {
+            const master = getSharedVolume();
+            if (master <= 0) {
                 const restored = getLastVolume() > 0 ? getLastVolume() : 0.85;
                 onSharedVolumeChange?.(restored, restored);
+            }
+            if ((this.volume ?? 1) <= 0) {
+                this.volume = this.lastVolume > 0 ? this.lastVolume : 1;
             }
             this.applyAudioToVideo();
             this.emitState();
         },
 
         toggleMute() {
-            if (this.muted || getSharedVolume() === 0) this.unmute();
+            const slotSilent = (this.volume ?? 1) <= 0;
+            if (this.muted || getSharedVolume() === 0 || slotSilent) this.unmute();
             else this.mute();
         },
 
