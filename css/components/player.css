@@ -879,7 +879,8 @@
     width: max-content;
     max-width: none;
     gap: 0.25rem;
-    padding: 0.25rem 0.35rem;
+    --tv-controls-strip-pad-y: 0.25rem;
+    padding: var(--tv-controls-strip-pad-y) 0.35rem;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.45);
     border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
@@ -915,18 +916,20 @@
     display: none;
 }
 
-.tv-controls__cast-wrap {
+.tv-controls__cast-wrap,
+.tv-controls__mute-wrap {
     position: relative;
     display: inline-flex;
 }
 
-.tv-controls__cast-wrap::after {
+.tv-controls__cast-wrap::after,
+.tv-controls__mute-wrap::after {
     content: '';
     position: absolute;
     left: -10px;
     right: -10px;
     bottom: 100%;
-    height: 14px;
+    height: calc(var(--tv-controls-strip-pad-y, 0.25rem) + 16px);
 }
 
 .tv-controls__cast-btn.is-casting,
@@ -935,34 +938,44 @@
     border-color: color-mix(in srgb, #7ecbff 55%, transparent);
 }
 
-.tv-controls__cast-popout {
+.tv-controls__cast-popout,
+.tv-controls__mute-popout {
     position: absolute;
-    bottom: 100%;
+    /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
+    bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
     left: 50%;
-    transform: translateX(-50%) translateY(2px);
+    transform: translateX(-50%) translateY(calc(100% + 6px));
     display: flex;
     gap: 0.2rem;
-    padding: 0.2rem;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.85);
+    padding: 0.25rem 0.35rem;
+    border-radius: 8px 8px 0 0;
+    background: rgba(0, 0, 0, 0.45);
     border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
+    border-bottom: none;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.12s ease 0.18s, visibility 0.12s ease 0.18s;
+    transition:
+        transform 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.14s,
+        opacity 0.18s ease 0.14s,
+        visibility 0.22s ease 0.14s;
     white-space: nowrap;
     z-index: 40;
 }
 
 .tv-controls__cast-wrap:hover .tv-controls__cast-popout,
-.tv-controls__cast-wrap:focus-within .tv-controls__cast-popout {
+.tv-controls__cast-wrap:focus-within .tv-controls__cast-popout,
+.tv-controls__mute-wrap:hover .tv-controls__mute-popout,
+.tv-controls__mute-wrap:focus-within .tv-controls__mute-popout {
+    transform: translateX(-50%) translateY(0);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition-delay: 0s;
+    transition-delay: 0.06s;
 }
 
-.tv-controls__cast-popout .tv-controls__btn {
+.tv-controls__cast-popout .tv-controls__btn,
+.tv-controls__mute-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;
@@ -970,7 +983,8 @@
 }
 
 .tv-player-tile__hover.has-dual-rows {
-    padding-top: 0.35rem;
+    --tv-controls-strip-pad-y: 0.35rem;
+    padding-top: var(--tv-controls-strip-pad-y);
 }
 
 .tv-player-tile__hover.is-casting .tv-controls__row--cast {

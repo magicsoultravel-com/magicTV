@@ -15,6 +15,9 @@ const ACTION_ALL_SIGMA = 'M6 2H1L4.8 6 1 10H6';
 
 export const MUTE_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-mute-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 4.2H9.8l3.2-3.2v9.8l-3.2-3.2H7.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M12.4 5.1c.55.55.55 1.7 0 2.25M13.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="6.4" y1="1.3" x2="16.2" y2="10.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0"/></svg>`;
 
+/** "1" + down arrow + speaker — mute others, unmute this TV. */
+export const MUTE_SOLO_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path d="M2.2 2.2v7.6M1.4 2.2h1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.2 3.2v5.6M3.8 7.2 5.2 8.8 6.6 7.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.2 4.2H10.8l3.2-3.2v9.8l-3.2-3.2H8.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path d="M13.4 5.1c.55.55.55 1.7 0 2.25M14.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
 export const STOP_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="7.4" y="3.8" width="4.4" height="4.4" fill="currentColor"/></svg>`;
 
 export const PLAY_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.6 3.2v5.6l5.2-2.8-5.2-2.8z" fill="currentColor"/></svg>`;
@@ -34,6 +37,15 @@ function muteBtn(target) {
     return `<button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" data-controls-target="${target}" title="Unmute" aria-label="Unmute" aria-pressed="true">${MUTE_SVG}</button>`;
 }
 
+function muteWrap(target) {
+    return `<div class="tv-controls__mute-wrap">
+        ${muteBtn(target)}
+        <div class="tv-controls__mute-popout" aria-hidden="true">
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="mute-solo" data-controls-target="${target}" title="Mute other TVs" aria-label="Mute other TVs">${MUTE_SOLO_SVG}</button>
+        </div>
+    </div>`;
+}
+
 function castWrap() {
     return `<div class="tv-controls__cast-wrap">
         <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__cast-btn" data-tile-action="cast" data-cast-active="false" title="Cast" aria-label="Cast" aria-pressed="false">${CAST_SVG}</button>
@@ -51,7 +63,7 @@ function coreRowButtons(target) {
         controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2'),
         controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),
         controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
-        muteBtn(target)
+        muteWrap(target)
     ].join('');
 }
 

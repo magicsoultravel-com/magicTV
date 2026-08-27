@@ -625,6 +625,23 @@ export const MultiView = {
         this.syncMosaicChrome();
     },
 
+    /** Mute every other TV; unmute this one (one-way). */
+    muteSolo(slotId) {
+        if (this.sharedVolume <= 0) {
+            const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
+            this.setSharedVolume(restored);
+        }
+        SLOT_IDS.forEach((id) => {
+            const slot = this.slots[id];
+            if (!slot?.enabled || !slot.player?.channel) return;
+            if (id === slotId) slot.player.unmute();
+            else slot.player.mute();
+        });
+        this.persistSlots();
+        this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
+    },
+
     unmuteAll() {
         if (this.sharedVolume <= 0) {
             const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
@@ -721,6 +738,11 @@ export const MultiView = {
     async handleTileAction(slotId, action, { target = 'local' } = {}) {
         if (action === 'reset') {
             this.resetMosaicPlacement();
+            return;
+        }
+
+        if (action === 'mute-solo') {
+            this.muteSolo(slotId);
             return;
         }
 
