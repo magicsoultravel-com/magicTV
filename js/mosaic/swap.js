@@ -60,7 +60,7 @@ export const swapMethods = {
             this.commitSwap(sideId);
             return;
         }
-        if (mode === 'dissolve' || mode === 'grain') {
+        if (mode === 'dissolve' || mode === 'grain' || mode === 'matrix') {
             this.animateSwapWipe(sideId, mode);
             return;
         }
@@ -112,7 +112,7 @@ export const swapMethods = {
         }
         this.swapBusy = true;
         try {
-            // Grain/dissolve only the two tiles in the swap — leave the rest of the mosaic alone.
+            // Grain/dissolve/matrix only the two tiles in the swap — leave the rest of the mosaic alone.
             await runWipeTransition(mode, () => this.commitSwap(sideId), {
                 scope: 'tiles',
                 fadeTargets: [centerTile, sideTile],

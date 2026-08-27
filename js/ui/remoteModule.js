@@ -32,7 +32,8 @@ import {
 
 const MIN_W = 260;
 const MIN_H = 560;
-const VIEW_PAD = 8;
+const VIEW_PAD = 24;
+const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
 
 function minDialogWidth() {
@@ -60,6 +61,8 @@ let guideNextSibling = null;
 let bound = false;
 let pinned = false;
 let sheetExpanded = false;
+/** @type {'left'|'right'} */
+let dockSide = 'left';
 /** @type {HTMLElement|null} External OS-window host; when set, mount prefers it over in-page hosts. */
 let externalHost = null;
 
@@ -131,16 +134,63 @@ function viewportSize() {
 
 function defaultGeometry() {
     const { h: vh } = viewportSize();
-    const inset = 12;
     const width = MIN_W;
     const height = MIN_H;
     const tabClearance = 44;
     return {
-        left: inset,
-        top: Math.round(vh - height - inset - tabClearance),
+        left: edgeInsetLeft(dockSide, width),
+        top: Math.round(vh - height - EDGE_INSET - tabClearance),
         width,
         height
     };
+}
+
+function normalizeDockSide(value) {
+    return value === 'right' ? 'right' : 'left';
+}
+
+function edgeInsetLeft(side, width) {
+    const { w: vw } = viewportSize();
+    const w = Math.max(MIN_W, Number(width) || MIN_W);
+    if (normalizeDockSide(side) === 'right') {
+        return Math.round(Math.max(VIEW_PAD, vw - w - EDGE_INSET));
+    }
+    return EDGE_INSET;
+}
+
+function syncDockSideBtn() {
+    const btn = el('remote-dock-side-btn');
+    if (!btn) return;
+    if (!btn.innerHTML) btn.innerHTML = ACTION_ICONS.dockSide;
+    const toRight = dockSide !== 'right';
+    const label = toRight ? 'Move to right' : 'Move to left';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+}
+
+function applyDockSide(side, { persist = true, moveGeometry = true } = {}) {
+    dockSide = normalizeDockSide(side);
+    document.body.classList.toggle('remote-dock-side-right', dockSide === 'right');
+    syncDockSideBtn();
+    if (moveGeometry && mode === 'undocked') {
+        const geom = readDialogGeometry();
+        applyGeometry({
+            ...geom,
+            left: edgeInsetLeft(dockSide, geom.width)
+        });
+    }
+    if (persist) {
+        const prev = getSavedState() || {};
+        const width = Number.isFinite(prev.width) ? prev.width : MIN_W;
+        persistState({
+            dockSide,
+            ...(mode !== 'undocked' ? { left: edgeInsetLeft(dockSide, width) } : {})
+        });
+    }
+}
+
+function toggleDockSide() {
+    applyDockSide(dockSide === 'right' ? 'left' : 'right');
 }
 
 function clampGeometry({ left, top, width, height }) {
@@ -190,10 +240,10 @@ function persistState(overrides = {}) {
     const geom = wasUndocked
         ? readDialogGeometry()
         : {
-            left: prev.left ?? defaultGeometry().left,
-            top: prev.top ?? defaultGeometry().top,
-            width: prev.width ?? defaultGeometry().width,
-            height: prev.height ?? defaultGeometry().height
+            left: overrides.left != null ? overrides.left : (prev.left ?? defaultGeometry().left),
+            top: overrides.top != null ? overrides.top : (prev.top ?? defaultGeometry().top),
+            width: overrides.width != null ? overrides.width : (prev.width ?? defaultGeometry().width),
+            height: overrides.height != null ? overrides.height : (prev.height ?? defaultGeometry().height)
         };
 
     const nextMode = overrides.mode != null ? overrides.mode : mode;
@@ -201,6 +251,9 @@ function persistState(overrides = {}) {
     const nextPinned = overrides.pinned != null ? overrides.pinned === true : pinned;
     let nextTarget = overrides.targetSlotId != null ? overrides.targetSlotId : targetSlotId;
     if (!nextTarget) nextTarget = prev.targetSlotId || 'center';
+    const nextDockSide = overrides.dockSide != null
+        ? normalizeDockSide(overrides.dockSide)
+        : dockSide;
 
     const sheet = dockSheetEl();
     const sheetHeight = overrides.sheetHeight != null
@@ -219,6 +272,7 @@ function persistState(overrides = {}) {
             open: nextOpen,
             pinned: nextPinned,
             targetSlotId: nextTarget,
+            dockSide: nextDockSide,
             sheetHeight: parseFloat(sheetHeight) || DEFAULT_SHEET_HEIGHT,
             sheetExpanded: overrides.sheetExpanded != null ? overrides.sheetExpanded === true : sheetExpanded,
             guideOpen: overrides.guideOpen != null ? overrides.guideOpen === true : WingPanel.isGuidePreferred?.(),
@@ -640,6 +694,7 @@ function updateBodyClasses() {
     document.body.classList.toggle('remote-docked-expanded', mode === 'docked' && sheetExpanded);
     document.body.classList.toggle('remote-hidden-tab', mode === 'hidden');
     document.body.classList.toggle('remote-undocked-open', mode === 'undocked');
+    document.body.classList.toggle('remote-dock-side-right', dockSide === 'right');
 }
 
 function onKeydown(e) {
@@ -779,6 +834,7 @@ function bindOnce() {
     dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
 
     el('remote-module-close')?.addEventListener('click', () => RemoteModule.close());
+    el('remote-dock-side-btn')?.addEventListener('click', () => toggleDockSide());
     bindLayoutToggleButtons();
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
         if (e.target.closest?.('button')) return;
@@ -862,6 +918,7 @@ function restoreFromState() {
     const geom = defaultGeometry();
     const guideOpen = saved?.guideOpen === true;
     const minW = guideOpen ? MIN_W * 2 : MIN_W;
+    applyDockSide(saved?.dockSide, { persist: false, moveGeometry: false });
     if (saved) {
         applyGeometry({
             left: Number.isFinite(saved.left) ? saved.left : geom.left,
@@ -1083,6 +1140,11 @@ export const RemoteModule = {
         if (!externalHost) {
             showUndockedUI(true);
             restoreFromState();
+            const geom = readDialogGeometry();
+            applyGeometry({
+                ...geom,
+                left: edgeInsetLeft(dockSide, geom.width)
+            });
             mountToActiveHost();
             applyOpacity();
         }

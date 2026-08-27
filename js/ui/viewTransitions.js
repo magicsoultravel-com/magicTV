@@ -14,6 +14,7 @@ export const VIEW_TRANSITIONS = [
     'flip',
     'dissolve',
     'grain',
+    'matrix',
     'glitch',
     'slideleft',
     'slideright',
@@ -32,6 +33,7 @@ export const VIEW_TRANSITION_LABELS = {
     flip: 'Flip',
     dissolve: 'Dissolve',
     grain: 'Grain',
+    matrix: 'Matrix',
     glitch: 'Glitch',
     slideleft: 'Slide Left',
     slideright: 'Slide Right',
@@ -58,6 +60,7 @@ export const VIEW_MOTION = {
     flip: { duration: 420, easing: 'ease-in-out' },
     dissolve: { duration: 280, easing: 'ease-in-out' },
     grain: { duration: 520, easing: 'ease-in-out' },
+    matrix: { duration: 1100, easing: 'ease-in-out' },
     glitch: { duration: 480, easing: 'cubic-bezier(0.68, -0.55, 0.27, 1.55)' },
     slideleft: { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
     slideright: { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
@@ -274,7 +277,7 @@ export async function runCatalogPanelTransition(surface, mode, mutate) {
         return;
     }
 
-    if (mode === 'dissolve' || mode === 'grain') {
+    if (mode === 'dissolve' || mode === 'grain' || mode === 'matrix') {
         await runWipeTransition(mode, mutate, {
             scope: 'catalog',
             fadeTarget: surface,
@@ -402,8 +405,194 @@ export function stopBootGrainPaint() {
     stopAllGrainPaint();
 }
 
+const MATRIX_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const MATRIX_COL_W = 10;
+const MATRIX_HEAD = '#00ff41';
+const MATRIX_TRAIL = '#008f11';
+const MATRIX_BG = '#000000';
+
+/** @type {Array<() => void>} */
+let matrixPaintStops = [];
+
+function stopAllMatrixPaint() {
+    matrixPaintStops.forEach((stop) => {
+        try { stop(); } catch { /* ignore */ }
+    });
+    matrixPaintStops = [];
+}
+
+function ensureMatrixOverlay(scope, host) {
+    if (!host) return null;
+    const id = scope === 'catalog'
+        ? 'catalog-matrix-overlay-scoped'
+        : scope === 'tiles'
+            ? `catalog-matrix-overlay-tile-${host.id || 'anon'}`
+            : scope === 'mosaic'
+                ? 'catalog-matrix-overlay-mosaic'
+                : 'catalog-matrix-overlay';
+    let overlay = el(id);
+    if (overlay && !overlay.querySelector('canvas.catalog-matrix-overlay__canvas')) {
+        overlay.remove();
+        overlay = null;
+    }
+    if (overlay) {
+        if (overlay.parentElement !== host) host.appendChild(overlay);
+        return overlay;
+    }
+
+    const scopedClass = scope === 'full'
+        ? 'catalog-matrix-overlay'
+        : 'catalog-matrix-overlay catalog-matrix-overlay--scoped';
+    overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.className = scopedClass;
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.innerHTML = '<canvas class="catalog-matrix-overlay__canvas"></canvas>';
+    host.appendChild(overlay);
+    return overlay;
+}
+
 /**
- * @param {'dissolve'|'grain'} mode
+ * Digital-rain canvas painter. Progress 0–1 controls how many columns are active
+ * and how long trails grow (cover fills; reveal retreats).
+ * @returns {{ stop: () => void, setProgress: (p: number) => void }}
+ */
+function startMatrixPaint(canvas, hostEl) {
+    if (!canvas) return { stop: () => {}, setProgress: () => {} };
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return { stop: () => {}, setProgress: () => {} };
+
+    /** @type {Array<{ x: number, y: number, speed: number, trail: string[] }>} */
+    let columns = [];
+    let progress = 0;
+    let fontSize = MATRIX_COL_W;
+
+    const randChar = () => MATRIX_CHARS[(Math.random() * MATRIX_CHARS.length) | 0];
+
+    const rebuild = () => {
+        const box = hostEl?.getBoundingClientRect?.() || {
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+        const cssW = Math.max(80, Math.floor(box.width || window.innerWidth));
+        const cssH = Math.max(60, Math.floor(box.height || window.innerHeight));
+        // Keep resolution high enough that narrow columns stay dense.
+        const scale = Math.min(1, 720 / Math.max(cssW, 1));
+        canvas.width = Math.max(80, Math.floor(cssW * scale));
+        canvas.height = Math.max(60, Math.floor(cssH * scale));
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        fontSize = Math.max(8, Math.floor(MATRIX_COL_W * scale));
+        const colCount = Math.max(1, Math.floor(canvas.width / fontSize));
+        columns = Array.from({ length: colCount }, (_, i) => ({
+            x: i * fontSize + fontSize * 0.1,
+            y: Math.random() * canvas.height,
+            speed: 1.1 + Math.random() * 2.4,
+            trail: Array.from({ length: 18 + ((Math.random() * 22) | 0) }, randChar)
+        }));
+        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.textBaseline = 'top';
+        // Hard clear so the first dense frame starts clean.
+        ctx.fillStyle = MATRIX_BG;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+    rebuild();
+
+    let raf = 0;
+    let alive = true;
+    const tick = () => {
+        if (!alive) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        // Soft clear leaves ghost trails — denser, more intense rain.
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+        ctx.fillRect(0, 0, w, h);
+
+        // Ramp columns in quickly so coverage feels thick early.
+        const density = Math.pow(progress, 0.55);
+        const activeCount = Math.floor(density * columns.length);
+        const trailScale = 0.55 + density * 0.9;
+        const maxTrail = Math.max(4, Math.floor((h / fontSize) * trailScale));
+
+        for (let i = 0; i < activeCount; i++) {
+            const col = columns[i];
+            const trailLen = Math.min(col.trail.length, maxTrail);
+            for (let t = 0; t < trailLen; t++) {
+                const cy = col.y - t * fontSize;
+                if (cy < -fontSize || cy > h) continue;
+                if (t === 0) {
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = MATRIX_HEAD;
+                } else {
+                    const fade = 1 - t / trailLen;
+                    ctx.globalAlpha = 0.35 + fade * 0.65;
+                    ctx.fillStyle = MATRIX_TRAIL;
+                }
+                ctx.fillText(col.trail[t] || randChar(), col.x, cy);
+            }
+            ctx.globalAlpha = 1;
+            col.y += col.speed * fontSize * 0.42;
+            // Scramble head + some trail cells every frame for intensity.
+            if (Math.random() < 0.35) col.trail[0] = randChar();
+            if (Math.random() < 0.2) {
+                const idx = 1 + ((Math.random() * Math.max(1, trailLen - 1)) | 0);
+                col.trail[idx] = randChar();
+            }
+            if (col.y - trailLen * fontSize > h) {
+                col.y = -Math.random() * h * 0.25;
+                col.speed = 1.1 + Math.random() * 2.4;
+                col.trail = Array.from(
+                    { length: 18 + ((Math.random() * 22) | 0) },
+                    randChar
+                );
+            }
+        }
+
+        raf = requestAnimationFrame(tick);
+    };
+    tick();
+
+    const onResize = () => rebuild();
+    window.addEventListener('resize', onResize);
+
+    return {
+        setProgress(p) {
+            progress = Math.max(0, Math.min(1, Number(p) || 0));
+        },
+        stop() {
+            alive = false;
+            cancelAnimationFrame(raf);
+            window.removeEventListener('resize', onResize);
+        }
+    };
+}
+
+function animateMatrixProgress(controllers, from, to, durationMs) {
+    if (!controllers.length) return Promise.resolve();
+    const duration = Math.max(1, durationMs || 1);
+    return new Promise((resolve) => {
+        const start = performance.now();
+        const step = (now) => {
+            const t = Math.min(1, (now - start) / duration);
+            // Ease-in-out for a more deliberate takeover / retreat.
+            const eased = t < 0.5
+                ? 2 * t * t
+                : 1 - ((-2 * t + 2) ** 2) / 2;
+            const p = from + (to - from) * eased;
+            controllers.forEach((c) => c.setProgress(p));
+            if (t < 1) {
+                requestAnimationFrame(step);
+            } else {
+                controllers.forEach((c) => c.setProgress(to));
+                resolve();
+            }
+        };
+        requestAnimationFrame(step);
+    });
+}
+
+/**
+ * @param {'dissolve'|'grain'|'matrix'} mode
  * @param {() => void} onSwap
  * @param {{
  *   scope?: 'full'|'catalog'|'mosaic'|'tiles',
@@ -452,12 +641,57 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
     }
 
     const useGrain = mode === 'grain';
+    const useMatrix = mode === 'matrix';
     const grains = useGrain
         ? grainHosts.map((host) => ensureGrainOverlay(scope, host)).filter(Boolean)
         : [];
+    const matrices = useMatrix
+        ? grainHosts.map((host) => ensureMatrixOverlay(scope, host)).filter(Boolean)
+        : [];
+    /** @type {Array<{ stop: () => void, setProgress: (p: number) => void }>} */
+    let matrixControllers = [];
+
+    const cleanupMatrix = () => {
+        matrices.forEach((m) => {
+            m.classList.remove('is-active');
+            m.style.opacity = '';
+        });
+        stopAllMatrixPaint();
+        matrixControllers = [];
+    };
 
     try {
-        if (grains.length) {
+        if (matrices.length) {
+            stopAllMatrixPaint();
+            matrixControllers = matrices.map((matrix, i) => {
+                matrix.classList.add('is-active');
+                matrix.style.opacity = '0';
+                const ctrl = startMatrixPaint(
+                    matrix.querySelector('canvas'),
+                    grainHosts[i] || fadeTargets[0]
+                );
+                ctrl.setProgress(0);
+                matrixPaintStops.push(() => ctrl.stop());
+                return ctrl;
+            });
+            const coverOverlay = matrices.map((matrix) => matrix.animate(
+                [
+                    { opacity: 0 },
+                    { opacity: 1, offset: 0.2 },
+                    { opacity: 1 }
+                ],
+                half
+            ));
+            const hideAnims = fadeTargets.map((target) => target.animate(
+                [{ opacity: 1 }, { opacity: 0 }],
+                half
+            ));
+            await Promise.all([
+                ...coverOverlay.map((a) => a.finished),
+                ...hideAnims.map((a) => a.finished),
+                animateMatrixProgress(matrixControllers, 0, 1, half.duration)
+            ]);
+        } else if (grains.length) {
             stopAllGrainPaint();
             grains.forEach((grain, i) => {
                 grain.classList.add('is-active');
@@ -493,7 +727,29 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
             target.style.opacity = '0';
         });
 
-        if (grains.length) {
+        if (matrices.length) {
+            const clearAnims = matrices.map((matrix) => matrix.animate(
+                [
+                    { opacity: 1 },
+                    { opacity: 1, offset: 0.35 },
+                    { opacity: 0 }
+                ],
+                half
+            ));
+            const showAnims = fadeTargets.map((target) => target.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                half
+            ));
+            await Promise.all([
+                ...clearAnims.map((a) => a.finished),
+                ...showAnims.map((a) => a.finished),
+                animateMatrixProgress(matrixControllers, 1, 0, half.duration)
+            ]);
+            try {
+                [...clearAnims, ...showAnims].forEach((a) => a.cancel());
+            } catch { /* ignore */ }
+            cleanupMatrix();
+        } else if (grains.length) {
             const clearAnims = grains.map((grain) => grain.animate(
                 [
                     { opacity: 1 },
@@ -531,6 +787,7 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
             grain.style.opacity = '';
         });
         stopAllGrainPaint();
+        cleanupMatrix();
     } finally {
         fadeTargets.forEach((target) => {
             target.style.opacity = '';

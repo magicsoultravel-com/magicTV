@@ -12,7 +12,6 @@ const PAGE_SIZE = 60;
 let deps = {
     appState: null,
     stampRefreshView: () => {},
-    updateRefreshAge: () => {},
     currentFilter: () => '',
     runBrowseTransition: (mutate) => {
         mutate?.();
@@ -64,11 +63,10 @@ function setupScrollLoading() {
 }
 
 export const BrowseView = {
-    init({ appState, stampRefreshView, updateRefreshAge, currentFilter, runBrowseTransition }) {
+    init({ appState, stampRefreshView, currentFilter, runBrowseTransition }) {
         deps = {
             appState,
             stampRefreshView,
-            updateRefreshAge,
             currentFilter,
             runBrowseTransition: typeof runBrowseTransition === 'function'
                 ? runBrowseTransition
@@ -114,7 +112,6 @@ export const BrowseView = {
             console.error('Failed to load countries:', err);
             showAppToast('Countries unavailable — check your connection');
         }
-        deps.updateRefreshAge();
         ListSort.syncCategoryFilterControls();
         this.renderCountries();
     },
@@ -179,7 +176,6 @@ export const BrowseView = {
                 });
             }
             if (channels) channels.innerHTML = catalogStatusHtml('Loading channels…');
-            deps.updateRefreshAge();
             ListSort.syncSortControls();
         });
 
@@ -363,7 +359,6 @@ export const BrowseView = {
             this.restoreScroll();
         }
         ListSort.syncSortControls();
-        deps.updateRefreshAge();
     },
 
     showCountriesView() {
@@ -386,7 +381,6 @@ export const BrowseView = {
             ListSort.syncSortControls();
             this.renderCountries();
             this.restoreScroll();
-            deps.updateRefreshAge();
         });
     }
 };

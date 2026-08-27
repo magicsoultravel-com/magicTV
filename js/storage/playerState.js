@@ -321,6 +321,7 @@ function normalizeRemoteModule(raw, legacyPicker) {
         targetSlotId: target,
         sheetHeight,
         sheetExpanded: src.sheetExpanded !== false,
+        dockSide: src.dockSide === 'right' ? 'right' : 'left',
         ...(layout ? { layout } : {})
     };
 }

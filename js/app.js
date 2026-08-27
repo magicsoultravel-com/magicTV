@@ -2,7 +2,7 @@
 import { TvPlayer } from './tvPlayer.js';
 import { TvProviderRegistry } from './tvProviders/registry.js';
 import { channelKey, parseChannelKey } from './tvProviders/channelShape.js';
-import { formatRelativeTime, el, els } from './tvUtils.js';
+import { el, els } from './tvUtils.js';
 import { showAppToast } from './ui/toast.js';
 import { TvPip } from './tvPip.js';
 import { TileFrames } from './tileFrames.js';
@@ -64,7 +64,7 @@ let appState = {
     sortBy: { ...DEFAULT_SORT_BY },
     sortDir: { ...DEFAULT_SORT_DIR },
     categoryFilter: { ...DEFAULT_CATEGORY_FILTER },
-    // Per-navigation refresh clocks for the bottom-right age label.
+    // Per-navigation refresh stamps used by live tile refresh.
     // Keys: browseCountries | browse:<iso> | favorites | recents | settings
     lastRefreshedByView: Object.create(null)
 };
@@ -87,16 +87,6 @@ function currentRefreshKey() {
 function stampRefreshView(key, ts = Date.now()) {
     if (!key || !ts) return;
     appState.lastRefreshedByView[key] = ts;
-}
-
-function updateRefreshAge() {
-    const btn = el('refresh-btn');
-    if (!btn) return;
-    const ts = appState.lastRefreshedByView[currentRefreshKey()] || 0;
-    const age = formatRelativeTime(ts);
-    const label = age ? `Refresh this tab · ${age}` : 'Refresh this tab · Never refreshed';
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
 }
 
 function activeChannelGrid() {
@@ -384,17 +374,6 @@ function bindCatalogLayout() {
     });
 }
 
-function bindRefreshBtn() {
-    const btn = el('refresh-btn');
-    if (!btn || btn.dataset.bound === '1') return;
-    btn.dataset.bound = '1';
-    btn.innerHTML = ACTION_ICONS.refresh;
-    updateRefreshAge();
-    btn.addEventListener('click', () => {
-        handleManualRefresh();
-    });
-}
-
 function bindPlayFavoritesMosaic() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn || btn.dataset.bound === '1') return;
@@ -423,59 +402,6 @@ function bindPlayFavoritesMosaic() {
     });
 }
 
-
-let refreshInFlight = false;
-
-async function handleManualRefresh() {
-    if (refreshInFlight) return;
-    refreshInFlight = true;
-    const btn = el('refresh-btn');
-    const spin = () => btn && btn.classList.add('is-loading');
-    const unspin = () => btn && btn.classList.remove('is-loading');
-    spin();
-    showAppToast('Refreshing…');
-    try {
-        const tab = appState.activeTab;
-        const viewKey = currentRefreshKey();
-        if (tab === 'browse') {
-            if (appState.browseCountry === null) {
-                TileFrames.clearLiveRefresh();
-                appState.countries = await TvProviderRegistry.refreshCatalog();
-                BrowseView.renderCountries();
-                stampRefreshView('browseCountries', TvProviderRegistry.getLastRefreshed());
-            } else {
-                await BrowseView.refreshBrowseCountry();
-                stampRefreshView(viewKey);
-                const grid = activeChannelGrid();
-                if (grid) await TileFrames.refresh(grid, { viewKey });
-            }
-        } else if (tab === 'favorites') {
-            await ChannelGrid.refreshFavorites(true);
-            stampRefreshView('favorites');
-            const grid = activeChannelGrid();
-            if (grid) await TileFrames.refresh(grid, { viewKey: 'favorites' });
-        } else if (tab === 'recents') {
-            await ChannelGrid.refreshRecents(true);
-            stampRefreshView('recents');
-            const grid = activeChannelGrid();
-            if (grid) await TileFrames.refresh(grid, { viewKey: 'recents' });
-        } else {
-            TileFrames.clearLiveRefresh();
-            Appearance.refreshWatchStats();
-            Appearance.updateStorageStats();
-            HiddenChannelsSettings.refresh();
-            VisitedChannelsSettings.refresh();
-            stampRefreshView('settings');
-        }
-        showAppToast('✅ Refreshed');
-    } catch {
-        showAppToast('Refresh failed — try again');
-    } finally {
-        refreshInFlight = false;
-        unspin();
-        updateRefreshAge();
-    }
-}
 
 function syncRemoteTabChrome() {
     const tab = appState.activeTab;
@@ -600,7 +526,6 @@ function switchTab(tabName) {
     syncCatalogLayoutBtn();
     RemoteExternalPopout.syncBtn();
     RemoteModule.syncSplitChromeButtons?.();
-    updateRefreshAge();
     RemotePanel.syncRemotePanel();
 }
 
@@ -672,7 +597,6 @@ async function init() {
         BrowseView.init({
             appState,
             stampRefreshView,
-            updateRefreshAge,
             currentFilter,
             runBrowseTransition: withBrowseDrillTransition
         });
@@ -699,7 +623,6 @@ async function init() {
         bindPlayFavoritesMosaic();
         bindCreateFavoriteFolderBtn();
         bindCatalogLayout();
-        bindRefreshBtn();
         syncPlayFavoritesMosaicBtn();
         syncCreateFavoriteFolderBtn();
         syncCatalogLayoutBtn();
@@ -760,9 +683,6 @@ async function init() {
 
         await countriesPromise;
         warmGuideIndex().catch(() => {});
-        updateRefreshAge();
-        const refreshAgeTimer = setInterval(updateRefreshAge, 60 * 1000);
-        if (refreshAgeTimer?.unref) refreshAgeTimer.unref();
     } finally {
         await reveal();
     }

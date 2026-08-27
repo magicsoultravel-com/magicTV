@@ -10,7 +10,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 const KNOWN_IDS = [
-    'settings-panel', 'back-btn', 'search-countries', 'refresh-btn',
+    'settings-panel', 'back-btn', 'search-countries', 'remote-dock-side-btn',
     'player-slot', 'player-mosaic',
     'remote-panel', 'remote-panel-footer', 'remote-catalog-tools', 'remote-channel-bar', 'remote-channel-name', 'tv-catalog-body', 'remote-module-staging',
     'remote-shell', 'browser-shell', 'guide-panel', 'guide-screens',

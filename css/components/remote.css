@@ -5,6 +5,7 @@
     --remote-grid-cols: 5;
     --remote-btn-size: 40px;
     --remote-grid-gap: 0.4rem;
+    --remote-edge-inset: 1.5rem;
     --remote-min-width: calc(
         var(--remote-grid-cols) * var(--remote-btn-size)
         + (var(--remote-grid-cols) - 1) * var(--remote-grid-gap)
@@ -20,14 +21,14 @@
 
 .remote-dock-tab {
     position: fixed;
-    left: max(0.75rem, env(safe-area-inset-left, 0px));
-    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    left: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-left, 0px));
+    bottom: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-bottom, 0px));
     z-index: 8501;
     display: flex;
     align-items: center;
     justify-content: center;
     width: var(--remote-min-width, 260px);
-    max-width: calc(100vw - 1.5rem);
+    max-width: calc(100vw - 2 * var(--remote-edge-inset, 1.5rem));
     padding: 0.7rem 1rem;
     border: 1px solid var(--tv-border, #2A2E3A);
     border-bottom: none;
@@ -66,9 +67,20 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     display: none;
 }
 
+body.remote-dock-side-right .remote-dock-tab {
+    left: auto;
+    right: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-right, 0px));
+}
+
+body.remote-dock-side-right .remote-dock-sheet {
+    left: auto;
+    right: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-right, 0px));
+    transform-origin: bottom right;
+}
+
 .remote-dock-sheet {
     position: fixed;
-    left: max(0.75rem, env(safe-area-inset-left, 0px));
+    left: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-left, 0px));
     right: auto;
     bottom: 0;
     z-index: 8500;
@@ -76,7 +88,7 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
     flex-direction: column;
     align-items: stretch;
     width: var(--remote-min-width, 260px);
-    max-width: calc(100vw - 1.5rem);
+    max-width: calc(100vw - 2 * var(--remote-edge-inset, 1.5rem));
     height: 0;
     max-height: 85vh;
     background: transparent;
@@ -211,12 +223,15 @@ body:not(.remote-hidden-tab) .remote-dock-tab {
 }
 
 #remote-module-pin,
-#remote-module-close {
+#remote-module-close,
+#remote-dock-side-btn {
     display: none;
 }
 
 .remote-module__host #remote-module-close,
-.remote-dock-sheet__inner #remote-module-close {
+.remote-dock-sheet__inner #remote-module-close,
+.remote-module__host #remote-dock-side-btn,
+.remote-dock-sheet__inner #remote-dock-side-btn {
     display: flex;
 }
 
@@ -601,7 +616,7 @@ body.browser-shell-split #remote-shell {
 .remote-dock-sheet__inner > .tv-module__actions--browser-end {
     position: absolute;
     top: 0.35rem;
-    left: calc(var(--tv-spacing-sm, 0.5rem) + 5.75rem);
+    left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
     right: auto;
     z-index: 6;
     pointer-events: auto;
@@ -926,7 +941,7 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
 }
 
 .remote-dock-sheet__inner > .tv-module__actions--browser-end {
-    left: calc(var(--tv-spacing-sm, 0.5rem) + 5.75rem);
+    left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
     right: auto;
 }
 

@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    VIEW_TRANSITIONS,
     VIEW_TRANSITION_POOL,
+    VIEW_MOTION,
     getCatalogViewTransitionFrames,
     resolveViewTransition
 } from '../js/ui/viewTransitions.js';
@@ -11,6 +13,13 @@ test('VIEW_TRANSITION_POOL excludes instant and random', () => {
     assert.ok(!VIEW_TRANSITION_POOL.includes('random'));
     assert.ok(VIEW_TRANSITION_POOL.includes('glitch'));
     assert.ok(VIEW_TRANSITION_POOL.includes('spiralin'));
+    assert.ok(VIEW_TRANSITION_POOL.includes('matrix'));
+});
+
+test('matrix is registered with a longer wipe duration than grain', () => {
+    assert.ok(VIEW_TRANSITIONS.includes('matrix'));
+    assert.ok(VIEW_MOTION.matrix);
+    assert.ok(VIEW_MOTION.matrix.duration >= VIEW_MOTION.grain.duration);
 });
 
 test('resolveViewTransition random never draws instant', () => {

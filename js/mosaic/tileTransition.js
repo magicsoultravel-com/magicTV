@@ -47,7 +47,7 @@ export async function runTileContentTransition(tileEl, onMidpoint, opts = {}) {
         return;
     }
 
-    if (mode === 'dissolve' || mode === 'grain') {
+    if (mode === 'dissolve' || mode === 'grain' || mode === 'matrix') {
         await runWipeTransition(mode, () => onMidpoint?.(), {
             scope: 'tiles',
             fadeTargets: [tileEl],
