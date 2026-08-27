@@ -801,7 +801,7 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     opacity: 0;
     display: none;
     overflow: hidden;
-    background: #000;
+    background: transparent;
 }
 
 .catalog-matrix-overlay.is-active {

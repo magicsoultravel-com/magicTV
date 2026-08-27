@@ -453,21 +453,41 @@ function ensureMatrixOverlay(scope, host) {
 }
 
 /**
- * Digital-rain canvas painter. Progress 0–1 controls how many columns are active
- * and how long trails grow (cover fills; reveal retreats).
- * @returns {{ stop: () => void, setProgress: (p: number) => void }}
+ * Digital-rain canvas painter.
+ * Progress 0–1 densifies columns (cover). Breakthrough 0–1 punches expanding
+ * holes so the channel shows through (reveal) — no black fade.
+ * @returns {{
+ *   stop: () => void,
+ *   setProgress: (p: number) => void,
+ *   setBreakthrough: (b: number) => void
+ * }}
  */
 function startMatrixPaint(canvas, hostEl) {
-    if (!canvas) return { stop: () => {}, setProgress: () => {} };
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return { stop: () => {}, setProgress: () => {} };
+    const noop = { stop: () => {}, setProgress: () => {}, setBreakthrough: () => {} };
+    if (!canvas) return noop;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return noop;
 
     /** @type {Array<{ x: number, y: number, speed: number, trail: string[] }>} */
     let columns = [];
+    /** @type {Array<{ x: number, y: number, delay: number, maxR: number }>} */
+    let holes = [];
     let progress = 0;
+    let breakthrough = 0;
     let fontSize = MATRIX_COL_W;
 
     const randChar = () => MATRIX_CHARS[(Math.random() * MATRIX_CHARS.length) | 0];
+
+    const seedHoles = (w, h) => {
+        const diag = Math.hypot(w, h);
+        const count = 5 + ((Math.random() * 4) | 0);
+        holes = Array.from({ length: count }, (_, i) => ({
+            x: (0.12 + Math.random() * 0.76) * w,
+            y: (0.12 + Math.random() * 0.76) * h,
+            delay: (i / count) * 0.42,
+            maxR: diag * (0.55 + Math.random() * 0.35)
+        }));
+    };
 
     const rebuild = () => {
         const box = hostEl?.getBoundingClientRect?.() || {
@@ -490,9 +510,11 @@ function startMatrixPaint(canvas, hostEl) {
             speed: 1.1 + Math.random() * 2.4,
             trail: Array.from({ length: 18 + ((Math.random() * 22) | 0) }, randChar)
         }));
+        seedHoles(canvas.width, canvas.height);
         ctx.font = `bold ${fontSize}px monospace`;
         ctx.textBaseline = 'top';
-        // Hard clear so the first dense frame starts clean.
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
         ctx.fillStyle = MATRIX_BG;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     };
@@ -504,12 +526,22 @@ function startMatrixPaint(canvas, hostEl) {
         if (!alive) return;
         const w = canvas.width;
         const h = canvas.height;
-        // Soft clear leaves ghost trails — denser, more intense rain.
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-        ctx.fillRect(0, 0, w, h);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+
+        if (breakthrough > 0) {
+            // Hard redraw so destination-out holes stay clear of soft-clear residue.
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = MATRIX_BG;
+            ctx.fillRect(0, 0, w, h);
+        } else {
+            // Soft clear leaves ghost trails — denser cover rain.
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+            ctx.fillRect(0, 0, w, h);
+        }
 
         // Ramp columns in quickly so coverage feels thick early.
-        const density = Math.pow(progress, 0.55);
+        const density = Math.pow(Math.max(progress, breakthrough > 0 ? 1 : 0), 0.55);
         const activeCount = Math.floor(density * columns.length);
         const trailScale = 0.55 + density * 0.9;
         const maxTrail = Math.max(4, Math.floor((h / fontSize) * trailScale));
@@ -548,6 +580,22 @@ function startMatrixPaint(canvas, hostEl) {
             }
         }
 
+        if (breakthrough > 0) {
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'destination-out';
+            for (const hole of holes) {
+                const span = Math.max(0.001, 1 - hole.delay);
+                const local = Math.max(0, Math.min(1, (breakthrough - hole.delay) / span));
+                if (local <= 0) continue;
+                const eased = local * local * (3 - 2 * local);
+                const r = hole.maxR * eased;
+                ctx.beginPath();
+                ctx.arc(hole.x, hole.y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
         raf = requestAnimationFrame(tick);
     };
     tick();
@@ -559,6 +607,9 @@ function startMatrixPaint(canvas, hostEl) {
         setProgress(p) {
             progress = Math.max(0, Math.min(1, Number(p) || 0));
         },
+        setBreakthrough(b) {
+            breakthrough = Math.max(0, Math.min(1, Number(b) || 0));
+        },
         stop() {
             alive = false;
             cancelAnimationFrame(raf);
@@ -567,23 +618,34 @@ function startMatrixPaint(canvas, hostEl) {
     };
 }
 
-function animateMatrixProgress(controllers, from, to, durationMs) {
+/**
+ * @param {Array<{ setProgress?: (p: number) => void, setBreakthrough?: (b: number) => void }>} controllers
+ * @param {'progress'|'breakthrough'} prop
+ * @param {number} from
+ * @param {number} to
+ * @param {number} durationMs
+ */
+function animateMatrixProp(controllers, prop, from, to, durationMs) {
     if (!controllers.length) return Promise.resolve();
     const duration = Math.max(1, durationMs || 1);
+    const apply = (c, v) => {
+        if (prop === 'breakthrough') c.setBreakthrough?.(v);
+        else c.setProgress?.(v);
+    };
     return new Promise((resolve) => {
         const start = performance.now();
         const step = (now) => {
             const t = Math.min(1, (now - start) / duration);
-            // Ease-in-out for a more deliberate takeover / retreat.
+            // Ease-in-out for a more deliberate takeover / breakthrough.
             const eased = t < 0.5
                 ? 2 * t * t
                 : 1 - ((-2 * t + 2) ** 2) / 2;
             const p = from + (to - from) * eased;
-            controllers.forEach((c) => c.setProgress(p));
+            controllers.forEach((c) => apply(c, p));
             if (t < 1) {
                 requestAnimationFrame(step);
             } else {
-                controllers.forEach((c) => c.setProgress(to));
+                controllers.forEach((c) => apply(c, to));
                 resolve();
             }
         };
@@ -648,7 +710,7 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
     const matrices = useMatrix
         ? grainHosts.map((host) => ensureMatrixOverlay(scope, host)).filter(Boolean)
         : [];
-    /** @type {Array<{ stop: () => void, setProgress: (p: number) => void }>} */
+    /** @type {Array<{ stop: () => void, setProgress: (p: number) => void, setBreakthrough: (b: number) => void }>} */
     let matrixControllers = [];
 
     const cleanupMatrix = () => {
@@ -661,6 +723,8 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
     };
 
     try {
+        // Matrix: solid rain cover → swap under sheet → channel punches through holes.
+        // Self-contained so content never fades through black.
         if (matrices.length) {
             stopAllMatrixPaint();
             matrixControllers = matrices.map((matrix, i) => {
@@ -671,27 +735,42 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
                     grainHosts[i] || fadeTargets[0]
                 );
                 ctrl.setProgress(0);
+                ctrl.setBreakthrough(0);
                 matrixPaintStops.push(() => ctrl.stop());
                 return ctrl;
             });
+            // Quick overlay settle; rain densifies over the full half — content stays opaque.
             const coverOverlay = matrices.map((matrix) => matrix.animate(
                 [
                     { opacity: 0 },
-                    { opacity: 1, offset: 0.2 },
+                    { opacity: 1, offset: 0.12 },
                     { opacity: 1 }
                 ],
                 half
             ));
-            const hideAnims = fadeTargets.map((target) => target.animate(
-                [{ opacity: 1 }, { opacity: 0 }],
-                half
-            ));
             await Promise.all([
                 ...coverOverlay.map((a) => a.finished),
-                ...hideAnims.map((a) => a.finished),
-                animateMatrixProgress(matrixControllers, 0, 1, half.duration)
+                animateMatrixProp(matrixControllers, 'progress', 0, 1, half.duration)
             ]);
-        } else if (grains.length) {
+            try {
+                coverOverlay.forEach((a) => a.cancel());
+            } catch { /* ignore */ }
+            matrices.forEach((matrix) => {
+                matrix.style.opacity = '1';
+            });
+
+            onSwap?.();
+            fadeTargets.forEach((target) => {
+                void target.offsetHeight;
+                target.style.opacity = '1';
+            });
+
+            await animateMatrixProp(matrixControllers, 'breakthrough', 0, 1, half.duration);
+            cleanupMatrix();
+            return;
+        }
+
+        if (grains.length) {
             stopAllGrainPaint();
             grains.forEach((grain, i) => {
                 grain.classList.add('is-active');
@@ -727,29 +806,7 @@ export async function runWipeTransition(mode, onSwap, opts = {}) {
             target.style.opacity = '0';
         });
 
-        if (matrices.length) {
-            const clearAnims = matrices.map((matrix) => matrix.animate(
-                [
-                    { opacity: 1 },
-                    { opacity: 1, offset: 0.35 },
-                    { opacity: 0 }
-                ],
-                half
-            ));
-            const showAnims = fadeTargets.map((target) => target.animate(
-                [{ opacity: 0 }, { opacity: 1 }],
-                half
-            ));
-            await Promise.all([
-                ...clearAnims.map((a) => a.finished),
-                ...showAnims.map((a) => a.finished),
-                animateMatrixProgress(matrixControllers, 1, 0, half.duration)
-            ]);
-            try {
-                [...clearAnims, ...showAnims].forEach((a) => a.cancel());
-            } catch { /* ignore */ }
-            cleanupMatrix();
-        } else if (grains.length) {
+        if (grains.length) {
             const clearAnims = grains.map((grain) => grain.animate(
                 [
                     { opacity: 1 },
