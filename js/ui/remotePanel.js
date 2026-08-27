@@ -8,6 +8,7 @@ import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
 import { STOP_ALL_SVG, PLAY_ALL_SVG } from './tileHoverControls.js';
+import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
 
 let deps = {
     switchTab: () => {},
@@ -99,9 +100,29 @@ export function syncRemoteChannelBar(_tabName) {
     if (flagEl) flagEl.textContent = show && country ? countryFlagEmoji(country) : '';
 }
 
+function focusedChannel() {
+    const slotId = MultiView.statusSlotId || 'center';
+    const player = MultiView.slots?.[slotId]?.player
+        || (slotId === 'center' ? MultiView.getPrimary?.() : null);
+    return player?.channel || null;
+}
+
 async function handleRemoteAction(action) {
     const slotId = MultiView.statusSlotId || 'center';
     switch (action) {
+        case 'share-copy-stream': {
+            const channel = focusedChannel();
+            if (channel) copyShareText(buildStreamLink(channel), 'Stream link copied');
+            break;
+        }
+        case 'share-copy-magictv': {
+            const channel = focusedChannel();
+            if (channel) {
+                const link = buildDeepLink(channel);
+                if (link) copyShareText(link, 'magicTV link copied');
+            }
+            break;
+        }
         case 'vol-up':
             MultiView.setSharedVolume((MultiView.sharedVolume ?? TvPlayer.volume ?? 0.85) + 0.05);
             break;
@@ -175,6 +196,13 @@ export function syncRemotePanel() {
         }
         favBtn.setAttribute('aria-label', favBtn.title);
     }
+
+    queryAllInApp('.remote-share-btn').forEach((btn) => {
+        const show = Boolean(player?.channel);
+        btn.classList.toggle('is-hidden', !show);
+        const cell = btn.closest('.remote-panel__cell');
+        if (cell) cell.classList.toggle('is-hidden', !show);
+    });
 
     const muteAllActive = MultiView.isMuteAllActive?.() ?? false;
     const muteAllBtn = el('remote-mute-all-btn');

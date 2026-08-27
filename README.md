@@ -11,6 +11,7 @@
 - **📱 Responsive** — Works on mobile, tablet, TV browser, desktop
 - **🎨 Themes** — Preset themes with customizable accent, background, border, and text colors
 - **🔊 Full Controls** — Play, pause, volume, quality, Picture-in-Picture, fullscreen, Chromecast
+- **🔗 Share Channels** — Copy a raw stream link or a magicTV deep link that opens the channel on a TV screen
 - **💾 Persistent** — localStorage saves favorites, recents, settings
 - **🚀 No Build** — Pure JavaScript modules, runs directly in browser
 
@@ -51,6 +52,7 @@ npm test            # or: node --test
 | `test/tvPlayer.test.mjs` | Favorites, favorites metadata, recents (cap 20, newest-first), buffer-size clamping (5–120s), volume clamping, provider settings |
 | `test/tvUtils.test.mjs` | `escapeHtml`, `countryFlagEmoji`, `debounce`, `formatRelativeTime` |
 | `test/channelShape.test.mjs` | `channelKey`, `parseChannelKey`, `normalizeChannel`, `migrateFavoriteRef` |
+| `test/shareChannel.test.mjs` | Deep-link build/parse round-trip, stream link, `chooseSharedPlayTarget` slot policy (free → center, full → last/fallback) |
 | `test/frameCache.test.mjs` | `FrameCache.setFrame`/`getFrame` round-trip, 7-day TTL expiry, per-key remove |
 
 ## 📁 Project Structure
@@ -114,6 +116,15 @@ magicTV/
 - **Favorite Button** — Use ★ on the player controls while a channel is playing
 - **Auto-tracked** — Recents tab fills as you watch
 - **Persistent** — Data saved to localStorage
+
+### Sharing a channel
+While a channel is playing, the magic remote shows two share buttons (next to ★):
+
+- **Copy stream link** — copies the raw HLS `url_resolved` for the focused channel.
+- **Copy magicTV link** — copies a deep link the recipient opens in magicTV:
+  `index.html?ch=iptv-org%3ACNBC&name=CNBC&country=us`
+
+Opening a magicTV deep link resolves the channel from the active catalog and plays it on a TV screen — the first free screen (only the single TV for a clean recipient), or the **last screen** when every screen is already full. It routes through normal playback, so it lands in Recents like any other watch. No share URL survives these deep links; only the channel *key* is in the URL.
 
 ### Settings
 Open via the remote/browser **Settings** tab (`#settings-panel`):

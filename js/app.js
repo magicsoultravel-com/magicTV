@@ -13,6 +13,8 @@ import { BrowseView } from './browse/browseView.js';
 import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
 import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
+import { SLOT_IDS, slotIsOccupied } from './mosaic/constants.js';
+import { parseDeepLink, resolveDeepLinkChannel, chooseSharedPlayTarget } from './share/shareChannel.js';
 import { TvClock } from './ui/tvClock.js';
 import { RemoteModule } from './ui/remoteModule.js';
 import { RemotePanel, syncRemoteNav, syncRemoteChannelBar } from './ui/remotePanel.js';
@@ -107,6 +109,37 @@ function startPlayback(channel) {
         const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
         if (!player?.playing) TileFrames.setPlaybackBusy(false);
     });
+}
+
+/**
+ * Handle a shared magicTV deep link (/?ch=<channelKey>&name=…&country=…).
+ * Resolves the channel via the active provider, then plays it on a TV screen:
+ *   - first free slot in fill order (→ 'center' = a single, clean TV for
+ *     recipients with nothing running), or
+ *   - the last (most-recently focused) screen when every slot is occupied.
+ * Routes through playOnSlot so recents/persistence behave like a normal play.
+ * @returns {Promise<boolean>} true if a shared channel was requested (played or failed).
+ */
+async function playSharedDeepLink() {
+    const shared = parseDeepLink();
+    if (!shared) return false;
+    const channel = await resolveDeepLinkChannel(shared);
+    if (!channel) {
+        showAppToast('Shared channel not found');
+        return true;
+    }
+    const occupied = SLOT_IDS.filter((id) => slotIsOccupied(
+        MultiView.slots?.[id]?.player?.channel,
+        MultiView.rememberedSlotKeys?.[id]
+    ));
+    const target = chooseSharedPlayTarget(occupied, {
+        max: MAX_MOSAIC_SLOTS,
+        fallback: MultiView.statusSlotId || 'center'
+    });
+    TileFrames.setPlaybackBusy(true);
+    await MultiView.playOnSlot(target, channel).catch(() => {});
+    TileFrames.setPlaybackBusy(false);
+    return true;
 }
 
 function loadLocalState() {
@@ -680,6 +713,8 @@ async function init() {
         }
 
         RemoteModule.restoreOpenIfNeeded();
+
+        await playSharedDeepLink();
 
         await countriesPromise;
         warmGuideIndex().catch(() => {});
