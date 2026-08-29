@@ -555,6 +555,20 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     font-family: inherit;
 }
 
+.settings-data-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: var(--tv-spacing-sm);
+}
+
+.settings-data-hint {
+    font-size: 0.8rem;
+    margin: 0.5rem 0 0;
+    color: var(--tv-text-secondary);
+    line-height: 1.35;
+}
+
 .settings-reset-defaults-btn:hover {
     background: var(--tv-border-light);
     color: var(--tv-primary);

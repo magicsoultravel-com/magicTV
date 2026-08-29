@@ -37,6 +37,7 @@ import {
 import { primeBootScreen, revealBootScreen, fadeOutBootCover, revealAppBehind } from './ui/bootScreen.js';
 import { ResumeSessionModal, collectSessionTiles } from './ui/resumeSessionModal.js';
 import { initHeaderCollapse } from './ui/headerCollapse.js';
+import { UserDataSettings } from './ui/userDataSettings.js';
 
 let appState = {
     countries: [],
@@ -671,6 +672,7 @@ async function init() {
         PlayerChrome.bindSettings();
         HiddenChannelsSettings.bind();
         VisitedChannelsSettings.bind();
+        UserDataSettings.bind();
         BrowseView.bind();
         ListSort.bind();
         ListSort.syncSortControls();
