@@ -47,6 +47,18 @@ const SORT_BY_ALLOWED = {
 
 const CATEGORY_FILTER_KEYS = ['channels', 'favorites', 'recents'];
 
+const DEFAULT_CHAN_BIND_SCOPE = Object.freeze({ mode: 'favorites' });
+
+/** @returns {{ mode: 'favorites' } | { mode: 'folder', folderId: string }} */
+export function normalizeChanBindScope(raw, favoriteFolders) {
+    if (!raw || typeof raw !== 'object') return { ...DEFAULT_CHAN_BIND_SCOPE };
+    if (raw.mode === 'folder' && typeof raw.folderId === 'string' && raw.folderId) {
+        const exists = (favoriteFolders || []).some((f) => f.id === raw.folderId);
+        if (exists) return { mode: 'folder', folderId: raw.folderId };
+    }
+    return { ...DEFAULT_CHAN_BIND_SCOPE };
+}
+
 function normalizeSortBy(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const out = { ...DEFAULT_SORT_BY };
@@ -381,6 +393,7 @@ export function loadPlayerState() {
             favoriteFolders,
             raw.favoritesRootOrder
         );
+        const chanBindScope = normalizeChanBindScope(raw.chanBindScope, favoriteFolders);
         const watchStatsMeta = normalizeWatchStatsMeta(raw.watchStatsMeta);
 
         return {
@@ -388,6 +401,7 @@ export function loadPlayerState() {
             favoritesMeta,
             favoriteFolders,
             favoritesRootOrder,
+            chanBindScope,
             recents,
             recentsMeta,
             visitedChannels,
@@ -416,6 +430,7 @@ export function loadPlayerState() {
             favoritesMeta: [],
             favoriteFolders: [],
             favoritesRootOrder: [],
+            chanBindScope: { ...DEFAULT_CHAN_BIND_SCOPE },
             recents: [],
             recentsMeta: [],
             visitedChannels: [],
@@ -459,6 +474,9 @@ export function savePlayerState(patch) {
             merged.favoriteFolders,
             merged.favoritesRootOrder
         );
+        merged.chanBindScope = normalizeChanBindScope(merged.chanBindScope, merged.favoriteFolders);
+    } else if ('chanBindScope' in patch) {
+        merged.chanBindScope = normalizeChanBindScope(merged.chanBindScope, merged.favoriteFolders);
     }
     if (merged.hiddenChannels) {
         merged.hiddenChannelsMeta = normalizeHiddenMeta(merged.hiddenChannels, merged.hiddenChannelsMeta);
@@ -475,6 +493,7 @@ export function savePlayerState(patch) {
         favoritesMeta: merged.favoritesMeta,
         favoriteFolders: merged.favoriteFolders,
         favoritesRootOrder: merged.favoritesRootOrder,
+        chanBindScope: merged.chanBindScope,
         recents: merged.recents,
         recentsMeta: merged.recentsMeta,
         visitedChannels: merged.visitedChannels,
@@ -502,7 +521,7 @@ export function savePlayerState(patch) {
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
                 k === 'favorites' || k === 'favoritesMeta' || k === 'favoriteFolders'
-                || k === 'favoritesRootOrder' || k === 'recents'
+                || k === 'favoritesRootOrder' || k === 'chanBindScope' || k === 'recents'
                 || k === 'recentsMeta' || k === 'visitedChannels' || k === 'visitedChannelsMeta'
                 || k === 'hiddenChannels' || k === 'hiddenChannelsMeta' || k === 'watchStatsMeta'
                 || k === 'volume' || k === 'lastChannelKey'

@@ -904,6 +904,12 @@ export const MultiView = {
                     this.setSlotVolume(slotId, (player.volume ?? 1) - 0.05);
                 }
                 break;
+            case 'chan-up':
+            case 'chan-down': {
+                const { navigateChannel } = await import('./channelNav.js');
+                await navigateChannel(slotId, action === 'chan-up' ? 'up' : 'down');
+                break;
+            }
             case 'cast-vol-down':
                 if (castActive && ChromecastManager.isCasting()) {
                     ChromecastManager.adjustVolume(-0.1);

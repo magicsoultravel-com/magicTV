@@ -28,6 +28,7 @@ import { warmGuideIndex } from './epg/epgService.js';
 
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
+import { ChanBindPicker } from './ui/chanBindPicker.js';
 import { loadPlayerState, DEFAULT_SORT_BY, DEFAULT_SORT_DIR, DEFAULT_CATEGORY_FILTER } from './storage/playerState.js';
 import {
     fillViewTransitionSelect,
@@ -338,6 +339,7 @@ function syncPlayFavoritesMosaicBtn() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn) return;
     btn.classList.toggle('is-hidden', appState.activeTab !== 'favorites');
+    ChanBindPicker.syncCatalogBindVisibility(appState.activeTab === 'favorites');
 }
 
 function syncCreateFavoriteFolderBtn() {
@@ -657,6 +659,7 @@ async function init() {
         bindPlayFavoritesMosaic();
         bindCreateFavoriteFolderBtn();
         bindCatalogLayout();
+        ChanBindPicker.bind();
         syncPlayFavoritesMosaicBtn();
         syncCreateFavoriteFolderBtn();
         syncCatalogLayoutBtn();

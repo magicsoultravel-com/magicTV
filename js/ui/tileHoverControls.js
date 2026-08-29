@@ -32,6 +32,8 @@ const VOL_CHEVRON_UP = `<svg viewBox="0 0 12 12" width="12" height="12" focusabl
 
 const VOL_CHEVRON_DOWN = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4 6 8l3.5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+export { VOL_CHEVRON_UP, VOL_CHEVRON_DOWN };
+
 const HOST_VIDEO_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
 function controlBtn(action, label, content, target, extraClass = '') {
@@ -58,6 +60,14 @@ export function buildTileVolRockerHtml(target = 'local') {
         <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="vol-up" data-controls-target="${target}" title="Volume up" aria-label="Volume up">${VOL_CHEVRON_UP}</button>
         <span class="tv-player-tile__vol-rocker-pct" data-tile-vol-pct aria-hidden="true">100</span>
         <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="vol-down" data-controls-target="${target}" title="Volume down" aria-label="Volume down">${VOL_CHEVRON_DOWN}</button>
+    </div>`;
+}
+
+/** Vertical channel rocker — right mid-height of the tile. */
+export function buildTileChanRockerHtml(target = 'local') {
+    return `<div class="tv-player-tile__chan-rocker" data-tile-chan-rocker>
+        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="chan-up" data-controls-target="${target}" title="Channel up" aria-label="Channel up">${VOL_CHEVRON_UP}</button>
+        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="chan-down" data-controls-target="${target}" title="Channel down" aria-label="Channel down">${VOL_CHEVRON_DOWN}</button>
     </div>`;
 }
 
@@ -136,6 +146,9 @@ export function hydrateTileHoverControls() {
 
         if (!tile.querySelector('[data-tile-vol-rocker]')) {
             hover.insertAdjacentHTML('beforebegin', buildTileVolRockerHtml('local'));
+        }
+        if (!tile.querySelector('[data-tile-chan-rocker]')) {
+            hover.insertAdjacentHTML('beforebegin', buildTileChanRockerHtml('local'));
         }
     });
 }

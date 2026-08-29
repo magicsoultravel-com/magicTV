@@ -11,6 +11,7 @@ import { FavoritesReorder } from './favoritesReorder.js';
 import { FavoritesFolders } from './favoritesFolders.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
+import { buildChannelIndex } from '../channelNav.js';
 
 const wiredTiles = new WeakSet();
 
@@ -20,15 +21,20 @@ let deps = {
     onPlay: () => {}
 };
 
-function tileHtml(ch) {
+function tileHtml(ch, opts = {}) {
     const initial = (ch.name || '?')[0].toUpperCase();
     const isFav = TvPlayer.isFavorite(ch);
     const isVisited = TvPlayer.isVisited(ch);
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
     const hideLabel = 'Hide channel';
     const refreshLabel = 'Refresh preview';
+    const chanNum = Number.isFinite(opts.chanNumber) ? opts.chanNumber : null;
+    const chanNumHtml = chanNum != null
+        ? `<span class="channel-tile__chan-num" aria-hidden="true">${chanNum}</span>`
+        : '';
     return `
         <div class="channel-tile${isVisited ? ' is-visited' : ''}" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">
+            ${chanNumHtml}
             <button type="button" class="channel-tile__refresh-btn" title="${refreshLabel}" aria-label="${refreshLabel}">${CARD_ICONS.tileRefresh}</button>
             <button type="button" class="channel-tile__hide-btn" title="${hideLabel}" aria-label="${hideLabel}">${CARD_ICONS.tileEye}</button>
             <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
@@ -198,6 +204,7 @@ function renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir,
     const folders = TvPlayer.getFavoriteFolders().filter((folder) => matchesFolderFilter(folder, filter));
     let rootChannelKeys = TvPlayer.getFavoritesRootOrder();
     rootChannelKeys = sortRootChannelRefs(rootChannelKeys, appState.favoritesList, sortBy, sortDir);
+    const { numberByKey } = buildChannelIndex();
 
     const parts = folders.map((folder) => ({ type: 'folder', folder }));
     for (const ref of rootChannelKeys) {
@@ -217,7 +224,7 @@ function renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir,
     const html = parts.map((part) => (
         part.type === 'folder'
             ? FavoritesFolders.folderTileHtml(part.folder)
-            : tileHtml(part.channel)
+            : tileHtml(part.channel, { chanNumber: numberByKey.get(channelKey(part.channel)) })
     )).join('');
     grid.innerHTML = html;
     const channels = parts.filter((p) => p.type === 'channel').map((p) => p.channel);
@@ -245,6 +252,7 @@ function renderFavoritesFolderGrid(appState, grid, empty, folderId, filter, sort
         .filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
     list = filterVisibleChannels(list);
     list = sortChannelList(list, sortBy, sortDir);
+    const { numberByKey } = buildChannelIndex();
 
     const parentHtml = FavoritesFolders.folderParentTileHtml();
     if (!list.length) {
@@ -254,7 +262,7 @@ function renderFavoritesFolderGrid(appState, grid, empty, folderId, filter, sort
         return;
     }
 
-    grid.innerHTML = parentHtml + list.map((ch) => tileHtml(ch)).join('');
+    grid.innerHTML = parentHtml + list.map((ch) => tileHtml(ch, { chanNumber: numberByKey.get(channelKey(ch)) })).join('');
     wireTiles(grid, list);
     FavoritesFolders.wireFolderViewTiles(grid);
     TileFrames.observe(grid, { viewKey: deps.getRefreshKey?.() || null });

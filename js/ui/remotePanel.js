@@ -9,6 +9,8 @@ import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
 import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
 import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
+import { navigateChannel } from '../channelNav.js';
+import { ChanBindPicker } from './chanBindPicker.js';
 
 let deps = {
     switchTab: () => {},
@@ -128,6 +130,14 @@ async function handleRemoteAction(action) {
             break;
         case 'vol-down':
             MultiView.setSharedVolume((MultiView.sharedVolume ?? TvPlayer.volume ?? 0.85) - 0.05);
+            break;
+        case 'chan-up':
+            await navigateChannel(slotId, 'up');
+            break;
+        case 'chan-down':
+            await navigateChannel(slotId, 'down');
+            break;
+        case 'chan-bind-toggle':
             break;
         case 'dock-toggle': {
             const mod = deps.getRemoteModule?.();
@@ -271,6 +281,7 @@ export function syncRemotePanel() {
     }
 
     syncVolumeDial();
+    ChanBindPicker.syncBindButtons();
 }
 
 function bindRemoteActions(root) {
@@ -286,8 +297,12 @@ function bindRemoteActions(root) {
     root?.querySelectorAll('[data-remote-action]').forEach((btn) => {
         if (btn.dataset.actionBound === '1') return;
         btn.dataset.actionBound = '1';
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
             const action = btn.getAttribute('data-remote-action');
+            if (action === 'chan-bind-toggle') {
+                e.stopPropagation();
+                return;
+            }
             if (action) handleRemoteAction(action);
         });
     });

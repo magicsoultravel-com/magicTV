@@ -169,6 +169,16 @@ export const TvPlayer = {
         return changed;
     },
 
+    getChanBindScope() {
+        return FavoritesRecents.getChanBindScope();
+    },
+
+    setChanBindScope(scope) {
+        const changed = FavoritesRecents.setChanBindScope(scope);
+        if (changed) this.emitState();
+        return changed;
+    },
+
     isHidden(channelOrKey) {
         return HiddenChannels.isHidden(channelOrKey);
     },

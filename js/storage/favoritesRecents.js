@@ -3,7 +3,8 @@ import { TvProviderRegistry } from '../tvProviders/registry.js';
 import {
     loadPlayerState,
     savePlayerState,
-    getRecentsCap
+    getRecentsCap,
+    normalizeChanBindScope
 } from './playerState.js';
 import { readPersistedState } from './persistedState.js';
 
@@ -128,7 +129,11 @@ export const FavoritesRecents = {
         const folder = folderById(state.favoriteFolders, id);
         if (!folder || folder.items.length > 0) return false;
         const favoriteFolders = state.favoriteFolders.filter((f) => f.id !== id);
-        savePlayerState({ favoriteFolders });
+        const patch = { favoriteFolders };
+        if (state.chanBindScope?.mode === 'folder' && state.chanBindScope.folderId === id) {
+            patch.chanBindScope = { mode: 'favorites' };
+        }
+        savePlayerState(patch);
         return true;
     },
 
@@ -450,6 +455,26 @@ export const FavoritesRecents = {
             countrycode: ''
         });
         savePlayerState({ favorites: next, favoritesMeta });
+        return true;
+    },
+
+    getChanBindScope() {
+        const scope = loadPlayerState().chanBindScope;
+        if (scope?.mode === 'folder' && scope.folderId) {
+            return { mode: 'folder', folderId: scope.folderId };
+        }
+        return { mode: 'favorites' };
+    },
+
+    setChanBindScope(scope) {
+        const folders = loadPlayerState().favoriteFolders;
+        const normalized = normalizeChanBindScope(scope, folders);
+        const current = loadPlayerState().chanBindScope;
+        if (current.mode === normalized.mode
+            && (normalized.mode !== 'folder' || current.folderId === normalized.folderId)) {
+            return false;
+        }
+        savePlayerState({ chanBindScope: normalized });
         return true;
     }
 };

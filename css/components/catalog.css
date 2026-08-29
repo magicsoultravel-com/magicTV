@@ -93,6 +93,34 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     touch-action: none;
 }
 
+.channel-tile__chan-num {
+    position: absolute;
+    left: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    min-width: 1.15rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--tv-text-primary, #f2f2f2);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 50%, transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    user-select: none;
+}
+
+#favorites-grid .channel-tile:hover .channel-tile__chan-num,
+#favorites-grid .channel-tile:focus-within .channel-tile__chan-num {
+    opacity: 1;
+}
+
 #favorites-grid.is-sort-locked .channel-tile {
     cursor: pointer;
     touch-action: auto;

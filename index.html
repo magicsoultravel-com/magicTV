@@ -442,6 +442,8 @@
                     <div class="remote-panel__grid">
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="vol-down" title="Volume down" aria-label="Volume down"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="vol-up" title="Volume up" aria-label="Volume up"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="chan-down" title="Channel down" aria-label="Channel down"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4 6 8l3.5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+                        <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="chan-up" title="Channel up" aria-label="Channel up"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 8 6 4l3.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
                         <div class="remote-panel__cell">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn remote-panel__btn is-muted" id="remote-mute-btn" data-remote-action="mute" title="Unmute" aria-label="Unmute" aria-pressed="true"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
                         </div>
@@ -479,6 +481,12 @@
                         </div>
                         <div class="remote-panel__cell">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-2 remote-panel__btn" id="remote-dock-toggle" data-remote-action="dock-toggle" title="Undock remote" aria-label="Undock remote"><svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M3 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        </div>
+                        <div class="remote-panel__cell">
+                            <div class="tv-tab-popup remote-panel__chan-bind-popup">
+                                <button type="button" class="tv-controls__btn tv-controls__btn--main-2 remote-panel__btn" id="remote-chan-bind-btn" data-remote-action="chan-bind-toggle" title="Bind channels" aria-label="Bind channels" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2 3.5h8M2 6h8M2 8.5h5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="9.2" cy="8.5" r="1.3" fill="currentColor"/></svg></button>
+                                <div id="remote-chan-bind-menu" class="chan-bind-menu" role="menu" aria-label="Channel bind scope" hidden></div>
+                            </div>
                         </div>
                         <div class="remote-panel__cell">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn" id="remote-guide-toggle" data-remote-action="guide-toggle" title="Hide TV guide" aria-label="Hide TV guide" aria-pressed="true"></button>
@@ -891,6 +899,10 @@
                                 </div>
                                 <button type="button" id="sort-dir-btn" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-2 tv-tab--sort-dir" title="Toggle ascending/descending" aria-label="Toggle sort direction"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,4.2 3.2,8 8.8,8" fill="currentColor"/></svg></button>
                                 <button type="button" id="play-favorites-mosaic-btn" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-1 is-hidden" title="Play favorites on multiple TVs" aria-label="Play favorites on multiple TVs"></button>
+                                <div class="tv-tab-popup remote-catalog__chan-bind-popup is-hidden" id="catalog-chan-bind-popup">
+                                    <button type="button" id="catalog-chan-bind-btn" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-2 is-hidden" title="Bind channels" aria-label="Bind channels" aria-haspopup="menu" aria-expanded="false"></button>
+                                    <div id="catalog-chan-bind-menu" class="chan-bind-menu" role="menu" aria-label="Channel bind scope" hidden></div>
+                                </div>
                                 <button type="button" id="create-favorite-folder-btn" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-3 is-hidden" title="New folder" aria-label="New folder"></button>
                             </div>
                             <div id="browser-window-controls" class="browser-window-controls remote-panel__cell--nav is-hidden" role="group" aria-label="Browser window controls">

@@ -247,7 +247,8 @@
 .tv-player-tile.tv-swap--flip .tv-player-tile__corner,
 .tv-player-tile.tv-swap--flip .tv-player-tile__quality,
 .tv-player-tile.tv-swap--flip .tv-player-tile__hover,
-.tv-player-tile.tv-swap--flip .tv-player-tile__vol-rocker {
+.tv-player-tile.tv-swap--flip .tv-player-tile__vol-rocker,
+.tv-player-tile.tv-swap--flip .tv-player-tile__chan-rocker {
     backface-visibility: hidden;
 }
 
@@ -939,6 +940,46 @@
     color: var(--tv-text-primary, #f2f2f2);
     user-select: none;
     pointer-events: none;
+}
+
+/* Per-TV channel rocker — outside bottom strip, right mid-height */
+.tv-player-tile__chan-rocker {
+    position: absolute;
+    right: 0.55rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 7400;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    padding: 0.2rem 0.15rem;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.tv-player-tile:hover .tv-player-tile__chan-rocker,
+.tv-player-tile:focus-within .tv-player-tile__chan-rocker,
+.tv-player-tile.is-selected .tv-player-tile__chan-rocker,
+.tv-player-tile.is-channel-picker-target .tv-player-tile__chan-rocker,
+.tv-player-tile.is-screen-strip-hover .tv-player-tile__chan-rocker {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: none) {
+    .tv-player-tile.is-primary .tv-player-tile__chan-rocker,
+    .tv-player-tile.is-selected .tv-player-tile__chan-rocker,
+    .tv-player-tile.is-channel-picker-target .tv-player-tile__chan-rocker,
+    .tv-player-tile.is-screen-strip-hover .tv-player-tile__chan-rocker {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .tv-player-tile__hover {
