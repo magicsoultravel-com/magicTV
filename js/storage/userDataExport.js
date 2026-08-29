@@ -7,7 +7,7 @@ import {
     savePlayerState,
     getRecentsCap,
     normalizeWatchStatsMeta,
-    normalizeChanBindScope
+    normalizeChanBindScopeBySlot
 } from './playerState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
@@ -335,6 +335,15 @@ export function applyUserDataMergeLibrary(payload) {
 
     const watchStatsMeta = mergeWatchStatsList(local.watchStatsMeta, imported.watchStatsMeta);
 
+    const chanBindScopeBySlot = normalizeChanBindScopeBySlot(
+        {
+            ...(local.chanBindScopeBySlot || {}),
+            ...(imported.chanBindScopeBySlot || {})
+        },
+        favoriteFolders,
+        imported.chanBindScopeBySlot ? null : imported.chanBindScope
+    );
+
     savePlayerState({
         favorites,
         favoritesMeta,
@@ -346,9 +355,7 @@ export function applyUserDataMergeLibrary(payload) {
         visitedChannels,
         visitedChannelsMeta,
         watchStatsMeta,
-        chanBindScope: imported.chanBindScope != null
-            ? normalizeChanBindScope(imported.chanBindScope, favoriteFolders)
-            : local.chanBindScope
+        chanBindScopeBySlot
     });
 }
 

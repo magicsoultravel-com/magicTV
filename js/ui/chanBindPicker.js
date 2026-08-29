@@ -1,12 +1,14 @@
-/** Bind scope picker for chan up/down — remote keypad + favorites toolbar. */
+/** Bind scope picker for chan up/down — per TV slot; remote, catalog, tile rockers. */
 import { el, escapeHtml } from '../tvUtils.js';
 import { TvPlayer } from '../tvPlayer.js';
+import { MultiView } from '../multiView.js';
 import { ChannelGrid } from './channelGrid.js';
+import { CHAN_BIND_SVG } from './tileHoverControls.js';
 
-const BIND_ICON = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2 3.5h8M2 6h8M2 8.5h5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="9.2" cy="8.5" r="1.3" fill="currentColor"/></svg>`;
+const BIND_ICON = CHAN_BIND_SVG;
 
-/** @type {Set<string>} */
-const openMenus = new Set();
+/** @type {Map<string, { menu: HTMLElement, btn: HTMLElement }>} */
+const openMenus = new Map();
 
 function scopeLabel(scope) {
     if (scope.mode === 'folder') {
@@ -22,9 +24,42 @@ function isScopeActive(scope, current) {
     return true;
 }
 
-function renderMenu(menuEl) {
+function menuKey(menuEl) {
+    if (!menuEl) return '';
+    if (menuEl.id) return menuEl.id;
+    const tile = menuEl.closest('.tv-player-tile');
+    const slot = tile?.getAttribute('data-slot') || 'tile';
+    return `tile-bind:${slot}`;
+}
+
+function resolveSlotForMenu(menuEl) {
+    const tile = menuEl?.closest('.tv-player-tile');
+    if (tile) return tile.getAttribute('data-slot') || 'center';
+    return MultiView.statusSlotId || 'center';
+}
+
+function syncBindButton(btn, slotId) {
+    if (!btn) return;
+    const scope = TvPlayer.getChanBindScope(slotId);
+    const label = scopeLabel(scope);
+    const title = `Bind channels (TV ${slotLabel(slotId)}): ${label}`;
+    const folderBound = scope.mode === 'folder';
+
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+    btn.setAttribute('aria-pressed', String(folderBound));
+    btn.classList.toggle('is-bound-folder', folderBound);
+}
+
+function slotLabel(slotId) {
+    const labels = { center: '1', topLeft: '2', topRight: '3', bottomLeft: '4', bottomRight: '5' };
+    return labels[slotId] || '1';
+}
+
+function renderMenu(menuEl, slotId) {
     if (!menuEl) return;
-    const current = TvPlayer.getChanBindScope();
+    menuEl.dataset.chanBindSlot = slotId;
+    const current = TvPlayer.getChanBindScope(slotId);
     const folders = TvPlayer.getFavoriteFolders();
     const options = [{ mode: 'favorites', label: 'All favorites' }];
     folders.forEach((folder) => {
@@ -40,40 +75,53 @@ function renderMenu(menuEl) {
     }).join('');
 }
 
-function closeMenu(menuId) {
-    openMenus.delete(menuId);
-    const menu = el(menuId);
-    const btn = menuId === 'remote-chan-bind-menu' ? el('remote-chan-bind-btn') : el('catalog-chan-bind-btn');
-    if (menu) menu.hidden = true;
-    if (btn) {
-        btn.setAttribute('aria-expanded', 'false');
-        btn.classList.remove('is-active');
+function closeMenuEntry(menuEl, btnEl) {
+    if (menuEl) {
+        openMenus.delete(menuKey(menuEl));
+        menuEl.hidden = true;
+    }
+    if (btnEl) {
+        btnEl.setAttribute('aria-expanded', 'false');
+        if (btnEl.getAttribute('aria-pressed') !== 'true') {
+            btnEl.classList.remove('is-active');
+        }
     }
 }
 
 function closeAllMenus() {
-    [...openMenus].forEach(closeMenu);
+    for (const { menu, btn } of openMenus.values()) {
+        if (menu) menu.hidden = true;
+        if (btn) {
+            btn.setAttribute('aria-expanded', 'false');
+            btn.classList.remove('is-active');
+        }
+    }
+    openMenus.clear();
 }
 
-function toggleMenu(menuId, btnId) {
-    const menu = el(menuId);
-    const btn = el(btnId);
-    if (!menu || !btn) return;
+function toggleMenuEl(menuEl, btnEl) {
+    if (!menuEl || !btnEl) return;
+    const key = menuKey(menuEl);
 
-    if (openMenus.has(menuId)) {
-        closeMenu(menuId);
+    if (openMenus.has(key)) {
+        closeMenuEntry(menuEl, btnEl);
         return;
     }
     closeAllMenus();
-    renderMenu(menu);
-    menu.hidden = false;
-    openMenus.add(menuId);
-    btn.setAttribute('aria-expanded', 'true');
-    btn.classList.add('is-active');
+    const slotId = resolveSlotForMenu(menuEl);
+    renderMenu(menuEl, slotId);
+    menuEl.hidden = false;
+    openMenus.set(key, { menu: menuEl, btn: btnEl });
+    btnEl.setAttribute('aria-expanded', 'true');
+    btnEl.classList.add('is-active');
 }
 
-function selectScope(scope) {
-    TvPlayer.setChanBindScope(scope);
+function toggleMenu(menuId, btnId) {
+    toggleMenuEl(el(menuId), el(btnId));
+}
+
+function selectScope(scope, slotId) {
+    TvPlayer.setChanBindScope(slotId, scope);
     closeAllMenus();
     syncBindButtons();
     ChannelGrid.refreshFavorites();
@@ -86,38 +134,38 @@ function wireMenu(menuEl) {
         const item = e.target.closest('[data-chan-bind-favorites], [data-chan-bind-folder]');
         if (!item) return;
         e.stopPropagation();
+        const slotId = menuEl.dataset.chanBindSlot || resolveSlotForMenu(menuEl);
         if (item.hasAttribute('data-chan-bind-favorites')) {
-            selectScope({ mode: 'favorites' });
+            selectScope({ mode: 'favorites' }, slotId);
             return;
         }
         const folderId = item.getAttribute('data-chan-bind-folder');
-        if (folderId) selectScope({ mode: 'folder', folderId });
+        if (folderId) selectScope({ mode: 'folder', folderId }, slotId);
     });
 }
 
-export function syncBindButtons() {
-    const scope = TvPlayer.getChanBindScope();
-    const label = scopeLabel(scope);
-    const title = `Bind channels: ${label}`;
+function wireTileBindMenus() {
+    document.querySelectorAll('.tv-player-tile__chan-bind-menu').forEach(wireMenu);
+}
 
-    const remoteBtn = el('remote-chan-bind-btn');
-    if (remoteBtn) {
-        remoteBtn.title = title;
-        remoteBtn.setAttribute('aria-label', title);
-        remoteBtn.classList.toggle('is-bound-folder', scope.mode === 'folder');
-    }
+export function toggleTileBindMenu(btnEl) {
+    const wrap = btnEl?.closest('.tv-player-tile__chan-bind-wrap');
+    const menu = wrap?.querySelector('.tv-player-tile__chan-bind-menu');
+    if (menu) toggleMenuEl(menu, btnEl);
+}
+
+export function syncBindButtons() {
+    const focusedSlot = MultiView.statusSlotId || 'center';
+    syncBindButton(el('remote-chan-bind-btn'), focusedSlot);
 
     const catalogBtn = el('catalog-chan-bind-btn');
-    const catalogPopup = el('catalog-chan-bind-popup');
-    if (catalogBtn) {
-        catalogBtn.innerHTML = BIND_ICON;
-        catalogBtn.title = title;
-        catalogBtn.setAttribute('aria-label', title);
-        catalogBtn.classList.toggle('is-bound-folder', scope.mode === 'folder');
-    }
-    if (catalogPopup) {
-        catalogPopup.classList.toggle('is-hidden', false);
-    }
+    syncBindButton(catalogBtn, focusedSlot);
+    if (catalogBtn) catalogBtn.innerHTML = BIND_ICON;
+
+    document.querySelectorAll('[data-tile-chan-bind-btn]').forEach((btn) => {
+        const slotId = btn.closest('.tv-player-tile')?.getAttribute('data-slot') || 'center';
+        syncBindButton(btn, slotId);
+    });
 }
 
 export function syncCatalogBindVisibility(isFavoritesTab) {
@@ -135,6 +183,7 @@ export const ChanBindPicker = {
         const catalogBtn = el('catalog-chan-bind-btn');
         wireMenu(el('remote-chan-bind-menu'));
         wireMenu(el('catalog-chan-bind-menu'));
+        wireTileBindMenus();
 
         if (remoteBtn && remoteBtn.dataset.bound !== '1') {
             remoteBtn.dataset.bound = '1';
@@ -152,6 +201,18 @@ export const ChanBindPicker = {
             });
         }
 
+        const mosaic = document.getElementById('player-mosaic');
+        if (mosaic && mosaic.dataset.chanBindBound !== '1') {
+            mosaic.dataset.chanBindBound = '1';
+            mosaic.addEventListener('click', (e) => {
+                const btn = e.target.closest?.('[data-tile-chan-bind-btn]');
+                if (!btn) return;
+                e.stopPropagation();
+                e.preventDefault();
+                toggleTileBindMenu(btn);
+            });
+        }
+
         if (!window.__chanBindDocBound) {
             window.__chanBindDocBound = true;
             document.addEventListener('click', () => closeAllMenus());
@@ -163,6 +224,8 @@ export const ChanBindPicker = {
         syncBindButtons();
     },
 
+    wireTileBindMenus,
+    toggleTileBindMenu,
     closeAllMenus,
     syncBindButtons,
     syncCatalogBindVisibility

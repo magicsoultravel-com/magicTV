@@ -169,12 +169,12 @@ export const TvPlayer = {
         return changed;
     },
 
-    getChanBindScope() {
-        return FavoritesRecents.getChanBindScope();
+    getChanBindScope(slotId) {
+        return FavoritesRecents.getChanBindScope(slotId);
     },
 
-    setChanBindScope(scope) {
-        const changed = FavoritesRecents.setChanBindScope(scope);
+    setChanBindScope(slotId, scope) {
+        const changed = FavoritesRecents.setChanBindScope(slotId, scope);
         if (changed) this.emitState();
         return changed;
     },

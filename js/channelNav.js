@@ -14,7 +14,7 @@ import { SLOT_IDS, slotIsOccupied } from './mosaic/constants.js';
  * @returns {{ keys: string[], numberByKey: Map<string, number> }}
  */
 export function buildChannelIndex(bindScope) {
-    const scope = bindScope || FavoritesRecents.getChanBindScope();
+    const scope = bindScope || { mode: 'favorites' };
     const keys = [];
     const numberByKey = new Map();
 
@@ -82,7 +82,7 @@ function currentSlotChannelKey(slotId) {
  * @returns {Promise<{ channel: object, number: number } | null>}
  */
 export async function resolveAdjacentChannel({ slotId, direction, bindScope }) {
-    const scope = bindScope || FavoritesRecents.getChanBindScope();
+    const scope = bindScope || FavoritesRecents.getChanBindScope(slotId);
     const { keys, numberByKey } = buildChannelIndex(scope);
     if (!keys.length) return null;
 
@@ -125,7 +125,7 @@ export async function navigateChannel(slotId, direction) {
     const { showAppToast } = await import('./ui/toast.js');
     const result = await resolveAdjacentChannel({ slotId, direction });
     if (!result) {
-        const { keys } = buildChannelIndex();
+        const { keys } = buildChannelIndex(FavoritesRecents.getChanBindScope(slotId));
         if (!keys.length) {
             showAppToast('No channels bound');
         } else {

@@ -40,7 +40,8 @@ function getScreenControlStrip() {
 import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
-import { hydrateTileHoverControls, PLAY_ALL_SVG, PAUSE_ALL_SVG } from './ui/tileHoverControls.js';
+import { hydrateTileHoverControls, PLAY_ALL_SVG, PAUSE_ALL_SVG, syncTileRockers } from './ui/tileHoverControls.js';
+import { ChanBindPicker } from './ui/chanBindPicker.js';
 import { syncScreenBtnActions } from './ui/screenStripControls.js';
 import { ChromecastManager } from './cast/chromecastManager.js';
 
@@ -167,6 +168,9 @@ export const MultiView = {
         }).catch(() => {});
         import('./ui/volumeDial.js').then(({ syncVolumeDial }) => {
             syncVolumeDial?.();
+        }).catch(() => {});
+        import('./ui/chanBindPicker.js').then(({ syncBindButtons }) => {
+            syncBindButtons?.();
         }).catch(() => {});
     },
 
@@ -391,6 +395,8 @@ export const MultiView = {
         this.ensureCenterOnTop();
 
         hydrateTileHoverControls();
+        syncTileRockers();
+        ChanBindPicker.wireTileBindMenus();
         this.syncLayout();
         this.mountAll();
         this.bindUi();

@@ -28,9 +28,14 @@ export const VOL_DOWN_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" foc
 
 export const VOL_UP_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
-const VOL_CHEVRON_UP = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 8 6 4l3.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const CHAN_CHEVRON_UP = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 8 6 4l3.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-const VOL_CHEVRON_DOWN = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4 6 8l3.5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const CHAN_CHEVRON_DOWN = `<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4 6 8l3.5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+export const CHAN_BIND_SVG = `<svg viewBox="0 0 12 12" width="11" height="11" focusable="false" aria-hidden="true"><path d="M2 3.5h8M2 6h8M2 8.5h5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="9.2" cy="8.5" r="1.3" fill="currentColor"/></svg>`;
+
+const VOL_CHEVRON_UP = CHAN_CHEVRON_UP;
+const VOL_CHEVRON_DOWN = CHAN_CHEVRON_DOWN;
 
 export { VOL_CHEVRON_UP, VOL_CHEVRON_DOWN };
 
@@ -56,19 +61,43 @@ function muteWrap(target) {
 
 /** Vertical rocker outside the bottom strip — left mid-height of the tile. */
 export function buildTileVolRockerHtml(target = 'local') {
-    return `<div class="tv-player-tile__vol-rocker" data-tile-vol-rocker>
-        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="vol-up" data-controls-target="${target}" title="Volume up" aria-label="Volume up">${VOL_CHEVRON_UP}</button>
-        <span class="tv-player-tile__vol-rocker-pct" data-tile-vol-pct aria-hidden="true">100</span>
-        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="vol-down" data-controls-target="${target}" title="Volume down" aria-label="Volume down">${VOL_CHEVRON_DOWN}</button>
+    return `<div class="tv-player-tile__rocker tv-player-tile__vol-rocker" data-tile-vol-rocker>
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-player-tile__rocker-btn" data-tile-action="vol-up" data-controls-target="${target}" title="Volume up" aria-label="Volume up">${VOL_UP_SVG}</button>
+        <span class="tv-player-tile__rocker-mid tv-player-tile__vol-rocker-pct" data-tile-vol-pct aria-hidden="true">100</span>
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn" data-tile-action="vol-down" data-controls-target="${target}" title="Volume down" aria-label="Volume down">${VOL_DOWN_SVG}</button>
     </div>`;
 }
 
 /** Vertical channel rocker — right mid-height of the tile. */
 export function buildTileChanRockerHtml(target = 'local') {
-    return `<div class="tv-player-tile__chan-rocker" data-tile-chan-rocker>
-        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="chan-up" data-controls-target="${target}" title="Channel up" aria-label="Channel up">${VOL_CHEVRON_UP}</button>
-        <button type="button" class="tv-player-tile__vol-rocker-btn" data-tile-action="chan-down" data-controls-target="${target}" title="Channel down" aria-label="Channel down">${VOL_CHEVRON_DOWN}</button>
+    return `<div class="tv-player-tile__rocker tv-player-tile__chan-rocker" data-tile-chan-rocker>
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-player-tile__rocker-btn" data-tile-action="chan-up" data-controls-target="${target}" title="Channel up" aria-label="Channel up">${CHAN_CHEVRON_UP}</button>
+        <div class="tv-player-tile__rocker-mid tv-player-tile__chan-bind-wrap">
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn tv-player-tile__chan-bind-btn" data-tile-chan-bind-btn title="Bind channels" aria-label="Bind channels" aria-haspopup="menu" aria-expanded="false">${CHAN_BIND_SVG}</button>
+            <div class="chan-bind-menu tv-player-tile__chan-bind-menu" role="menu" aria-label="Channel bind scope" hidden></div>
+        </div>
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn" data-tile-action="chan-down" data-controls-target="${target}" title="Channel down" aria-label="Channel down">${CHAN_CHEVRON_DOWN}</button>
     </div>`;
+}
+
+/** Refresh vol/chan rocker markup on all mosaic tiles (e.g. after style updates). */
+export function syncTileRockers() {
+    if (typeof document === 'undefined') return;
+    const mosaic = document.getElementById('player-mosaic');
+    if (!mosaic) return;
+
+    mosaic.querySelectorAll('.tv-player-tile').forEach((tile) => {
+        const hover = tile.querySelector('.tv-player-tile__hover');
+        if (!hover) return;
+
+        const vol = tile.querySelector('[data-tile-vol-rocker]');
+        if (vol) vol.outerHTML = buildTileVolRockerHtml('local');
+        else hover.insertAdjacentHTML('beforebegin', buildTileVolRockerHtml('local'));
+
+        const chan = tile.querySelector('[data-tile-chan-rocker]');
+        if (chan) chan.outerHTML = buildTileChanRockerHtml('local');
+        else hover.insertAdjacentHTML('beforebegin', buildTileChanRockerHtml('local'));
+    });
 }
 
 function castWrap() {
@@ -143,12 +172,6 @@ export function hydrateTileHoverControls() {
         const slotId = tile.getAttribute('data-slot');
         const variant = slotId === 'center' ? 'center' : 'corner';
         hover.innerHTML = buildTileHoverHtml(variant);
-
-        if (!tile.querySelector('[data-tile-vol-rocker]')) {
-            hover.insertAdjacentHTML('beforebegin', buildTileVolRockerHtml('local'));
-        }
-        if (!tile.querySelector('[data-tile-chan-rocker]')) {
-            hover.insertAdjacentHTML('beforebegin', buildTileChanRockerHtml('local'));
-        }
+        syncTileRockers();
     });
 }

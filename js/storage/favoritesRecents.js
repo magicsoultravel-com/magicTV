@@ -6,6 +6,7 @@ import {
     getRecentsCap,
     normalizeChanBindScope
 } from './playerState.js';
+import { SLOT_IDS } from '../mosaic/constants.js';
 import { readPersistedState } from './persistedState.js';
 
 function cloneFolders(folders) {
@@ -130,9 +131,16 @@ export const FavoritesRecents = {
         if (!folder || folder.items.length > 0) return false;
         const favoriteFolders = state.favoriteFolders.filter((f) => f.id !== id);
         const patch = { favoriteFolders };
-        if (state.chanBindScope?.mode === 'folder' && state.chanBindScope.folderId === id) {
-            patch.chanBindScope = { mode: 'favorites' };
+        const nextBySlot = { ...state.chanBindScopeBySlot };
+        let bindChanged = false;
+        for (const slotId of SLOT_IDS) {
+            const scope = nextBySlot[slotId];
+            if (scope?.mode === 'folder' && scope.folderId === id) {
+                nextBySlot[slotId] = { mode: 'favorites' };
+                bindChanged = true;
+            }
         }
+        if (bindChanged) patch.chanBindScopeBySlot = nextBySlot;
         savePlayerState(patch);
         return true;
     },
@@ -458,23 +466,27 @@ export const FavoritesRecents = {
         return true;
     },
 
-    getChanBindScope() {
-        const scope = loadPlayerState().chanBindScope;
+    getChanBindScope(slotId = 'center') {
+        const id = SLOT_IDS.includes(slotId) ? slotId : 'center';
+        const scope = loadPlayerState().chanBindScopeBySlot?.[id];
         if (scope?.mode === 'folder' && scope.folderId) {
             return { mode: 'folder', folderId: scope.folderId };
         }
         return { mode: 'favorites' };
     },
 
-    setChanBindScope(scope) {
-        const folders = loadPlayerState().favoriteFolders;
-        const normalized = normalizeChanBindScope(scope, folders);
-        const current = loadPlayerState().chanBindScope;
+    setChanBindScope(slotId, scope) {
+        const id = SLOT_IDS.includes(slotId) ? slotId : 'center';
+        const state = loadPlayerState();
+        const normalized = normalizeChanBindScope(scope, state.favoriteFolders);
+        const map = { ...(state.chanBindScopeBySlot || {}) };
+        const current = map[id] || { mode: 'favorites' };
         if (current.mode === normalized.mode
             && (normalized.mode !== 'folder' || current.folderId === normalized.folderId)) {
             return false;
         }
-        savePlayerState({ chanBindScope: normalized });
+        map[id] = normalized;
+        savePlayerState({ chanBindScopeBySlot: map });
         return true;
     }
 };

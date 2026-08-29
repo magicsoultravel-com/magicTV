@@ -4,6 +4,7 @@
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
+import { SLOT_IDS } from '../mosaic/constants.js';
 
 export const DEFAULT_RECENTS_CAP = 20;
 export const RECENTS_CAP_MIN = 0;
@@ -57,6 +58,19 @@ export function normalizeChanBindScope(raw, favoriteFolders) {
         if (exists) return { mode: 'folder', folderId: raw.folderId };
     }
     return { ...DEFAULT_CHAN_BIND_SCOPE };
+}
+
+/** Per-TV chan bind map; migrates legacy global `chanBindScope` when present. */
+export function normalizeChanBindScopeBySlot(rawBySlot, favoriteFolders, legacyGlobal) {
+    const src = rawBySlot && typeof rawBySlot === 'object' ? rawBySlot : {};
+    const hasAny = SLOT_IDS.some((id) => src[id] != null);
+    if (!hasAny && legacyGlobal) {
+        const legacy = normalizeChanBindScope(legacyGlobal, favoriteFolders);
+        return Object.fromEntries(SLOT_IDS.map((id) => [id, { ...legacy }]));
+    }
+    return Object.fromEntries(
+        SLOT_IDS.map((id) => [id, normalizeChanBindScope(src[id], favoriteFolders)])
+    );
 }
 
 function normalizeSortBy(raw) {
@@ -393,7 +407,11 @@ export function loadPlayerState() {
             favoriteFolders,
             raw.favoritesRootOrder
         );
-        const chanBindScope = normalizeChanBindScope(raw.chanBindScope, favoriteFolders);
+        const chanBindScopeBySlot = normalizeChanBindScopeBySlot(
+            raw.chanBindScopeBySlot,
+            favoriteFolders,
+            raw.chanBindScope
+        );
         const watchStatsMeta = normalizeWatchStatsMeta(raw.watchStatsMeta);
 
         return {
@@ -401,7 +419,7 @@ export function loadPlayerState() {
             favoritesMeta,
             favoriteFolders,
             favoritesRootOrder,
-            chanBindScope,
+            chanBindScopeBySlot,
             recents,
             recentsMeta,
             visitedChannels,
@@ -430,7 +448,7 @@ export function loadPlayerState() {
             favoritesMeta: [],
             favoriteFolders: [],
             favoritesRootOrder: [],
-            chanBindScope: { ...DEFAULT_CHAN_BIND_SCOPE },
+            chanBindScopeBySlot: normalizeChanBindScopeBySlot(null, [], null),
             recents: [],
             recentsMeta: [],
             visitedChannels: [],
@@ -474,9 +492,17 @@ export function savePlayerState(patch) {
             merged.favoriteFolders,
             merged.favoritesRootOrder
         );
-        merged.chanBindScope = normalizeChanBindScope(merged.chanBindScope, merged.favoriteFolders);
-    } else if ('chanBindScope' in patch) {
-        merged.chanBindScope = normalizeChanBindScope(merged.chanBindScope, merged.favoriteFolders);
+        merged.chanBindScopeBySlot = normalizeChanBindScopeBySlot(
+            merged.chanBindScopeBySlot,
+            merged.favoriteFolders,
+            merged.chanBindScope
+        );
+    } else if ('chanBindScopeBySlot' in patch || 'chanBindScope' in patch) {
+        merged.chanBindScopeBySlot = normalizeChanBindScopeBySlot(
+            merged.chanBindScopeBySlot,
+            merged.favoriteFolders,
+            merged.chanBindScope
+        );
     }
     if (merged.hiddenChannels) {
         merged.hiddenChannelsMeta = normalizeHiddenMeta(merged.hiddenChannels, merged.hiddenChannelsMeta);
@@ -493,7 +519,7 @@ export function savePlayerState(patch) {
         favoritesMeta: merged.favoritesMeta,
         favoriteFolders: merged.favoriteFolders,
         favoritesRootOrder: merged.favoritesRootOrder,
-        chanBindScope: merged.chanBindScope,
+        chanBindScopeBySlot: merged.chanBindScopeBySlot,
         recents: merged.recents,
         recentsMeta: merged.recentsMeta,
         visitedChannels: merged.visitedChannels,
@@ -521,7 +547,7 @@ export function savePlayerState(patch) {
         ...Object.fromEntries(
             Object.entries(patch).filter(([k]) => !(
                 k === 'favorites' || k === 'favoritesMeta' || k === 'favoriteFolders'
-                || k === 'favoritesRootOrder' || k === 'chanBindScope' || k === 'recents'
+                || k === 'favoritesRootOrder' || k === 'chanBindScopeBySlot' || k === 'recents'
                 || k === 'recentsMeta' || k === 'visitedChannels' || k === 'visitedChannelsMeta'
                 || k === 'hiddenChannels' || k === 'hiddenChannelsMeta' || k === 'watchStatsMeta'
                 || k === 'volume' || k === 'lastChannelKey'
