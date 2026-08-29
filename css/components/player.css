@@ -975,10 +975,11 @@
     z-index: 9000;
 }
 
+/* Chan-bind toggles — accent color flip only; the pressed disc + ring come
+   from the shared toggled recipe (.tv-controls__btn / .ui-icon-btn rules). */
 .tv-player-tile__chan-bind-btn.is-bound-folder,
 .tv-player-tile__chan-bind-btn[aria-pressed="true"] {
     color: var(--tv-main-3-flip, #fff);
-    background: color-mix(in srgb, var(--tv-main-3) 28%, transparent);
 }
 
 #remote-chan-bind-btn.is-bound-folder,
@@ -986,7 +987,6 @@
 #catalog-chan-bind-btn.is-bound-folder,
 #catalog-chan-bind-btn[aria-pressed="true"]:not(.is-active) {
     color: var(--tv-main-3-flip, #fff);
-    background: color-mix(in srgb, var(--tv-main-3) 28%, transparent);
 }
 
 .tv-player-tile__hover {
@@ -1208,17 +1208,20 @@
     background: transparent;
     border: 1px solid transparent;
     color: var(--tv-main-1);
-    border-radius: 0;
+    border-radius: 50%;
     font-size: 1rem;
     transition: var(--tv-transition), transform 0.15s ease;
     cursor: pointer;
     will-change: transform;
 }
 
-.tv-controls__btn:hover {
-    background: color-mix(in srgb, var(--tv-main-1) 30%, transparent);
-    border-radius: 50%;
-    transform: scale(1.05);
+/* Ghost hover — overlay TVs keep the lighter form: no disc/ring at rest,
+   shared shades appear on hover/toggle (tokens in base.tv.css). */
+.tv-controls__btn:hover,
+.tv-controls__btn:focus-visible {
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
+    transform: scale(var(--btn-press-scale, 1.04));
 }
 
 /* Shared circular icon button — nav, screen strip, module quick actions */
@@ -1231,22 +1234,24 @@
     min-width: var(--ui-icon-btn-size, 32px);
     padding: 0;
     border-radius: 50%;
-    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-    background: color-mix(in srgb, currentColor 10%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor var(--btn-ring, 22%), transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint, 10%), transparent);
     color: inherit;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
-.ui-icon-btn:hover {
-    background: color-mix(in srgb, currentColor 18%, transparent);
+.ui-icon-btn:hover,
+.ui-icon-btn:focus-visible {
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
 }
 
 .ui-icon-btn.is-active,
 .ui-icon-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
-    background: color-mix(in srgb, currentColor 24%, transparent);
-    border-color: color-mix(in srgb, currentColor 45%, transparent);
-    transform: scale(1.04);
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    transform: scale(var(--btn-press-scale, 1.04));
 }
 
 .tv-module__action.ui-icon-btn {
@@ -1259,89 +1264,32 @@
     color: var(--tv-text-primary);
 }
 
-.tv-controls__btn--main-1 {
-    background: transparent;
-    border-color: transparent;
-    color: var(--tv-main-1);
-}
+/* Accent variants — color only. Shape, disc and ring shades come from the
+   shared currentColor recipe (.tv-controls__btn + tokens in base.tv.css),
+   so every round button reads identically at rest, on hover and toggled. */
+.tv-controls__btn--main-1 { color: var(--tv-main-1); }
+.tv-controls__btn--main-2 { color: var(--tv-main-2); }
+.tv-controls__btn--main-3 { color: var(--tv-main-3); }
 
-.tv-controls__btn--main-1:hover {
-    background: color-mix(in srgb, var(--tv-main-1) 30%, transparent);
-    border-radius: 50%;
-    color: var(--tv-main-1);
-    transform: scale(1.05);
+/* Toggled (is-active / is-muted / aria-pressed) — shared tinted disc + ring,
+   unified with the magic remote. The icon flips to the paired accent below
+   and the disc/ring follow via currentColor. */
+.tv-controls__btn.is-active,
+.tv-controls__btn.is-muted,
+.tv-controls__btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    transform: scale(var(--btn-press-scale, 1.04));
 }
 
 .tv-controls__btn--main-1.is-active,
-.tv-controls__btn--main-1.is-muted {
-    background: transparent;
-    border-color: transparent;
-    color: var(--tv-main-1-flip);
-}
-
-.tv-controls__btn--main-1.is-active:hover,
-.tv-controls__btn--main-1.is-muted:hover {
-    background: color-mix(in srgb, var(--tv-main-1-flip) 30%, transparent);
-    border-radius: 50%;
-    color: var(--tv-main-1-flip);
-    transform: scale(1.05);
-}
-
-.tv-controls__btn--main-2 {
-    background: transparent;
-    border-color: transparent;
-    color: var(--tv-main-2);
-}
-
-.tv-controls__btn--main-2:hover {
-    background: color-mix(in srgb, var(--tv-main-2) 30%, transparent);
-    border-radius: 50%;
-    color: var(--tv-main-2);
-    transform: scale(1.05);
-}
+.tv-controls__btn--main-1.is-muted { color: var(--tv-main-1-flip); }
 
 .tv-controls__btn--main-2.is-active,
-.tv-controls__btn--main-2.is-muted {
-    background: transparent;
-    border-color: transparent;
-    color: var(--tv-main-2-flip);
-}
-
-.tv-controls__btn--main-2.is-active:hover,
-.tv-controls__btn--main-2.is-muted:hover {
-    background: color-mix(in srgb, var(--tv-main-2-flip) 30%, transparent);
-    border-radius: 50%;
-    color: var(--tv-main-2-flip);
-    transform: scale(1.05);
-}
-
-.tv-controls__btn--main-3 {
-    background: transparent;
-    border-color: transparent;
-    color: var(--tv-main-3);
-}
-
-.tv-controls__btn--main-3:hover {
-    background: color-mix(in srgb, var(--tv-main-3) 30%, transparent);
-    border-radius: 50%;
-    color: var(--tv-main-3);
-    transform: scale(1.05);
-}
+.tv-controls__btn--main-2.is-muted { color: var(--tv-main-2-flip); }
 
 .tv-controls__btn--main-3.is-active,
-.tv-controls__btn--main-3.is-muted {
-    background: transparent;
-    border-color: transparent;
-    color: var(--tv-main-3-flip);
-}
-
-.tv-controls__btn--main-3.is-active:hover,
-.tv-controls__btn--main-3.is-muted:hover {
-    background: color-mix(in srgb, var(--tv-main-3-flip) 30%, transparent);
-    border-radius: 50%;
-    color: var(--tv-main-3-flip);
-    transform: scale(1.05);
-}
+.tv-controls__btn--main-3.is-muted { color: var(--tv-main-3-flip); }
 
 /* Compact volume section */
 .tv-controls__volume {
