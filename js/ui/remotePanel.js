@@ -7,7 +7,7 @@ import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
-import { STOP_ALL_SVG, PLAY_ALL_SVG } from './tileHoverControls.js';
+import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
 import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
 
 let deps = {
@@ -147,7 +147,7 @@ async function handleRemoteAction(action) {
         }
         default:
             await MultiView.handleTileAction(
-                action === 'reset' || action === 'mute-all' || action === 'stop-all' ? 'center' : slotId,
+                action === 'reset' || action === 'mute-all' || action === 'stop-all' || action === 'play-all' ? 'center' : slotId,
                 action
             );
     }
@@ -218,13 +218,28 @@ export function syncRemotePanel() {
     }
 
     const anyPlaying = MultiView.isAnyPlaying?.() ?? false;
+    const allPlaying = MultiView.isAllPlaying?.() ?? false;
+
+    const playAllBtn = el('remote-play-all-btn');
+    if (playAllBtn) {
+        const isPause = allPlaying;
+        const label = isPause ? 'Pause all' : 'Play all';
+        playAllBtn.title = label;
+        playAllBtn.setAttribute('aria-label', label);
+        playAllBtn.setAttribute('aria-pressed', String(isPause));
+        playAllBtn.innerHTML = isPause ? PAUSE_ALL_SVG : PLAY_ALL_SVG;
+    }
+
     const stopAllBtn = el('remote-stop-all-btn');
     if (stopAllBtn) {
-        const label = anyPlaying ? 'Stop all' : 'Play all';
+        const label = 'Stop all';
         stopAllBtn.title = label;
         stopAllBtn.setAttribute('aria-label', label);
+        stopAllBtn.classList.toggle('is-hidden', !anyPlaying);
+        stopAllBtn.setAttribute('aria-disabled', String(!anyPlaying));
         stopAllBtn.setAttribute('aria-pressed', String(anyPlaying));
-        stopAllBtn.innerHTML = anyPlaying ? STOP_ALL_SVG : PLAY_ALL_SVG;
+        const stopCell = typeof stopAllBtn.closest === 'function' ? stopAllBtn.closest('.remote-panel__cell') : null;
+        if (stopCell) stopCell.classList.toggle('is-hidden', !anyPlaying);
     }
 
     const mod = deps.getRemoteModule?.();

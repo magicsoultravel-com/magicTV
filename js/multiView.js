@@ -40,7 +40,7 @@ function getScreenControlStrip() {
 import { swapMethods } from './mosaic/swap.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
-import { hydrateTileHoverControls, STOP_ALL_SVG, PLAY_ALL_SVG } from './ui/tileHoverControls.js';
+import { hydrateTileHoverControls, PLAY_ALL_SVG, PAUSE_ALL_SVG } from './ui/tileHoverControls.js';
 import { syncScreenBtnActions } from './ui/screenStripControls.js';
 import { ChromecastManager } from './cast/chromecastManager.js';
 
@@ -633,6 +633,17 @@ export const MultiView = {
         return false;
     },
 
+    isAllPlaying() {
+        let hasChannel = false;
+        for (const id of SLOT_IDS) {
+            const slot = this.slots[id];
+            if (!slot?.enabled || !slot.player?.channel) continue;
+            hasChannel = true;
+            if (!(slot.player.wantPlaying === true || slot.player.playing === true)) return false;
+        }
+        return hasChannel;
+    },
+
     muteAll() {
         SLOT_IDS.forEach((id) => {
             const slot = this.slots[id];
@@ -710,6 +721,23 @@ export const MultiView = {
         this.syncMosaicChrome();
     },
 
+    async pauseAll() {
+        await Promise.all(SLOT_IDS.map(async (id) => {
+            const slot = this.slots[id];
+            const player = slot?.player;
+            if (!slot?.enabled || !player?.channel) return;
+            if (player.wantPlaying !== true && player.playing !== true) return;
+            try {
+                player.pause();
+            } catch {
+                /* ignore per-slot failures */
+            }
+        }));
+        this.persistSlots();
+        this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
+    },
+
     syncMosaicChrome() {
         if (typeof document === 'undefined') return;
         const app = el('app-container') || document.body;
@@ -729,13 +757,26 @@ export const MultiView = {
         });
 
         const anyPlaying = this.isAnyPlaying();
-        const stopAllBtns = [el('mosaic-stop-all-btn'), el('remote-stop-all-btn')].filter(Boolean);
-        stopAllBtns.forEach((btn) => {
-            const label = anyPlaying ? 'Stop all' : 'Play all';
+        const allPlaying = this.isAllPlaying();
+
+        const playAllBtns = [el('mosaic-play-all-btn'), el('remote-play-all-btn')].filter(Boolean);
+        playAllBtns.forEach((btn) => {
+            const isPause = allPlaying;
+            const label = isPause ? 'Pause all' : 'Play all';
             btn.title = label;
             btn.setAttribute('aria-label', label);
+            btn.setAttribute('aria-pressed', String(isPause));
+            btn.innerHTML = isPause ? PAUSE_ALL_SVG : PLAY_ALL_SVG;
+        });
+
+        const stopAllBtns = [el('mosaic-stop-all-btn'), el('remote-stop-all-btn')].filter(Boolean);
+        stopAllBtns.forEach((btn) => {
+            const label = 'Stop all';
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+            btn.classList.toggle('is-hidden', !anyPlaying);
+            btn.setAttribute('aria-disabled', String(!anyPlaying));
             btn.setAttribute('aria-pressed', String(anyPlaying));
-            btn.innerHTML = anyPlaying ? STOP_ALL_SVG : PLAY_ALL_SVG;
         });
 
         if (typeof document !== 'undefined') {
@@ -772,9 +813,14 @@ export const MultiView = {
             return;
         }
 
-        if (action === 'stop-all') {
-            if (this.isAnyPlaying()) await this.stopAll();
+        if (action === 'play-all') {
+            if (this.isAllPlaying()) await this.pauseAll();
             else await this.playAll();
+            return;
+        }
+
+        if (action === 'stop-all') {
+            await this.stopAll();
             return;
         }
 
