@@ -967,10 +967,14 @@
     height: 22px;
 }
 
-.tv-player-tile__chan-bind-menu {
+/* Shared .chan-bind-menu base lives in remote.css, imported after this file;
+   double the class so tile placement wins the cascade on specificity. */
+.chan-bind-menu.tv-player-tile__chan-bind-menu {
     position: absolute;
-    right: calc(100% + 0.35rem);
     top: 50%;
+    bottom: auto;
+    right: calc(100% + 0.35rem);
+    left: auto;
     transform: translateY(-50%);
     z-index: 9000;
 }

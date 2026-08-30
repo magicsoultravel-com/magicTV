@@ -557,6 +557,7 @@ export const MultiView = {
         mosaic.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             if (e.target.closest?.('[data-tile-action]')) return;
+            if (e.target.closest?.('[data-tile-chan-bind-btn]')) return;
             const tile = e.target.closest?.('.tv-player-tile');
             if (!tile) return;
             e.preventDefault();
