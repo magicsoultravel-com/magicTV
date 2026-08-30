@@ -120,3 +120,18 @@ test('load-first fires onPrepare without blocking commit sequence', async () => 
     }, { mode: 'crossfade', skipOut: true, skipIn: true });
     assert.deepEqual(order, ['prepare', 'commit']);
 });
+
+test('safe-loading-shaped flow runs out and in when skip flags are false', async () => {
+    const tile = mockTile();
+    const phases = [];
+
+    await runTileContentTransition(tile, {
+        onPrepare: () => {},
+        onCommit: async () => { phases.push('commit'); }
+    }, { mode: 'crossfade', skipOut: false, skipIn: false });
+
+    assert.deepEqual(phases, ['commit']);
+    assert.equal(tile.classes.has('tv-swap-out'), false);
+    assert.equal(tile.classes.has('tv-swap-in'), false);
+    assert.equal(tile.classes.has('is-swapping'), false);
+});

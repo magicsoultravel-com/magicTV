@@ -1116,6 +1116,7 @@ export const MultiView = {
     async playOnSlotSafeLoading(id, channel, player, normalized, key) {
         showAppToast('Fetching next channel…');
 
+        player._suppressErrorToast = true;
         player.switchGeneration = (player.switchGeneration || 0) + 1;
         const switchGen = player.switchGeneration;
 
@@ -1134,6 +1135,7 @@ export const MultiView = {
                 player.channel
                 && (player.playing || player.loading || player.pausePhase !== 'idle')
             );
+            const bufferReady = player.isPrepareReady();
 
             let committed = false;
             await this.withChannelSwitchTransition(
@@ -1150,7 +1152,7 @@ export const MultiView = {
                 },
                 {
                     skipOut: !hasVisibleContent,
-                    skipIn: false
+                    skipIn: bufferReady
                 }
             );
 
@@ -1162,10 +1164,9 @@ export const MultiView = {
                 return;
             }
 
-            this.persistSlots();
-            this.scheduleRefreshTiles();
             this.syncStatusChrome();
         } finally {
+            player._suppressErrorToast = false;
             this.persistSlots();
             this.scheduleRefreshTiles();
             this.syncSettingsToggles();
@@ -1206,6 +1207,7 @@ export const MultiView = {
         player.switchGeneration = (player.switchGeneration || 0) + 1;
         const switchGen = player.switchGeneration;
 
+        player._suppressErrorToast = true;
         player.channel = normalized;
         player.error = null;
         player.beginTransport(true);
@@ -1240,6 +1242,7 @@ export const MultiView = {
                 skipIn: bufferReady
             }
         ).finally(async () => {
+            player._suppressErrorToast = false;
             this.persistSlots();
             this.scheduleRefreshTiles();
             this.syncSettingsToggles();
@@ -1664,6 +1667,10 @@ export const MultiView = {
 
     syncSettingsToggles() {
         if (typeof document === 'undefined') return;
+        const modeSelect = el('chan-switch-mode-select');
+        if (modeSelect) {
+            modeSelect.value = SettingsStore.getChanSwitchMode();
+        }
         const swapSelect = el('swap-transition-select');
         if (swapSelect) {
             fillViewTransitionSelect(swapSelect, SettingsStore.getSwapTransition());

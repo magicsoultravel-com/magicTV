@@ -382,13 +382,44 @@ export function createPlayerInstance(options) {
         mountVideo(targetEl) {
             if (!this.video) return;
             const mount = targetEl || this.videoHolder;
-            if (this.video.parentElement !== mount) {
-                mount.appendChild(this.video);
-            }
             this.videoMount = mount;
+            this._syncVideoMount();
             mount.classList?.remove('is-hidden');
             this.videoHolder.classList.toggle('is-hidden', mount !== this.videoHolder);
-            if (this.videoBack && this.videoBack.parentElement !== this.videoHolder) {
+        },
+
+        /**
+         * Keep exactly one visible <video> in the tile surface; staging stays in videoHolder.
+         * Removes untracked orphan videos left by buffer swaps.
+         */
+        _syncVideoMount() {
+            const mount = this.videoMount;
+            if (!mount?.querySelectorAll) return;
+
+            if (this.videoBack && this.videoBack.parentElement === mount && this.videoHolder) {
+                this.videoHolder.appendChild(this.videoBack);
+            }
+
+            for (const el of [...mount.querySelectorAll('video')]) {
+                if (el === this.video) continue;
+                if (el === this.videoBack) {
+                    if (this.videoHolder) this.videoHolder.appendChild(el);
+                    continue;
+                }
+                try { el.pause(); } catch { /* ignore */ }
+                el.removeAttribute('src');
+                try { el.load(); } catch { /* ignore */ }
+                el.remove();
+            }
+
+            if (this.video && mount) {
+                if (this.video.parentElement !== mount) {
+                    mount.appendChild(this.video);
+                }
+            }
+
+            if (this.videoBack && this.videoHolder
+                && this.videoBack.parentElement !== this.videoHolder) {
                 this.videoHolder.appendChild(this.videoBack);
             }
         },
@@ -400,9 +431,28 @@ export function createPlayerInstance(options) {
             try { this.videoBack.load(); } catch { /* ignore */ }
             this.videoBack.classList.add('tv-video--staging');
             this.videoBack.style.cssText = '';
+            this.videoBack.muted = true;
+            this.videoBack.defaultMuted = true;
             if (this.videoBack.parentElement !== this.videoHolder) {
                 this.videoHolder.appendChild(this.videoBack);
             }
+        },
+
+        async _exitPresentationBeforeSwap() {
+            if (typeof document === 'undefined') return;
+            const pipEl = document.pictureInPictureElement;
+            if (pipEl === this.video || pipEl === this.videoBack) {
+                try { await document.exitPictureInPicture(); } catch { /* ignore */ }
+            }
+            const fsEl = document.fullscreenElement;
+            if (fsEl === this.video || fsEl === this.videoBack) {
+                try { await document.exitFullscreen(); } catch { /* ignore */ }
+            }
+        },
+
+        async _fallbackPlayChannel(channel) {
+            await this.playChannel(channel);
+            return Boolean(this.channel && !this.error);
         },
 
         /** Clear offscreen prefetch/staging styling so swapped-in video is visible in the tile. */
@@ -414,12 +464,22 @@ export function createPlayerInstance(options) {
             v.classList.remove('tv-video--staging', 'tv-video--prefetch');
             if (wasOffscreen) {
                 v.style.cssText = '';
+                v.defaultMuted = false;
             }
-            if (this.videoMount) {
-                if (v.parentElement !== this.videoMount) {
-                    this.videoMount.appendChild(v);
-                }
-                this.videoMount.classList.remove('is-hidden');
+            this._syncVideoMount();
+        },
+
+        /** Re-apply audible output after promoting a muted staging buffer. */
+        _refreshAudioAfterSwap() {
+            if (!this.video) return;
+            this.video.defaultMuted = false;
+            this.applyAudioToVideo();
+            const master = getSharedVolume();
+            const slot = Number.isFinite(this.volume) ? this.volume : 1;
+            const heard = Math.min(1, Math.max(0, master * slot));
+            if (!this.muted && heard > 0) {
+                this.video.muted = false;
+                this.video.volume = heard;
             }
         },
 
@@ -452,20 +512,27 @@ export function createPlayerInstance(options) {
         _adoptPrefetchedStaging(prefetched) {
             if (!prefetched?.video) return false;
             this._preloader.cancel();
-            if (this.videoBack && this.videoBack !== prefetched.video) {
-                try {
-                    if (this.videoBack.parentElement) {
-                        this.videoBack.parentElement.removeChild(this.videoBack);
-                    }
-                } catch { /* ignore */ }
-            }
+            const discarded = this.videoBack;
             this.videoBack = prefetched.video;
+            if (discarded && discarded !== prefetched.video && discarded !== this.video) {
+                try { discarded.pause(); } catch { /* ignore */ }
+                discarded.removeAttribute('src');
+                try { discarded.load(); } catch { /* ignore */ }
+                discarded.classList.add('tv-video--staging');
+                discarded.style.cssText = '';
+                discarded.muted = true;
+                discarded.defaultMuted = true;
+                if (this.videoHolder && discarded.parentElement !== this.videoHolder) {
+                    this.videoHolder.appendChild(discarded);
+                }
+            }
             this.videoBack.classList.add('tv-video--staging');
             this.videoBack.muted = true;
             this.videoBack.defaultMuted = true;
             if (this.videoBack.parentElement !== this.videoHolder) {
                 this.videoHolder.appendChild(this.videoBack);
             }
+            this._bindVideoEvents(prefetched.video);
             this._preloader.adoptPrepared({
                 video: this.videoBack,
                 hls: prefetched.hls,
@@ -505,8 +572,11 @@ export function createPlayerInstance(options) {
          * @returns {Promise<boolean>}
          */
         async _runPrepare(channelOrKey, switchGen, { suppressUi = false } = {}) {
+            const prepareGen = this.prepareGeneration;
+            const isStale = () => switchGen !== this.switchGeneration
+                || prepareGen !== this.prepareGeneration;
             const resolved = await this._resolveChannelInput(channelOrKey, switchGen);
-            if (!resolved || switchGen !== this.switchGeneration) return false;
+            if (!resolved || isStale()) return false;
 
             const { channel, key } = resolved;
             const prefetched = consumePrefetched(this.id, key);
@@ -527,10 +597,10 @@ export function createPlayerInstance(options) {
             }
 
             const ok = await this._preloader.warmChannel(this.videoBack, channel, {
-                isStale: () => switchGen !== this.switchGeneration
+                isStale
             });
 
-            if (switchGen !== this.switchGeneration) return false;
+            if (isStale()) return false;
             if (!suppressUi) {
                 this.preparing = false;
                 if (ok) this.preparedTarget = channel;
@@ -607,14 +677,14 @@ export function createPlayerInstance(options) {
 
             const fallbackInput = channelOrKey || this.preparedTarget;
             const fallbackResolved = fallbackInput
-                ? await this._resolveChannelInput(fallbackInput, null)
+                ? await this._resolveChannelInput(fallbackInput, switchGen)
                 : null;
 
             if (!this._preloader.isReady()) {
                 if (fallbackResolved?.channel) {
                     if (switchGen != null && switchGen !== this.switchGeneration) return false;
                     if (!allowFallback) return false;
-                    return this.playChannel(fallbackResolved.channel);
+                    return this._fallbackPlayChannel(fallbackResolved.channel);
                 }
                 return false;
             }
@@ -627,7 +697,7 @@ export function createPlayerInstance(options) {
                 if (fallbackResolved?.channel) {
                     if (switchGen != null && switchGen !== this.switchGeneration) return false;
                     if (!allowFallback) return false;
-                    return this.playChannel(fallbackResolved.channel);
+                    return this._fallbackPlayChannel(fallbackResolved.channel);
                 }
                 return false;
             }
@@ -643,8 +713,12 @@ export function createPlayerInstance(options) {
             this.setPauseLiveSync(false);
             TileFrames.armLiveSnap(channel.url_resolved || '');
 
-            await destroyHls(this);
+            let swapCompleted = false;
+
+            await this.destroyHls();
             try { this.video?.pause(); } catch { /* ignore */ }
+
+            await this._exitPresentationBeforeSwap();
 
             const oldFront = this.video;
             this.video = this.videoBack;
@@ -655,19 +729,19 @@ export function createPlayerInstance(options) {
                 this.qualityMode = applyQualityMode(this.hls, this.qualityMode);
             }
 
+            this._recycleStagingVideo();
+            this._promoteFrontVideo();
             if (this.videoMount) {
-                if (this.video.parentElement !== this.videoMount) {
-                    this.videoMount.appendChild(this.video);
-                }
                 this.videoMount.classList.remove('is-hidden');
             }
-            this._promoteFrontVideo();
-            this._recycleStagingVideo();
-            this.videoHolder.classList.add('is-hidden');
+            if (this.videoMount !== this.videoHolder) {
+                this.videoHolder.classList.add('is-hidden');
+            }
 
             this.channel = normalizeChannel(channel, channel.providerId) || channel;
             this.preparing = false;
             this.preparedTarget = null;
+            swapCompleted = true;
 
             if (shouldRecordRecents()) {
                 savePlayerState({
@@ -692,6 +766,7 @@ export function createPlayerInstance(options) {
             }
 
             this.applyAudioToVideo();
+            this._refreshAudioAfterSwap();
             this.emitState();
 
             if (!wasPlaying || !hasWarmFrame) {
@@ -705,7 +780,7 @@ export function createPlayerInstance(options) {
                         transportGen: this.transportGen,
                         transportAtStart
                     })) {
-                        return;
+                        return false;
                     }
                     if (shouldRetryPlayMuted({
                         blocked: isAutoplayNotAllowedError(playErr),
@@ -719,7 +794,10 @@ export function createPlayerInstance(options) {
                     }
                 }
             } else {
-                try { await this.video.play(); } catch { /* already playing */ }
+                try {
+                    await this.video.play();
+                } catch { /* already playing */ }
+                this._refreshAudioAfterSwap();
             }
 
             if (!shouldContinuePlayAfterAttach({
@@ -730,14 +808,17 @@ export function createPlayerInstance(options) {
                 transportAtStart
             })) {
                 try { this.video?.pause(); } catch { /* ignore */ }
-                return;
+                return false;
             }
 
-            if (switchGen != null && switchGen !== this.switchGeneration) return false;
-
-            evictPrefetchedKey(this.id, key);
-            scheduleSlotPrefetch(this.id, this);
-            return true;
+            if (swapCompleted) {
+                if (switchGen == null || switchGen === this.switchGeneration) {
+                    evictPrefetchedKey(this.id, key);
+                    scheduleSlotPrefetch(this.id, this);
+                }
+                return true;
+            }
+            return false;
         },
 
         emitState() {

@@ -131,7 +131,7 @@ export const PlayerChrome = {
         let toastKey = null;
         if (state.resumeBlocked) {
             toastKey = 'resumeBlocked';
-        } else if (state.error) {
+        } else if (state.error && !state._suppressErrorToast) {
             toastKey = `error:${channelKey(state.channel) || ''}`;
         }
         if (toastKey) {
