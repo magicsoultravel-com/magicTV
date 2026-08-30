@@ -125,3 +125,29 @@ test('cancelPrepare clears staging state without changing channel', async () => 
     assert.equal(player.preparing, false);
     assert.equal(player.preparedTarget, null);
 });
+
+test('_promoteFrontVideo clears offscreen prefetch styles', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    const mount = globalThis.document.createElement('div');
+    mount.classList = { remove() {} };
+    player.videoMount = mount;
+    player.video.classList = {
+        _set: new Set(['tv-video--prefetch']),
+        remove(...names) { names.forEach((n) => this._set.delete(n)); },
+        contains(n) { return this._set.has(n); }
+    };
+    player.video.style.cssText = 'position:fixed;left:-9999px;opacity:0;';
+
+    player._promoteFrontVideo();
+
+    assert.equal(player.video.classList.contains('tv-video--prefetch'), false);
+    assert.equal(player.video.style.cssText, '');
+});

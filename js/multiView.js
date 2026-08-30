@@ -1130,15 +1130,35 @@ export const MultiView = {
                 return;
             }
 
-            const committed = await player.commitPreparedChannel(
-                normalized,
-                switchGen,
-                { allowFallback: false }
+            const hasVisibleContent = Boolean(
+                player.channel
+                && (player.playing || player.loading || player.pausePhase !== 'idle')
+            );
+
+            let committed = false;
+            await this.withChannelSwitchTransition(
+                id,
+                {
+                    onPrepare: () => {},
+                    onCommit: async () => {
+                        committed = await player.commitPreparedChannel(
+                            normalized,
+                            switchGen,
+                            { allowFallback: false }
+                        ) === true;
+                    }
+                },
+                {
+                    skipOut: !hasVisibleContent,
+                    skipIn: false
+                }
             );
 
             if (!committed || switchGen !== player.switchGeneration) {
-                player.cancelPrepare();
-                showAppToast('Stream unavailable');
+                if (!committed) {
+                    player.cancelPrepare();
+                    showAppToast('Stream unavailable');
+                }
                 return;
             }
 

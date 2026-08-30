@@ -398,8 +398,28 @@ export function createPlayerInstance(options) {
             try { this.videoBack.pause(); } catch { /* ignore */ }
             this.videoBack.removeAttribute('src');
             try { this.videoBack.load(); } catch { /* ignore */ }
+            this.videoBack.classList.add('tv-video--staging');
+            this.videoBack.style.cssText = '';
             if (this.videoBack.parentElement !== this.videoHolder) {
                 this.videoHolder.appendChild(this.videoBack);
+            }
+        },
+
+        /** Clear offscreen prefetch/staging styling so swapped-in video is visible in the tile. */
+        _promoteFrontVideo() {
+            const v = this.video;
+            if (!v) return;
+            const wasOffscreen = v.classList.contains('tv-video--staging')
+                || v.classList.contains('tv-video--prefetch');
+            v.classList.remove('tv-video--staging', 'tv-video--prefetch');
+            if (wasOffscreen) {
+                v.style.cssText = '';
+            }
+            if (this.videoMount) {
+                if (v.parentElement !== this.videoMount) {
+                    this.videoMount.appendChild(v);
+                }
+                this.videoMount.classList.remove('is-hidden');
             }
         },
 
@@ -612,7 +632,7 @@ export function createPlayerInstance(options) {
                 return false;
             }
 
-            if (switchGen != null && switchGen !== this.switchGeneration) return;
+            if (switchGen != null && switchGen !== this.switchGeneration) return false;
 
             this.recentRecordedForKey = null;
             this.error = null;
@@ -641,6 +661,7 @@ export function createPlayerInstance(options) {
                 }
                 this.videoMount.classList.remove('is-hidden');
             }
+            this._promoteFrontVideo();
             this._recycleStagingVideo();
             this.videoHolder.classList.add('is-hidden');
 
