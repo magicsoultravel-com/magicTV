@@ -32,10 +32,11 @@ import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.
 import { TileFrames } from '../tileFrames.js';
 import { PosterCache } from '../storage/posterCache.js';
 import { FrameCache } from '../storage/frameCache.js';
-import { ChannelPreloader } from './channelPreloader.js';
+import { ChannelPreloader, PRELOAD_TIMEOUT_MS } from './channelPreloader.js';
 import {
     consumePrefetched,
     cancelSlotPrefetch,
+    evictPrefetchedKey,
     scheduleSlotPrefetch
 } from './channelPrefetch.js';
 import {
@@ -160,6 +161,10 @@ export function createPlayerInstance(options) {
         preparing: false,
         preparedTarget: null,
         prepareGeneration: 0,
+        /** Bumped on each user channel pick; stale prepare/commit no-op. */
+        switchGeneration: 0,
+        _prepareSwitchGen: 0,
+        _preparePromise: null,
         _preloader: null,
         loadPhase: 'idle',
         error: null,
@@ -406,7 +411,7 @@ export function createPlayerInstance(options) {
             if (!channel && typeof channelOrKey === 'string') {
                 const parsed = parseChannelKey(channelOrKey);
                 channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation != null && generation !== this.prepareGeneration) {
+                if (generation != null && generation !== this.switchGeneration) {
                     return null;
                 }
             }
@@ -414,7 +419,7 @@ export function createPlayerInstance(options) {
             if (channel && !channel.url_resolved) {
                 const parsed = parseChannelKey(channelKey(channel));
                 channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation != null && generation !== this.prepareGeneration) {
+                if (generation != null && generation !== this.switchGeneration) {
                     return null;
                 }
             }
@@ -451,18 +456,36 @@ export function createPlayerInstance(options) {
         },
 
         /**
-         * Warm the next channel offscreen while the current stream keeps playing.
+         * Whether the staging buffer is warmed and ready to swap in.
+         * @returns {boolean}
+         */
+        isPrepareReady() {
+            return this._preloader?.isReady() === true;
+        },
+
+        async _awaitPrepareReady(switchGen) {
+            const promise = this._preparePromise;
+            if (!promise) return;
+            try {
+                await Promise.race([
+                    promise,
+                    new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error('timeout')), PRELOAD_TIMEOUT_MS);
+                    })
+                ]);
+            } catch { /* warm failed or timed out — commit may fallback */ }
+            if (switchGen != null && switchGen !== this.switchGeneration) return;
+        },
+
+        /**
+         * Internal warm-up worker for startPrepareChannel.
          * @param {object|string} channelOrKey
+         * @param {number} switchGen
          * @returns {Promise<boolean>}
          */
-        async prepareChannel(channelOrKey) {
-            this.init();
-            this.prepareGeneration += 1;
-            const gen = this.prepareGeneration;
-            this._preloader.cancel();
-
-            const resolved = await this._resolveChannelInput(channelOrKey, gen);
-            if (!resolved || gen !== this.prepareGeneration) return false;
+        async _runPrepare(channelOrKey, switchGen) {
+            const resolved = await this._resolveChannelInput(channelOrKey, switchGen);
+            if (!resolved || switchGen !== this.switchGeneration) return false;
 
             const { channel, key } = resolved;
             const prefetched = consumePrefetched(this.id, key);
@@ -473,15 +496,16 @@ export function createPlayerInstance(options) {
                 return true;
             }
 
+            this._preloader.cancel();
             this.preparedTarget = channel;
             this.preparing = true;
             this.emitState();
 
             const ok = await this._preloader.warmChannel(this.videoBack, channel, {
-                isStale: () => gen !== this.prepareGeneration
+                isStale: () => switchGen !== this.switchGeneration
             });
 
-            if (gen !== this.prepareGeneration) return false;
+            if (switchGen !== this.switchGeneration) return false;
             this.preparing = false;
             if (ok) this.preparedTarget = channel;
             else this.preparedTarget = null;
@@ -490,12 +514,51 @@ export function createPlayerInstance(options) {
         },
 
         /**
+         * Kick off background warm-up (non-blocking). Idempotent per switchGeneration.
+         * @param {object|string} channelOrKey
+         * @param {number} switchGen
+         * @returns {Promise<boolean>}
+         */
+        startPrepareChannel(channelOrKey, switchGen) {
+            this.init();
+            if (switchGen != null && switchGen !== this.switchGeneration) {
+                return Promise.resolve(false);
+            }
+            if (this._preparePromise && this._prepareSwitchGen === switchGen) {
+                return this._preparePromise;
+            }
+
+            this.prepareGeneration += 1;
+            this._prepareSwitchGen = switchGen;
+            this._preparePromise = this._runPrepare(channelOrKey, switchGen).finally(() => {
+                if (this._prepareSwitchGen === switchGen) {
+                    this._preparePromise = null;
+                }
+            });
+            return this._preparePromise;
+        },
+
+        /**
+         * @deprecated Use startPrepareChannel — kept for callers that await warm-up.
+         */
+        prepareChannel(channelOrKey, switchGen) {
+            const gen = switchGen ?? ++this.switchGeneration;
+            return this.startPrepareChannel(channelOrKey, gen);
+        },
+
+        /**
          * Swap the warmed staging buffer into the visible player.
          * Falls back to playChannel when warm-up did not complete.
          * @param {object|string} [channelOrKey]
+         * @param {number} [switchGen]
          */
-        async commitPreparedChannel(channelOrKey) {
+        async commitPreparedChannel(channelOrKey, switchGen) {
             this.init();
+            if (switchGen != null && switchGen !== this.switchGeneration) return;
+
+            await this._awaitPrepareReady(switchGen);
+            if (switchGen != null && switchGen !== this.switchGeneration) return;
+
             const fallbackInput = channelOrKey || this.preparedTarget;
             const fallbackResolved = fallbackInput
                 ? await this._resolveChannelInput(fallbackInput, null)
@@ -503,6 +566,7 @@ export function createPlayerInstance(options) {
 
             if (!this._preloader.isReady()) {
                 if (fallbackResolved?.channel) {
+                    if (switchGen != null && switchGen !== this.switchGeneration) return;
                     return this.playChannel(fallbackResolved.channel);
                 }
                 return;
@@ -514,10 +578,13 @@ export function createPlayerInstance(options) {
             const key = channelKey(channel);
             if (!key || !channel?.url_resolved) {
                 if (fallbackResolved?.channel) {
+                    if (switchGen != null && switchGen !== this.switchGeneration) return;
                     return this.playChannel(fallbackResolved.channel);
                 }
                 return;
             }
+
+            if (switchGen != null && switchGen !== this.switchGeneration) return;
 
             this.recentRecordedForKey = null;
             this.error = null;
@@ -550,8 +617,6 @@ export function createPlayerInstance(options) {
             this.videoHolder.classList.add('is-hidden');
 
             this.channel = normalizeChannel(channel, channel.providerId) || channel;
-            this.loading = false;
-            this.loadPhase = 'idle';
             this.preparing = false;
             this.preparedTarget = null;
 
@@ -563,31 +628,49 @@ export function createPlayerInstance(options) {
             }
 
             this.connection = 'connected';
+            const v = this.video;
+            const hasWarmFrame = Boolean(v?.videoWidth > 0);
+            const wasPlaying = Boolean(v && !v.paused);
+
+            if (hasWarmFrame && wasPlaying) {
+                this.playing = true;
+                this.loading = false;
+                this.loadPhase = 'idle';
+                this.posterDataUrl = null;
+            } else {
+                this.loading = false;
+                this.loadPhase = 'idle';
+            }
+
             this.applyAudioToVideo();
             this.emitState();
 
-            try {
-                await this.video.play();
-            } catch (playErr) {
-                if (!shouldContinuePlayAfterAttach({
-                    generation,
-                    playGeneration: this.playGeneration,
-                    wantPlaying: this.wantPlaying,
-                    transportGen: this.transportGen,
-                    transportAtStart
-                })) {
-                    return;
-                }
-                if (shouldRetryPlayMuted({
-                    blocked: isAutoplayNotAllowedError(playErr),
-                    muted: this.muted
-                })) {
-                    this.muted = true;
-                    this.applyAudioToVideo();
+            if (!wasPlaying || !hasWarmFrame) {
+                try {
                     await this.video.play();
-                } else {
-                    throw playErr;
+                } catch (playErr) {
+                    if (!shouldContinuePlayAfterAttach({
+                        generation,
+                        playGeneration: this.playGeneration,
+                        wantPlaying: this.wantPlaying,
+                        transportGen: this.transportGen,
+                        transportAtStart
+                    })) {
+                        return;
+                    }
+                    if (shouldRetryPlayMuted({
+                        blocked: isAutoplayNotAllowedError(playErr),
+                        muted: this.muted
+                    })) {
+                        this.muted = true;
+                        this.applyAudioToVideo();
+                        await this.video.play();
+                    } else {
+                        throw playErr;
+                    }
                 }
+            } else {
+                try { await this.video.play(); } catch { /* already playing */ }
             }
 
             if (!shouldContinuePlayAfterAttach({
@@ -601,7 +684,9 @@ export function createPlayerInstance(options) {
                 return;
             }
 
-            cancelSlotPrefetch(this.id);
+            if (switchGen != null && switchGen !== this.switchGeneration) return;
+
+            evictPrefetchedKey(this.id, key);
             scheduleSlotPrefetch(this.id, this);
         },
 
@@ -982,8 +1067,10 @@ export function createPlayerInstance(options) {
          */
         pause() {
             const gen = this.beginTransport(false);
+            this.switchGeneration += 1;
             this.prepareGeneration += 1;
             this._preloader?.cancel();
+            this._preparePromise = null;
             this.preparing = false;
             this.preparedTarget = null;
             this.stopped = false;
@@ -1054,8 +1141,10 @@ export function createPlayerInstance(options) {
 
         async playChannel(channelOrKey) {
             this.init();
+            this.switchGeneration += 1;
             this.prepareGeneration += 1;
             this._preloader?.cancel();
+            this._preparePromise = null;
             this.preparing = false;
             this.preparedTarget = null;
             const generation = ++this.playGeneration;
@@ -1272,8 +1361,10 @@ export function createPlayerInstance(options) {
 
         async stop({ clearChannel = false } = {}) {
             this.playGeneration += 1;
+            this.switchGeneration += 1;
             this.prepareGeneration += 1;
             this._preloader?.cancel();
+            this._preparePromise = null;
             cancelSlotPrefetch(this.id);
             this.preparing = false;
             this.preparedTarget = null;

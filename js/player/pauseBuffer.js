@@ -68,6 +68,7 @@ export function classifyTilePlayback({
     loading = false,
     loadPhase = 'idle',
     wantPlaying = false,
+    preparing = false,
     error = null
 } = {}) {
     const uiPlaying = playing === true;
@@ -76,11 +77,14 @@ export function classifyTilePlayback({
         && !uiPlaying
         && !!error
     );
-    const awaitingFirstPaint = wantPlaying === true && !uiPlaying;
+    /** Background warm-up while the front stream is still live — keep showing TV, not loading. */
+    const tuningWithLivePicture = preparing === true && uiPlaying;
+    const awaitingFirstPaint = wantPlaying === true && !uiPlaying && !tuningWithLivePicture;
     const uiLoading = Boolean(
         hasChannel
         && !uiPlaying
         && !uiDisconnected
+        && !tuningWithLivePicture
         && (
             loading === true
             || loadPhase === 'connecting'

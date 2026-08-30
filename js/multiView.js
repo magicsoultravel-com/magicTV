@@ -8,7 +8,7 @@ import {
 } from './storage/playerState.js';
 import { SettingsStore } from './storage/settingsStore.js';
 import { FavoritesRecents } from './storage/favoritesRecents.js';
-import { channelKey } from './tvProviders/channelShape.js';
+import { channelKey, normalizeChannel } from './tvProviders/channelShape.js';
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { showAppToast } from './ui/toast.js';
 import { TvPopoutWindows } from './tvPopoutWindows.js';
@@ -1122,17 +1122,45 @@ export const MultiView = {
         if (!player) return Promise.reject(new Error(`No player for slot ${id}`));
         const surface = el(`tv-playback-surface-${id}`);
         if (surface) player.mountVideo(surface);
+
+        const normalized = normalizeChannel(channel, channel?.providerId) || channel;
+        const key = channelKey(normalized);
+        player.switchGeneration = (player.switchGeneration || 0) + 1;
+        const switchGen = player.switchGeneration;
+
+        player.channel = normalized;
+        player.error = null;
+        player.beginTransport(true);
+        TileFrames.armLiveSnap(normalized.url_resolved || '');
+        if (key) {
+            savePlayerState({
+                lastChannelKey: key,
+                lastChannelName: normalized.name || ''
+            });
+        }
+        player.emitState();
+        this.persistSlots();
+        this.scheduleRefreshTiles();
+        this.syncStatusChrome();
+
+        player.startPrepareChannel(normalized, switchGen);
+
         const hasVisibleContent = Boolean(
             player.channel
             && (player.playing || player.loading || player.pausePhase !== 'idle')
         );
+        const bufferReady = player.isPrepareReady();
+
         return this.withChannelSwitchTransition(
             id,
             {
-                onPrepare: () => player.prepareChannel(channel),
-                onCommit: () => player.commitPreparedChannel(channel)
+                onPrepare: () => player.startPrepareChannel(normalized, switchGen),
+                onCommit: () => player.commitPreparedChannel(normalized, switchGen)
             },
-            { skipOut: !hasVisibleContent }
+            {
+                skipOut: !hasVisibleContent || bufferReady,
+                skipIn: bufferReady
+            }
         ).finally(async () => {
             this.persistSlots();
             this.scheduleRefreshTiles();
@@ -1300,6 +1328,7 @@ export const MultiView = {
             const empty = tile.querySelector('.tv-player-tile__empty');
             const mediaPlaying = player?.playing === true;
             const intentPlaying = player?.wantPlaying === true || mediaPlaying;
+            const tuningLive = player?.preparing === true && mediaPlaying;
             const { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback({
                 hasChannel,
                 playing: mediaPlaying,
@@ -1309,13 +1338,14 @@ export const MultiView = {
                 loading: player?.loading === true,
                 loadPhase: player?.loadPhase || 'idle',
                 wantPlaying: player?.wantPlaying === true,
+                preparing: player?.preparing === true,
                 error: player?.error || null
             });
 
             tile.classList.toggle('is-empty', !hasChannel);
             tile.classList.toggle('is-playing', uiPlaying);
             tile.classList.toggle('is-loading', uiLoading);
-            tile.classList.toggle('is-preparing', player?.preparing === true);
+            tile.classList.toggle('is-preparing', tuningLive);
             tile.classList.toggle('is-paused', uiPaused);
             tile.classList.toggle('is-stopped', uiStopped);
             tile.classList.toggle('is-disconnected', uiDisconnected);
@@ -1364,6 +1394,7 @@ export const MultiView = {
                 && player
                 && player.posterDataUrl
                 && !uiPlaying
+                && !tuningLive
                 && (uiLoading || !videoHasFrame)
             );
             tile.classList.toggle('has-poster', showPoster);

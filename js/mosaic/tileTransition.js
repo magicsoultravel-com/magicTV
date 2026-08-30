@@ -55,16 +55,18 @@ function normalizeHandlers(handlers) {
  * Run a channel-switch transition on one mosaic tile.
  * @param {HTMLElement | null | undefined} tileEl
  * @param {(() => void | Promise<void>) | TileTransitionHandlers} handlers
- * @param {{ mode?: string, skipOut?: boolean }} [opts]
+ * @param {{ mode?: string, skipOut?: boolean, skipIn?: boolean }} [opts]
  */
 export async function runTileContentTransition(tileEl, handlers, opts = {}) {
     const { onPrepare, onCommit, onMidpoint } = normalizeHandlers(handlers);
     const loadFirst = typeof onPrepare === 'function' && typeof onCommit === 'function';
     const mode = opts.mode || 'instant';
     const skipOut = opts.skipOut === true;
+    const skipIn = opts.skipIn === true;
 
     if (loadFirst) {
-        await onPrepare();
+        // Start background warm-up without blocking — out-animation runs over the live picture.
+        void Promise.resolve(onPrepare?.());
 
         if (mode === 'instant' || !tileEl) {
             await onCommit();
@@ -98,6 +100,10 @@ export async function runTileContentTransition(tileEl, handlers, opts = {}) {
             }
 
             await onCommit();
+
+            if (skipIn) {
+                return;
+            }
 
             clearSwapClasses(tileEl);
             tileEl.classList.add('is-swapping', modeClass, 'tv-swap-in');

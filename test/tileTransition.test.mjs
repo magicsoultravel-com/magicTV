@@ -100,3 +100,23 @@ test('css mode applies out then in classes around midpoint', async () => {
     assert.equal(tile.classes.has('tv-swap-in'), false);
     assert.equal(tile.classes.has('is-swapping'), false);
 });
+
+test('load-first with skipIn skips in-phase classes', async () => {
+    const tile = mockTile();
+    await runTileContentTransition(tile, {
+        onPrepare: () => {},
+        onCommit: async () => {}
+    }, { mode: 'crossfade', skipOut: true, skipIn: true });
+    assert.equal(tile.classes.has('tv-swap-in'), false);
+    assert.equal(tile.classes.has('is-swapping'), false);
+});
+
+test('load-first fires onPrepare without blocking commit sequence', async () => {
+    const tile = mockTile();
+    const order = [];
+    await runTileContentTransition(tile, {
+        onPrepare: () => { order.push('prepare'); },
+        onCommit: async () => { order.push('commit'); }
+    }, { mode: 'crossfade', skipOut: true, skipIn: true });
+    assert.deepEqual(order, ['prepare', 'commit']);
+});

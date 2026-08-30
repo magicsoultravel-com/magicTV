@@ -85,6 +85,20 @@ export function consumePrefetched(slotId, key) {
 }
 
 /**
+ * Remove one warmed entry without clearing the whole slot cache.
+ * @param {string} slotId
+ * @param {string} key
+ */
+export function evictPrefetchedKey(slotId, key) {
+    const map = slotCache.get(slotId);
+    if (!map || !key) return;
+    const entry = map.get(key);
+    if (!entry) return;
+    destroyEntry(entry);
+    map.delete(key);
+}
+
+/**
  * @param {string} slotId
  * @param {object} player
  */
@@ -182,5 +196,5 @@ export function scheduleSlotPrefetch(slotId, player) {
     scheduleSlotPrefetch._timers.set(slotId, setTimeout(() => {
         scheduleSlotPrefetch._timers.delete(slotId);
         void refreshSlotPrefetch(slotId, player);
-    }, 600));
+    }, 200));
 }

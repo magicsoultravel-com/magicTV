@@ -178,6 +178,19 @@ test('playing suppresses loading overlay', () => {
     assert.equal(state.uiLoading, false);
 });
 
+test('preparing while front stream plays suppresses loading overlay', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: true,
+        wantPlaying: true,
+        preparing: true,
+        loading: false,
+        loadPhase: 'idle'
+    });
+    assert.equal(state.uiPlaying, true);
+    assert.equal(state.uiLoading, false);
+});
+
 test('stream error shows disconnected over loading/pause/stop', () => {
     const state = classifyTilePlayback({
         hasChannel: true,

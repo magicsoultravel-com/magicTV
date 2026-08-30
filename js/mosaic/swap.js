@@ -33,7 +33,7 @@ export const swapMethods = {
 
         if (this.swapBusy) {
             if (callbacks.onPrepare && callbacks.onCommit) {
-                await callbacks.onPrepare?.();
+                void Promise.resolve(callbacks.onPrepare?.());
                 await callbacks.onCommit?.();
             } else {
                 await callbacks.onMidpoint?.();
@@ -46,7 +46,8 @@ export const swapMethods = {
         try {
             await runTileContentTransition(tile, callbacks, {
                 mode,
-                skipOut: opts.skipOut === true
+                skipOut: opts.skipOut === true,
+                skipIn: opts.skipIn === true
             });
         } finally {
             this.swapBusy = false;
