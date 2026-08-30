@@ -481,9 +481,10 @@ export function createPlayerInstance(options) {
          * Internal warm-up worker for startPrepareChannel.
          * @param {object|string} channelOrKey
          * @param {number} switchGen
+         * @param {{ suppressUi?: boolean }} [opts]
          * @returns {Promise<boolean>}
          */
-        async _runPrepare(channelOrKey, switchGen) {
+        async _runPrepare(channelOrKey, switchGen, { suppressUi = false } = {}) {
             const resolved = await this._resolveChannelInput(channelOrKey, switchGen);
             if (!resolved || switchGen !== this.switchGeneration) return false;
 
@@ -491,35 +492,57 @@ export function createPlayerInstance(options) {
             const prefetched = consumePrefetched(this.id, key);
             if (prefetched && this._adoptPrefetchedStaging(prefetched)) {
                 this.preparedTarget = channel;
-                this.preparing = false;
-                this.emitState();
+                if (!suppressUi) {
+                    this.preparing = false;
+                    this.emitState();
+                }
                 return true;
             }
 
             this._preloader.cancel();
             this.preparedTarget = channel;
-            this.preparing = true;
-            this.emitState();
+            if (!suppressUi) {
+                this.preparing = true;
+                this.emitState();
+            }
 
             const ok = await this._preloader.warmChannel(this.videoBack, channel, {
                 isStale: () => switchGen !== this.switchGeneration
             });
 
             if (switchGen !== this.switchGeneration) return false;
-            this.preparing = false;
-            if (ok) this.preparedTarget = channel;
-            else this.preparedTarget = null;
-            this.emitState();
+            if (!suppressUi) {
+                this.preparing = false;
+                if (ok) this.preparedTarget = channel;
+                else this.preparedTarget = null;
+                this.emitState();
+            } else if (!ok) {
+                this.preparedTarget = null;
+            } else {
+                this.preparedTarget = channel;
+            }
             return ok;
+        },
+
+        /**
+         * Cancel offscreen warm-up without touching the visible stream.
+         */
+        cancelPrepare() {
+            this.prepareGeneration += 1;
+            this._preloader?.cancel();
+            this._preparePromise = null;
+            this.preparing = false;
+            this.preparedTarget = null;
         },
 
         /**
          * Kick off background warm-up (non-blocking). Idempotent per switchGeneration.
          * @param {object|string} channelOrKey
          * @param {number} switchGen
+         * @param {{ suppressUi?: boolean }} [opts]
          * @returns {Promise<boolean>}
          */
-        startPrepareChannel(channelOrKey, switchGen) {
+        startPrepareChannel(channelOrKey, switchGen, opts = {}) {
             this.init();
             if (switchGen != null && switchGen !== this.switchGeneration) {
                 return Promise.resolve(false);
@@ -530,7 +553,7 @@ export function createPlayerInstance(options) {
 
             this.prepareGeneration += 1;
             this._prepareSwitchGen = switchGen;
-            this._preparePromise = this._runPrepare(channelOrKey, switchGen).finally(() => {
+            this._preparePromise = this._runPrepare(channelOrKey, switchGen, opts).finally(() => {
                 if (this._prepareSwitchGen === switchGen) {
                     this._preparePromise = null;
                 }
@@ -551,13 +574,16 @@ export function createPlayerInstance(options) {
          * Falls back to playChannel when warm-up did not complete.
          * @param {object|string} [channelOrKey]
          * @param {number} [switchGen]
+         * @param {{ allowFallback?: boolean }} [opts]
+         * @returns {Promise<boolean|void>}
          */
-        async commitPreparedChannel(channelOrKey, switchGen) {
+        async commitPreparedChannel(channelOrKey, switchGen, opts = {}) {
+            const allowFallback = opts.allowFallback !== false;
             this.init();
-            if (switchGen != null && switchGen !== this.switchGeneration) return;
+            if (switchGen != null && switchGen !== this.switchGeneration) return false;
 
             await this._awaitPrepareReady(switchGen);
-            if (switchGen != null && switchGen !== this.switchGeneration) return;
+            if (switchGen != null && switchGen !== this.switchGeneration) return false;
 
             const fallbackInput = channelOrKey || this.preparedTarget;
             const fallbackResolved = fallbackInput
@@ -566,10 +592,11 @@ export function createPlayerInstance(options) {
 
             if (!this._preloader.isReady()) {
                 if (fallbackResolved?.channel) {
-                    if (switchGen != null && switchGen !== this.switchGeneration) return;
+                    if (switchGen != null && switchGen !== this.switchGeneration) return false;
+                    if (!allowFallback) return false;
                     return this.playChannel(fallbackResolved.channel);
                 }
-                return;
+                return false;
             }
 
             const generation = ++this.playGeneration;
@@ -578,10 +605,11 @@ export function createPlayerInstance(options) {
             const key = channelKey(channel);
             if (!key || !channel?.url_resolved) {
                 if (fallbackResolved?.channel) {
-                    if (switchGen != null && switchGen !== this.switchGeneration) return;
+                    if (switchGen != null && switchGen !== this.switchGeneration) return false;
+                    if (!allowFallback) return false;
                     return this.playChannel(fallbackResolved.channel);
                 }
-                return;
+                return false;
             }
 
             if (switchGen != null && switchGen !== this.switchGeneration) return;
@@ -684,10 +712,11 @@ export function createPlayerInstance(options) {
                 return;
             }
 
-            if (switchGen != null && switchGen !== this.switchGeneration) return;
+            if (switchGen != null && switchGen !== this.switchGeneration) return false;
 
             evictPrefetchedKey(this.id, key);
             scheduleSlotPrefetch(this.id, this);
+            return true;
         },
 
         emitState() {

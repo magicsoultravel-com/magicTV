@@ -1106,6 +1106,59 @@ export const MultiView = {
     },
 
     /**
+     * Safe Loading: hold current stream/UI until next channel is confirmed on staging.
+     * @param {string} id
+     * @param {object} channel
+     * @param {object} player
+     * @param {object} normalized
+     * @param {string} key
+     */
+    async playOnSlotSafeLoading(id, channel, player, normalized, key) {
+        showAppToast('Fetching next channel…');
+
+        player.switchGeneration = (player.switchGeneration || 0) + 1;
+        const switchGen = player.switchGeneration;
+
+        try {
+            await player.startPrepareChannel(normalized, switchGen, { suppressUi: true });
+
+            if (switchGen !== player.switchGeneration) return;
+
+            if (!player.isPrepareReady()) {
+                player.cancelPrepare();
+                showAppToast('Stream unavailable');
+                return;
+            }
+
+            const committed = await player.commitPreparedChannel(
+                normalized,
+                switchGen,
+                { allowFallback: false }
+            );
+
+            if (!committed || switchGen !== player.switchGeneration) {
+                player.cancelPrepare();
+                showAppToast('Stream unavailable');
+                return;
+            }
+
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            this.syncStatusChrome();
+        } finally {
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            this.syncSettingsToggles();
+            if (ChromecastManager.getActiveSlot() === id && ChromecastManager.isCasting()) {
+                try {
+                    await ChromecastManager.loadMedia(channel);
+                } catch { /* ignore */ }
+            }
+            if (id === 'center') this.getPrimary()?.emitState();
+        }
+    },
+
+    /**
      * Play a channel on a specific mosaic slot (enables the side if needed).
      * @param {string} slotId
      * @param {object} channel
@@ -1125,6 +1178,11 @@ export const MultiView = {
 
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
         const key = channelKey(normalized);
+
+        if (SettingsStore.getChanSwitchMode() === 'safeLoading') {
+            return this.playOnSlotSafeLoading(id, channel, player, normalized, key);
+        }
+
         player.switchGeneration = (player.switchGeneration || 0) + 1;
         const switchGen = player.switchGeneration;
 
@@ -1671,6 +1729,21 @@ export const MultiView = {
 
     bindSettings() {
         if (typeof document === 'undefined') return;
+        const CHAN_SWITCH_MODE_LABELS = {
+            classic: 'Classic',
+            safeLoading: 'Safe Loading'
+        };
+        const modeSelect = el('chan-switch-mode-select');
+        if (modeSelect && modeSelect.dataset.bound !== '1') {
+            modeSelect.dataset.bound = '1';
+            modeSelect.value = SettingsStore.getChanSwitchMode();
+            modeSelect.addEventListener('change', () => {
+                const next = SettingsStore.setChanSwitchMode(modeSelect.value);
+                modeSelect.value = next;
+                const label = CHAN_SWITCH_MODE_LABELS[next] || next;
+                showAppToast(`Chan switch mode: ${label}`);
+            });
+        }
         const swapSelect = el('swap-transition-select');
         if (swapSelect && swapSelect.dataset.bound !== '1') {
             swapSelect.dataset.bound = '1';

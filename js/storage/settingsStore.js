@@ -57,6 +57,12 @@ const DEFAULT_REMOTE_TEXTURE = 'none';
 const CATALOG_LAYOUTS = ['tiles', 'list'];
 const DEFAULT_ACTIVE_TILE_STYLE = 'wave';
 const ACTIVE_TILE_STYLES = ['none', 'wave', 'pulse', 'visualizer'];
+export const CHAN_SWITCH_MODES = ['classic', 'safeLoading'];
+const DEFAULT_CHAN_SWITCH_MODE = 'classic';
+
+function normalizeChanSwitchMode(value) {
+    return CHAN_SWITCH_MODES.includes(value) ? value : DEFAULT_CHAN_SWITCH_MODE;
+}
 
 function clampTextSize(value) {
     const n = Number(value);
@@ -388,6 +394,16 @@ export const SettingsStore = {
     setSwapTransition(value) {
         const next = normalizeViewTransition(value);
         patchPersistedState({ swapTransition: next });
+        return next;
+    },
+
+    getChanSwitchMode() {
+        return normalizeChanSwitchMode(readPersistedState().chanSwitchMode);
+    },
+
+    setChanSwitchMode(value) {
+        const next = normalizeChanSwitchMode(value);
+        patchPersistedState({ chanSwitchMode: next });
         return next;
     },
 

@@ -32,6 +32,7 @@ const KNOWN_IDS = [
     'countries-container', 'channels-container',
     'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
     'buffer-size-select',
+    'chan-switch-mode-select',
     'swap-transition-select',
     'text-size-slider', 'text-size-value',
     'tile-width-slider', 'tile-width-value',

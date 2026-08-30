@@ -542,6 +542,23 @@ test('view transitions default to random', () => {
     assert.equal(SettingsStore.getCatalogTransition(), 'random');
 });
 
+test('chanSwitchMode defaults to classic', () => {
+    assert.equal(SettingsStore.getChanSwitchMode(), 'classic');
+});
+
+test('chanSwitchMode round-trip and invalid fallback', () => {
+    SettingsStore.setChanSwitchMode('safeLoading');
+    assert.equal(SettingsStore.getChanSwitchMode(), 'safeLoading');
+    let raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.equal(raw.chanSwitchMode, 'safeLoading');
+
+    SettingsStore.setChanSwitchMode('bogus');
+    assert.equal(SettingsStore.getChanSwitchMode(), 'classic');
+
+    SettingsStore.setChanSwitchMode('classic');
+    assert.equal(SettingsStore.getChanSwitchMode(), 'classic');
+});
+
 test('remoteModuleOpacity migrates from channelPickerOpacity', () => {
     store.set('matrix_tv_state', JSON.stringify({ channelPickerOpacity: 55 }));
     assert.equal(SettingsStore.getRemoteModuleOpacity(), 55);
