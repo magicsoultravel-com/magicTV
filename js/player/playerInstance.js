@@ -32,6 +32,12 @@ import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.
 import { TileFrames } from '../tileFrames.js';
 import { PosterCache } from '../storage/posterCache.js';
 import { FrameCache } from '../storage/frameCache.js';
+import { ChannelPreloader } from './channelPreloader.js';
+import {
+    consumePrefetched,
+    cancelSlotPrefetch,
+    scheduleSlotPrefetch
+} from './channelPrefetch.js';
 import {
     computeParkBehindTime,
     computeResumeSeekTime,
@@ -143,11 +149,18 @@ export function createPlayerInstance(options) {
     const player = {
         id,
         video: null,
+        /** Hidden staging buffer swapped in at channel commit. */
+        videoBack: null,
         videoHolder: null,
         hls: null,
         channel: null,
         playing: false,
         loading: false,
+        /** True while an offscreen warm-up is in flight (current picture stays live). */
+        preparing: false,
+        preparedTarget: null,
+        prepareGeneration: 0,
+        _preloader: null,
         loadPhase: 'idle',
         error: null,
         resumeBlocked: false,
@@ -183,43 +196,31 @@ export function createPlayerInstance(options) {
         watchAccrueKey: null,
         watchAccrueStartedAt: null,
 
-        init() {
-            if (this.video) return;
-            registerWatchAccrualFlusher(snapshotWatchAccrual);
-            registerWatchAccrualAborter(abortWatchAccrual);
+        _bindVideoEvents(videoEl) {
+            if (!videoEl) return;
+            const isActive = () => videoEl === this.video;
 
-            this.videoHolder = document.createElement('div');
-            this.videoHolder.className = 'tv-video-holder is-hidden';
-            this.videoHolder.setAttribute('aria-hidden', 'true');
-            this.videoHolder.dataset.playerId = id;
-            document.body.appendChild(this.videoHolder);
-
-            this.video = document.createElement('video');
-            this.video.className = 'tv-video';
-            this.video.playsInline = true;
-            this.video.setAttribute('playsinline', '');
-            this.video.preload = 'auto';
-            this.video.dataset.playerId = id;
-            this.applyAudioToVideo();
-            this.videoHolder.appendChild(this.video);
-
-            this.video.addEventListener('loadstart', () => {
+            videoEl.addEventListener('loadstart', () => {
+                if (!isActive()) return;
                 this.loadPhase = 'connecting';
                 this.emitState();
             });
-            this.video.addEventListener('canplay', () => {
+            videoEl.addEventListener('canplay', () => {
+                if (!isActive()) return;
                 if (this.loadPhase !== 'idle') {
                     this.loadPhase = 'idle';
                     this.emitState();
                 }
             });
-            this.video.addEventListener('canplaythrough', () => {
+            videoEl.addEventListener('canplaythrough', () => {
+                if (!isActive()) return;
                 if (this.loading) {
                     this.loading = false;
                     this.emitState();
                 }
             });
-            this.video.addEventListener('playing', () => {
+            videoEl.addEventListener('playing', () => {
+                if (!isActive()) return;
                 if (!shouldAcceptPlayingEvent(this.wantPlaying)) {
                     return;
                 }
@@ -228,7 +229,6 @@ export function createPlayerInstance(options) {
                 this.loadPhase = 'idle';
                 this.pausePhase = 'idle';
                 this.stopped = false;
-                // Keep pause-buffer liveMaxLatency (Infinity) — restoring 10 yanks to live.
                 this.error = null;
                 this.resumeBlocked = false;
                 this.posterDataUrl = null;
@@ -240,8 +240,10 @@ export function createPlayerInstance(options) {
                     FavoritesRecents.markVisited(key, this.channel);
                 }
                 this.emitState();
+                scheduleSlotPrefetch(this.id, this);
             });
-            this.video.addEventListener('timeupdate', () => {
+            videoEl.addEventListener('timeupdate', () => {
+                if (!isActive()) return;
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
                 }
@@ -259,12 +261,14 @@ export function createPlayerInstance(options) {
                 }
                 syncWatchAccrual();
             });
-            this.video.addEventListener('progress', () => {
+            videoEl.addEventListener('progress', () => {
+                if (!isActive()) return;
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
                 }
             });
-            this.video.addEventListener('pause', () => {
+            videoEl.addEventListener('pause', () => {
+                if (!isActive()) return;
                 if (!shouldAcceptPauseEvent(this.wantPlaying)) {
                     return;
                 }
@@ -274,7 +278,8 @@ export function createPlayerInstance(options) {
                 }
                 this.emitState();
             });
-            this.video.addEventListener('waiting', () => {
+            videoEl.addEventListener('waiting', () => {
+                if (!isActive()) return;
                 if (this.wantPlaying !== true) return;
                 this.loading = true;
                 this.loadPhase = 'buffering';
@@ -283,7 +288,8 @@ export function createPlayerInstance(options) {
                 }
                 this.emitState();
             });
-            this.video.addEventListener('stalled', () => {
+            videoEl.addEventListener('stalled', () => {
+                if (!isActive()) return;
                 if (this.wantPlaying !== true) return;
                 if (this.playing || this.loading) {
                     this.loadPhase = 'buffering';
@@ -293,18 +299,57 @@ export function createPlayerInstance(options) {
                     this.emitState();
                 }
             });
-            this.video.addEventListener('error', () => {
+            videoEl.addEventListener('error', () => {
+                if (!isActive()) return;
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.playing = false;
                 this.error = 'Stream unavailable';
                 this.emitState();
             });
-            this.video.addEventListener('ended', () => {
+            videoEl.addEventListener('ended', () => {
+                if (!isActive()) return;
                 this.playing = false;
                 this.loadPhase = 'idle';
                 this.emitState();
             });
+        },
+
+        init() {
+            if (this.video) return;
+            registerWatchAccrualFlusher(snapshotWatchAccrual);
+            registerWatchAccrualAborter(abortWatchAccrual);
+
+            this._preloader = new ChannelPreloader();
+
+            this.videoHolder = document.createElement('div');
+            this.videoHolder.className = 'tv-video-holder is-hidden';
+            this.videoHolder.setAttribute('aria-hidden', 'true');
+            this.videoHolder.dataset.playerId = id;
+            document.body.appendChild(this.videoHolder);
+
+            this.video = document.createElement('video');
+            this.video.className = 'tv-video';
+            this.video.playsInline = true;
+            this.video.setAttribute('playsinline', '');
+            this.video.preload = 'auto';
+            this.video.dataset.playerId = id;
+
+            this.videoBack = document.createElement('video');
+            this.videoBack.className = 'tv-video tv-video--staging';
+            this.videoBack.playsInline = true;
+            this.videoBack.setAttribute('playsinline', '');
+            this.videoBack.preload = 'auto';
+            this.videoBack.muted = true;
+            this.videoBack.defaultMuted = true;
+            this.videoBack.dataset.playerId = `${id}-staging`;
+
+            this.applyAudioToVideo();
+            this.videoHolder.appendChild(this.videoBack);
+            this.videoHolder.appendChild(this.video);
+
+            this._bindVideoEvents(this.video);
+            this._bindVideoEvents(this.videoBack);
         },
 
         applyAudioToVideo() {
@@ -338,6 +383,226 @@ export function createPlayerInstance(options) {
             this.videoMount = mount;
             mount.classList?.remove('is-hidden');
             this.videoHolder.classList.toggle('is-hidden', mount !== this.videoHolder);
+            if (this.videoBack && this.videoBack.parentElement !== this.videoHolder) {
+                this.videoHolder.appendChild(this.videoBack);
+            }
+        },
+
+        _recycleStagingVideo() {
+            if (!this.videoBack) return;
+            try { this.videoBack.pause(); } catch { /* ignore */ }
+            this.videoBack.removeAttribute('src');
+            try { this.videoBack.load(); } catch { /* ignore */ }
+            if (this.videoBack.parentElement !== this.videoHolder) {
+                this.videoHolder.appendChild(this.videoBack);
+            }
+        },
+
+        async _resolveChannelInput(channelOrKey, generation) {
+            let channel = typeof channelOrKey === 'object' && channelOrKey !== null
+                ? channelOrKey
+                : null;
+
+            if (!channel && typeof channelOrKey === 'string') {
+                const parsed = parseChannelKey(channelOrKey);
+                channel = await TvProviderRegistry.getChannel(parsed);
+                if (generation != null && generation !== this.prepareGeneration) {
+                    return null;
+                }
+            }
+
+            if (channel && !channel.url_resolved) {
+                const parsed = parseChannelKey(channelKey(channel));
+                channel = await TvProviderRegistry.getChannel(parsed);
+                if (generation != null && generation !== this.prepareGeneration) {
+                    return null;
+                }
+            }
+
+            const key = channelKey(channel);
+            if (!key || !channel?.url_resolved) return null;
+            return { channel, key };
+        },
+
+        _adoptPrefetchedStaging(prefetched) {
+            if (!prefetched?.video) return false;
+            this._preloader.cancel();
+            if (this.videoBack && this.videoBack !== prefetched.video) {
+                try {
+                    if (this.videoBack.parentElement) {
+                        this.videoBack.parentElement.removeChild(this.videoBack);
+                    }
+                } catch { /* ignore */ }
+            }
+            this.videoBack = prefetched.video;
+            this.videoBack.classList.add('tv-video--staging');
+            this.videoBack.muted = true;
+            this.videoBack.defaultMuted = true;
+            if (this.videoBack.parentElement !== this.videoHolder) {
+                this.videoHolder.appendChild(this.videoBack);
+            }
+            this._preloader.adoptPrepared({
+                video: this.videoBack,
+                hls: prefetched.hls,
+                channel: prefetched.channel,
+                url: prefetched.channel?.url_resolved || ''
+            });
+            return true;
+        },
+
+        /**
+         * Warm the next channel offscreen while the current stream keeps playing.
+         * @param {object|string} channelOrKey
+         * @returns {Promise<boolean>}
+         */
+        async prepareChannel(channelOrKey) {
+            this.init();
+            this.prepareGeneration += 1;
+            const gen = this.prepareGeneration;
+            this._preloader.cancel();
+
+            const resolved = await this._resolveChannelInput(channelOrKey, gen);
+            if (!resolved || gen !== this.prepareGeneration) return false;
+
+            const { channel, key } = resolved;
+            const prefetched = consumePrefetched(this.id, key);
+            if (prefetched && this._adoptPrefetchedStaging(prefetched)) {
+                this.preparedTarget = channel;
+                this.preparing = false;
+                this.emitState();
+                return true;
+            }
+
+            this.preparedTarget = channel;
+            this.preparing = true;
+            this.emitState();
+
+            const ok = await this._preloader.warmChannel(this.videoBack, channel, {
+                isStale: () => gen !== this.prepareGeneration
+            });
+
+            if (gen !== this.prepareGeneration) return false;
+            this.preparing = false;
+            if (ok) this.preparedTarget = channel;
+            else this.preparedTarget = null;
+            this.emitState();
+            return ok;
+        },
+
+        /**
+         * Swap the warmed staging buffer into the visible player.
+         * Falls back to playChannel when warm-up did not complete.
+         * @param {object|string} [channelOrKey]
+         */
+        async commitPreparedChannel(channelOrKey) {
+            this.init();
+            const fallbackInput = channelOrKey || this.preparedTarget;
+            const fallbackResolved = fallbackInput
+                ? await this._resolveChannelInput(fallbackInput, null)
+                : null;
+
+            if (!this._preloader.isReady()) {
+                if (fallbackResolved?.channel) {
+                    return this.playChannel(fallbackResolved.channel);
+                }
+                return;
+            }
+
+            const generation = ++this.playGeneration;
+            const taken = this._preloader.takeover();
+            const channel = taken.channel || fallbackResolved?.channel;
+            const key = channelKey(channel);
+            if (!key || !channel?.url_resolved) {
+                if (fallbackResolved?.channel) {
+                    return this.playChannel(fallbackResolved.channel);
+                }
+                return;
+            }
+
+            this.recentRecordedForKey = null;
+            this.error = null;
+            this.resumeBlocked = false;
+            this.stopped = false;
+            this.pausePhase = 'idle';
+            const transportAtStart = this.beginTransport(true);
+            this.setPauseLiveSync(false);
+            TileFrames.armLiveSnap(channel.url_resolved || '');
+
+            await destroyHls(this);
+            try { this.video?.pause(); } catch { /* ignore */ }
+
+            const oldFront = this.video;
+            this.video = this.videoBack;
+            this.videoBack = oldFront;
+            this.hls = taken.hls;
+            if (this.hls) {
+                applyHlsBufferConfig(this.hls, this.getBufferSize());
+                this.qualityMode = applyQualityMode(this.hls, this.qualityMode);
+            }
+
+            if (this.videoMount) {
+                if (this.video.parentElement !== this.videoMount) {
+                    this.videoMount.appendChild(this.video);
+                }
+                this.videoMount.classList.remove('is-hidden');
+            }
+            this._recycleStagingVideo();
+            this.videoHolder.classList.add('is-hidden');
+
+            this.channel = normalizeChannel(channel, channel.providerId) || channel;
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.preparing = false;
+            this.preparedTarget = null;
+
+            if (shouldRecordRecents()) {
+                savePlayerState({
+                    lastChannelKey: key,
+                    lastChannelName: channel.name || ''
+                });
+            }
+
+            this.connection = 'connected';
+            this.applyAudioToVideo();
+            this.emitState();
+
+            try {
+                await this.video.play();
+            } catch (playErr) {
+                if (!shouldContinuePlayAfterAttach({
+                    generation,
+                    playGeneration: this.playGeneration,
+                    wantPlaying: this.wantPlaying,
+                    transportGen: this.transportGen,
+                    transportAtStart
+                })) {
+                    return;
+                }
+                if (shouldRetryPlayMuted({
+                    blocked: isAutoplayNotAllowedError(playErr),
+                    muted: this.muted
+                })) {
+                    this.muted = true;
+                    this.applyAudioToVideo();
+                    await this.video.play();
+                } else {
+                    throw playErr;
+                }
+            }
+
+            if (!shouldContinuePlayAfterAttach({
+                generation,
+                playGeneration: this.playGeneration,
+                wantPlaying: this.wantPlaying,
+                transportGen: this.transportGen,
+                transportAtStart
+            })) {
+                try { this.video?.pause(); } catch { /* ignore */ }
+                return;
+            }
+
+            cancelSlotPrefetch(this.id);
+            scheduleSlotPrefetch(this.id, this);
         },
 
         emitState() {
@@ -717,6 +982,10 @@ export function createPlayerInstance(options) {
          */
         pause() {
             const gen = this.beginTransport(false);
+            this.prepareGeneration += 1;
+            this._preloader?.cancel();
+            this.preparing = false;
+            this.preparedTarget = null;
             this.stopped = false;
             // Cancel in-flight playChannel attach so pause mid-load cannot restart play.
             if (shouldBumpPlayGenerationOnPause({
@@ -785,6 +1054,10 @@ export function createPlayerInstance(options) {
 
         async playChannel(channelOrKey) {
             this.init();
+            this.prepareGeneration += 1;
+            this._preloader?.cancel();
+            this.preparing = false;
+            this.preparedTarget = null;
             const generation = ++this.playGeneration;
             let channel = typeof channelOrKey === 'object' && channelOrKey !== null
                 ? channelOrKey
@@ -999,6 +1272,11 @@ export function createPlayerInstance(options) {
 
         async stop({ clearChannel = false } = {}) {
             this.playGeneration += 1;
+            this.prepareGeneration += 1;
+            this._preloader?.cancel();
+            cancelSlotPrefetch(this.id);
+            this.preparing = false;
+            this.preparedTarget = null;
             this.beginTransport(false);
             if (document.pictureInPictureElement === this.video
                 && typeof document.exitPictureInPicture === 'function') {
@@ -1011,6 +1289,13 @@ export function createPlayerInstance(options) {
                 this.video.pause();
                 this.video.removeAttribute('src');
                 this.video.load();
+            }
+            if (this.videoBack) {
+                try {
+                    this.videoBack.pause();
+                    this.videoBack.removeAttribute('src');
+                    this.videoBack.load();
+                } catch { /* ignore */ }
             }
             if (clearChannel) this.channel = null;
             this.playing = false;
@@ -1033,16 +1318,23 @@ export function createPlayerInstance(options) {
             flushWatchAccrual();
             unregisterWatchAccrualFlusher(snapshotWatchAccrual);
             unregisterWatchAccrualAborter(abortWatchAccrual);
+            this._preloader?.cancel();
+            cancelSlotPrefetch(this.id);
             await this.stop({ clearChannel: true });
             if (this.video?.parentElement) {
                 this.video.parentElement.removeChild(this.video);
+            }
+            if (this.videoBack?.parentElement) {
+                this.videoBack.parentElement.removeChild(this.videoBack);
             }
             if (this.videoHolder?.parentElement) {
                 this.videoHolder.parentElement.removeChild(this.videoHolder);
             }
             this.video = null;
+            this.videoBack = null;
             this.videoHolder = null;
             this.videoMount = null;
+            this._preloader = null;
         }
     };
 

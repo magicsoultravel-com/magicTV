@@ -1,7 +1,7 @@
 /**
  * Favorites-based channel index and chan up/down navigation.
  */
-import { channelKey } from './tvProviders/channelShape.js';
+import { channelKey, parseChannelKey } from './tvProviders/channelShape.js';
 import { TvProviderRegistry } from './tvProviders/registry.js';
 import { FavoritesRecents } from './storage/favoritesRecents.js';
 import { MultiView } from './multiView.js';
@@ -78,6 +78,36 @@ function currentSlotChannelKey(slotId) {
 }
 
 /**
+ * Walk bind-scope keys to the next/previous candidate ref (no catalog fetch).
+ * @param {{ slotId: string, direction: 'up' | 'down', bindScope?: ChanBindScope }} opts
+ * @returns {{ key: string, number: number } | null}
+ */
+export function resolveAdjacentChannelKey({ slotId, direction, bindScope }) {
+    const scope = bindScope || FavoritesRecents.getChanBindScope(slotId);
+    const { keys, numberByKey } = buildChannelIndex(scope);
+    if (!keys.length) return null;
+
+    const occupied = getOccupiedKeysExcept(slotId);
+    const currentKey = currentSlotChannelKey(slotId);
+    let startIdx = keys.indexOf(currentKey);
+    if (startIdx < 0) {
+        startIdx = direction === 'up' ? -1 : 0;
+    }
+
+    const step = direction === 'up' ? 1 : -1;
+    const len = keys.length;
+
+    for (let n = 1; n <= len; n += 1) {
+        const idx = ((startIdx + step * n) % len + len) % len;
+        const key = keys[idx];
+        if (!occupied.has(key)) {
+            return { key, number: numberByKey.get(key) || idx + 1 };
+        }
+    }
+    return null;
+}
+
+/**
  * @param {{ slotId: string, direction: 'up' | 'down', bindScope?: ChanBindScope }} opts
  * @returns {Promise<{ channel: object, number: number } | null>}
  */
@@ -86,30 +116,25 @@ export async function resolveAdjacentChannel({ slotId, direction, bindScope }) {
     const { keys, numberByKey } = buildChannelIndex(scope);
     if (!keys.length) return null;
 
-    const channels = await TvProviderRegistry.getChannelsByRefs(keys);
-    const channelByRef = new Map();
-    keys.forEach((key, i) => {
-        const ch = channels[i];
-        if (ch) channelByRef.set(key, ch);
-    });
-    const availableKeys = keys.filter((k) => channelByRef.has(k));
-    if (!availableKeys.length) return null;
-
     const occupied = getOccupiedKeysExcept(slotId);
     const currentKey = currentSlotChannelKey(slotId);
-    let startIdx = availableKeys.indexOf(currentKey);
+    let startIdx = keys.indexOf(currentKey);
     if (startIdx < 0) {
         startIdx = direction === 'up' ? -1 : 0;
     }
 
     const step = direction === 'up' ? 1 : -1;
-    const len = availableKeys.length;
+    const len = keys.length;
 
     for (let n = 1; n <= len; n += 1) {
         const idx = ((startIdx + step * n) % len + len) % len;
-        const key = availableKeys[idx];
-        if (!occupied.has(key)) {
-            return { channel: channelByRef.get(key), number: numberByKey.get(key) || idx + 1 };
+        const key = keys[idx];
+        if (occupied.has(key)) continue;
+
+        const parsed = parseChannelKey(key);
+        const channel = await TvProviderRegistry.getChannel(parsed);
+        if (channel?.url_resolved) {
+            return { channel, number: numberByKey.get(key) || idx + 1 };
         }
     }
     return null;

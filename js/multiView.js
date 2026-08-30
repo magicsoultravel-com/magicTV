@@ -1128,7 +1128,10 @@ export const MultiView = {
         );
         return this.withChannelSwitchTransition(
             id,
-            () => player.playChannel(channel),
+            {
+                onPrepare: () => player.prepareChannel(channel),
+                onCommit: () => player.commitPreparedChannel(channel)
+            },
             { skipOut: !hasVisibleContent }
         ).finally(async () => {
             this.persistSlots();
@@ -1312,6 +1315,7 @@ export const MultiView = {
             tile.classList.toggle('is-empty', !hasChannel);
             tile.classList.toggle('is-playing', uiPlaying);
             tile.classList.toggle('is-loading', uiLoading);
+            tile.classList.toggle('is-preparing', player?.preparing === true);
             tile.classList.toggle('is-paused', uiPaused);
             tile.classList.toggle('is-stopped', uiStopped);
             tile.classList.toggle('is-disconnected', uiDisconnected);

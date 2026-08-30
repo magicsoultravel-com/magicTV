@@ -19,6 +19,14 @@ const SWAP_DURATIONS = TILE_SWAP_DURATIONS;
 const TRANSFORM_DOWNGRADE = new Set(['smooth', 'flip', 'slide', 'spring']);
 
 /**
+ * @typedef {{
+ *   onPrepare?: () => void | Promise<void>,
+ *   onCommit?: () => void | Promise<void>,
+ *   onMidpoint?: () => void | Promise<void>
+ * }} TileTransitionHandlers
+ */
+
+/**
  * Resolve the Channel switch setting for a single-tile content change.
  * @param {{ hasCustomPlacement?: () => boolean } | null | undefined} multiView
  */
@@ -33,14 +41,73 @@ export function resolveChannelSwitchMode(multiView) {
 }
 
 /**
+ * @param {(() => void | Promise<void>) | TileTransitionHandlers} handlers
+ * @returns {TileTransitionHandlers}
+ */
+function normalizeHandlers(handlers) {
+    if (typeof handlers === 'function') {
+        return { onMidpoint: handlers };
+    }
+    return handlers || {};
+}
+
+/**
  * Run a channel-switch transition on one mosaic tile.
  * @param {HTMLElement | null | undefined} tileEl
- * @param {() => void | Promise<void>} onMidpoint
+ * @param {(() => void | Promise<void>) | TileTransitionHandlers} handlers
  * @param {{ mode?: string, skipOut?: boolean }} [opts]
  */
-export async function runTileContentTransition(tileEl, onMidpoint, opts = {}) {
+export async function runTileContentTransition(tileEl, handlers, opts = {}) {
+    const { onPrepare, onCommit, onMidpoint } = normalizeHandlers(handlers);
+    const loadFirst = typeof onPrepare === 'function' && typeof onCommit === 'function';
     const mode = opts.mode || 'instant';
     const skipOut = opts.skipOut === true;
+
+    if (loadFirst) {
+        await onPrepare();
+
+        if (mode === 'instant' || !tileEl) {
+            await onCommit();
+            return;
+        }
+
+        if (mode === 'dissolve' || mode === 'grain' || mode === 'matrix') {
+            await runWipeTransition(mode, () => onCommit(), {
+                scope: 'tiles',
+                fadeTargets: [tileEl],
+                grainHosts: [tileEl]
+            });
+            return;
+        }
+
+        const tileMode = mode === 'fade' ? 'fade' : mode;
+        if (!SWAP_DURATIONS[tileMode] && !SWAP_DURATIONS[mode]) {
+            await onCommit();
+            return;
+        }
+
+        const duration = SWAP_DURATIONS[tileMode] || 280;
+        const modeClass = `tv-swap--${tileMode}`;
+
+        try {
+            tileEl.classList.add('is-swapping', modeClass);
+            if (!skipOut) {
+                tileEl.classList.add('tv-swap-out');
+                void tileEl.offsetWidth;
+                await waitMs(duration);
+            }
+
+            await onCommit();
+
+            clearSwapClasses(tileEl);
+            tileEl.classList.add('is-swapping', modeClass, 'tv-swap-in');
+            void tileEl.offsetWidth;
+            await waitMs(duration);
+        } finally {
+            clearSwapClasses(tileEl);
+        }
+        return;
+    }
 
     if (mode === 'instant' || !tileEl) {
         await onMidpoint?.();

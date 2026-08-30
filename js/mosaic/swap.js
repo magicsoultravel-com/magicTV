@@ -26,16 +26,25 @@ import {
 const SWAP_DURATIONS = TILE_SWAP_DURATIONS;
 
 export const swapMethods = {
-    async withChannelSwitchTransition(slotId, onMidpoint, opts = {}) {
+    async withChannelSwitchTransition(slotId, handlers, opts = {}) {
+        const callbacks = typeof handlers === 'function'
+            ? { onMidpoint: handlers }
+            : (handlers || {});
+
         if (this.swapBusy) {
-            await onMidpoint?.();
+            if (callbacks.onPrepare && callbacks.onCommit) {
+                await callbacks.onPrepare?.();
+                await callbacks.onCommit?.();
+            } else {
+                await callbacks.onMidpoint?.();
+            }
             return;
         }
         const tile = el(`player-tile-${slotId || 'center'}`);
         const mode = resolveChannelSwitchMode(this);
         this.swapBusy = true;
         try {
-            await runTileContentTransition(tile, onMidpoint, {
+            await runTileContentTransition(tile, callbacks, {
                 mode,
                 skipOut: opts.skipOut === true
             });
