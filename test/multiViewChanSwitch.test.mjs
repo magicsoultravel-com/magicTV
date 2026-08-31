@@ -184,7 +184,7 @@ test('safe loading does not assign player.channel before commit', async () => {
 });
 
 test('safe loading cancels when prepare is not ready', async () => {
-    let cancelled = false;
+    let aborted = false;
     const player = {
         switchGeneration: 0,
         channel: makeChannel('Old'),
@@ -194,7 +194,7 @@ test('safe loading cancels when prepare is not ready', async () => {
         _suppressErrorToast: false,
         startPrepareChannel: async () => {},
         isPrepareReady: () => false,
-        cancelPrepare: () => { cancelled = true; },
+        _abortSwitchIntent: () => { aborted = true; },
         emitState: () => {}
     };
     stubPlayOnSlotDeps(player);
@@ -207,7 +207,7 @@ test('safe loading cancels when prepare is not ready', async () => {
         'test:Dead'
     );
 
-    assert.equal(cancelled, true);
+    assert.equal(aborted, true);
 });
 
 test('safe loading calls commitPreparedChannel with allowFallback false', async () => {
@@ -250,41 +250,136 @@ test('safe loading calls commitPreparedChannel with allowFallback false', async 
     }
 });
 
-test('classic assigns channel before transition', async () => {
+test('classic calls playChannel on cold switch', async () => {
     SettingsStore.setChanSwitchMode('classic');
     const newChannel = makeChannel('Classic');
-    let channelAtTransition = null;
+    let playChannelCalled = false;
+    let commitCalled = false;
 
     const player = {
         switchGeneration: 0,
-        channel: null,
-        playing: false,
+        channel: makeChannel('Old'),
+        playing: true,
         loading: false,
         pausePhase: 'idle',
         _suppressErrorToast: false,
         error: null,
-        beginTransport: () => {},
         emitState: () => {},
         startPrepareChannel: () => Promise.resolve(true),
         isPrepareReady: () => false,
-        commitPreparedChannel: async () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => {},
+        commitPreparedChannel: async () => {
+            commitCalled = true;
+            return true;
+        },
+        playChannel: async () => { playChannelCalled = true; },
         mountVideo: () => {}
     };
 
     const origTransition = MultiView.withChannelSwitchTransition;
-    MultiView.withChannelSwitchTransition = async (_id, handlers) => {
-        channelAtTransition = player.channel;
-        await handlers.onPrepare?.();
-        await handlers.onCommit?.();
+    MultiView.withChannelSwitchTransition = async (_id, handler) => {
+        await handler();
     };
     stubPlayOnSlotDeps(player);
 
     try {
         await MultiView.playOnSlot('center', newChannel);
-        assert.equal(channelAtTransition?.name, 'Classic');
+        assert.equal(playChannelCalled, true);
+        assert.equal(commitCalled, false);
     } finally {
         MultiView.withChannelSwitchTransition = origTransition;
     }
+});
+
+test('classic uses commit fast path when buffer is ready', async () => {
+    SettingsStore.setChanSwitchMode('classic');
+    const newChannel = makeChannel('Fast');
+    let commitCalled = false;
+    let playChannelCalled = false;
+
+    const player = {
+        switchGeneration: 0,
+        channel: makeChannel('Old'),
+        playing: true,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        error: null,
+        emitState: () => {},
+        startPrepareChannel: () => Promise.resolve(true),
+        isPrepareReady: () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => {},
+        commitPreparedChannel: async () => {
+            commitCalled = true;
+            return true;
+        },
+        playChannel: async () => { playChannelCalled = true; },
+        mountVideo: () => {}
+    };
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handler) => {
+        await handler();
+    };
+    stubPlayOnSlotDeps(player);
+
+    try {
+        await MultiView.playOnSlot('center', newChannel);
+        assert.equal(commitCalled, true);
+        assert.equal(playChannelCalled, false);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
+
+test('classic falls back to playChannel when commit fails', async () => {
+    SettingsStore.setChanSwitchMode('classic');
+    let aborted = false;
+    let playChannelCalled = false;
+
+    const player = {
+        switchGeneration: 0,
+        channel: makeChannel('Old'),
+        playing: true,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        error: null,
+        emitState: () => {},
+        startPrepareChannel: () => Promise.resolve(true),
+        isPrepareReady: () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => { aborted = true; },
+        commitPreparedChannel: async () => false,
+        playChannel: async () => { playChannelCalled = true; },
+        mountVideo: () => {}
+    };
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handler) => {
+        await handler();
+    };
+    stubPlayOnSlotDeps(player);
+
+    try {
+        await MultiView.playOnSlot('center', makeChannel('Fallback'));
+        assert.equal(aborted, true);
+        assert.equal(playChannelCalled, true);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
+
+test('playOnSlot cancels slot prefetch at switch start', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+        path.join(process.cwd(), 'js/multiView.js'),
+        'utf8'
+    );
+    assert.match(src, /cancelSlotPrefetch\(id\)/);
 });
 
 test('classic and safe loading both skip in-animation when buffer is ready', async () => {
@@ -301,6 +396,7 @@ test('classic and safe loading both skip in-animation when buffer is ready', asy
             startPrepareChannel: async () => {},
             isPrepareReady: () => true,
             cancelPrepare: () => {},
+            _abortSwitchIntent: () => {},
             emitState: () => {},
             commitPreparedChannel: async () => true
         };
@@ -322,41 +418,10 @@ test('classic and safe loading both skip in-animation when buffer is ready', asy
         }
     }
 
-    async function exerciseClassic() {
-        SettingsStore.setChanSwitchMode('classic');
-        const player = {
-            switchGeneration: 0,
-            channel: null,
-            playing: true,
-            loading: false,
-            pausePhase: 'idle',
-            _suppressErrorToast: false,
-            error: null,
-            beginTransport: () => {},
-            emitState: () => {},
-            startPrepareChannel: () => Promise.resolve(true),
-            isPrepareReady: () => true,
-            commitPreparedChannel: async () => true,
-            mountVideo: () => {}
-        };
-        const origTransition = MultiView.withChannelSwitchTransition;
-        MultiView.withChannelSwitchTransition = async (_id, _handlers, opts) => {
-            cases.push({ mode: 'classic', skipIn: opts.skipIn });
-        };
-        stubPlayOnSlotDeps(player);
-        try {
-            await MultiView.playOnSlot('center', makeChannel('New'));
-        } finally {
-            MultiView.withChannelSwitchTransition = origTransition;
-        }
-    }
-
     await exerciseSafe();
-    await exerciseClassic();
 
-    assert.equal(cases.length, 2);
+    assert.equal(cases.length, 1);
     assert.equal(cases[0].skipIn, true);
-    assert.equal(cases[1].skipIn, true);
 });
 
 test('syncSettingsToggles syncs chan-switch-mode select', async () => {

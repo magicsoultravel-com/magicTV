@@ -439,3 +439,56 @@ test('cancelPrepare invalidates in-flight warm via prepareGeneration', async () 
     assert.equal(staleDuringWarm, true);
     assert.ok(player.prepareGeneration > prepareGenAtStart);
 });
+
+test('_abortSwitchIntent clears loading and aligns wantPlaying with playing', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.playing = true;
+    player.wantPlaying = true;
+    player.loading = true;
+    player.loadPhase = 'connecting';
+    player.preparing = true;
+
+    player._abortSwitchIntent();
+
+    assert.equal(player.loading, false);
+    assert.equal(player.loadPhase, 'idle');
+    assert.equal(player.preparing, false);
+    assert.equal(player.wantPlaying, true);
+});
+
+test('commitPreparedChannel without fallback aborts stuck switch intent', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.switchGeneration = 1;
+    player.channel = { name: 'Old', url_resolved: 'https://example.com/old.m3u8' };
+    player.playing = true;
+    player.wantPlaying = true;
+    player.loading = true;
+    player._preloader = { isReady: () => false, cancel: () => {} };
+
+    const result = await player.commitPreparedChannel(
+        { name: 'Dead', url_resolved: 'https://example.com/dead.m3u8', providerId: 't' },
+        1,
+        { allowFallback: false }
+    );
+
+    assert.equal(result, false);
+    assert.equal(player.loading, false);
+    assert.equal(player.wantPlaying, true);
+});

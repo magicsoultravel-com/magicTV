@@ -95,10 +95,15 @@ export function syncRemoteChannelBar(_tabName) {
     const name = (channel?.name || '').trim();
     const country = channel?.countrycode || '';
     const show = Boolean(name);
+    const tuning = player?.preparing === true;
     const tvLabel = SLOT_SCREEN_LABELS[slotId] || '1';
 
-    if (bar) bar.classList.toggle('is-hidden', !show);
-    if (nameEl) nameEl.textContent = show ? `TV ${tvLabel} · ${name}` : '';
+    if (bar) bar.classList.toggle('is-hidden', !show && !tuning);
+    if (nameEl) {
+        nameEl.textContent = tuning
+            ? `TV ${tvLabel} · Tuning…`
+            : (show ? `TV ${tvLabel} · ${name}` : '');
+    }
     if (flagEl) flagEl.textContent = show && country ? countryFlagEmoji(country) : '';
 }
 
@@ -111,7 +116,8 @@ function focusedChannel() {
 
 async function handleRemoteAction(action) {
     const slotId = MultiView.statusSlotId || 'center';
-    switch (action) {
+    try {
+        switch (action) {
         case 'share-copy-stream': {
             const channel = focusedChannel();
             if (channel) copyShareText(buildStreamLink(channel), 'Stream link copied');
@@ -160,8 +166,11 @@ async function handleRemoteAction(action) {
                 action === 'reset' || action === 'mute-all' || action === 'stop-all' || action === 'play-all' ? 'center' : slotId,
                 action
             );
+        }
+    } finally {
+        syncRemotePanel();
+        syncRemoteChannelBar();
     }
-    syncRemotePanel();
 }
 
 export function syncRemotePanel() {

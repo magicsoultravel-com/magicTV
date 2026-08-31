@@ -452,7 +452,28 @@ export function createPlayerInstance(options) {
 
         async _fallbackPlayChannel(channel) {
             await this.playChannel(channel);
-            return Boolean(this.channel && !this.error);
+            const ok = Boolean(this.channel && !this.error);
+            if (!ok) this._abortSwitchIntent();
+            return ok;
+        },
+
+        /**
+         * Clear stuck switch intent when prepare/commit fails without a new stream.
+         */
+        _abortSwitchIntent() {
+            this.cancelPrepare();
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.preparing = false;
+            this.wantPlaying = this.playing === true;
+            this.emitState();
+        },
+
+        _failPreparedSwitch(switchGen) {
+            if (switchGen == null || switchGen === this.switchGeneration) {
+                this._abortSwitchIntent();
+            }
+            return false;
         },
 
         /** Clear offscreen prefetch/staging styling so swapped-in video is visible in the tile. */
@@ -683,10 +704,10 @@ export function createPlayerInstance(options) {
             if (!this._preloader.isReady()) {
                 if (fallbackResolved?.channel) {
                     if (switchGen != null && switchGen !== this.switchGeneration) return false;
-                    if (!allowFallback) return false;
+                    if (!allowFallback) return this._failPreparedSwitch(switchGen);
                     return this._fallbackPlayChannel(fallbackResolved.channel);
                 }
-                return false;
+                return this._failPreparedSwitch(switchGen);
             }
 
             const generation = ++this.playGeneration;
@@ -696,10 +717,10 @@ export function createPlayerInstance(options) {
             if (!key || !channel?.url_resolved) {
                 if (fallbackResolved?.channel) {
                     if (switchGen != null && switchGen !== this.switchGeneration) return false;
-                    if (!allowFallback) return false;
+                    if (!allowFallback) return this._failPreparedSwitch(switchGen);
                     return this._fallbackPlayChannel(fallbackResolved.channel);
                 }
-                return false;
+                return this._failPreparedSwitch(switchGen);
             }
 
             if (switchGen != null && switchGen !== this.switchGeneration) return false;
@@ -808,7 +829,7 @@ export function createPlayerInstance(options) {
                 transportAtStart
             })) {
                 try { this.video?.pause(); } catch { /* ignore */ }
-                return false;
+                return this._failPreparedSwitch(switchGen);
             }
 
             if (swapCompleted) {

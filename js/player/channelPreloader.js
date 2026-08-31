@@ -6,7 +6,7 @@ import { loadHlsLibrary, isHlsUrl, canPlayNativeHls } from '../tvHls.js';
 import { normalizeChannel, channelKey } from '../tvProviders/channelShape.js';
 
 /** Max wall-clock wait for first playable frame during warm-up. */
-export const PRELOAD_TIMEOUT_MS = 4000;
+export const PRELOAD_TIMEOUT_MS = 8000;
 
 /** Lightweight buffer — enough for first frame, not full playback buffer. */
 export const PRELOAD_HLS_CONFIG = {

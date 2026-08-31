@@ -19,6 +19,7 @@ import {
     VIEW_TRANSITION_LABELS
 } from './ui/viewTransitions.js';
 import { classifyTilePlayback } from './player/pauseBuffer.js';
+import { cancelSlotPrefetch } from './player/channelPrefetch.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -1115,18 +1116,19 @@ export const MultiView = {
      */
     async playOnSlotSafeLoading(id, channel, player, normalized, key) {
         showAppToast('Fetching next channel…');
+        this.syncStatusChrome();
 
         player._suppressErrorToast = true;
         player.switchGeneration = (player.switchGeneration || 0) + 1;
         const switchGen = player.switchGeneration;
 
         try {
-            await player.startPrepareChannel(normalized, switchGen, { suppressUi: true });
+            await player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
 
             if (switchGen !== player.switchGeneration) return;
 
             if (!player.isPrepareReady()) {
-                player.cancelPrepare();
+                player._abortSwitchIntent();
                 showAppToast('Stream unavailable');
                 return;
             }
@@ -1158,7 +1160,7 @@ export const MultiView = {
 
             if (!committed || switchGen !== player.switchGeneration) {
                 if (!committed) {
-                    player.cancelPrepare();
+                    player._abortSwitchIntent();
                     showAppToast('Stream unavailable');
                 }
                 return;
@@ -1169,6 +1171,7 @@ export const MultiView = {
             player._suppressErrorToast = false;
             this.persistSlots();
             this.scheduleRefreshTiles();
+            this.syncStatusChrome();
             this.syncSettingsToggles();
             if (ChromecastManager.getActiveSlot() === id && ChromecastManager.isCasting()) {
                 try {
@@ -1200,47 +1203,40 @@ export const MultiView = {
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
         const key = channelKey(normalized);
 
+        cancelSlotPrefetch(id);
+
         if (SettingsStore.getChanSwitchMode() === 'safeLoading') {
             return this.playOnSlotSafeLoading(id, channel, player, normalized, key);
         }
-
-        player.switchGeneration = (player.switchGeneration || 0) + 1;
-        const switchGen = player.switchGeneration;
-
-        player._suppressErrorToast = true;
-        player.channel = normalized;
-        player.error = null;
-        player.beginTransport(true);
-        TileFrames.armLiveSnap(normalized.url_resolved || '');
-        if (key) {
-            savePlayerState({
-                lastChannelKey: key,
-                lastChannelName: normalized.name || ''
-            });
-        }
-        player.emitState();
-        this.persistSlots();
-        this.scheduleRefreshTiles();
-        this.syncStatusChrome();
-
-        player.startPrepareChannel(normalized, switchGen);
 
         const hasVisibleContent = Boolean(
             player.channel
             && (player.playing || player.loading || player.pausePhase !== 'idle')
         );
-        const bufferReady = player.isPrepareReady();
+
+        player.switchGeneration = (player.switchGeneration || 0) + 1;
+        const switchGen = player.switchGeneration;
+        player._suppressErrorToast = true;
+
+        void player.startPrepareChannel(normalized, switchGen);
 
         return this.withChannelSwitchTransition(
             id,
-            {
-                onPrepare: () => player.startPrepareChannel(normalized, switchGen),
-                onCommit: () => player.commitPreparedChannel(normalized, switchGen)
+            async () => {
+                if (switchGen === player.switchGeneration && player.isPrepareReady()) {
+                    const committed = await player.commitPreparedChannel(
+                        normalized,
+                        switchGen,
+                        { allowFallback: true }
+                    );
+                    if (committed === true) return;
+                    player._abortSwitchIntent();
+                } else {
+                    player.cancelPrepare();
+                }
+                await player.playChannel(normalized);
             },
-            {
-                skipOut: !hasVisibleContent || bufferReady,
-                skipIn: bufferReady
-            }
+            { skipOut: !hasVisibleContent }
         ).finally(async () => {
             player._suppressErrorToast = false;
             this.persistSlots();
