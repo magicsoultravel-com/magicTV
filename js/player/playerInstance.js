@@ -26,6 +26,7 @@ import {
     applyQualityMode,
     listQualityLevels,
     formatQualityLabel,
+    bindHlsPlaybackHandlers,
     LIVE_MAX_LATENCY_DURATION_COUNT
 } from './hlsAttach.js';
 import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.js';
@@ -58,6 +59,9 @@ import {
 
 /** Max wall-clock seconds credited in a single flush (guards hidden-tab / stuck windows). */
 const WATCH_ACCRUAL_FLUSH_CAP_SEC = 30;
+
+/** Watchdog: fail a channel load that has been stuck loading/buffering this long. */
+const STUCK_LOAD_TIMEOUT_MS = 9000;
 
 /**
  * Create an independent HLS player instance (one <video> + hls.js).
@@ -200,6 +204,12 @@ export function createPlayerInstance(options) {
         playGeneration: 0,
         watchAccrueKey: null,
         watchAccrueStartedAt: null,
+        /** Timer id + gen for the stuck-load watchdog (null when idle). */
+        _stuckLoadTimer: null,
+        _stuckLoadGen: 0,
+        _stuckLoadStartedAt: 0,
+        /** Synchronous watchdog tick — also the test seam. */
+        _stuckLoadTick: null,
 
         _bindVideoEvents(videoEl) {
             if (!videoEl) return;
@@ -223,9 +233,11 @@ export function createPlayerInstance(options) {
                     this.loading = false;
                     this.emitState();
                 }
+                this._clearStuckLoadWatchdog();
             });
             videoEl.addEventListener('playing', () => {
                 if (!isActive()) return;
+                this._clearStuckLoadWatchdog();
                 if (!shouldAcceptPlayingEvent(this.wantPlaying)) {
                     return;
                 }
@@ -264,6 +276,7 @@ export function createPlayerInstance(options) {
                     this.emitState();
                     return;
                 }
+                this._clearStuckLoadWatchdog();
                 syncWatchAccrual();
             });
             videoEl.addEventListener('progress', () => {
@@ -271,6 +284,7 @@ export function createPlayerInstance(options) {
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
                 }
+                this._clearStuckLoadWatchdog();
             });
             videoEl.addEventListener('pause', () => {
                 if (!isActive()) return;
@@ -291,6 +305,7 @@ export function createPlayerInstance(options) {
                 if (this.pausePhase !== 'idle') {
                     this.pausePhase = 'buffering';
                 }
+                this._armStuckLoadWatchdog();
                 this.emitState();
             });
             videoEl.addEventListener('stalled', () => {
@@ -301,11 +316,13 @@ export function createPlayerInstance(options) {
                     if (this.pausePhase !== 'idle') {
                         this.pausePhase = 'buffering';
                     }
+                    this._armStuckLoadWatchdog();
                     this.emitState();
                 }
             });
             videoEl.addEventListener('error', () => {
                 if (!isActive()) return;
+                this._clearStuckLoadWatchdog();
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.playing = false;
@@ -314,6 +331,7 @@ export function createPlayerInstance(options) {
             });
             videoEl.addEventListener('ended', () => {
                 if (!isActive()) return;
+                this._clearStuckLoadWatchdog();
                 this.playing = false;
                 this.loadPhase = 'idle';
                 this.emitState();
@@ -476,6 +494,48 @@ export function createPlayerInstance(options) {
             return false;
         },
 
+        /**
+         * Watchdog against a permanently stuck load: when wantPlaying while
+         * loading/buffering and no media progress, force error state after a
+         * timeout so the tile never spins forever and chan-nav can recover.
+         */
+        _armStuckLoadWatchdog() {
+            this._clearStuckLoadWatchdog();
+            const transportGen = this.transportGen;
+            const playGen = this.playGeneration;
+            const channelKeyStr = channelKey(this.channel);
+            this._stuckLoadGen = playGen;
+            this._stuckLoadStartedAt = Date.now();
+            // Stored as a method so tests can fire the tick synchronously
+            // instead of waiting out STUCK_LOAD_TIMEOUT_MS.
+            this._stuckLoadTick = () => {
+                if (this.wantPlaying !== true) return;
+                if (transportGen !== this.transportGen) return;
+                if (playGen !== this.playGeneration) return;
+                if (channelKeyStr && channelKeyStr !== channelKey(this.channel)) return;
+                if (this.playing) return;
+                if (!(this.loading || this.loadPhase === 'connecting' || this.loadPhase === 'buffering')) return;
+                // Stuck — surface a recoverable error state and re-arm prefetch.
+                this.loading = false;
+                this.loadPhase = 'idle';
+                this.preparing = false;
+                this.error = 'Stream unavailable';
+                this.emitState();
+                scheduleSlotPrefetch(this.id, this);
+            };
+            this._stuckLoadTimer = setTimeout(() => {
+                this._stuckLoadTimer = null;
+                this._stuckLoadTick?.();
+            }, STUCK_LOAD_TIMEOUT_MS);
+        },
+
+        _clearStuckLoadWatchdog() {
+            if (this._stuckLoadTimer) {
+                clearTimeout(this._stuckLoadTimer);
+                this._stuckLoadTimer = null;
+            }
+        },
+
         /** Clear offscreen prefetch/staging styling so swapped-in video is visible in the tile. */
         _promoteFrontVideo() {
             const v = this.video;
@@ -536,16 +596,15 @@ export function createPlayerInstance(options) {
             const discarded = this.videoBack;
             this.videoBack = prefetched.video;
             if (discarded && discarded !== prefetched.video && discarded !== this.video) {
+                // Remove the orphaned staging element instead of parking it in the holder —
+                // otherwise every prefetched handoff leaks a <video> into the hidden holder.
                 try { discarded.pause(); } catch { /* ignore */ }
                 discarded.removeAttribute('src');
                 try { discarded.load(); } catch { /* ignore */ }
-                discarded.classList.add('tv-video--staging');
-                discarded.style.cssText = '';
-                discarded.muted = true;
-                discarded.defaultMuted = true;
-                if (this.videoHolder && discarded.parentElement !== this.videoHolder) {
-                    this.videoHolder.appendChild(discarded);
-                }
+                discarded.remove?.();
+            }
+            if (this.videoMount && this.videoBack.parentElement === this.videoMount) {
+                if (this.videoHolder) this.videoHolder.appendChild(this.videoBack);
             }
             this.videoBack.classList.add('tv-video--staging');
             this.videoBack.muted = true;
@@ -617,11 +676,35 @@ export function createPlayerInstance(options) {
                 this.emitState();
             }
 
-            const ok = await this._preloader.warmChannel(this.videoBack, channel, {
+            // Warm the staging element while RENDERED but offscreen. Browsers throttle
+            // media inside display:none subtrees (the videoHolder is is-hidden), leaving
+            // warm-ups to always time out. Prefetch already does this on <body>; mirror it.
+            let movedToBody = false;
+            const back = this.videoBack;
+            if (back) {
+                const doBody = typeof document !== 'undefined' && document.body;
+                if (doBody && back.parentElement !== document.body) {
+                    try {
+                        document.body.appendChild(back);
+                        back.classList.add('tv-video--staging');
+                        back.classList.remove('tv-video--prefetch');
+                        back.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:160px;height:90px;opacity:0;pointer-events:none;';
+                        movedToBody = true;
+                    } catch { /* keep holder */ }
+                }
+            }
+
+            const ok = await this._preloader.warmChannel(back, channel, {
                 isStale
             });
 
             if (isStale()) return false;
+
+            if (!movedToBody && back) {
+                // Ensure staging styling so a promoted front video is visible later.
+                back.classList.add('tv-video--staging');
+                back.classList.remove('tv-video--prefetch');
+            }
             if (!suppressUi) {
                 this.preparing = false;
                 if (ok) this.preparedTarget = channel;
@@ -692,6 +775,7 @@ export function createPlayerInstance(options) {
             const allowFallback = opts.allowFallback !== false;
             this.init();
             if (switchGen != null && switchGen !== this.switchGeneration) return false;
+            this._clearStuckLoadWatchdog();
 
             await this._awaitPrepareReady(switchGen);
             if (switchGen != null && switchGen !== this.switchGeneration) return false;
@@ -748,6 +832,13 @@ export function createPlayerInstance(options) {
             if (this.hls) {
                 applyHlsBufferConfig(this.hls, this.getBufferSize());
                 this.qualityMode = applyQualityMode(this.hls, this.qualityMode);
+                // Re-wire live handling so the taken-over stream stays healthy:
+                // fatal errors surface as error state + retry, non-fatal errors
+                // call startLoad()/recoverMediaError(), and quality/latency updates
+                // keep flowing. Without this the promoted hls is a dead shell whose
+                // warm-up handlers were already consumed by the preloader.
+                this._onPlaybackFatal = null;
+                bindHlsPlaybackHandlers(this, this.hls, generation);
             }
 
             this._recycleStagingVideo();
@@ -1218,6 +1309,7 @@ export function createPlayerInstance(options) {
          * do not block a fresher pause freeze into IDB.
          */
         pause() {
+            this._clearStuckLoadWatchdog();
             const gen = this.beginTransport(false);
             this.switchGeneration += 1;
             this.prepareGeneration += 1;
@@ -1330,6 +1422,7 @@ export function createPlayerInstance(options) {
             this.setPauseLiveSync(false);
             // Every intentional PLAY arms a fresh channel-tile snap (even same URL).
             TileFrames.armLiveSnap(channel.url_resolved || '');
+            this._armStuckLoadWatchdog();
             this.emitState();
 
             try {
@@ -1402,6 +1495,7 @@ export function createPlayerInstance(options) {
                     }
                     return;
                 }
+                scheduleSlotPrefetch(this.id, this);
             } catch (e) {
                 if (generation !== this.playGeneration) return;
                 if (!this.wantPlaying || this.transportGen !== transportAtStart) return;
@@ -1462,6 +1556,7 @@ export function createPlayerInstance(options) {
             this.error = null;
             this.resumeBlocked = false;
             this.stopped = false;
+            this._armStuckLoadWatchdog();
             this.emitState();
 
             const desiredMuted = this.muted;
@@ -1512,6 +1607,7 @@ export function createPlayerInstance(options) {
         },
 
         async stop({ clearChannel = false } = {}) {
+            this._clearStuckLoadWatchdog();
             this.playGeneration += 1;
             this.switchGeneration += 1;
             this.prepareGeneration += 1;
@@ -1561,6 +1657,7 @@ export function createPlayerInstance(options) {
             flushWatchAccrual();
             unregisterWatchAccrualFlusher(snapshotWatchAccrual);
             unregisterWatchAccrualAborter(abortWatchAccrual);
+            this._clearStuckLoadWatchdog();
             this._preloader?.cancel();
             cancelSlotPrefetch(this.id);
             await this.stop({ clearChannel: true });

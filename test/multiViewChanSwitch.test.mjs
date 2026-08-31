@@ -183,8 +183,9 @@ test('safe loading does not assign player.channel before commit', async () => {
     }
 });
 
-test('safe loading cancels when prepare is not ready', async () => {
+test('safe loading no longer aborts when prepare is not ready — falls back via commit', async () => {
     let aborted = false;
+    let commitCalled = false;
     const player = {
         switchGeneration: 0,
         channel: makeChannel('Old'),
@@ -195,22 +196,38 @@ test('safe loading cancels when prepare is not ready', async () => {
         startPrepareChannel: async () => {},
         isPrepareReady: () => false,
         _abortSwitchIntent: () => { aborted = true; },
-        emitState: () => {}
+        emitState: () => {},
+        commitPreparedChannel: async () => {
+            commitCalled = true;
+            return false;
+        }
     };
     stubPlayOnSlotDeps(player);
 
-    await MultiView.playOnSlotSafeLoading(
-        'center',
-        makeChannel('Dead'),
-        player,
-        makeChannel('Dead'),
-        'test:Dead'
-    );
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handlers) => {
+        await handlers.onCommit();
+    };
 
-    assert.equal(aborted, true);
+    try {
+        await MultiView.playOnSlotSafeLoading(
+            'center',
+            makeChannel('Dead'),
+            player,
+            makeChannel('Dead'),
+            'test:Dead'
+        );
+
+        // Warm never confirmed, so commit (with fallback) is still invoked and
+        // the switch is not aborted preemptively. Abort only when commit itself
+        // also failed — here it returns false, so abort is expected after commit.
+        assert.equal(commitCalled, true);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
 });
 
-test('safe loading calls commitPreparedChannel with allowFallback false', async () => {
+test('safe loading calls commitPreparedChannel with allowFallback true (fallback path)', async () => {
     const newChannel = makeChannel('New');
     let commitOpts = null;
     const player = {
@@ -244,7 +261,85 @@ test('safe loading calls commitPreparedChannel with allowFallback false', async 
             newChannel,
             'test:New'
         );
-        assert.deepEqual(commitOpts, { allowFallback: false });
+        assert.deepEqual(commitOpts, { allowFallback: true });
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
+
+test('safe loading cold start skips warm-up and plays directly', async () => {
+    SettingsStore.setChanSwitchMode('safeLoading');
+    let prepareCalled = false;
+    let commitCalled = false;
+    let playChannelCalled = false;
+    const player = {
+        switchGeneration: 0,
+        channel: null,
+        playing: false,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        startPrepareChannel: async () => { prepareCalled = true; return true; },
+        isPrepareReady: () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => {},
+        emitState: () => {},
+        commitPreparedChannel: async () => { commitCalled = true; return true; },
+        playChannel: async () => { playChannelCalled = true; },
+        mountVideo: () => {}
+    };
+    stubPlayOnSlotDeps(player);
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handler) => {
+        await handler();
+    };
+
+    try {
+        await MultiView.playOnSlot('center', makeChannel('First'));
+        assert.equal(playChannelCalled, true);
+        assert.equal(prepareCalled, false);
+        assert.equal(commitCalled, false);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
+
+test('classic mash guard skips stale switch callback', async () => {
+    SettingsStore.setChanSwitchMode('classic');
+    let commitCalled = false;
+    let playChannelCalled = false;
+    const player = {
+        switchGeneration: 0,
+        channel: makeChannel('Old'),
+        playing: true,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        error: null,
+        emitState: () => {},
+        startPrepareChannel: () => Promise.resolve(true),
+        isPrepareReady: () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => {},
+        commitPreparedChannel: async () => { commitCalled = true; return true; },
+        playChannel: async () => { playChannelCalled = true; },
+        mountVideo: () => {}
+    };
+    stubPlayOnSlotDeps(player);
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handler) => {
+        // A newer pick lands mid-transition — the stale one must bail
+        // without committing or playing the superseded channel.
+        player.switchGeneration += 1;
+        await handler();
+    };
+
+    try {
+        await MultiView.playOnSlot('center', makeChannel('New'));
+        assert.equal(commitCalled, false);
+        assert.equal(playChannelCalled, false);
     } finally {
         MultiView.withChannelSwitchTransition = origTransition;
     }

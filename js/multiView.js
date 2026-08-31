@@ -1123,20 +1123,24 @@ export const MultiView = {
         const switchGen = player.switchGeneration;
 
         try {
-            await player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
-
-            if (switchGen !== player.switchGeneration) return;
-
-            if (!player.isPrepareReady()) {
-                player._abortSwitchIntent();
-                showAppToast('Stream unavailable');
-                return;
-            }
-
             const hasVisibleContent = Boolean(
                 player.channel
                 && (player.playing || player.loading || player.pausePhase !== 'idle')
             );
+
+            if (!hasVisibleContent) {
+                // Cold start / stopped tile — nothing to hold, play now. Do not wait
+                // on a warm-up that has no live picture to protect.
+                await this.withChannelSwitchTransition(
+                    id,
+                    () => player.playChannel(normalized),
+                    { skipOut: true }
+                );
+                return;
+            }
+
+            await player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
+
             const bufferReady = player.isPrepareReady();
 
             let committed = false;
@@ -1148,7 +1152,7 @@ export const MultiView = {
                         committed = await player.commitPreparedChannel(
                             normalized,
                             switchGen,
-                            { allowFallback: false }
+                            { allowFallback: true }
                         ) === true;
                     }
                 },
@@ -1158,11 +1162,11 @@ export const MultiView = {
                 }
             );
 
-            if (!committed || switchGen !== player.switchGeneration) {
-                if (!committed) {
-                    player._abortSwitchIntent();
-                    showAppToast('Stream unavailable');
-                }
+            if (!committed && switchGen === player.switchGeneration) {
+                // Genuine failure (not superseded by a newer pick) — the warm-up
+                // never confirmed and fallback also failed.
+                player._abortSwitchIntent();
+                showAppToast('Stream unavailable');
                 return;
             }
 
@@ -1218,12 +1222,18 @@ export const MultiView = {
         const switchGen = player.switchGeneration;
         player._suppressErrorToast = true;
 
-        void player.startPrepareChannel(normalized, switchGen);
+        // Only bother with a background warm when there is a live picture to hold.
+        // Cold starts go straight to playChannel in the transition below.
+        if (hasVisibleContent) {
+            void player.startPrepareChannel(normalized, switchGen);
+        }
 
         return this.withChannelSwitchTransition(
             id,
             async () => {
-                if (switchGen === player.switchGeneration && player.isPrepareReady()) {
+                // Mash guard: a newer pick superseded this one — never act on the stale channel.
+                if (switchGen !== player.switchGeneration) return;
+                if (player.isPrepareReady()) {
                     const committed = await player.commitPreparedChannel(
                         normalized,
                         switchGen,

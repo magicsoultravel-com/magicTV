@@ -103,7 +103,7 @@ export function evictPrefetchedKey(slotId, key) {
  * @param {object} player
  */
 export async function refreshSlotPrefetch(slotId, player) {
-    if (!slotId || !player?.playing || !player.channel || player.loading) return;
+    if (!slotId || !player?.channel || player.loading) return;
 
     const gen = (slotGeneration.get(slotId) || 0) + 1;
     slotGeneration.set(slotId, gen);

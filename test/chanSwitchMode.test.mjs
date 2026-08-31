@@ -492,3 +492,138 @@ test('commitPreparedChannel without fallback aborts stuck switch intent', async 
     assert.equal(player.loading, false);
     assert.equal(player.wantPlaying, true);
 });
+
+test('stuck-load watchdog clears stuck loading and surfaces error state', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const errors = [];
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false,
+        onState: () => { errors.push(player.error); }
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = false;
+    player.loading = true;
+    player.loadPhase = 'buffering';
+
+    player._armStuckLoadWatchdog();
+    assert.ok(player._stuckLoadTimer != null);
+    assert.equal(typeof player._stuckLoadTick, 'function');
+
+    try {
+        // Synchronous seam — same code path the 9s timer runs.
+        player._stuckLoadTick();
+
+        assert.equal(player.loading, false);
+        assert.equal(player.loadPhase, 'idle');
+        assert.equal(player.preparing, false);
+        assert.equal(player.error, 'Stream unavailable');
+        assert.ok(errors.includes('Stream unavailable'));
+    } finally {
+        player._clearStuckLoadWatchdog();
+    }
+});
+
+test('stuck-load watchdog is a no-op while playing and clear disarms it', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player.loading = true;
+    player.loadPhase = 'buffering';
+
+    player._armStuckLoadWatchdog();
+    try {
+        player._stuckLoadTick();
+        assert.equal(player.error, null);
+
+        // Stuck again later (playing dropped) — tick fires the recovery.
+        player.playing = false;
+        player.loading = true;
+        player.loadPhase = 'buffering';
+        player._stuckLoadTick();
+        assert.equal(player.error, 'Stream unavailable');
+    } finally {
+        player._clearStuckLoadWatchdog();
+    }
+
+    assert.equal(player._stuckLoadTimer, null);
+});
+
+test('commitPreparedChannel re-wires live hls handlers after takeover', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const events = {
+        MANIFEST_PARSED: 'MANIFEST_PARSED',
+        LEVEL_SWITCHED: 'LEVEL_SWITCHED',
+        FRAG_LOADED: 'FRAG_LOADED',
+        ERROR: 'ERROR',
+        BUFFER_DEPTH_UPDATE: 'BUFFER_DEPTH_UPDATE'
+    };
+    const registered = [];
+    const handlers = {};
+    const hlsMock = {
+        Events: events,
+        ErrorTypes: { NETWORK_ERROR: 'networkError', MEDIA_ERROR: 'mediaError' },
+        config: {},
+        autoLevelEnabled: true,
+        currentLevel: -1,
+        startLoadCount: 0,
+        recoverCount: 0,
+        on(name, fn) {
+            registered.push(name);
+            handlers[name] = fn;
+        },
+        startLoad() { this.startLoadCount += 1; },
+        recoverMediaError() { this.recoverCount += 1; },
+        destroy() {}
+    };
+    const channel = {
+        name: 'Live',
+        url_resolved: 'https://example.com/live.m3u8',
+        providerId: 'test',
+        channelId: 'c1'
+    };
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.switchGeneration = 1;
+    player._preloader = {
+        isReady: () => true,
+        cancel: () => {},
+        takeover: () => ({ hls: hlsMock, channel, url: channel.url_resolved })
+    };
+
+    const result = await player.commitPreparedChannel(channel, 1);
+
+    assert.equal(result, true);
+    assert.equal(player.hls, hlsMock);
+    for (const name of Object.values(events)) {
+        assert.ok(registered.includes(name), `missing ${name} handler after takeover`);
+    }
+
+    // Fatal error surfaces as a recoverable error state, not a silent dead stream.
+    handlers.ERROR(null, { fatal: true, type: 'networkError' });
+    assert.equal(player.error, 'Stream unavailable');
+
+    // Non-fatal network error recovers via startLoad.
+    handlers.ERROR(null, { fatal: false, type: 'networkError' });
+    assert.equal(hlsMock.startLoadCount, 1);
+});
