@@ -1,6 +1,4 @@
-/**
- * Chan switch mode — Safe Loading player contract tests.
- */
+import { PRELOAD_STALL_MS } from '../js/player/channelPreloader.js';
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -519,7 +517,8 @@ test('stuck-load watchdog clears stuck loading and surfaces error state', async 
     assert.equal(typeof player._stuckLoadTick, 'function');
 
     try {
-        // Synchronous seam — same code path the 9s timer runs.
+        // Simulate stall — no progress for the full stall window.
+        player._loadLastProgressAt = Date.now() - PRELOAD_STALL_MS - 1;
         player._stuckLoadTick();
 
         assert.equal(player.loading, false);
@@ -557,6 +556,8 @@ test('stuck-load watchdog is a no-op while playing and clear disarms it', async 
         player.playing = false;
         player.loading = true;
         player.loadPhase = 'buffering';
+        player._stuckLoadRetried = true;
+        player._loadLastProgressAt = Date.now() - PRELOAD_STALL_MS - 1;
         player._stuckLoadTick();
         assert.equal(player.error, 'Stream unavailable');
     } finally {
@@ -633,7 +634,7 @@ test('commitPreparedChannel re-wires live hls handlers after takeover', async ()
     assert.equal(hlsMock.startLoadCount, 1);
 });
 
-test('isPrepareReadyWithFrame requires decoded staging dimensions', async () => {
+test('isPrepareReadyWithFrame accepts readyState >= 2 without decoded dimensions', async () => {
     const { createPlayerInstance } = await import('../js/player/playerInstance.js');
     const player = createPlayerInstance({
         id: 'center',
@@ -645,12 +646,48 @@ test('isPrepareReadyWithFrame requires decoded staging dimensions', async () => 
     player.init();
     player._preloader = { isReady: () => true };
     player.videoBack.videoWidth = 0;
-    player.videoBack.readyState = 0;
-    assert.equal(player.isPrepareReadyWithFrame(), false);
-
-    player.videoBack.videoWidth = 640;
     player.videoBack.readyState = 2;
     assert.equal(player.isPrepareReadyWithFrame(), true);
+
+    player.videoBack.readyState = 0;
+    assert.equal(player.isPrepareReadyWithFrame(), false);
+});
+
+test('safe loading keeps current channel when warm does not become ready', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    const oldChannel = {
+        name: 'Old',
+        url_resolved: 'https://example.com/old.m3u8',
+        providerId: 'test'
+    };
+    player.init();
+    player.channel = oldChannel;
+    player.playing = true;
+    player.wantPlaying = true;
+    player.video.videoWidth = 1280;
+    player.video.paused = false;
+
+    player._preloader = {
+        isReady: () => false,
+        isMakingProgress: () => false,
+        isStalled: () => true,
+        cancel: () => {}
+    };
+    player._preparePromise = Promise.resolve(false);
+    player.switchGeneration = 1;
+
+    const ready = await player.waitForPrepareReady(1);
+    assert.equal(ready, false);
+    player._abortSwitchIntent();
+    assert.equal(player.channel, oldChannel);
+    assert.equal(player.playing, true);
 });
 
 test('commitPreparedChannel sets playing after swap when staging was paused', async () => {
@@ -682,7 +719,7 @@ test('commitPreparedChannel sets playing after swap when staging was paused', as
     assert.equal(player.wantPlaying, true);
 });
 
-test('commitPreparedChannel rejects swap when staging has no decoded frame', async () => {
+test('commitPreparedChannel rejects swap when staging media is not ready', async () => {
     const { createPlayerInstance } = await import('../js/player/playerInstance.js');
     const player = createPlayerInstance({
         id: 'center',

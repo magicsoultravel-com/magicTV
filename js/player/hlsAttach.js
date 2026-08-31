@@ -115,6 +115,7 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
 
     hls.on(events.MANIFEST_PARSED, () => {
         if (generation !== ctx.playGeneration || !ctx.hls) return;
+        ctx._noteLoadProgress?.('hls_manifest_parsed');
         ctx.connection = 'connected';
         ctx.qualityMode = applyQualityMode(ctx.hls, ctx.qualityMode);
         const levelIdx = resolveLevelIndex(ctx.hls);
@@ -150,6 +151,7 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
 
     hls.on(events.FRAG_LOADED, (_, data) => {
         if (generation !== ctx.playGeneration) return;
+        ctx._noteLoadProgress?.('hls_frag_loaded');
         const prevBw = ctx.bandwidthEstimateBps;
         const prevLabel = ctx.qualityLabel;
         const bw = data?.stats?.bwEstimate ?? data?.frag?.stats?.bwEstimate;
@@ -190,6 +192,7 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
 
     hls.on(events.BUFFER_DEPTH_UPDATE, () => {
         if (generation !== ctx.playGeneration) return;
+        ctx._noteLoadProgress?.('hls_buffer_depth');
         const now = Date.now();
         if (ctx._lastBufferDepthEmit && now - ctx._lastBufferDepthEmit < 400) {
             return;

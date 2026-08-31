@@ -1,11 +1,13 @@
 /**
  * Favorites-based channel index and chan up/down navigation.
  */
-import { channelKey, parseChannelKey } from './tvProviders/channelShape.js';
+import { parseChannelKey } from './tvProviders/channelShape.js';
 import { TvProviderRegistry } from './tvProviders/registry.js';
 import { FavoritesRecents } from './storage/favoritesRecents.js';
-import { MultiView } from './multiView.js';
-import { SLOT_IDS, slotIsOccupied } from './mosaic/constants.js';
+import {
+    getOccupiedKeysExcept,
+    currentSlotChannelKey
+} from './mosaic/slotOccupancy.js';
 
 /** @typedef {{ mode: 'favorites' } | { mode: 'folder', folderId: string }} ChanBindScope */
 
@@ -39,42 +41,6 @@ export function buildChannelIndex(bindScope) {
 
     keys.forEach((key, i) => numberByKey.set(key, i + 1));
     return { keys, numberByKey };
-}
-
-/**
- * Channel keys assigned to other enabled TV slots.
- * @param {string} slotId
- * @returns {Set<string>}
- */
-export function getOccupiedKeysExcept(slotId) {
-    const occupied = new Set();
-    const slots = MultiView.slots || {};
-    const remembered = MultiView.rememberedSlotKeys || {};
-
-    for (const id of SLOT_IDS) {
-        if (id === slotId) continue;
-        const slot = slots[id];
-        if (!slot?.enabled) continue;
-        const player = slot.player;
-        const key = player?.channel
-            ? channelKey(player.channel)
-            : remembered[id] || null;
-        if (slotIsOccupied(player?.channel, remembered[id]) && key) {
-            occupied.add(key);
-        }
-    }
-    return occupied;
-}
-
-/**
- * @param {string} slotId
- * @returns {string | null}
- */
-function currentSlotChannelKey(slotId) {
-    const slot = MultiView.slots?.[slotId];
-    const player = slot?.player || (slotId === 'center' ? MultiView.getPrimary?.() : null);
-    if (player?.channel) return channelKey(player.channel);
-    return MultiView.rememberedSlotKeys?.[slotId] || null;
 }
 
 /**
@@ -158,6 +124,7 @@ export async function navigateChannel(slotId, direction) {
         }
         return false;
     }
+    const { MultiView } = await import('./multiView.js');
     await MultiView.playOnSlot(slotId, result.channel);
     return true;
 }

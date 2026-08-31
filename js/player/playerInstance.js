@@ -34,7 +34,7 @@ import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.
 import { TileFrames } from '../tileFrames.js';
 import { PosterCache } from '../storage/posterCache.js';
 import { FrameCache } from '../storage/frameCache.js';
-import { ChannelPreloader, PRELOAD_TIMEOUT_MS } from './channelPreloader.js';
+import { ChannelPreloader, PRELOAD_STALL_MS } from './channelPreloader.js';
 import {
     consumePrefetched,
     cancelSlotPrefetch,
@@ -57,12 +57,13 @@ import {
     isHealthyWatchPlayback,
     shouldClearStaleBufferOnTimeupdate
 } from './pauseBuffer.js';
+import { tvDebug } from './tvDebug.js';
 
 /** Max wall-clock seconds credited in a single flush (guards hidden-tab / stuck windows). */
 const WATCH_ACCRUAL_FLUSH_CAP_SEC = 30;
 
-/** Watchdog: fail a channel load that has been stuck loading/buffering this long. */
-const STUCK_LOAD_TIMEOUT_MS = 9000;
+/** No load progress for this long while wanting play ⇒ stall (then one hls.startLoad retry). */
+const STUCK_LOAD_STALL_MS = PRELOAD_STALL_MS;
 
 /**
  * Create an independent HLS player instance (one <video> + hls.js).
@@ -209,6 +210,8 @@ export function createPlayerInstance(options) {
         _stuckLoadTimer: null,
         _stuckLoadGen: 0,
         _stuckLoadStartedAt: 0,
+        _loadLastProgressAt: 0,
+        _stuckLoadRetried: false,
         /** Synchronous watchdog tick — also the test seam. */
         _stuckLoadTick: null,
 
@@ -218,11 +221,13 @@ export function createPlayerInstance(options) {
 
             videoEl.addEventListener('loadstart', () => {
                 if (!isActive()) return;
+                this._noteLoadProgress('loadstart');
                 this.loadPhase = 'connecting';
                 this.emitState();
             });
             videoEl.addEventListener('canplay', () => {
                 if (!isActive()) return;
+                this._noteLoadProgress('canplay');
                 if (this.loadPhase !== 'idle') {
                     this.loadPhase = 'idle';
                     this.emitState();
@@ -230,6 +235,7 @@ export function createPlayerInstance(options) {
             });
             videoEl.addEventListener('canplaythrough', () => {
                 if (!isActive()) return;
+                this._noteLoadProgress('canplaythrough');
                 if (this.loading) {
                     this.loading = false;
                     this.emitState();
@@ -262,6 +268,7 @@ export function createPlayerInstance(options) {
             });
             videoEl.addEventListener('timeupdate', () => {
                 if (!isActive()) return;
+                this._noteLoadProgress('timeupdate');
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
                 }
@@ -282,6 +289,7 @@ export function createPlayerInstance(options) {
             });
             videoEl.addEventListener('progress', () => {
                 if (!isActive()) return;
+                this._noteLoadProgress('progress');
                 if (this.pausePhase !== 'idle') {
                     this.updatePauseBuffer();
                 }
@@ -504,10 +512,16 @@ export function createPlayerInstance(options) {
         },
 
         /**
-         * Watchdog against a permanently stuck load: when wantPlaying while
-         * loading/buffering and no media progress, force error state after a
-         * timeout so the tile never spins forever and chan-nav can recover.
+         * Progress-aware stuck-load watchdog — only fires after no progress for STUCK_LOAD_STALL_MS.
          */
+        _noteLoadProgress(reason = 'progress') {
+            this._loadLastProgressAt = Date.now();
+            tvDebug('player', `load progress: ${reason}`, { slot: this.id });
+            if (this._stuckLoadTimer && this.wantPlaying === true) {
+                this._armStuckLoadWatchdog();
+            }
+        },
+
         _armStuckLoadWatchdog() {
             this._clearStuckLoadWatchdog();
             const transportGen = this.transportGen;
@@ -515,8 +529,10 @@ export function createPlayerInstance(options) {
             const channelKeyStr = channelKey(this.channel);
             this._stuckLoadGen = playGen;
             this._stuckLoadStartedAt = Date.now();
-            // Stored as a method so tests can fire the tick synchronously
-            // instead of waiting out STUCK_LOAD_TIMEOUT_MS.
+            if (!this._loadLastProgressAt) {
+                this._loadLastProgressAt = Date.now();
+            }
+
             this._stuckLoadTick = () => {
                 if (this.wantPlaying !== true) return;
                 if (transportGen !== this.transportGen) return;
@@ -524,7 +540,26 @@ export function createPlayerInstance(options) {
                 if (channelKeyStr && channelKeyStr !== channelKey(this.channel)) return;
                 if (this.playing) return;
                 if (!(this.loading || this.loadPhase === 'connecting' || this.loadPhase === 'buffering')) return;
-                // Stuck — surface a recoverable error state and re-arm prefetch.
+
+                const sinceProgress = Date.now() - (this._loadLastProgressAt || 0);
+                if (sinceProgress < STUCK_LOAD_STALL_MS) {
+                    this._stuckLoadTimer = setTimeout(() => {
+                        this._stuckLoadTimer = null;
+                        this._stuckLoadTick?.();
+                    }, STUCK_LOAD_STALL_MS - sinceProgress);
+                    return;
+                }
+
+                if (this.hls && !this._stuckLoadRetried) {
+                    this._stuckLoadRetried = true;
+                    tvDebug('player', 'stuck-load retry startLoad', { slot: this.id });
+                    try { this.hls.startLoad(); } catch { /* ignore */ }
+                    this._loadLastProgressAt = Date.now();
+                    this._armStuckLoadWatchdog();
+                    return;
+                }
+
+                tvDebug('player', 'stuck-load giving up', { slot: this.id });
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.preparing = false;
@@ -532,10 +567,13 @@ export function createPlayerInstance(options) {
                 this.emitState();
                 scheduleSlotPrefetch(this.id, this);
             };
+
+            const sinceProgress = Date.now() - (this._loadLastProgressAt || 0);
+            const delay = Math.max(0, STUCK_LOAD_STALL_MS - sinceProgress);
             this._stuckLoadTimer = setTimeout(() => {
                 this._stuckLoadTimer = null;
                 this._stuckLoadTick?.();
-            }, STUCK_LOAD_TIMEOUT_MS);
+            }, delay);
         },
 
         _clearStuckLoadWatchdog() {
@@ -640,27 +678,51 @@ export function createPlayerInstance(options) {
         },
 
         /**
-         * Staging buffer warmed with a decoded frame — required before safe-loading swap.
+         * Staging buffer warmed enough to swap — readyState ≥ 2 (decoded data), dimensions optional.
          * @returns {boolean}
          */
         isPrepareReadyWithFrame() {
             if (!this.isPrepareReady()) return false;
             const staging = this.videoBack;
-            return Boolean(staging?.videoWidth > 0 && staging.readyState >= 2);
+            return Boolean(staging && staging.readyState >= 2);
+        },
+
+        /**
+         * Wait for in-flight warm-up; returns when ready, stalled, or superseded.
+         * @param {number} [switchGen]
+         * @returns {Promise<boolean>}
+         */
+        async waitForPrepareReady(switchGen) {
+            if (switchGen != null && switchGen !== this.switchGeneration) return false;
+            if (this.isPrepareReadyWithFrame()) return true;
+
+            const promise = this._preparePromise;
+            if (promise) {
+                try {
+                    await promise;
+                } catch { /* warm failed */ }
+            }
+
+            if (switchGen != null && switchGen !== this.switchGeneration) return false;
+
+            if (this.isPrepareReadyWithFrame()) return true;
+
+            const preloader = this._preloader;
+            if (preloader?.isMakingProgress?.()) {
+                const deadline = Date.now() + PRELOAD_STALL_MS;
+                while (Date.now() < deadline) {
+                    if (switchGen != null && switchGen !== this.switchGeneration) return false;
+                    if (this.isPrepareReadyWithFrame()) return true;
+                    if (!preloader.isMakingProgress()) break;
+                    await new Promise((r) => setTimeout(r, 80));
+                }
+            }
+
+            return this.isPrepareReadyWithFrame();
         },
 
         async _awaitPrepareReady(switchGen) {
-            const promise = this._preparePromise;
-            if (!promise) return;
-            try {
-                await Promise.race([
-                    promise,
-                    new Promise((_, reject) => {
-                        setTimeout(() => reject(new Error('timeout')), PRELOAD_TIMEOUT_MS);
-                    })
-                ]);
-            } catch { /* warm failed or timed out — commit may fallback */ }
-            if (switchGen != null && switchGen !== this.switchGeneration) return;
+            await this.waitForPrepareReady(switchGen);
         },
 
         /**
@@ -814,11 +876,13 @@ export function createPlayerInstance(options) {
             }
 
             const stagingVideo = this.videoBack;
-            if (!(stagingVideo?.videoWidth > 0 && stagingVideo.readyState >= 2)) {
+            if (!(stagingVideo && stagingVideo.readyState >= 2)) {
                 return this._failPreparedSwitch(switchGen);
             }
 
             const generation = ++this.playGeneration;
+            this._stuckLoadRetried = false;
+            this._loadLastProgressAt = Date.now();
             const taken = this._preloader.takeover();
             const channel = taken.channel || fallbackResolved?.channel;
             const key = channelKey(channel);
@@ -870,6 +934,7 @@ export function createPlayerInstance(options) {
             this._promoteFrontVideo();
             if (this.videoMount) {
                 this.videoMount.classList.remove('is-hidden');
+                this._syncVideoMount();
             }
             if (this.videoMount !== this.videoHolder) {
                 this.videoHolder.classList.add('is-hidden');
@@ -888,8 +953,7 @@ export function createPlayerInstance(options) {
             }
 
             const v = this.video;
-            const hasWarmFrame = Boolean(v?.videoWidth > 0 && v.readyState >= 2);
-            if (!hasWarmFrame) {
+            if (!(v && v.readyState >= 2)) {
                 return this._failPreparedSwitch(switchGen);
             }
 
@@ -897,28 +961,43 @@ export function createPlayerInstance(options) {
             this.loadPhase = 'idle';
             this.posterDataUrl = null;
 
-            try {
-                await this.video.play();
-            } catch (playErr) {
-                if (!shouldContinuePlayAfterAttach({
-                    generation,
-                    playGeneration: this.playGeneration,
-                    wantPlaying: this.wantPlaying,
-                    transportGen: this.transportGen,
-                    transportAtStart
-                })) {
-                    return false;
-                }
-                if (shouldRetryPlayMuted({
-                    blocked: isAutoplayNotAllowedError(playErr),
-                    muted: this.muted
-                })) {
-                    this.muted = true;
-                    this.applyAudioToVideo();
+            const playPromoted = async () => {
+                try {
                     await this.video.play();
-                } else {
+                } catch (playErr) {
+                    if (!shouldContinuePlayAfterAttach({
+                        generation,
+                        playGeneration: this.playGeneration,
+                        wantPlaying: this.wantPlaying,
+                        transportGen: this.transportGen,
+                        transportAtStart
+                    })) {
+                        return false;
+                    }
+                    if (shouldRetryPlayMuted({
+                        blocked: isAutoplayNotAllowedError(playErr),
+                        muted: this.muted
+                    })) {
+                        this.muted = true;
+                        this.applyAudioToVideo();
+                        await this.video.play();
+                        return true;
+                    }
+                    if (playErr?.name === 'AbortError') {
+                        await new Promise((r) => setTimeout(r, 50));
+                        await this.video.play();
+                        return true;
+                    }
                     throw playErr;
                 }
+                return true;
+            };
+
+            try {
+                const played = await playPromoted();
+                if (!played) return false;
+            } catch {
+                return this._failPreparedSwitch(switchGen);
             }
 
             this._refreshAudioAfterSwap();
@@ -1434,6 +1513,8 @@ export function createPlayerInstance(options) {
             this.resumeBlocked = false;
             this.stopped = false;
             this.pausePhase = 'idle';
+            this._stuckLoadRetried = false;
+            this._loadLastProgressAt = Date.now();
             const transportAtStart = this.beginTransport(true);
             this.setPauseLiveSync(false);
             // Every intentional PLAY arms a fresh channel-tile snap (even same URL).

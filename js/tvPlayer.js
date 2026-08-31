@@ -14,7 +14,8 @@ export const TvPlayer = {
         FavoritesRecents.reconcileVisitedChannels();
         const primary = MultiView.getPrimary();
         const saved = loadPlayerState();
-        if (primary && saved.lastChannelKey && !primary.channel) {
+        const hasMosaic = saved.mosaicSlots && Object.keys(saved.mosaicSlots).length > 0;
+        if (primary && saved.lastChannelKey && !primary.channel && !hasMosaic) {
             const parsed = parseChannelKey(saved.lastChannelKey);
             primary.channel = {
                 providerId: parsed.providerId,

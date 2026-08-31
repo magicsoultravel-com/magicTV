@@ -14,6 +14,16 @@ const slotCache = new Map();
 const slotGeneration = new Map();
 
 const MAX_WARM_PER_SLOT = 2;
+/** Global cap on offscreen prefetch <video> elements (all slots). */
+const MAX_CONCURRENT_PREFETCH_VIDEOS = 6;
+
+function countPrefetchVideos() {
+    let n = 0;
+    for (const map of slotCache.values()) {
+        n += map.size;
+    }
+    return n;
+}
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -141,6 +151,7 @@ export async function refreshSlotPrefetch(slotId, player) {
 
     for (const { key, channel } of targets) {
         if (isStale()) return;
+        if (countPrefetchVideos() >= MAX_CONCURRENT_PREFETCH_VIDEOS) break;
         if (map.has(key) && map.get(key)?.preloader?.isReady()) continue;
 
         if (map.has(key)) {

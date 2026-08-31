@@ -640,6 +640,7 @@ async function init() {
         HiddenChannelsSettings.init({ appState, onPlay: startPlayback });
         VisitedChannelsSettings.init({ appState, onPlay: startPlayback });
 
+        MultiView._deferFullRestore = true;
         TvPlayer.init();
         TvPip.init();
         TvPlayer.mountVideo();
@@ -688,6 +689,8 @@ async function init() {
 
         await restoreLastChannelMeta();
         PlayerChrome.updateNowPlayingHeader();
+
+        await MultiView.hydrateMosaicFromSaved();
 
         // Mosaic stubs already painted in MultiView.init; streams attach on user play.
         const countriesPromise = BrowseView.refreshCountries().catch(() => {});

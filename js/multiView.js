@@ -45,6 +45,8 @@ import { hydrateTileHoverControls, PLAY_ALL_SVG, PAUSE_ALL_SVG, syncTileRockers 
 import { ChanBindPicker } from './ui/chanBindPicker.js';
 import { syncScreenBtnActions } from './ui/screenStripControls.js';
 import { ChromecastManager } from './cast/chromecastManager.js';
+import { registerMosaicSlotState } from './mosaic/slotOccupancy.js';
+import { tvDebug } from './player/tvDebug.js';
 
 export { MAX_MOSAIC_SLOTS };
 
@@ -384,6 +386,12 @@ export const MultiView = {
         if (this.initialized) return;
         this.initialized = true;
 
+        registerMosaicSlotState(() => ({
+            slots: this.slots,
+            rememberedSlotKeys: this.rememberedSlotKeys,
+            getPrimary: () => this.getPrimary()
+        }));
+
         this.ensurePlayer('center', { startMuted: true });
         CORNER_IDS.forEach((id) => {
             this.setSideEnabled(id, SCREEN_GETTERS[id](), { silent: true });
@@ -405,7 +413,11 @@ export const MultiView = {
         window.addEventListener('tv:cast_state_changed', () => this.scheduleRefreshTiles());
         window.addEventListener('tv:cast_host_toggled', () => this.scheduleRefreshTiles());
         this.bindPlacementChrome();
-        this.applySavedSlotStubs();
+        // Stubs only — full stream restore is hydrateMosaicFromSaved() from app.js.
+        if (!this._deferFullRestore) {
+            this.applySavedSlotStubs();
+            this.slotsHydrated = true;
+        }
 
         if (this.hasCustomPlacement() && !this.isPlacementSane()) {
             this.mosaicPlacement = {};
@@ -424,8 +436,25 @@ export const MultiView = {
         }
         window.addEventListener('tv:popout_changed', () => this.scheduleRefreshTiles());
 
-        this.slotsHydrated = true;
+        if (!this._deferFullRestore) {
+            this.syncScreenControls();
+        }
+    },
+
+    /**
+     * Boot hook: restore paused HLS on saved mosaic slots (replaces stub-only path).
+     * @returns {Promise<boolean>}
+     */
+    async hydrateMosaicFromSaved() {
+        this._deferFullRestore = true;
+        if (!this.initialized) this.init();
+        const restored = await this.restoreSlots();
+        if (!restored) {
+            this.applySavedSlotStubs();
+            this.slotsHydrated = true;
+        }
         this.syncScreenControls();
+        return restored;
     },
 
     ensurePlayer(slotId, { startMuted = true } = {}) {
@@ -1115,12 +1144,14 @@ export const MultiView = {
      * @param {string} key
      */
     async playOnSlotSafeLoading(id, channel, player, normalized, key) {
+        cancelSlotPrefetch(id);
         showAppToast('Fetching next channel…');
         this.syncStatusChrome();
 
         player._suppressErrorToast = true;
         player.switchGeneration = (player.switchGeneration || 0) + 1;
         const switchGen = player.switchGeneration;
+        tvDebug('multiview', 'safe loading switch', { slot: id, key });
 
         try {
             const hasVisibleContent = Boolean(
@@ -1129,8 +1160,6 @@ export const MultiView = {
             );
 
             if (!hasVisibleContent) {
-                // Cold start / stopped tile — nothing to hold, play now. Do not wait
-                // on a warm-up that has no live picture to protect.
                 await this.withChannelSwitchTransition(
                     id,
                     () => player.playChannel(normalized),
@@ -1141,17 +1170,15 @@ export const MultiView = {
 
             await player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
 
-            // Target may have consumed adjacent prefetch; clear remaining stale entries.
-            cancelSlotPrefetch(id);
-
             if (switchGen !== player.switchGeneration) return;
 
-            const bufferReady = player.isPrepareReadyWithFrame();
+            const bufferReady = await player.waitForPrepareReady(switchGen);
 
             if (!bufferReady) {
                 player.cancelPrepare();
                 player._abortSwitchIntent();
-                showAppToast('Stream unavailable');
+                showAppToast('Could not load channel');
+                tvDebug('multiview', 'safe loading aborted — warm failed', { slot: id });
                 return;
             }
 
@@ -1176,8 +1203,7 @@ export const MultiView = {
 
             if (!committed && switchGen === player.switchGeneration) {
                 player._abortSwitchIntent();
-                showAppToast('Stream unavailable');
-                return;
+                showAppToast('Could not load channel');
             }
 
             this.syncStatusChrome();
@@ -1203,6 +1229,7 @@ export const MultiView = {
      */
     playOnSlot(slotId, channel) {
         const id = slotId || 'center';
+        cancelSlotPrefetch(id);
         if (CORNER_IDS.includes(id) && !this.slots[id]?.enabled) {
             this.setSideEnabled(id, true);
         }
@@ -1220,8 +1247,6 @@ export const MultiView = {
         if (SettingsStore.getChanSwitchMode() === 'safeLoading') {
             return this.playOnSlotSafeLoading(id, channel, player, normalized, key);
         }
-
-        cancelSlotPrefetch(id);
 
         const hasVisibleContent = Boolean(
             player.channel
