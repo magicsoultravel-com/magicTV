@@ -27,6 +27,7 @@ import {
     listQualityLevels,
     formatQualityLabel,
     bindHlsPlaybackHandlers,
+    syncHlsPlaybackState,
     LIVE_MAX_LATENCY_DURATION_COUNT
 } from './hlsAttach.js';
 import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.js';
@@ -483,6 +484,14 @@ export function createPlayerInstance(options) {
             this.loading = false;
             this.loadPhase = 'idle';
             this.preparing = false;
+            const frontLive = Boolean(
+                this.video
+                && this.video.videoWidth > 0
+                && !this.video.paused
+            );
+            if (frontLive) {
+                this.playing = true;
+            }
             this.wantPlaying = this.playing === true;
             this.emitState();
         },
@@ -628,6 +637,16 @@ export function createPlayerInstance(options) {
          */
         isPrepareReady() {
             return this._preloader?.isReady() === true;
+        },
+
+        /**
+         * Staging buffer warmed with a decoded frame — required before safe-loading swap.
+         * @returns {boolean}
+         */
+        isPrepareReadyWithFrame() {
+            if (!this.isPrepareReady()) return false;
+            const staging = this.videoBack;
+            return Boolean(staging?.videoWidth > 0 && staging.readyState >= 2);
         },
 
         async _awaitPrepareReady(switchGen) {
@@ -794,6 +813,11 @@ export function createPlayerInstance(options) {
                 return this._failPreparedSwitch(switchGen);
             }
 
+            const stagingVideo = this.videoBack;
+            if (!(stagingVideo?.videoWidth > 0 && stagingVideo.readyState >= 2)) {
+                return this._failPreparedSwitch(switchGen);
+            }
+
             const generation = ++this.playGeneration;
             const taken = this._preloader.takeover();
             const channel = taken.channel || fallbackResolved?.channel;
@@ -839,6 +863,7 @@ export function createPlayerInstance(options) {
                 // warm-up handlers were already consumed by the preloader.
                 this._onPlaybackFatal = null;
                 bindHlsPlaybackHandlers(this, this.hls, generation);
+                syncHlsPlaybackState(this, this.hls, this.video);
             }
 
             this._recycleStagingVideo();
@@ -862,55 +887,41 @@ export function createPlayerInstance(options) {
                 });
             }
 
-            this.connection = 'connected';
             const v = this.video;
-            const hasWarmFrame = Boolean(v?.videoWidth > 0);
-            const wasPlaying = Boolean(v && !v.paused);
-
-            if (hasWarmFrame && wasPlaying) {
-                this.playing = true;
-                this.loading = false;
-                this.loadPhase = 'idle';
-                this.posterDataUrl = null;
-            } else {
-                this.loading = false;
-                this.loadPhase = 'idle';
+            const hasWarmFrame = Boolean(v?.videoWidth > 0 && v.readyState >= 2);
+            if (!hasWarmFrame) {
+                return this._failPreparedSwitch(switchGen);
             }
 
-            this.applyAudioToVideo();
-            this._refreshAudioAfterSwap();
-            this.emitState();
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.posterDataUrl = null;
 
-            if (!wasPlaying || !hasWarmFrame) {
-                try {
-                    await this.video.play();
-                } catch (playErr) {
-                    if (!shouldContinuePlayAfterAttach({
-                        generation,
-                        playGeneration: this.playGeneration,
-                        wantPlaying: this.wantPlaying,
-                        transportGen: this.transportGen,
-                        transportAtStart
-                    })) {
-                        return false;
-                    }
-                    if (shouldRetryPlayMuted({
-                        blocked: isAutoplayNotAllowedError(playErr),
-                        muted: this.muted
-                    })) {
-                        this.muted = true;
-                        this.applyAudioToVideo();
-                        await this.video.play();
-                    } else {
-                        throw playErr;
-                    }
+            try {
+                await this.video.play();
+            } catch (playErr) {
+                if (!shouldContinuePlayAfterAttach({
+                    generation,
+                    playGeneration: this.playGeneration,
+                    wantPlaying: this.wantPlaying,
+                    transportGen: this.transportGen,
+                    transportAtStart
+                })) {
+                    return false;
                 }
-            } else {
-                try {
+                if (shouldRetryPlayMuted({
+                    blocked: isAutoplayNotAllowedError(playErr),
+                    muted: this.muted
+                })) {
+                    this.muted = true;
+                    this.applyAudioToVideo();
                     await this.video.play();
-                } catch { /* already playing */ }
-                this._refreshAudioAfterSwap();
+                } else {
+                    throw playErr;
+                }
             }
+
+            this._refreshAudioAfterSwap();
 
             if (!shouldContinuePlayAfterAttach({
                 generation,
@@ -922,6 +933,11 @@ export function createPlayerInstance(options) {
                 try { this.video?.pause(); } catch { /* ignore */ }
                 return this._failPreparedSwitch(switchGen);
             }
+
+            this.playing = true;
+            this.wantPlaying = true;
+            this.connection = 'connected';
+            this.emitState();
 
             if (swapCompleted) {
                 if (switchGen == null || switchGen === this.switchGeneration) {

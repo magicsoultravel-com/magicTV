@@ -29,6 +29,7 @@ function makeVideoEl() {
         style: {},
         parentElement: null,
         videoWidth: 0,
+        readyState: 0,
         paused: true,
         volume: 1,
         setAttribute() {},
@@ -338,6 +339,7 @@ test('commitPreparedChannel swap order: destroyHls → recycle → promote', asy
         takeover: () => ({ hls: null, channel, url: channel.url_resolved })
     };
     player.videoBack.videoWidth = 1280;
+    player.videoBack.readyState = 2;
     player.videoBack.paused = false;
 
     const order = [];
@@ -370,6 +372,7 @@ test('commitPreparedChannel returns true after successful swap even if switchGen
         takeover: () => ({ hls: null, channel, url: channel.url_resolved })
     };
     player.videoBack.videoWidth = 1280;
+    player.videoBack.readyState = 2;
     player.videoBack.paused = true;
     player.video.play = async () => {
         player.switchGeneration = 2;
@@ -610,6 +613,8 @@ test('commitPreparedChannel re-wires live hls handlers after takeover', async ()
         cancel: () => {},
         takeover: () => ({ hls: hlsMock, channel, url: channel.url_resolved })
     };
+    player.videoBack.videoWidth = 1280;
+    player.videoBack.readyState = 2;
 
     const result = await player.commitPreparedChannel(channel, 1);
 
@@ -626,4 +631,106 @@ test('commitPreparedChannel re-wires live hls handlers after takeover', async ()
     // Non-fatal network error recovers via startLoad.
     handlers.ERROR(null, { fatal: false, type: 'networkError' });
     assert.equal(hlsMock.startLoadCount, 1);
+});
+
+test('isPrepareReadyWithFrame requires decoded staging dimensions', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player._preloader = { isReady: () => true };
+    player.videoBack.videoWidth = 0;
+    player.videoBack.readyState = 0;
+    assert.equal(player.isPrepareReadyWithFrame(), false);
+
+    player.videoBack.videoWidth = 640;
+    player.videoBack.readyState = 2;
+    assert.equal(player.isPrepareReadyWithFrame(), true);
+});
+
+test('commitPreparedChannel sets playing after swap when staging was paused', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    const { channel } = setupCommitPlayer();
+    player.init();
+    player.switchGeneration = 1;
+    player.wantPlaying = true;
+    player.playing = false;
+    player._preloader = {
+        isReady: () => true,
+        takeover: () => ({ hls: null, channel, url: channel.url_resolved })
+    };
+    player.videoBack.videoWidth = 1280;
+    player.videoBack.readyState = 2;
+    player.videoBack.paused = true;
+
+    const result = await player.commitPreparedChannel(channel, 1);
+
+    assert.equal(result, true);
+    assert.equal(player.playing, true);
+    assert.equal(player.wantPlaying, true);
+});
+
+test('commitPreparedChannel rejects swap when staging has no decoded frame', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    const { channel } = setupCommitPlayer();
+    player.init();
+    player.switchGeneration = 1;
+    player.channel = { name: 'Old', url_resolved: 'https://example.com/old.m3u8' };
+    player.playing = true;
+    player._preloader = { isReady: () => true, cancel: () => {} };
+    player.videoBack.videoWidth = 0;
+    player.videoBack.readyState = 0;
+
+    let destroyCalled = false;
+    player.destroyHls = async () => { destroyCalled = true; };
+
+    const result = await player.commitPreparedChannel(channel, 1, { allowFallback: false });
+
+    assert.equal(result, false);
+    assert.equal(destroyCalled, false);
+    assert.equal(player.channel.name, 'Old');
+});
+
+test('_abortSwitchIntent restores playing when front video is still live', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.video.videoWidth = 1280;
+    player.video.paused = false;
+    player.playing = false;
+    player.wantPlaying = true;
+    player.loading = true;
+    player.preparing = true;
+
+    player._abortSwitchIntent();
+
+    assert.equal(player.playing, true);
+    assert.equal(player.wantPlaying, true);
+    assert.equal(player.loading, false);
 });

@@ -176,6 +176,11 @@ export class ChannelPreloader {
             }
 
             if (isStale() || gen !== this.generation) return false;
+            if (!(video.videoWidth > 0 && video.readyState >= 2)) {
+                destroySession(session);
+                if (this.session === session) this.session = null;
+                return false;
+            }
             session.ready = true;
             return true;
         } catch {

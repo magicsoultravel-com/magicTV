@@ -1141,7 +1141,19 @@ export const MultiView = {
 
             await player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
 
-            const bufferReady = player.isPrepareReady();
+            // Target may have consumed adjacent prefetch; clear remaining stale entries.
+            cancelSlotPrefetch(id);
+
+            if (switchGen !== player.switchGeneration) return;
+
+            const bufferReady = player.isPrepareReadyWithFrame();
+
+            if (!bufferReady) {
+                player.cancelPrepare();
+                player._abortSwitchIntent();
+                showAppToast('Stream unavailable');
+                return;
+            }
 
             let committed = false;
             await this.withChannelSwitchTransition(
@@ -1152,19 +1164,17 @@ export const MultiView = {
                         committed = await player.commitPreparedChannel(
                             normalized,
                             switchGen,
-                            { allowFallback: true }
+                            { allowFallback: false }
                         ) === true;
                     }
                 },
                 {
                     skipOut: !hasVisibleContent,
-                    skipIn: bufferReady
+                    skipIn: true
                 }
             );
 
             if (!committed && switchGen === player.switchGeneration) {
-                // Genuine failure (not superseded by a newer pick) — the warm-up
-                // never confirmed and fallback also failed.
                 player._abortSwitchIntent();
                 showAppToast('Stream unavailable');
                 return;
@@ -1207,11 +1217,11 @@ export const MultiView = {
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
         const key = channelKey(normalized);
 
-        cancelSlotPrefetch(id);
-
         if (SettingsStore.getChanSwitchMode() === 'safeLoading') {
             return this.playOnSlotSafeLoading(id, channel, player, normalized, key);
         }
+
+        cancelSlotPrefetch(id);
 
         const hasVisibleContent = Boolean(
             player.channel

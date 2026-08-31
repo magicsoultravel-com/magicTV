@@ -89,6 +89,24 @@ export async function destroyHls(ctx) {
  * @param {number} generation generation the handlers belong to (ctx.playGeneration)
  * @param {{ onManifestParsed?: (hls, video) => void }} [opts]
  */
+/** Sync player quality/connection when manifest already parsed (e.g. after staging takeover). */
+export function syncHlsPlaybackState(ctx, hls, video) {
+    if (!hls?.levels?.length) return;
+    ctx.connection = 'connected';
+    ctx.qualityMode = applyQualityMode(hls, ctx.qualityMode);
+    const levelIdx = resolveLevelIndex(hls);
+    if (levelIdx >= 0 && hls.levels?.[levelIdx]) {
+        ctx.qualityLevel = levelIdx;
+        ctx.qualityLabel = formatQualityLabel(
+            hls.levels[levelIdx],
+            video?.videoHeight || 0
+        );
+    } else {
+        ctx.qualityLevel = -1;
+        ctx.qualityLabel = formatQualityLabel(null, video?.videoHeight || 0);
+    }
+}
+
 export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
     if (!hls || typeof hls !== 'object') return;
     const video = ctx.video;

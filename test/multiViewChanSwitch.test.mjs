@@ -153,6 +153,7 @@ test('safe loading does not assign player.channel before commit', async () => {
         _suppressErrorToast: false,
         startPrepareChannel: async () => {},
         isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
         cancelPrepare: () => {},
         emitState: () => {},
         commitPreparedChannel: async () => {
@@ -183,30 +184,32 @@ test('safe loading does not assign player.channel before commit', async () => {
     }
 });
 
-test('safe loading no longer aborts when prepare is not ready — falls back via commit', async () => {
+test('safe loading aborts without transition when prepare is not ready', async () => {
     let aborted = false;
-    let commitCalled = false;
+    let transitionCalled = false;
+    let cancelCalled = false;
+    const oldChannel = makeChannel('Old');
     const player = {
         switchGeneration: 0,
-        channel: makeChannel('Old'),
+        channel: oldChannel,
         playing: true,
         loading: false,
         pausePhase: 'idle',
         _suppressErrorToast: false,
         startPrepareChannel: async () => {},
-        isPrepareReady: () => false,
+        isPrepareReadyWithFrame: () => false,
+        cancelPrepare: () => { cancelCalled = true; },
         _abortSwitchIntent: () => { aborted = true; },
         emitState: () => {},
         commitPreparedChannel: async () => {
-            commitCalled = true;
-            return false;
+            throw new Error('commit should not run');
         }
     };
     stubPlayOnSlotDeps(player);
 
     const origTransition = MultiView.withChannelSwitchTransition;
-    MultiView.withChannelSwitchTransition = async (_id, handlers) => {
-        await handlers.onCommit();
+    MultiView.withChannelSwitchTransition = async () => {
+        transitionCalled = true;
     };
 
     try {
@@ -218,16 +221,16 @@ test('safe loading no longer aborts when prepare is not ready — falls back via
             'test:Dead'
         );
 
-        // Warm never confirmed, so commit (with fallback) is still invoked and
-        // the switch is not aborted preemptively. Abort only when commit itself
-        // also failed — here it returns false, so abort is expected after commit.
-        assert.equal(commitCalled, true);
+        assert.equal(transitionCalled, false);
+        assert.equal(cancelCalled, true);
+        assert.equal(aborted, true);
+        assert.equal(player.channel, oldChannel);
     } finally {
         MultiView.withChannelSwitchTransition = origTransition;
     }
 });
 
-test('safe loading calls commitPreparedChannel with allowFallback true (fallback path)', async () => {
+test('safe loading calls commitPreparedChannel with allowFallback false', async () => {
     const newChannel = makeChannel('New');
     let commitOpts = null;
     const player = {
@@ -238,7 +241,7 @@ test('safe loading calls commitPreparedChannel with allowFallback true (fallback
         pausePhase: 'idle',
         _suppressErrorToast: false,
         startPrepareChannel: async () => {},
-        isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
         cancelPrepare: () => {},
         emitState: () => {},
         commitPreparedChannel: async (_ch, _gen, opts) => {
@@ -261,7 +264,7 @@ test('safe loading calls commitPreparedChannel with allowFallback true (fallback
             newChannel,
             'test:New'
         );
-        assert.deepEqual(commitOpts, { allowFallback: true });
+        assert.deepEqual(commitOpts, { allowFallback: false });
     } finally {
         MultiView.withChannelSwitchTransition = origTransition;
     }
@@ -281,6 +284,7 @@ test('safe loading cold start skips warm-up and plays directly', async () => {
         _suppressErrorToast: false,
         startPrepareChannel: async () => { prepareCalled = true; return true; },
         isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
         cancelPrepare: () => {},
         _abortSwitchIntent: () => {},
         emitState: () => {},
@@ -320,6 +324,7 @@ test('classic mash guard skips stale switch callback', async () => {
         emitState: () => {},
         startPrepareChannel: () => Promise.resolve(true),
         isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
         cancelPrepare: () => {},
         _abortSwitchIntent: () => {},
         commitPreparedChannel: async () => { commitCalled = true; return true; },
@@ -404,6 +409,7 @@ test('classic uses commit fast path when buffer is ready', async () => {
         emitState: () => {},
         startPrepareChannel: () => Promise.resolve(true),
         isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
         cancelPrepare: () => {},
         _abortSwitchIntent: () => {},
         commitPreparedChannel: async () => {
@@ -445,6 +451,7 @@ test('classic falls back to playChannel when commit fails', async () => {
         emitState: () => {},
         startPrepareChannel: () => Promise.resolve(true),
         isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
         cancelPrepare: () => {},
         _abortSwitchIntent: () => { aborted = true; },
         commitPreparedChannel: async () => false,
@@ -467,7 +474,7 @@ test('classic falls back to playChannel when commit fails', async () => {
     }
 });
 
-test('playOnSlot cancels slot prefetch at switch start', async () => {
+test('playOnSlot cancels slot prefetch for classic mode at switch start', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const src = fs.readFileSync(
@@ -475,6 +482,10 @@ test('playOnSlot cancels slot prefetch at switch start', async () => {
         'utf8'
     );
     assert.match(src, /cancelSlotPrefetch\(id\)/);
+    // Safe loading defers prefetch cancel until after prepare consumes the target.
+    const safeIdx = src.indexOf('async playOnSlotSafeLoading');
+    const safeBlock = src.slice(safeIdx, safeIdx + 2500);
+    assert.match(safeBlock, /cancelSlotPrefetch\(id\)/);
 });
 
 test('classic and safe loading both skip in-animation when buffer is ready', async () => {
@@ -489,7 +500,7 @@ test('classic and safe loading both skip in-animation when buffer is ready', asy
             pausePhase: 'idle',
             _suppressErrorToast: false,
             startPrepareChannel: async () => {},
-            isPrepareReady: () => true,
+            isPrepareReadyWithFrame: () => true,
             cancelPrepare: () => {},
             _abortSwitchIntent: () => {},
             emitState: () => {},
