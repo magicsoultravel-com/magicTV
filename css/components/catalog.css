@@ -37,6 +37,8 @@
     border-color: var(--tv-primary);
     background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 12%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 6%, transparent) 100%);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    transform: scale(var(--tile-hover-scale, 1.03));
+    z-index: 1;
 }
 
 /* ===== VISITED CHANNEL ACCENT =====
@@ -135,6 +137,12 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     content-visibility: visible;
 }
 
+/* Mid-drag the pointer often rests on a tile — keep it from popping
+   so the reorder drag reads as the only motion. */
+#favorites-grid.is-reordering .channel-tile:hover {
+    transform: none;
+}
+
 #favorites-grid .channel-tile.is-dragging {
     cursor: grabbing;
     opacity: 0.92;
@@ -192,6 +200,8 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     border-color: var(--tv-primary);
     background: color-mix(in srgb, var(--tv-primary) 26%, var(--tv-bg-secondary));
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    transform: scale(var(--tile-hover-scale, 1.03));
+    z-index: 1;
 }
 
 .favorite-folder-parent-tile {
@@ -204,6 +214,8 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
 .favorite-folder-parent-tile:hover {
     border-color: var(--tv-text-secondary);
     background: color-mix(in srgb, var(--tv-text-muted) 18%, var(--tv-bg-secondary));
+    transform: scale(var(--tile-hover-scale, 1.03));
+    z-index: 1;
 }
 
 .favorite-folder-parent-tile.is-drop-target {
@@ -525,7 +537,8 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     border-color: var(--tv-primary);
     background: linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 12%, transparent) 0%, color-mix(in srgb, var(--tv-secondary) 6%, transparent) 100%);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
-    transform: none;
+    transform: scale(var(--tile-hover-scale, 1.03));
+    z-index: 1;
     outline: none;
 }
 
@@ -594,6 +607,11 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     contain: none;
     content-visibility: visible;
     max-width: 100%;
+}
+
+/* Static preview — the sample tile never pops on hover */
+.settings-preview .channel-tile:hover {
+    transform: none;
 }
 
 /* Preview variants — tile and list side by side */

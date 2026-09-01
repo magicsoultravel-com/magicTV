@@ -57,6 +57,10 @@
     --btn-ring-active: 45%;
     --btn-tint-active: 24%;
     --btn-press-scale: 1.04;
+
+    /* Catalog tile hover pop — tiles and list rows share .channel-tile,
+       so one token drives the popout in both grid and list layouts. */
+    --tile-hover-scale: 1.03;
 }
 
 * {
