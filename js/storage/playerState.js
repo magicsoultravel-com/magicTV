@@ -265,6 +265,11 @@ function clamp01(n) {
     return Math.min(1, Math.max(0, n));
 }
 
+/** Multi-TV layout preset: equal grid (default) or butterfly CSS grid. */
+export function normalizeMosaicLayoutMode(raw) {
+    return raw === 'butterfly' ? 'butterfly' : 'grid';
+}
+
 /** Free-drag geometry per slot (fractions of mosaic size + z-order). */
 function normalizeMosaicPlacement(raw) {
     if (!raw || typeof raw !== 'object') return {};
@@ -436,6 +441,7 @@ export function loadPlayerState() {
                 : DEFAULT_BUFFER_SIZE,
             mosaicSlots: normalizeMosaicSlots(raw.mosaicSlots),
             mosaicPlacement: normalizeMosaicPlacement(raw.mosaicPlacement),
+            mosaicLayoutMode: normalizeMosaicLayoutMode(raw.mosaicLayoutMode),
             remoteModule: normalizeRemoteModule(raw.remoteModule, raw.channelPicker),
             channelPicker: normalizeChannelPicker(raw.channelPicker),
             sortBy: normalizeSortBy(raw.sortBy),
@@ -463,6 +469,7 @@ export function loadPlayerState() {
             bufferSize: DEFAULT_BUFFER_SIZE,
             mosaicSlots: {},
             mosaicPlacement: {},
+            mosaicLayoutMode: 'grid',
             remoteModule: null,
             channelPicker: null,
             sortBy: { ...DEFAULT_SORT_BY },
@@ -533,6 +540,7 @@ export function savePlayerState(patch) {
         bufferSize: merged.bufferSize,
         mosaicSlots: merged.mosaicSlots || {},
         mosaicPlacement: merged.mosaicPlacement || {},
+        mosaicLayoutMode: normalizeMosaicLayoutMode(merged.mosaicLayoutMode),
         remoteModule: normalizeRemoteModule(merged.remoteModule, merged.channelPicker),
         channelPicker: normalizeChannelPicker(merged.channelPicker),
         sortBy,
@@ -552,7 +560,8 @@ export function savePlayerState(patch) {
                 || k === 'hiddenChannels' || k === 'hiddenChannelsMeta' || k === 'watchStatsMeta'
                 || k === 'volume' || k === 'lastChannelKey'
                 || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
-                || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'remoteModule' || k === 'channelPicker'
+                || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'mosaicLayoutMode'
+                || k === 'remoteModule' || k === 'channelPicker'
                 || k === 'sortBy' || k === 'sortDir' || k === 'categoryFilter'
             ))
         )

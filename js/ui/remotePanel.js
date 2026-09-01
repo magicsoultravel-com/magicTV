@@ -2,7 +2,7 @@
 import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
-import { ACTION_ICONS, CARD_ICONS } from './icons.js';
+import { ACTION_ICONS, CARD_ICONS, LAYOUT_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
@@ -112,6 +112,64 @@ function focusedChannel() {
     const player = MultiView.slots?.[slotId]?.player
         || (slotId === 'center' ? MultiView.getPrimary?.() : null);
     return player?.channel || null;
+}
+
+function closeLayoutPicker() {
+    const wrap = el('remote-layout-picker-wrap');
+    const btn = el('remote-layout-picker-btn');
+    const popout = el('remote-layout-picker-popout');
+    wrap?.classList.remove('is-open');
+    btn?.setAttribute('aria-expanded', 'false');
+    popout?.setAttribute('aria-hidden', 'true');
+}
+
+export function syncLayoutPicker() {
+    const mode = MultiView.getSelectedLayoutMode?.() || 'grid';
+    queryAllInApp('[data-layout-mode]').forEach((btn) => {
+        const active = btn.getAttribute('data-layout-mode') === mode;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', String(active));
+    });
+    const pickerBtn = el('remote-layout-picker-btn');
+    if (pickerBtn && LAYOUT_ICONS.picker) {
+        pickerBtn.innerHTML = LAYOUT_ICONS.picker;
+    }
+}
+
+function bindLayoutPicker() {
+    const wrap = el('remote-layout-picker-wrap');
+    const btn = el('remote-layout-picker-btn');
+    if (!wrap || !btn || wrap.dataset.layoutPickerBound === '1') return;
+    wrap.dataset.layoutPickerBound = '1';
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = !wrap.classList.contains('is-open');
+        wrap.classList.toggle('is-open', open);
+        btn.setAttribute('aria-expanded', String(open));
+        el('remote-layout-picker-popout')?.setAttribute('aria-hidden', String(!open));
+    });
+
+    wrap.querySelectorAll('[data-layout-mode]').forEach((opt) => {
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const mode = opt.getAttribute('data-layout-mode');
+            if (mode) MultiView.setSelectedLayoutMode(mode);
+            closeLayoutPicker();
+            syncRemotePanel();
+        });
+    });
+
+    if (typeof window !== 'undefined' && !window.__remoteLayoutPickerDismissBound) {
+        window.__remoteLayoutPickerDismissBound = true;
+        document.addEventListener('pointerdown', (e) => {
+            if (e.target.closest?.('#remote-layout-picker-wrap')) return;
+            closeLayoutPicker();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLayoutPicker();
+        });
+    }
 }
 
 async function handleRemoteAction(action) {
@@ -291,6 +349,7 @@ export function syncRemotePanel() {
 
     syncVolumeDial();
     ChanBindPicker.syncBindButtons();
+    syncLayoutPicker();
 }
 
 function bindRemoteActions(root) {
@@ -338,10 +397,12 @@ export const RemotePanel = {
             browser.dataset.remoteBound = '1';
             bindRemoteActions(browser);
         }
+        bindLayoutPicker();
         syncRemotePanel();
     },
 
     syncRemotePanel,
     syncRemoteChannelBar,
+    syncLayoutPicker,
     handleRemoteAction
 };

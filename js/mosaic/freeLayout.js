@@ -2,7 +2,7 @@
  * Mosaic free-layout: drag, resize, placement persist, applyFreeLayout.
  * Methods are mixed into MultiView (this === MultiView).
  */
-import { savePlayerState } from '../storage/playerState.js';
+import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { el } from '../tvUtils.js';
 import {
     CORNER_IDS,
@@ -13,6 +13,15 @@ import {
     RESIZE_EDGES,
     clearTilePlacementStyle
 } from './constants.js';
+
+/** TV label order mapped to 2×3 grid cells (cell 5 unused). */
+const GRID_CELL_BY_SLOT = Object.freeze({
+    center: 0,
+    topLeft: 1,
+    topRight: 2,
+    bottomLeft: 3,
+    bottomRight: 4
+});
 
 /**
  * Live free-layout board height (parity with clientWidth).
@@ -528,5 +537,67 @@ export const freeLayoutMethods = {
         this.mountAll();
         this.scheduleRefreshTiles();
         this.syncPlacementChrome();
+    },
+
+    getSelectedLayoutMode() {
+        const mode = loadPlayerState().mosaicLayoutMode;
+        return mode === 'butterfly' ? 'butterfly' : 'grid';
+    },
+
+    setSelectedLayoutMode(mode) {
+        const next = mode === 'butterfly' ? 'butterfly' : 'grid';
+        savePlayerState({ mosaicLayoutMode: next });
+        this.resetToSelectedLayout();
+        if (typeof document !== 'undefined') {
+            import('../ui/remotePanel.js')
+                .then(({ syncLayoutPicker }) => syncLayoutPicker?.())
+                .catch(() => {});
+        }
+    },
+
+    applyGridLayoutPreset() {
+        const next = {};
+        let z = 1;
+        SLOT_IDS.forEach((id) => {
+            if (!this.slots[id]?.enabled) return;
+            const cell = GRID_CELL_BY_SLOT[id];
+            if (cell == null) return;
+            const col = cell % 3;
+            const row = Math.floor(cell / 3);
+            next[id] = {
+                x: col / 3,
+                y: row / 2,
+                w: 1 / 3,
+                h: 1 / 2,
+                z: z++
+            };
+        });
+        if (!Object.keys(next).length) return;
+
+        this.mosaicPlacement = next;
+        this.placementZTop = Object.values(next).reduce((max, p) => Math.max(max, p.z || 1), 1);
+        this.ensureCenterOnTop();
+        this.syncLayout();
+        this.applyFreeLayout();
+        this.persistPlacement();
+        this.mountAll();
+        this.scheduleRefreshTiles();
+        this.syncPlacementChrome();
+    },
+
+    resetToSelectedLayout() {
+        if (this.getSelectedLayoutMode() === 'grid') {
+            this.applyGridLayoutPreset();
+            return;
+        }
+        this.resetMosaicPlacement();
+    },
+
+    ensureLayoutModeOnInit() {
+        if (this.getSelectedLayoutMode() !== 'grid') return;
+        const missingSlot = SLOT_IDS.some((id) => this.slots[id]?.enabled && !this.mosaicPlacement[id]);
+        if (!this.hasCustomPlacement() || missingSlot) {
+            this.applyGridLayoutPreset();
+        }
     },
 };

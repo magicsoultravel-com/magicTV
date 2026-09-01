@@ -1496,3 +1496,64 @@ body.remote-undocked-open .remote-dock-tab {
 .remote-module__catalog-tools .remote-catalog__chan-bind-popup {
     display: inline-flex;
 }
+
+/* Multi-TV layout picker — icon popout above remote button */
+.remote-panel__layout-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remote-panel__layout-wrap::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    bottom: 100%;
+    height: calc(0.35rem + 16px);
+}
+
+.remote-panel__layout-popout {
+    position: absolute;
+    bottom: calc(100% + 0.35rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border-radius: 8px;
+    background: var(--tv-bg-secondary, #12151f);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        transform 0.22s ease,
+        opacity 0.22s ease,
+        visibility 0.22s ease 0.14s;
+    white-space: nowrap;
+    z-index: 9000;
+}
+
+.remote-panel__layout-wrap.is-open .remote-panel__layout-popout,
+.remote-panel__layout-wrap:focus-within .remote-panel__layout-popout {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+.remote-panel__layout-popout .remote-panel__layout-option {
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    padding: 0;
+}
+
+.remote-panel__layout-option.is-active {
+    background: color-mix(in srgb, var(--tv-main-1) 22%, transparent);
+    border-color: color-mix(in srgb, var(--tv-main-1) 45%, transparent);
+}

@@ -434,6 +434,7 @@ export const MultiView = {
         if (this.hasCustomPlacement()) {
             requestAnimationFrame(() => this.applyFreeLayout());
         }
+        this.ensureLayoutModeOnInit();
         window.addEventListener('tv:popout_changed', () => this.scheduleRefreshTiles());
 
         if (!this._deferFullRestore) {
@@ -835,7 +836,7 @@ export const MultiView = {
 
     async handleTileAction(slotId, action, { target = 'local' } = {}) {
         if (action === 'reset') {
-            this.resetMosaicPlacement();
+            this.resetToSelectedLayout();
             return;
         }
 
@@ -1048,7 +1049,11 @@ export const MultiView = {
         });
 
         if (this.hasCustomPlacement()) {
-            requestAnimationFrame(() => this.applyFreeLayout());
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => this.applyFreeLayout());
+            } else {
+                this.applyFreeLayout();
+            }
         } else {
             this.clearFreeLayoutStyles();
         }
@@ -1090,15 +1095,17 @@ export const MultiView = {
             slot.player.muted = true;
             slot.player.applyAudioToVideo();
             if (this.hasCustomPlacement() && !this.mosaicPlacement[sideId]) {
-                this.mosaicPlacement[sideId] = {
-                    x: 0.04,
-                    y: 0.04,
-                    w: 0.28,
-                    h: 0.32,
-                    z: 1
-                };
-                this.raiseTileInStack(sideId);
-                this.persistPlacement();
+                if (this.getSelectedLayoutMode?.() !== 'grid') {
+                    this.mosaicPlacement[sideId] = {
+                        x: 0.04,
+                        y: 0.04,
+                        w: 0.28,
+                        h: 0.32,
+                        z: 1
+                    };
+                    this.raiseTileInStack(sideId);
+                    this.persistPlacement();
+                }
             }
         } else {
             if (slot.player) {
@@ -1115,6 +1122,12 @@ export const MultiView = {
         SCREEN_SETTERS[sideId]?.(next);
 
         this.syncLayout();
+        if (next && this.getSelectedLayoutMode?.() === 'grid' && !silent) {
+            const mosaic = el('player-mosaic');
+            if (mosaic?.classList?.add) {
+                this.applyGridLayoutPreset();
+            }
+        }
         this.mountAll();
         this.scheduleRefreshTiles();
         if (!next) {

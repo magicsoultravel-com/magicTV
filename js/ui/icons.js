@@ -88,6 +88,16 @@ export const ACTION_ICONS = {
     sortDown: '<svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><polygon points="6,7.8 3.2,4 8.8,4" fill="currentColor"/></svg>',
 };
 
+/** Multi-TV layout picker — grid preset and butterfly preset. */
+export const LAYOUT_ICONS = {
+    /** Main remote button — 2×3 equal cells. */
+    picker: '<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.2" y="1.2" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="4.6" y="1.2" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="8" y="1.2" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="1.2" y="6.6" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="4.6" y="6.6" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="8" y="6.6" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85" opacity="0.35"/></svg>',
+    /** Equal 2×3 grid preset. */
+    grid: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.2" y="1.2" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="4.6" y="1.2" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="8" y="1.2" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="1.2" y="6.6" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="4.6" y="6.6" width="2.8" height="4.2" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/></svg>',
+    /** Large center + four corners. */
+    butterfly: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.2" y="1.2" width="2.4" height="2.4" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="8.4" y="1.2" width="2.4" height="2.4" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="3.6" y="3.6" width="4.8" height="4.8" rx="0.45" fill="none" stroke="currentColor" stroke-width="0.95"/><rect x="1.2" y="8.4" width="2.4" height="2.4" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/><rect x="8.4" y="8.4" width="2.4" height="2.4" rx="0.35" fill="none" stroke="currentColor" stroke-width="0.85"/></svg>',
+};
+
 /** Monochrome nav / settings glyphs (currentColor stroke). */
 export const NAV_ICONS = {
     globe: '<svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 1.8v8.4M1.8 6h8.4M2.6 3.6c1.2.9 2.3 1.2 3.4 1.2s2.2-.3 3.4-1.2M2.6 8.4c1.2-.9 2.3-1.2 3.4-1.2s2.2.3 3.4 1.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
