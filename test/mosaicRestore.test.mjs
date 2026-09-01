@@ -76,7 +76,8 @@ beforeEach(async () => {
         center: { id: 'center', enabled: true, player: null },
         topRight: { id: 'topRight', enabled: false, player: null },
         bottomLeft: { id: 'bottomLeft', enabled: false, player: null },
-        bottomRight: { id: 'bottomRight', enabled: false, player: null }
+        bottomRight: { id: 'bottomRight', enabled: false, player: null },
+        bottomCenter: { id: 'bottomCenter', enabled: false, player: null }
     };
     savePlayerState = (await import('../js/storage/playerState.js')).savePlayerState;
     ChanBindPicker = (await import('../js/ui/chanBindPicker.js')).ChanBindPicker;

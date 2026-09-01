@@ -14,11 +14,11 @@ import { appDirectoryUrl } from '../ui/popoutWindows.js';
 import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
 import { showAppToast } from '../ui/toast.js';
+import { MAX_MOSAIC_SLOTS, PLAY_FILL_ORDER } from '../mosaic/constants.js';
 
 export const SHARE_PARAM = 'ch';
 
 /** Default fill order — mirrors PLAY_FILL_ORDER in mosaic/constants.js. */
-const PLAY_FILL_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
 /**
  * Raw stream URL to copy for a channel.
@@ -124,7 +124,7 @@ export async function resolveDeepLinkChannel(shared) {
  * @param {{ max?: number, fallback?: string | null }} [opts]
  * @returns {string}
  */
-export function chooseSharedPlayTarget(occupiedIds = [], { max = 5, fallback = null } = {}) {
+export function chooseSharedPlayTarget(occupiedIds = [], { max = MAX_MOSAIC_SLOTS, fallback = null } = {}) {
     const order = PLAY_FILL_ORDER.slice(0, Math.max(1, max));
     const occupied = new Set(occupiedIds || []);
     for (const id of order) {

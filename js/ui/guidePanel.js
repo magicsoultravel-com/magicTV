@@ -13,7 +13,7 @@ import { WingPanel } from './wingPanel.js';
 const GUIDE_REFRESH_ICON = ACTION_ICONS.refresh;
 const GUIDE_UNAVAILABLE_ICON = ACTION_ICONS.guideUnavailable;
 
-const GUIDE_SLOT_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+const GUIDE_SLOT_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 
 let refreshTimer = null;
 let lastSnapshot = '';

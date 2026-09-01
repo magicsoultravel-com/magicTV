@@ -4,11 +4,11 @@
 
 import { TILE_SWAP_DURATIONS } from '../ui/viewTransitions.js';
 
-export const CORNER_IDS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
-export const SLOT_IDS = ['topLeft', 'center', 'topRight', 'bottomLeft', 'bottomRight'];
+export const CORNER_IDS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
+export const SLOT_IDS = ['topLeft', 'center', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 /** Fill order for batch play: primary first, then corners. */
-export const MAX_MOSAIC_SLOTS = 5;
-export const PLAY_FILL_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+export const MAX_MOSAIC_SLOTS = 6;
+export const PLAY_FILL_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 
 export const DRAG_THRESHOLD_PX = 6;
 export const RESIZE_MIN_W = 72;

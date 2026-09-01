@@ -176,7 +176,7 @@ export const PlayerChrome = {
         };
 
         // Per-screen overlays on mosaic tiles.
-        for (const id of ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight']) {
+        for (const id of ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter']) {
             const tile = el(`player-tile-${id}`);
             if (!tile) continue;
             const slot = MultiView.slots?.[id];

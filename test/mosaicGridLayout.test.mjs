@@ -47,8 +47,15 @@ test('left-only top+bottom uses two-column layout', () => {
     assert.equal(g.hasRight, false);
 });
 
-test('top-right only is single row', () => {
-    const g = resolveMosaicGridTemplate({ topRight: true });
-    assert.equal(g.areas, '"center topRight"');
-    assert.equal(g.rows, '1fr');
+test('six-TV butterfly uses two large middle columns', () => {
+    const g = resolveMosaicGridTemplate({
+        topLeft: true,
+        topRight: true,
+        bottomLeft: true,
+        bottomRight: true,
+        bottomCenter: true
+    });
+    assert.equal(g.areas, '"topLeft center topRight" "bottomLeft bottomCenter bottomRight"');
+    assert.equal(g.columns, 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)');
+    assert.equal(g.rows, '1fr 1fr');
 });

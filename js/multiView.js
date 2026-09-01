@@ -54,24 +54,27 @@ const SCREEN_GETTERS = {
     topLeft: () => SettingsStore.getScreenTopLeft(),
     topRight: () => SettingsStore.getScreenTopRight(),
     bottomLeft: () => SettingsStore.getScreenBottomLeft(),
-    bottomRight: () => SettingsStore.getScreenBottomRight()
+    bottomRight: () => SettingsStore.getScreenBottomRight(),
+    bottomCenter: () => SettingsStore.getScreenBottomCenter()
 };
 
 const SCREEN_SETTERS = {
     topLeft: (v) => SettingsStore.setScreenTopLeft(v),
     topRight: (v) => SettingsStore.setScreenTopRight(v),
     bottomLeft: (v) => SettingsStore.setScreenBottomLeft(v),
-    bottomRight: (v) => SettingsStore.setScreenBottomRight(v)
+    bottomRight: (v) => SettingsStore.setScreenBottomRight(v),
+    bottomCenter: (v) => SettingsStore.setScreenBottomCenter(v)
 };
 
-const SCREEN_ADD_ORDER = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+const SCREEN_ADD_ORDER = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 
 const SCREEN_LABELS = {
     center: '1',
     topLeft: '2',
     topRight: '3',
     bottomLeft: '4',
-    bottomRight: '5'
+    bottomRight: '5',
+    bottomCenter: '6'
 };
 
 export const SLOT_SCREEN_LABELS = SCREEN_LABELS;
@@ -102,7 +105,8 @@ export const MultiView = {
         center: { id: 'center', enabled: true, player: null },
         topRight: { id: 'topRight', enabled: false, player: null },
         bottomLeft: { id: 'bottomLeft', enabled: false, player: null },
-        bottomRight: { id: 'bottomRight', enabled: false, player: null }
+        bottomRight: { id: 'bottomRight', enabled: false, player: null },
+        bottomCenter: { id: 'bottomCenter', enabled: false, player: null }
     },
     pipWatchers: new WeakSet(),
 
@@ -1020,7 +1024,8 @@ export const MultiView = {
             topLeft: this.slots.topLeft.enabled,
             topRight: this.slots.topRight.enabled,
             bottomLeft: this.slots.bottomLeft.enabled,
-            bottomRight: this.slots.bottomRight.enabled
+            bottomRight: this.slots.bottomRight.enabled,
+            bottomCenter: this.slots.bottomCenter.enabled
         });
 
         mosaic.classList.toggle('has-left', grid.hasLeft);
@@ -1029,6 +1034,7 @@ export const MultiView = {
         mosaic.classList.toggle('has-top-right', this.slots.topRight.enabled);
         mosaic.classList.toggle('has-bottom-left', this.slots.bottomLeft.enabled);
         mosaic.classList.toggle('has-bottom-right', this.slots.bottomRight.enabled);
+        mosaic.classList.toggle('has-bottom-center', this.slots.bottomCenter.enabled);
         mosaic.classList.toggle('has-corners', grid.hasAnyCorner);
 
         mosaic.style.gridTemplateAreas = grid.areas;
@@ -1095,7 +1101,7 @@ export const MultiView = {
             slot.player.muted = true;
             slot.player.applyAudioToVideo();
             if (this.hasCustomPlacement() && !this.mosaicPlacement[sideId]) {
-                if (this.getSelectedLayoutMode?.() !== 'grid') {
+                if (!this.isGridLayoutMode?.()) {
                     this.mosaicPlacement[sideId] = {
                         x: 0.04,
                         y: 0.04,
@@ -1122,7 +1128,7 @@ export const MultiView = {
         SCREEN_SETTERS[sideId]?.(next);
 
         this.syncLayout();
-        if (next && this.getSelectedLayoutMode?.() === 'grid' && !silent) {
+        if (next && this.isGridLayoutMode?.() && !silent) {
             const mosaic = el('player-mosaic');
             if (mosaic?.classList?.add) {
                 this.applyGridLayoutPreset();

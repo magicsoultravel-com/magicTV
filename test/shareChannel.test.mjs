@@ -79,10 +79,10 @@ test('chooseSharedPlayTarget: free slots open the first one (center when clean)'
 });
 
 test('chooseSharedPlayTarget: when every slot is full, replace last (or fallback)', () => {
-    const all = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
-    assert.equal(chooseSharedPlayTarget(all), 'bottomRight');
+    const all = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
+    assert.equal(chooseSharedPlayTarget(all), 'bottomCenter');
     assert.equal(chooseSharedPlayTarget(all, { fallback: 'topRight' }), 'topRight');
-    assert.equal(chooseSharedPlayTarget(all, { fallback: 'nope' }), 'bottomRight');
+    assert.equal(chooseSharedPlayTarget(all, { fallback: 'nope' }), 'bottomCenter');
 });
 
 test('chooseSharedPlayTarget respects a reduced max (platform cap)', () => {

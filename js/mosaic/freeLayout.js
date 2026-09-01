@@ -14,14 +14,37 @@ import {
     clearTilePlacementStyle
 } from './constants.js';
 
-/** TV label order mapped to 2×3 grid cells (cell 5 unused). */
+/** TV label order mapped to 6 grid cells. */
 const GRID_CELL_BY_SLOT = Object.freeze({
     center: 0,
     topLeft: 1,
     topRight: 2,
     bottomLeft: 3,
-    bottomRight: 4
+    bottomRight: 4,
+    bottomCenter: 5
 });
+
+function gridBoxForCell(cell, orientation) {
+    if (orientation === 'grid-v') {
+        const col = cell % 2;
+        const row = Math.floor(cell / 2);
+        return { x: col / 2, y: row / 3, w: 1 / 2, h: 1 / 3 };
+    }
+    const col = cell % 3;
+    const row = Math.floor(cell / 3);
+    return { x: col / 3, y: row / 2, w: 1 / 3, h: 1 / 2 };
+}
+
+function normalizeSelectedLayoutMode(mode) {
+    if (mode === 'butterfly') return 'butterfly';
+    if (mode === 'grid-v') return 'grid-v';
+    if (mode === 'grid' || mode === 'grid-h') return 'grid-h';
+    return 'grid-h';
+}
+
+function isGridLayoutMode(mode) {
+    return mode === 'grid-h' || mode === 'grid-v';
+}
 
 /**
  * Live free-layout board height (parity with clientWidth).
@@ -540,12 +563,15 @@ export const freeLayoutMethods = {
     },
 
     getSelectedLayoutMode() {
-        const mode = loadPlayerState().mosaicLayoutMode;
-        return mode === 'butterfly' ? 'butterfly' : 'grid';
+        return normalizeSelectedLayoutMode(loadPlayerState().mosaicLayoutMode);
+    },
+
+    isGridLayoutMode() {
+        return isGridLayoutMode(this.getSelectedLayoutMode());
     },
 
     setSelectedLayoutMode(mode) {
-        const next = mode === 'butterfly' ? 'butterfly' : 'grid';
+        const next = normalizeSelectedLayoutMode(mode);
         savePlayerState({ mosaicLayoutMode: next });
         this.resetToSelectedLayout();
         if (typeof document !== 'undefined') {
@@ -555,22 +581,17 @@ export const freeLayoutMethods = {
         }
     },
 
-    applyGridLayoutPreset() {
+    applyGridLayoutPreset(orientation) {
+        const orient = normalizeSelectedLayoutMode(orientation || this.getSelectedLayoutMode());
+        const gridOrient = orient === 'grid-v' ? 'grid-v' : 'grid-h';
         const next = {};
         let z = 1;
         SLOT_IDS.forEach((id) => {
             if (!this.slots[id]?.enabled) return;
             const cell = GRID_CELL_BY_SLOT[id];
             if (cell == null) return;
-            const col = cell % 3;
-            const row = Math.floor(cell / 3);
-            next[id] = {
-                x: col / 3,
-                y: row / 2,
-                w: 1 / 3,
-                h: 1 / 2,
-                z: z++
-            };
+            const box = gridBoxForCell(cell, gridOrient);
+            next[id] = { ...box, z: z++ };
         });
         if (!Object.keys(next).length) return;
 
@@ -586,18 +607,20 @@ export const freeLayoutMethods = {
     },
 
     resetToSelectedLayout() {
-        if (this.getSelectedLayoutMode() === 'grid') {
-            this.applyGridLayoutPreset();
+        const mode = this.getSelectedLayoutMode();
+        if (isGridLayoutMode(mode)) {
+            this.applyGridLayoutPreset(mode);
             return;
         }
         this.resetMosaicPlacement();
     },
 
     ensureLayoutModeOnInit() {
-        if (this.getSelectedLayoutMode() !== 'grid') return;
+        const mode = this.getSelectedLayoutMode();
+        if (!isGridLayoutMode(mode)) return;
         const missingSlot = SLOT_IDS.some((id) => this.slots[id]?.enabled && !this.mosaicPlacement[id]);
         if (!this.hasCustomPlacement() || missingSlot) {
-            this.applyGridLayoutPreset();
+            this.applyGridLayoutPreset(mode);
         }
     },
 };

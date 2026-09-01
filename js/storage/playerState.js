@@ -238,7 +238,7 @@ export function normalizeWatchStatsMeta(raw) {
         .filter((e) => e && e.seconds > 0 && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
-const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 
 function normalizeMosaicSlots(raw) {
     if (!raw || typeof raw !== 'object') return {};
@@ -267,7 +267,10 @@ function clamp01(n) {
 
 /** Multi-TV layout preset: equal grid (default) or butterfly CSS grid. */
 export function normalizeMosaicLayoutMode(raw) {
-    return raw === 'butterfly' ? 'butterfly' : 'grid';
+    if (raw === 'butterfly') return 'butterfly';
+    if (raw === 'grid-v') return 'grid-v';
+    if (raw === 'grid' || raw === 'grid-h') return 'grid-h';
+    return 'grid-h';
 }
 
 /** Free-drag geometry per slot (fractions of mosaic size + z-order). */
@@ -469,7 +472,7 @@ export function loadPlayerState() {
             bufferSize: DEFAULT_BUFFER_SIZE,
             mosaicSlots: {},
             mosaicPlacement: {},
-            mosaicLayoutMode: 'grid',
+            mosaicLayoutMode: 'grid-h',
             remoteModule: null,
             channelPicker: null,
             sortBy: { ...DEFAULT_SORT_BY },

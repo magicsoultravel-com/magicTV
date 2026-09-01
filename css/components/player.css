@@ -40,6 +40,7 @@
 #player-tile-topRight { grid-area: topRight; }
 #player-tile-bottomLeft { grid-area: bottomLeft; }
 #player-tile-bottomRight { grid-area: bottomRight; }
+#player-tile-bottomCenter { grid-area: bottomCenter; }
 #player-tile-center { grid-area: center; }
 
 .tv-player-tile {
@@ -1482,6 +1483,10 @@
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="5"] .tv-controls__screens {
+    max-width: calc(3 * var(--strip-tile-w) + 1rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="6"] .tv-controls__screens {
     max-width: calc(3 * var(--strip-tile-w) + 1rem);
 }
 

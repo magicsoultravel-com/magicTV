@@ -124,11 +124,17 @@ function closeLayoutPicker() {
 }
 
 export function syncLayoutPicker() {
-    const mode = MultiView.getSelectedLayoutMode?.() || 'grid';
+    const mode = MultiView.getSelectedLayoutMode?.() || 'grid-h';
     queryAllInApp('[data-layout-mode]').forEach((btn) => {
         const active = btn.getAttribute('data-layout-mode') === mode;
         btn.classList.toggle('is-active', active);
         btn.setAttribute('aria-pressed', String(active));
+        const iconKey = btn.getAttribute('data-layout-mode') === 'grid-h'
+            ? 'gridH'
+            : btn.getAttribute('data-layout-mode') === 'grid-v'
+                ? 'gridV'
+                : btn.getAttribute('data-layout-mode');
+        if (LAYOUT_ICONS[iconKey]) btn.innerHTML = LAYOUT_ICONS[iconKey];
     });
     const pickerBtn = el('remote-layout-picker-btn');
     if (pickerBtn && LAYOUT_ICONS.picker) {
@@ -144,10 +150,14 @@ function bindLayoutPicker() {
 
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const open = !wrap.classList.contains('is-open');
-        wrap.classList.toggle('is-open', open);
-        btn.setAttribute('aria-expanded', String(open));
-        el('remote-layout-picker-popout')?.setAttribute('aria-hidden', String(!open));
+        if (wrap.classList.contains('is-open')) {
+            closeLayoutPicker();
+            btn.blur();
+            return;
+        }
+        wrap.classList.add('is-open');
+        btn.setAttribute('aria-expanded', 'true');
+        el('remote-layout-picker-popout')?.setAttribute('aria-hidden', 'false');
     });
 
     wrap.querySelectorAll('[data-layout-mode]').forEach((opt) => {

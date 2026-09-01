@@ -387,6 +387,16 @@ export const SettingsStore = {
         return next;
     },
 
+    getScreenBottomCenter() {
+        return readScreenFlag('screenBottomCenter', null);
+    },
+
+    setScreenBottomCenter(enabled) {
+        const next = Boolean(enabled);
+        patchPersistedState({ screenBottomCenter: next });
+        return next;
+    },
+
     getSwapTransition() {
         return normalizeViewTransition(readPersistedState().swapTransition);
     },

@@ -52,7 +52,7 @@ function syncBindButton(btn, slotId) {
 }
 
 function slotLabel(slotId) {
-    const labels = { center: '1', topLeft: '2', topRight: '3', bottomLeft: '4', bottomRight: '5' };
+    const labels = { center: '1', topLeft: '2', topRight: '3', bottomLeft: '4', bottomRight: '5', bottomCenter: '6' };
     return labels[slotId] || '1';
 }
 
