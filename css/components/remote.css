@@ -42,8 +42,19 @@
     transition:
         transform 0.25s ease,
         opacity 0.15s ease,
+        border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
     opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
+}
+
+.remote-dock-tab:hover,
+.remote-dock-tab:focus-visible {
+    border-color: var(--tv-primary);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
+        0 -4px 20px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    outline: none;
 }
 
 .remote-dock-tab__brand {
@@ -114,7 +125,7 @@ body.remote-dock-side-right .remote-dock-sheet {
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.35);
 }
 
-.remote-dock-sheet.is-collapsed:not(.is-expanded) {
+.remote-dock-sheet.is-collapsed:not(.is-expanded):not(.is-collapsing) {
     height: 0 !important;
 }
 
@@ -392,6 +403,7 @@ body.browser-shell-split #remote-shell {
 }
 
 .remote-module__brand {
+    position: relative;
     margin: 0;
     background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
     -webkit-background-clip: text;
@@ -407,8 +419,30 @@ body.browser-shell-split #remote-shell {
     transition: opacity 0.15s ease;
 }
 
-.remote-module__brand:hover {
+.remote-module__brand::before {
+    content: '';
+    position: absolute;
+    inset: -0.3rem -0.65rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    pointer-events: none;
+    transition:
+        border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.remote-module__brand:hover,
+.remote-module__brand:focus-visible {
     opacity: 1;
+    outline: none;
+}
+
+.remote-module__brand:hover::before,
+.remote-module__brand:focus-visible::before {
+    border-color: var(--tv-primary);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
+        0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
 }
 
 .remote-module__channel-bar {
@@ -1345,7 +1379,7 @@ body.remote-undocked-open .remote-dock-tab {
     pointer-events: none !important;
 }
 
-.remote-dock-sheet:not(.is-expanded) .remote-dock-sheet__inner {
+.remote-dock-sheet:not(.is-expanded):not(.is-collapsing) .remote-dock-sheet__inner {
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;

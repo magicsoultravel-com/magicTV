@@ -35,6 +35,7 @@ const MIN_H = 560;
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
+const SHEET_TRANSITION_MS = 280;
 
 function minDialogWidth() {
     return WingPanel.isOpen?.() ? MIN_W * 2 : MIN_W;
@@ -61,6 +62,7 @@ let guideNextSibling = null;
 let bound = false;
 let pinned = false;
 let sheetExpanded = false;
+let sheetCollapseAnimating = false;
 /** @type {'left'|'right'} */
 let dockSide = 'left';
 /** @type {HTMLElement|null} External OS-window host; when set, mount prefers it over in-page hosts. */
@@ -156,6 +158,58 @@ function edgeInsetLeft(side, width) {
         return Math.round(Math.max(VIEW_PAD, vw - w - EDGE_INSET));
     }
     return EDGE_INSET;
+}
+
+function syncCollapseHeaderBtn() {
+    const btn = el('remote-collapse-header-btn');
+    if (!btn) return;
+    btn.innerHTML = ACTION_ICONS.expand;
+    btn.title = 'Collapse remote';
+    btn.setAttribute('aria-label', 'Collapse remote');
+}
+
+function waitForSheetCollapseAnimation() {
+    const sheet = dockSheetEl();
+    if (!sheet || !sheetExpanded || mode !== 'docked') {
+        return Promise.resolve();
+    }
+
+    sheet.classList.add('is-collapsing');
+    setSheetExpanded(false, { persist: false });
+    updateBodyClasses();
+    void sheet.offsetHeight;
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            sheet.removeEventListener('transitionend', onTransitionEnd);
+            clearTimeout(fallback);
+            sheet.classList.remove('is-collapsing');
+            resolve();
+        };
+        const onTransitionEnd = (e) => {
+            if (e.target === sheet && e.propertyName === 'transform') finish();
+        };
+        sheet.addEventListener('transitionend', onTransitionEnd);
+        const fallback = setTimeout(finish, SHEET_TRANSITION_MS);
+    });
+}
+
+async function animateDockedCollapseThen(run) {
+    if (sheetCollapseAnimating) return;
+    if (mode !== 'docked' || !sheetExpanded) {
+        run();
+        return;
+    }
+    sheetCollapseAnimating = true;
+    try {
+        await waitForSheetCollapseAnimation();
+        run();
+    } finally {
+        sheetCollapseAnimating = false;
+    }
 }
 
 function syncDockSideBtn() {
@@ -926,6 +980,70 @@ function restoreFromState() {
     applySheetHeight(DEFAULT_SHEET_HEIGHT);
 }
 
+function finishClose() {
+    if (RemoteExternalPopout.isPoppedOut()) {
+        RemoteExternalPopout.popIn();
+    }
+
+    persistState({ open: false, mode: 'hidden' });
+
+    externalHost = null;
+    restoreBodyToStaging();
+    ensureShellsJoinedInRoot();
+    showUndockedUI(false);
+    setSheetExpanded(false, { persist: false });
+
+    mode = 'hidden';
+    targetSlotId = null;
+    remoteEndActionsDockParent = null;
+    remoteEndActionsNextSibling = null;
+    browserEndActionsDockParent = null;
+    browserEndActionsNextSibling = null;
+
+    MultiView.syncTileStatusHighlight?.();
+    updateBodyClasses();
+    syncSplitChromeButtons();
+
+    ChannelGrid.setOnPlay(deps.getDefaultOnPlay());
+    syncBrowseButtons();
+    RemoteExternalPopout.syncBtn();
+}
+
+function finishHideSplit() {
+    if (RemoteExternalPopout.isPoppedOut()) {
+        RemoteExternalPopout.popIn();
+    }
+
+    externalHost = null;
+    showUndockedUI(false);
+    setSheetExpanded(false, { persist: false });
+
+    const body = catalogBody();
+    const guide = guidePanelEl();
+    const staging = stagingEl();
+    const remoteEnd = moduleRemoteEndActions();
+    if (body && staging) {
+        if (remoteEnd) staging.appendChild(remoteEnd);
+        staging.appendChild(body);
+        if (guide) staging.appendChild(guide);
+    }
+    dockParent = null;
+    nextSibling = null;
+    guideDockParent = null;
+    guideNextSibling = null;
+    remoteEndActionsDockParent = null;
+    remoteEndActionsNextSibling = null;
+
+    mode = 'hidden';
+    persistState({ open: false, mode: 'hidden' });
+    updateBodyClasses();
+    syncSplitChromeButtons();
+    syncBrowseButtons();
+    RemoteExternalPopout.syncBtn();
+    RemotePanel.syncRemotePanel();
+    ChannelGrid.setOnPlay(playIntoTarget);
+}
+
 export const RemoteModule = {
     init({ getDefaultOnPlay, switchTab, switchTabNav, ensureBrowserCatalog } = {}) {
         if (typeof getDefaultOnPlay === 'function') deps.getDefaultOnPlay = getDefaultOnPlay;
@@ -952,6 +1070,7 @@ export const RemoteModule = {
         updateBodyClasses();
         ensureShellsJoinedInRoot();
         syncDockSideBtn();
+        syncCollapseHeaderBtn();
     },
 
     getMode() {
@@ -1024,38 +1143,12 @@ export const RemoteModule = {
     close() {
         if (mode === 'hidden') return;
 
-        // While split, "close/hide" must not rejoin Browser — only collapse Remote.
         if (isSplit()) {
             this.hide();
             return;
         }
 
-        if (RemoteExternalPopout.isPoppedOut()) {
-            RemoteExternalPopout.popIn();
-        }
-
-        persistState({ open: false, mode: 'hidden' });
-
-        externalHost = null;
-        restoreBodyToStaging();
-        ensureShellsJoinedInRoot();
-        showUndockedUI(false);
-        setSheetExpanded(false, { persist: false });
-
-        mode = 'hidden';
-        targetSlotId = null;
-        remoteEndActionsDockParent = null;
-        remoteEndActionsNextSibling = null;
-        browserEndActionsDockParent = null;
-        browserEndActionsNextSibling = null;
-
-        MultiView.syncTileStatusHighlight?.();
-        updateBodyClasses();
-        syncSplitChromeButtons();
-
-        ChannelGrid.setOnPlay(deps.getDefaultOnPlay());
-        syncBrowseButtons();
-        RemoteExternalPopout.syncBtn();
+        animateDockedCollapseThen(finishClose);
     },
 
     /**
@@ -1071,41 +1164,7 @@ export const RemoteModule = {
             return;
         }
 
-        if (RemoteExternalPopout.isPoppedOut()) {
-            RemoteExternalPopout.popIn();
-        }
-
-        // Collapse Remote UI only — leave layout.mode === 'split' and Browser hosts alone.
-        externalHost = null;
-        showUndockedUI(false);
-        setSheetExpanded(false, { persist: false });
-
-        const body = catalogBody();
-        const guide = guidePanelEl();
-        const staging = stagingEl();
-        const remoteEnd = moduleRemoteEndActions();
-        if (body && staging) {
-            if (remoteEnd) staging.appendChild(remoteEnd);
-            staging.appendChild(body);
-            if (guide) staging.appendChild(guide);
-        }
-        dockParent = null;
-        nextSibling = null;
-        guideDockParent = null;
-        guideNextSibling = null;
-        remoteEndActionsDockParent = null;
-        remoteEndActionsNextSibling = null;
-
-        mode = 'hidden';
-        persistState({ open: false, mode: 'hidden' });
-        // Keep targetSlotId so reopening still aims at the same TV.
-        updateBodyClasses();
-        syncSplitChromeButtons();
-        syncBrowseButtons();
-        RemoteExternalPopout.syncBtn();
-        RemotePanel.syncRemotePanel();
-        // Playback-from-browser still uses playIntoTarget while split.
-        ChannelGrid.setOnPlay(playIntoTarget);
+        animateDockedCollapseThen(finishHideSplit);
     },
 
     dock() {
