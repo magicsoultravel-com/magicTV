@@ -138,7 +138,7 @@ Open via the remote/browser **Settings** tab (`#settings-panel`):
 - **Storage** — Counts and quota estimate
 - **About** — Version
 
-Volume and catalog layout (tiles/list) live on the player chrome / catalog toolbar, not in this panel. Screen add/remove is on the remote mosaic controls.
+Volume and catalog layout (tiles/list) live on the player chrome / catalog toolbar, not in this panel. Screen add/remove is on the remote mosaic controls. With 2+ screens the remote also shows **Rotate TVs** — every channel shifts to the next screen (TV 1 → 2 → … → last → 1) while the pictures travel between the tiles.
 
 ## 🔌 Data Source
 

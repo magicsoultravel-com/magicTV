@@ -229,6 +229,10 @@ async function handleRemoteAction(action) {
             GuidePanel.toggle();
             break;
         }
+        case 'rotate': {
+            await MultiView.rotateScreens();
+            break;
+        }
         default:
             await MultiView.handleTileAction(
                 action === 'reset' || action === 'mute-all' || action === 'stop-all' || action === 'play-all' ? 'center' : slotId,
@@ -327,6 +331,17 @@ export function syncRemotePanel() {
         stopAllBtn.setAttribute('aria-pressed', String(anyPlaying));
         const stopCell = typeof stopAllBtn.closest === 'function' ? stopAllBtn.closest('.remote-panel__cell') : null;
         if (stopCell) stopCell.classList.toggle('is-hidden', !anyPlaying);
+    }
+
+    // Rotate TVs — only meaningful (and only visible) with 2+ screens.
+    const rotateBtn = el('remote-rotate-btn');
+    if (rotateBtn) {
+        const tvCount = MultiView.getRotationRing?.().length
+            ?? Object.values(MultiView.slots || {}).filter((slot) => slot?.enabled).length;
+        const showRotate = tvCount > 1;
+        rotateBtn.classList.toggle('is-hidden', !showRotate);
+        const rotateCell = rotateBtn.closest('.remote-panel__cell');
+        if (rotateCell) rotateCell.classList.toggle('is-hidden', !showRotate);
     }
 
     const mod = deps.getRemoteModule?.();

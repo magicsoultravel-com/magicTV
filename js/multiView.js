@@ -39,6 +39,7 @@ function getScreenControlStrip() {
     return getScreenControlStrips()[0] || null;
 }
 import { swapMethods } from './mosaic/swap.js';
+import { rotateMethods } from './mosaic/rotate.js';
 import { persistMethods } from './mosaic/persist.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
 import { hydrateTileHoverControls, PLAY_ALL_SVG, PAUSE_ALL_SVG, syncTileRockers } from './ui/tileHoverControls.js';
@@ -95,6 +96,7 @@ export const MultiView = {
     ...persistMethods,
     ...freeLayoutMethods,
     ...swapMethods,
+    ...rotateMethods,
 
     initialized: false,
     sharedVolume: savedVolume(),
