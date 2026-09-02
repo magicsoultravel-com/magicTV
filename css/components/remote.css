@@ -252,7 +252,7 @@ body.remote-dock-side-right .remote-dock-sheet {
 .remote-dock-sheet__inner #remote-dock-toggle,
 .remote-module__host #remote-split-browser-btn,
 .remote-dock-sheet__inner #remote-split-browser-btn {
-    display: flex;
+    display: inline-flex;
 }
 
 .remote-module__host #browser-split-browser-btn,
@@ -262,8 +262,10 @@ body.remote-dock-side-right .remote-dock-sheet {
 .browser-module .remote-module__host #browser-dock-toggle,
 .browser-dock-sheet__inner #browser-dock-toggle,
 .browser-module .remote-module__host #browser-collapse-header-btn,
-.browser-dock-sheet__inner #browser-collapse-header-btn {
-    display: flex;
+.browser-dock-sheet__inner #browser-collapse-header-btn,
+.browser-module .remote-module__host #catalog-layout-btn,
+.browser-dock-sheet__inner #catalog-layout-btn {
+    display: inline-flex;
 }
 
 .remote-module__host #remote-module-pin,
@@ -552,19 +554,23 @@ body.browser-shell-split #remote-shell {
 
 .remote-panel__footer-chrome {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.45rem;
-    width: 100%;
-}
-
-.remote-panel__footer-tools-row {
-    display: flex;
-    flex-wrap: wrap;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
     gap: 0.45rem 0.65rem;
     width: 100%;
+    overflow-x: auto;
+}
+
+.remote-panel__footer-tools-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem 0.65rem;
+    width: auto;
+    flex: 0 0 auto;
 }
 
 .remote-panel__footer-tools-row .remote-module__catalog-tools.is-visible,
@@ -575,15 +581,21 @@ body.browser-shell-split #remote-shell {
 }
 
 .remote-panel__footer-nav-row {
-    display: grid;
-    grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
     gap: var(--remote-grid-gap, 0.4rem);
-    justify-items: center;
-    width: min(100%, var(--remote-min-width, 260px));
+    width: auto;
+    flex: 0 0 auto;
 }
 
 .remote-panel__footer-nav-row .remote-panel__nav-group {
-    display: contents;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--remote-grid-gap, 0.4rem);
 }
 
 .remote-panel__footer-nav-row .remote-panel__cell {
@@ -674,27 +686,32 @@ body.browser-shell-split #remote-shell {
 }
 
 .remote-module__host > .tv-module__actions--remote-end,
-.remote-dock-sheet__inner > .tv-module__actions--remote-end {
+.remote-dock-sheet__inner > .tv-module__actions--remote-end,
+.remote-module__host > .tv-module__actions--browser-end,
+.remote-dock-sheet__inner > .tv-module__actions--browser-end,
+.browser-module .remote-module__host > .tv-module__actions--browser-end,
+.browser-dock-sheet__inner > .tv-module__actions--browser-end {
     position: absolute;
     top: 0.35rem;
-    left: auto;
-    right: var(--tv-spacing-sm, 0.5rem);
     z-index: 6;
     pointer-events: auto;
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 0.25rem;
+}
+
+.remote-module__host > .tv-module__actions--remote-end,
+.remote-dock-sheet__inner > .tv-module__actions--remote-end {
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
 }
 
 .remote-module__host > .tv-module__actions--browser-end,
 .remote-dock-sheet__inner > .tv-module__actions--browser-end {
-    position: absolute;
-    top: 0.35rem;
     left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
     right: auto;
-    z-index: 6;
-    pointer-events: auto;
-    display: flex;
-    gap: 0.25rem;
 }
 
 .remote-module__host > .tv-module__actions--remote-end:only-of-type,
@@ -703,7 +720,8 @@ body.browser-shell-split #remote-shell {
 }
 
 .remote-module__host > .tv-module__actions--start,
-.remote-dock-sheet__inner > .tv-module__actions--start {
+.remote-dock-sheet__inner > .tv-module__actions--start,
+.browser-dock-sheet__inner > .tv-module__actions--start {
     position: absolute;
     top: 0.35rem;
     left: var(--tv-spacing-sm, 0.5rem);
@@ -1007,28 +1025,7 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
 }
 
-.browser-dock-sheet__inner > .tv-module__actions--start,
-.browser-dock-sheet__inner > .tv-module__actions--browser-end {
-    position: absolute;
-    top: 0.35rem;
-    z-index: 6;
-    pointer-events: auto;
-}
-
-.browser-dock-sheet__inner > .tv-module__actions--start {
-    left: var(--tv-spacing-sm, 0.5rem);
-}
-
-.browser-dock-sheet__inner > .tv-module__actions--browser-end {
-    left: var(--tv-spacing-sm, 0.5rem);
-    right: auto;
-}
-
-body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--browser-end {
-    left: auto;
-    right: var(--tv-spacing-sm, 0.5rem);
-}
-
+body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--browser-end,
 .browser-module .remote-module__host > .tv-module__actions--browser-end {
     left: auto;
     right: var(--tv-spacing-sm, 0.5rem);
