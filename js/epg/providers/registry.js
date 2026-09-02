@@ -4,7 +4,7 @@
 import { epgPwProvider, fetchEpgPwProgrammes } from './epgPwProvider.js';
 import { xmltvIndexProvider } from './xmltvIndexProvider.js';
 import { mjhFastProvider } from './mjhFastProvider.js';
-import { programmesForDay, pickNowNext, localDayBounds } from '../xmltvParser.js';
+import { pickNowNext } from '../xmltvParser.js';
 
 /** @type {import('./types.js').EpgProvider[]} */
 const PROVIDERS = [epgPwProvider, xmltvIndexProvider, mjhFastProvider];
@@ -78,9 +78,11 @@ export async function fetchViaChain(channel, opts = {}) {
  */
 export function attachNowNext(result, nowMs = Date.now()) {
     if (result.status !== 'ok' || !result.programmes?.length) return result;
-    const today = localDayBounds(nowMs, 0);
-    const todayProgs = programmesForDay(result.programmes, today.start, today.end);
-    const { current, next } = pickNowNext(todayProgs.length ? todayProgs : result.programmes, nowMs);
+    // Pick from the full programme list — epg.pw already returns today plus
+    // tomorrow, and regional feeds may span several days. Filtering to the
+    // local "today" window here dropped the next programme whenever it
+    // started after midnight (the "Next:" line vanished every evening).
+    const { current, next } = pickNowNext(result.programmes, nowMs);
     return { ...result, current, next };
 }
 

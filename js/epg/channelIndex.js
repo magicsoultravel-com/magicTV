@@ -30,31 +30,50 @@ export function parseChannelIndex(xml) {
 /**
  * Stream-fetch XML until first programme tag; returns channel-section text.
  * @param {string} url
+ * @param {{ gzip?: boolean }} [opts] When true, the response body is gunzipped
+ *   on the fly (DecompressionStream) before scanning — e.g. epg.pw's
+ *   `epg_CC.xml.gz` index files, which are raw .gz payloads (not
+ *   HTTP-level compression, so fetch will not decompress them itself).
  * @returns {Promise<string>}
  */
-export async function streamChannelSection(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+export async function streamChannelSection(url, { gzip = false } = {}) {
+    const controller = new AbortController();
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+        controller.abort();
+        throw new Error(`HTTP ${res.status}`);
+    }
     if (!res.body) {
-        const text = await res.text();
+        const text = await maybeDecompress(await res.arrayBuffer(), gzip ? 'GZIP' : '');
         const idx = text.indexOf('<programme');
         return idx > 0 ? text.slice(0, idx) : text;
     }
 
-    const reader = res.body.getReader();
+    let stream = res.body;
+    if (gzip) {
+        if (typeof DecompressionStream === 'undefined') throw new Error('gzip not supported');
+        stream = stream.pipeThrough(new DecompressionStream('gzip'));
+    }
+
+    const reader = stream.getReader();
     const dec = new TextDecoder();
     let buf = '';
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const idx = buf.indexOf('<programme');
-        if (idx >= 0) {
-            try { reader.cancel(); } catch { /* ignore */ }
-            return buf.slice(0, idx);
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const idx = buf.indexOf('<programme');
+            if (idx >= 0) return buf.slice(0, idx);
         }
+        return buf;
+    } finally {
+        // Stop reading as soon as we have the channel section — abort the fetch
+        // itself so the connection is torn down deterministically (a bare
+        // reader.cancel() can leave the socket streaming in the background).
+        try { controller.abort(); } catch { /* ignore */ }
+        try { reader.cancel(); } catch { /* ignore */ }
     }
-    return buf;
 }
 
 /**

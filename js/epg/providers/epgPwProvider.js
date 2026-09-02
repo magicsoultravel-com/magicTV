@@ -25,6 +25,36 @@ function dateStrFromMs(ms) {
 }
 
 /**
+ * URL of the per-country XMLTV channel index (the name-matching source).
+ * epg.pw now serves these gzipped under an uppercase feed code
+ * (`epg_US.xml.gz`); the legacy plain `epg_US.xml` files 404.
+ * @param {string} feedCode
+ */
+export function epgPwIndexUrl(feedCode) {
+    return `https://epg.pw/xmltv/epg_${feedCode}.xml.gz`;
+}
+
+/** Legacy plain-XML index URL — fallback in case the gz variant disappears. */
+export function epgPwIndexUrlLegacy(feedCode) {
+    return `https://epg.pw/xmltv/epg_${feedCode}.xml`;
+}
+
+/**
+ * Fetch just the channel section of the index (stream + early-cancel, so only
+ * the head of the multi-MB file is downloaded). Prefers the gzipped feed and
+ * falls back to the legacy plain-XML URL.
+ * @param {string} feedCode
+ * @returns {Promise<string>}
+ */
+export async function fetchEpgPwIndexHead(feedCode) {
+    try {
+        return await streamChannelSection(epgPwIndexUrl(feedCode), { gzip: true });
+    } catch (e) {
+        return await streamChannelSection(epgPwIndexUrlLegacy(feedCode));
+    }
+}
+
+/**
  * @param {string} feedCode
  */
 async function loadIndex(feedCode) {
@@ -40,9 +70,9 @@ async function loadIndex(feedCode) {
     if (inflightIndex.has(cacheKey)) return inflightIndex.get(cacheKey);
 
     const promise = (async () => {
-        const url = `https://epg.pw/xmltv/epg_${feedCode}.xml`;
-        const head = await streamChannelSection(url);
+        const head = await fetchEpgPwIndexHead(feedCode);
         const index = parseChannelIndex(head);
+        if (!index.length) throw new Error('epg.pw index empty');
         sessionIndex.set(cacheKey, index);
         await setChannelIndexCache(cacheKey, index);
         return index;

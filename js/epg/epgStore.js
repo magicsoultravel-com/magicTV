@@ -11,6 +11,8 @@ const PROG_PREFIX = 'matrix_tv_epg_prog:';
 
 const INDEX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROG_TTL_MS = 6 * 60 * 60 * 1000;
+/** Negative CORS results expire — one transient failure must not block a feed forever. */
+const CORS_NEGATIVE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function safeKey(s) {
     return String(s || '').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
@@ -43,7 +45,12 @@ export async function setMappingCache(channelKey, mapping) {
 }
 
 export async function getCorsCache(url) {
-    return IndexedDBStore.get(`${CORS_PREFIX}${safeKey(url)}`);
+    const hit = await IndexedDBStore.get(`${CORS_PREFIX}${safeKey(url)}`);
+    if (!hit) return null;
+    if (hit.corsOk === false && hit.cachedAt && Date.now() - hit.cachedAt > CORS_NEGATIVE_TTL_MS) {
+        return null;
+    }
+    return hit;
 }
 
 export async function setCorsCache(url, corsOk) {

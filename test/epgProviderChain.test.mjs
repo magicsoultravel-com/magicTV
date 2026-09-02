@@ -29,3 +29,18 @@ test('attachNowNext picks current and next programmes', () => {
     assert.equal(result.current?.title, 'Live');
     assert.equal(result.next?.title, 'Later');
 });
+
+test('attachNowNext picks next programme that starts after midnight', () => {
+    // 23:30 local — the next programme starts tomorrow (00:30). The epg.pw
+    // provider returns today + tomorrow, so "next" must survive the day roll.
+    const d = new Date();
+    d.setHours(23, 30, 0, 0);
+    const now = d.getTime();
+    const programmes = [
+        { title: 'Evening', start: now - 3600000, stop: now + 1800000, channelId: 'x' },
+        { title: 'Late Night', start: now + 3600000, stop: now + 7200000, channelId: 'x' }
+    ];
+    const result = attachNowNext({ status: 'ok', programmes }, now);
+    assert.equal(result.current?.title, 'Evening');
+    assert.equal(result.next?.title, 'Late Night');
+});
