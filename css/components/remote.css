@@ -531,6 +531,10 @@ body.browser-shell-split #remote-shell {
     background: color-mix(in srgb, var(--tv-bg-secondary) 92%, transparent);
 }
 
+#browser-shell > .remote-module__footer {
+    padding-top: var(--tv-spacing-sm, 0.5rem);
+}
+
 .remote-module__catalog-tools {
     display: none;
     flex-wrap: nowrap;
