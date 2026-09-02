@@ -235,14 +235,34 @@ body.remote-dock-side-right .remote-dock-sheet {
 
 #remote-module-pin,
 #remote-collapse-header-btn,
-#remote-dock-side-btn {
+#remote-dock-side-btn,
+#remote-dock-toggle,
+#remote-split-browser-btn,
+#browser-split-browser-btn,
+#browser-dock-toggle,
+#browser-collapse-header-btn {
     display: none;
 }
 
 .remote-module__host #remote-collapse-header-btn,
 .remote-dock-sheet__inner #remote-collapse-header-btn,
 .remote-module__host #remote-dock-side-btn,
-.remote-dock-sheet__inner #remote-dock-side-btn {
+.remote-dock-sheet__inner #remote-dock-side-btn,
+.remote-module__host #remote-dock-toggle,
+.remote-dock-sheet__inner #remote-dock-toggle,
+.remote-module__host #remote-split-browser-btn,
+.remote-dock-sheet__inner #remote-split-browser-btn {
+    display: flex;
+}
+
+.remote-module__host #browser-split-browser-btn,
+.remote-dock-sheet__inner #browser-split-browser-btn,
+.browser-dock-sheet__inner #browser-split-browser-btn,
+.browser-module .remote-module__host #browser-split-browser-btn,
+.browser-module .remote-module__host #browser-dock-toggle,
+.browser-dock-sheet__inner #browser-dock-toggle,
+.browser-module .remote-module__host #browser-collapse-header-btn,
+.browser-dock-sheet__inner #browser-collapse-header-btn {
     display: flex;
 }
 
@@ -766,7 +786,9 @@ body.browser-shell-split #remote-shell {
    Hidden (non-interactive) by default on pointer devices; always visible on touch. */
 @media (hover: hover) {
     .remote-module__host > .tv-module__actions,
-    .remote-dock-sheet__inner > .tv-module__actions {
+    .remote-dock-sheet__inner > .tv-module__actions,
+    .browser-module .remote-module__host > .tv-module__actions,
+    .browser-dock-sheet__inner > .tv-module__actions {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.15s ease;
@@ -775,7 +797,11 @@ body.browser-shell-split #remote-shell {
     .remote-module__host:hover > .tv-module__actions,
     .remote-module__host:focus-within > .tv-module__actions,
     .remote-dock-sheet__inner:hover > .tv-module__actions,
-    .remote-dock-sheet__inner:focus-within > .tv-module__actions {
+    .remote-dock-sheet__inner:focus-within > .tv-module__actions,
+    .browser-module .remote-module__host:hover > .tv-module__actions,
+    .browser-module .remote-module__host:focus-within > .tv-module__actions,
+    .browser-dock-sheet__inner:hover > .tv-module__actions,
+    .browser-dock-sheet__inner:focus-within > .tv-module__actions {
         opacity: 1;
         pointer-events: auto;
     }
@@ -998,9 +1024,14 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     right: auto;
 }
 
+body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--browser-end {
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
+}
+
 .browser-module .remote-module__host > .tv-module__actions--browser-end {
-    left: var(--tv-spacing-sm, 0.5rem);
-    right: auto;
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
 }
 
 .remote-dock-sheet__inner > .tv-module__actions--browser-end {
@@ -1234,13 +1265,9 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
 }
 
-/* Hide/collapse chevron: point down when module is open, up when folded to tab */
-#browser-hide-toggle svg {
+/* Hide/collapse chevron on browser header — arrow down for collapse */
+#browser-collapse-header-btn svg {
     transition: transform 0.2s ease;
-}
-
-#browser-hide-toggle.is-module-unhidden svg {
-    transform: rotate(180deg);
 }
 
 .remote-module__catalog-tools .tv-tab-popup,

@@ -482,6 +482,8 @@
         <div class="tv-module__actions tv-module__actions--start"></div>
         <div class="tv-module__actions tv-module__actions--remote-end">
             <button type="button" id="remote-external-popout-btn" class="tv-module__action ui-icon-btn tv-module__action--echo is-hidden" title="Pop out remote" aria-label="Pop out remote" aria-pressed="false"></button>
+            <button type="button" id="remote-split-browser-btn" class="tv-module__action ui-icon-btn is-hidden" data-layout-toggle="split" title="Split browser" aria-label="Split browser" aria-pressed="false"></button>
+            <button type="button" id="remote-dock-toggle" class="tv-module__action ui-icon-btn" title="Undock remote" aria-label="Undock remote"></button>
             <button type="button" id="remote-dock-side-btn" class="tv-module__action ui-icon-btn" title="Move to right" aria-label="Move to right"></button>
             <button type="button" id="remote-module-pin" class="tv-module__action remote-module__pin" title="Pin window" aria-label="Pin window" aria-pressed="false">
                 <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M4.2 1.8h3.6l.6 3.2 1.6.8v1.2H6.6V10l-.6.8-.6-.8V7H2V5.8l1.6-.8.6-3.2z" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
@@ -492,7 +494,12 @@
         </div>
         <div class="tv-module__actions tv-module__actions--browser-end">
             <button type="button" id="browser-external-popout-btn" class="tv-module__action ui-icon-btn is-hidden" title="Pop out browser" aria-label="Pop out browser" aria-pressed="false"></button>
+            <button type="button" id="browser-split-browser-btn" class="tv-module__action ui-icon-btn is-hidden" data-layout-toggle="split" title="Join browser with remote" aria-label="Join browser with remote" aria-pressed="true"></button>
+            <button type="button" id="browser-dock-toggle" class="tv-module__action ui-icon-btn is-hidden" title="Dock browser" aria-label="Dock browser"></button>
             <button type="button" id="catalog-layout-btn" class="tv-module__action ui-icon-btn is-hidden" title="List view" aria-label="List view"></button>
+            <button type="button" id="browser-collapse-header-btn" class="tv-module__action browser-module__collapse is-hidden" title="Collapse browser" aria-label="Collapse browser">
+                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M3 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
         </div>
         <div id="tv-catalog-body" class="tv-module__body remote-module__shell catalog-root module-layout--joined">
             <div id="remote-shell" class="module-shell module-shell--remote">
@@ -556,9 +563,6 @@
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn" id="remote-reset-btn" data-remote-action="reset" title="Reset multi-TV layout" aria-label="Reset multi-TV layout"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.2 6a3.8 3.8 0 0 1 6.5-2.6M9.8 6a3.8 3.8 0 0 1-6.5 2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.2 1.8v2.2H10.4M3.8 10.2V8H1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                         </div>
                         <div class="remote-panel__cell">
-                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 remote-panel__btn" id="remote-dock-toggle" data-remote-action="dock-toggle" title="Undock remote" aria-label="Undock remote"><svg viewBox="0 0 12 12" width="11" height="11" focusable="false"><path d="M3 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                        </div>
-                        <div class="remote-panel__cell">
                             <div class="tv-tab-popup remote-panel__chan-bind-popup">
                                 <button type="button" class="tv-controls__btn tv-controls__btn--main-2 remote-panel__btn" id="remote-chan-bind-btn" data-remote-action="chan-bind-toggle" title="Bind channels" aria-label="Bind channels" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2 3.5h8M2 6h8M2 8.5h5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="9.2" cy="8.5" r="1.3" fill="currentColor"/></svg></button>
                                 <div id="remote-chan-bind-menu" class="chan-bind-menu" role="menu" aria-label="Channel bind scope" hidden></div>
@@ -582,9 +586,6 @@
                             </div>
                             <div class="remote-panel__cell">
                                 <button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-nav="settings" title="Settings" aria-label="Settings"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M7.2 2.6a1.5 1.5 0 0 0-2.1 0L2 5.7a1.5 1.5 0 0 0 2.1 2.1l3.1-3.1a1.5 1.5 0 0 0 0-2.1zM2.6 7.4 1.5 8.5c-.3.3-.3.8 0 1.1l.6.6c.3.3.8.3 1.1 0l1.1-1.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                            </div>
-                            <div class="remote-panel__cell" id="remote-layout-toggle-cell">
-                                <button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1 is-hidden" id="remote-split-browser-btn" data-layout-toggle="split" title="Split browser" aria-label="Split browser" aria-pressed="false"></button>
                             </div>
                         </div>
 
@@ -994,10 +995,6 @@
                                 </div>
                                 <button type="button" id="create-favorite-folder-btn" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-3 is-hidden" title="New folder" aria-label="New folder"></button>
                             </div>
-                            <div id="browser-window-controls" class="browser-window-controls remote-panel__cell--nav is-hidden" role="group" aria-label="Browser window controls">
-                                <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-2" id="browser-dock-toggle" data-browser-window-action="dock-toggle" title="Dock browser" aria-label="Dock browser"></button>
-                                <button type="button" class="ui-icon-btn remote-panel__nav-btn tv-controls__btn--main-2" id="browser-hide-toggle" data-browser-window-action="hide-toggle" title="Hide browser" aria-label="Hide browser"></button>
-                            </div>
                         </div>
                         <div id="remote-panel-footer-nav-row" class="remote-panel__footer-nav-row" role="navigation" aria-label="Catalog sections">
                             <div id="browser-panel-nav-group" class="remote-panel__nav-group is-hidden" aria-hidden="true">
@@ -1015,9 +1012,6 @@
                                 </div>
                                 <div class="remote-panel__cell">
                                     <button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-nav="settings" title="Settings" aria-label="Settings"><svg class="ui-icon" viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M7.2 2.6a1.5 1.5 0 0 0-2.1 0L2 5.7a1.5 1.5 0 0 0 2.1 2.1l3.1-3.1a1.5 1.5 0 0 0 0-2.1zM2.6 7.4 1.5 8.5c-.3.3-.3.8 0 1.1l.6.6c.3.3.8.3 1.1 0l1.1-1.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                                </div>
-                                <div class="remote-panel__cell">
-                                    <button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1 is-hidden" id="browser-split-browser-btn" data-layout-toggle="split" title="Join browser with remote" aria-label="Join browser with remote" aria-pressed="true"></button>
                                 </div>
                             </div>
                         </div>

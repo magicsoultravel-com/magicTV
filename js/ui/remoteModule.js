@@ -212,6 +212,15 @@ async function animateDockedCollapseThen(run) {
     }
 }
 
+function syncDockToggleBtn() {
+    const btn = el('remote-dock-toggle');
+    if (!btn) return;
+    const undocked = mode === 'undocked';
+    btn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
+    btn.title = undocked ? 'Dock remote' : 'Undock remote';
+    btn.setAttribute('aria-label', btn.title);
+}
+
 function syncDockSideBtn() {
     const btn = el('remote-dock-side-btn');
     if (!btn) return;
@@ -535,7 +544,7 @@ function ensureShellsJoinedInRoot() {
 function syncLayoutToggleBtn(btn, { visible, split }) {
     if (!btn) return;
     btn.classList.toggle('is-hidden', !visible);
-    if (typeof btn.closest === 'function') {
+    if (!btn.classList.contains('tv-module__action') && typeof btn.closest === 'function') {
         btn.closest('.remote-panel__cell')?.classList.toggle('is-hidden', !visible);
     }
     btn.innerHTML = CARD_ICONS.splitLayout;
@@ -881,6 +890,10 @@ function bindOnce() {
     dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
 
     el('remote-collapse-header-btn')?.addEventListener('click', () => RemoteModule.hide());
+    el('remote-dock-toggle')?.addEventListener('click', () => {
+        if (mode === 'undocked') RemoteModule.dock();
+        else RemoteModule.undock();
+    });
     el('remote-dock-side-btn')?.addEventListener('click', () => toggleDockSide());
     bindLayoutToggleButtons();
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
@@ -1071,6 +1084,7 @@ export const RemoteModule = {
         ensureShellsJoinedInRoot();
         syncDockSideBtn();
         syncCollapseHeaderBtn();
+        syncDockToggleBtn();
     },
 
     getMode() {
@@ -1137,6 +1151,7 @@ export const RemoteModule = {
         syncBrowseButtons();
         syncSplitChromeButtons();
         RemoteExternalPopout.syncBtn();
+        syncDockToggleBtn();
         RemotePanel.syncRemotePanel();
     },
 
@@ -1181,6 +1196,7 @@ export const RemoteModule = {
         updateBodyClasses();
         persistState({ mode: 'docked', open: true });
         syncBrowseButtons();
+        syncDockToggleBtn();
         RemotePanel.syncRemotePanel();
     },
 
@@ -1203,6 +1219,7 @@ export const RemoteModule = {
         updateBodyClasses();
         persistState({ mode: 'undocked', open: true });
         syncBrowseButtons();
+        syncDockToggleBtn();
         RemotePanel.syncRemotePanel();
     },
 

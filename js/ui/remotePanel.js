@@ -213,13 +213,6 @@ async function handleRemoteAction(action) {
             break;
         case 'chan-bind-toggle':
             break;
-        case 'dock-toggle': {
-            const mod = deps.getRemoteModule?.();
-            if (!mod) break;
-            if (mod.getMode?.() === 'undocked') mod.dock?.();
-            else mod.undock?.();
-            break;
-        }
         case 'guide-toggle': {
             GuidePanel.toggle();
             break;
@@ -340,14 +333,6 @@ export function syncRemotePanel() {
     }
 
     const mod = deps.getRemoteModule?.();
-    const dockBtn = el('remote-dock-toggle');
-    if (dockBtn && mod) {
-        const undocked = mod.getMode?.() === 'undocked';
-        dockBtn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
-        dockBtn.title = undocked ? 'Dock remote' : 'Undock remote';
-        dockBtn.setAttribute('aria-label', dockBtn.title);
-    }
-
     const guideBtn = el('remote-guide-toggle');
     if (guideBtn) {
         const visible = GuidePanel.isVisible();

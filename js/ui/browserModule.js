@@ -384,30 +384,25 @@ function beginGesture(e, mode, edge = '') {
     e.preventDefault();
 }
 
-function syncWindowControls() {
-    const strip = el('browser-window-controls');
+function syncDockToggleBtn() {
     const dockBtn = el('browser-dock-toggle');
-    const hideBtn = el('browser-hide-toggle');
+    if (!dockBtn) return;
     const split = isSplit();
-    const kind = getLayoutState().browserHostKind;
+    dockBtn.classList.toggle('is-hidden', !split);
+    const undocked = getLayoutState().browserHostKind === 'undocked';
+    dockBtn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
+    dockBtn.title = undocked ? 'Dock browser' : 'Undock browser';
+    dockBtn.setAttribute('aria-label', dockBtn.title);
+}
 
-    strip?.classList.toggle('is-hidden', !split);
-
-    if (dockBtn) {
-        dockBtn.classList.toggle('is-hidden', !split);
-        const undocked = kind === 'undocked';
-        dockBtn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
-        dockBtn.title = undocked ? 'Dock browser' : 'Undock browser';
-        dockBtn.setAttribute('aria-label', dockBtn.title);
-    }
-    if (hideBtn) {
-        hideBtn.classList.toggle('is-hidden', !split);
-        hideBtn.innerHTML = ACTION_ICONS.collapse;
-        const unhidden = kind !== 'hidden';
-        hideBtn.classList.toggle('is-module-unhidden', unhidden);
-        hideBtn.title = unhidden ? 'Hide browser' : 'Show browser';
-        hideBtn.setAttribute('aria-label', hideBtn.title);
-    }
+function syncCollapseHeaderBtn() {
+    const collapseBtn = el('browser-collapse-header-btn');
+    if (!collapseBtn) return;
+    const split = isSplit();
+    collapseBtn.classList.toggle('is-hidden', !split);
+    collapseBtn.innerHTML = ACTION_ICONS.expand;
+    collapseBtn.title = 'Collapse browser';
+    collapseBtn.setAttribute('aria-label', 'Collapse browser');
 }
 
 function syncActionButtons() {
@@ -419,7 +414,8 @@ function syncActionButtons() {
         popBtn.title = 'Pop out browser';
         popBtn.setAttribute('aria-label', 'Pop out browser');
     }
-    syncWindowControls();
+    syncDockToggleBtn();
+    syncCollapseHeaderBtn();
     syncRemoteScreenFooter();
 }
 
@@ -453,7 +449,7 @@ function bindOnce() {
             beginGesture(e, 'drag');
             return;
         }
-        if (e.target.closest?.('button, input, select, textarea, a, .channel-tile, .country-tile, .tv-controls__screen-btn, .tv-controls__add-screen-btn, [data-browser-resize], [data-browser-window-action]')) {
+        if (e.target.closest?.('button, input, select, textarea, a, .channel-tile, .country-tile, .tv-controls__screen-btn, .tv-controls__add-screen-btn, [data-browser-resize]')) {
             return;
         }
         beginGesture(e, 'drag');
@@ -484,20 +480,14 @@ function bindOnce() {
         showAppToast('Browser OS popout uses the remote Pop out control for now');
     });
 
+    el('browser-dock-toggle')?.addEventListener('click', () => {
+        if (getLayoutState().browserHostKind === 'undocked') BrowserModule.dock();
+        else BrowserModule.undock();
+    });
+
+    el('browser-collapse-header-btn')?.addEventListener('click', () => BrowserModule.hide());
+
     document.addEventListener('click', (e) => {
-        const btn = e.target?.closest?.('[data-browser-window-action]');
-        if (btn) {
-            e.preventDefault();
-            const action = btn.getAttribute('data-browser-window-action');
-            if (action === 'dock-toggle') {
-                if (getLayoutState().browserHostKind === 'undocked') BrowserModule.dock();
-                else BrowserModule.undock();
-            } else if (action === 'hide-toggle') {
-                if (getLayoutState().browserHostKind === 'hidden') BrowserModule.show();
-                else BrowserModule.hide();
-            }
-            return;
-        }
         const brand = e.target?.closest?.('#browser-shell > .module-shell__chrome > .remote-module__brand');
         if (!brand) return;
         if (!isSplit() || uiMode === 'hidden') return;
@@ -631,7 +621,8 @@ export const BrowserModule = {
     },
 
     syncActionButtons,
-    syncWindowControls,
+    syncDockToggleBtn,
+    syncCollapseHeaderBtn,
 
     persistGeometry() {
         if (uiMode !== 'undocked') return;
