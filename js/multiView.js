@@ -1169,6 +1169,100 @@ export const MultiView = {
     },
 
     /**
+     * Play a channel using safe-loading semantics regardless of the global
+     * channel-switch mode. Returns true only when the staging buffer was
+     * warmed and the swap committed/playing. Never falls back to a
+     * destructive playChannel() that would stop the current stream before the
+     * next one is confirmed.
+     * @param {string} slotId
+     * @param {object} channel
+     * @returns {Promise<boolean>}
+     */
+    async playChannelSafe(slotId, channel) {
+        const id = slotId || 'center';
+        cancelSlotPrefetch(id);
+        if (CORNER_IDS.includes(id) && !this.slots[id]?.enabled) {
+            this.setSideEnabled(id, true);
+        }
+        this.setStatusSlot(id);
+        this.mountAll();
+        const startMuted = id !== 'center';
+        const player = this.ensurePlayer(id, { startMuted });
+        if (!player) return false;
+        const surface = el(`tv-playback-surface-${id}`);
+        if (surface) player.mountVideo(surface);
+
+        const normalized = normalizeChannel(channel, channel?.providerId) || channel;
+        const key = channelKey(normalized);
+
+        const hasVisibleContent = Boolean(
+            player.channel
+            && (player.playing || player.loading || player.pausePhase !== 'idle')
+        );
+
+        player._suppressErrorToast = true;
+        player.switchGeneration = (player.switchGeneration || 0) + 1;
+        const switchGen = player.switchGeneration;
+        tvDebug('multiview', 'playChannelSafe', { slot: id, key });
+
+        try {
+            if (!hasVisibleContent) {
+                await this.withChannelSwitchTransition(
+                    id,
+                    () => player.playChannel(normalized),
+                    { skipOut: true }
+                );
+                return player.playing === true;
+            }
+
+            await player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
+
+            if (switchGen !== player.switchGeneration) return false;
+
+            const bufferReady = await player.waitForPrepareReady(switchGen);
+
+            if (!bufferReady || switchGen !== player.switchGeneration) {
+                player.cancelPrepare();
+                player._abortSwitchIntent();
+                return false;
+            }
+
+            let committed = false;
+            await this.withChannelSwitchTransition(
+                id,
+                {
+                    onPrepare: () => {},
+                    onCommit: async () => {
+                        committed = await player.commitPreparedChannel(
+                            normalized,
+                            switchGen,
+                            { allowFallback: false }
+                        ) === true;
+                    }
+                },
+                {
+                    skipOut: false,
+                    skipIn: true
+                }
+            );
+
+            return committed && player.playing === true;
+        } finally {
+            player._suppressErrorToast = false;
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            this.syncStatusChrome();
+            this.syncSettingsToggles();
+            if (ChromecastManager.getActiveSlot() === id && ChromecastManager.isCasting()) {
+                try {
+                    await ChromecastManager.loadMedia(channel);
+                } catch { /* ignore */ }
+            }
+            if (id === 'center') this.getPrimary()?.emitState();
+        }
+    },
+
+    /**
      * Safe Loading: hold current stream/UI until next channel is confirmed on staging.
      * @param {string} id
      * @param {object} channel

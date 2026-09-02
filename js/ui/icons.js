@@ -78,6 +78,8 @@ export const ACTION_ICONS = {
     fullscreenExit: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" vector-effect="non-scaling-stroke"><path d="M4.2 4.2H2.8M4.2 4.2V2.8M7.8 4.2h1.4M7.8 4.2V2.8M4.2 7.8H2.8M4.2 7.8v1.4M7.8 7.8h1.4M7.8 7.8v1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     /** Circular arrows — manual catalog refresh. */
     refresh: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M9.4 4.2A3.5 3.5 0 1 0 9.1 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M9.4 2.2v2.4H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Die — play a random channel from any country. */
+    random: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="4.6" cy="4.6" r="0.6" fill="currentColor"/><circle cx="7.4" cy="4.6" r="0.6" fill="currentColor"/><circle cx="4.6" cy="7.4" r="0.6" fill="currentColor"/><circle cx="7.4" cy="7.4" r="0.6" fill="currentColor"/></svg>',
     /** Bidirectional arrows — snap remote dock to the opposite side. */
     dockSide: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M1.8 6h8.4M3.6 3.8 1.8 6l1.8 2.2M8.4 3.8 10.2 6 8.4 8.2" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     /** Trash — clear accumulated stats. */

@@ -10,6 +10,7 @@ import { syncVolumeDial } from './volumeDial.js';
 import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
 import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
 import { navigateChannel } from '../channelNav.js';
+import { playRandomChannel } from '../randomChannel.js';
 import { ChanBindPicker } from './chanBindPicker.js';
 
 let deps = {
@@ -210,6 +211,9 @@ async function handleRemoteAction(action) {
             break;
         case 'chan-down':
             await navigateChannel(slotId, 'down');
+            break;
+        case 'random':
+            await playRandomChannel(slotId);
             break;
         case 'chan-bind-toggle':
             break;

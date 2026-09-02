@@ -554,3 +554,123 @@ test('syncSettingsToggles syncs chan-switch-mode select', async () => {
 
     assert.equal(modeSelect.value, 'safeLoading');
 });
+
+test('playChannelSafe returns true when warm-up and commit succeed', async () => {
+    const newChannel = makeChannel('SafeNew');
+    let commitCalled = false;
+    const player = {
+        switchGeneration: 0,
+        channel: makeChannel('Old'),
+        playing: true,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        startPrepareChannel: async () => {},
+        waitForPrepareReady: async () => true,
+        isPrepareReady: () => true,
+        isPrepareReadyWithFrame: () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => {},
+        emitState: () => {},
+        commitPreparedChannel: async () => {
+            commitCalled = true;
+            player.channel = newChannel;
+            player.playing = true;
+            return true;
+        },
+        mountVideo: () => {}
+    };
+    stubPlayOnSlotDeps(player);
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handlers) => {
+        await handlers.onCommit();
+    };
+
+    try {
+        const result = await MultiView.playChannelSafe('center', newChannel);
+        assert.equal(result, true);
+        assert.equal(commitCalled, true);
+        assert.equal(player.channel.name, 'SafeNew');
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
+
+test('playChannelSafe returns false and keeps current channel when warm-up fails', async () => {
+    const oldChannel = makeChannel('Old');
+    let abortCalled = false;
+    let playChannelCalled = false;
+    const player = {
+        switchGeneration: 0,
+        channel: oldChannel,
+        playing: true,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        startPrepareChannel: async () => {},
+        waitForPrepareReady: async () => false,
+        isPrepareReady: () => false,
+        isPrepareReadyWithFrame: () => false,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => { abortCalled = true; },
+        playChannel: async () => { playChannelCalled = true; },
+        emitState: () => {},
+        mountVideo: () => {}
+    };
+    stubPlayOnSlotDeps(player);
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async () => {
+        throw new Error('transition should not be called');
+    };
+
+    try {
+        const result = await MultiView.playChannelSafe('center', makeChannel('Dead'));
+        assert.equal(result, false);
+        assert.equal(abortCalled, true);
+        assert.equal(playChannelCalled, false);
+        assert.equal(player.channel.name, 'Old');
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
+
+test('playChannelSafe cold start plays channel directly and returns playing state', async () => {
+    const newChannel = makeChannel('Cold');
+    let playChannelCalled = false;
+    const player = {
+        switchGeneration: 0,
+        channel: null,
+        playing: false,
+        loading: false,
+        pausePhase: 'idle',
+        _suppressErrorToast: false,
+        startPrepareChannel: async () => {},
+        waitForPrepareReady: async () => true,
+        cancelPrepare: () => {},
+        _abortSwitchIntent: () => {},
+        emitState: () => {},
+        playChannel: async (ch) => {
+            playChannelCalled = true;
+            player.channel = ch;
+            player.playing = true;
+        },
+        mountVideo: () => {}
+    };
+    stubPlayOnSlotDeps(player);
+
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (_id, handler) => {
+        await handler();
+    };
+
+    try {
+        const result = await MultiView.playChannelSafe('center', newChannel);
+        assert.equal(result, true);
+        assert.equal(playChannelCalled, true);
+        assert.equal(player.channel.name, 'Cold');
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+    }
+});
