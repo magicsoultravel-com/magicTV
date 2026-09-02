@@ -161,7 +161,7 @@ function edgeInsetLeft(side, width) {
 function syncDockSideBtn() {
     const btn = el('remote-dock-side-btn');
     if (!btn) return;
-    if (!btn.innerHTML) btn.innerHTML = ACTION_ICONS.dockSide;
+    btn.innerHTML = ACTION_ICONS.dockSide;
     const toRight = dockSide !== 'right';
     const label = toRight ? 'Move to right' : 'Move to left';
     btn.title = label;
@@ -826,7 +826,7 @@ function bindOnce() {
     dockSheetEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
     dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
 
-    el('remote-module-close')?.addEventListener('click', () => RemoteModule.close());
+    el('remote-collapse-header-btn')?.addEventListener('click', () => RemoteModule.hide());
     el('remote-dock-side-btn')?.addEventListener('click', () => toggleDockSide());
     bindLayoutToggleButtons();
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
@@ -951,6 +951,7 @@ export const RemoteModule = {
         applyOpacity();
         updateBodyClasses();
         ensureShellsJoinedInRoot();
+        syncDockSideBtn();
     },
 
     getMode() {
@@ -995,7 +996,7 @@ export const RemoteModule = {
                 mountToActiveHost();
                 applyOpacity();
                 if (focusClose) {
-                    queueMicrotask(() => el('remote-module-close')?.focus());
+                    queueMicrotask(() => el('remote-collapse-header-btn')?.focus());
                 }
             } else {
                 showUndockedUI(false);

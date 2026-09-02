@@ -22,7 +22,7 @@
 .remote-dock-tab {
     position: fixed;
     left: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-left, 0px));
-    bottom: max(var(--remote-edge-inset, 1.5rem), env(safe-area-inset-bottom, 0px));
+    bottom: 0;
     z-index: 8501;
     display: flex;
     align-items: center;
@@ -223,13 +223,13 @@ body.remote-dock-side-right .remote-dock-sheet {
 }
 
 #remote-module-pin,
-#remote-module-close,
+#remote-collapse-header-btn,
 #remote-dock-side-btn {
     display: none;
 }
 
-.remote-module__host #remote-module-close,
-.remote-dock-sheet__inner #remote-module-close,
+.remote-module__host #remote-collapse-header-btn,
+.remote-dock-sheet__inner #remote-collapse-header-btn,
 .remote-module__host #remote-dock-side-btn,
 .remote-dock-sheet__inner #remote-dock-side-btn {
     display: flex;
@@ -623,8 +623,8 @@ body.browser-shell-split #remote-shell {
 .remote-dock-sheet__inner > .tv-module__actions--remote-end {
     position: absolute;
     top: 0.35rem;
-    left: var(--tv-spacing-sm, 0.5rem);
-    right: auto;
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
     z-index: 6;
     pointer-events: auto;
     display: flex;
@@ -1201,12 +1201,10 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
 }
 
 /* Hide/collapse chevron: point down when module is open, up when folded to tab */
-#remote-collapse-btn svg,
 #browser-hide-toggle svg {
     transition: transform 0.2s ease;
 }
 
-#remote-collapse-btn.is-module-unhidden svg,
 #browser-hide-toggle.is-module-unhidden svg {
     transform: rotate(180deg);
 }

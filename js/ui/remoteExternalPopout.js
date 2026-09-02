@@ -25,7 +25,7 @@ const EXTERNAL_HOST_ID = 'remote-external-host';
  *   popDoc: Document,
  *   host: HTMLElement,
  *   onKey?: (e: KeyboardEvent) => void,
- *   closeWire?: { onCloseClick: (e: Event) => void, prevTitle: string, prevLabel: string | null }
+ *   closeWire?: { onCloseClick: (e: Event) => void, prevTitle: string, prevLabel: string | null, prevInnerHTML: string }
  * } | null} */
 let entry = null;
 
@@ -128,22 +128,24 @@ async function openPopoutWindow() {
 }
 
 function wirePopoutChrome(popDoc) {
-    const closeBtn = popDoc.getElementById('remote-module-close');
-    if (!closeBtn) return null;
+    const collapseBtn = popDoc.getElementById('remote-collapse-header-btn');
+    if (!collapseBtn) return null;
 
-    const prevTitle = closeBtn.title;
-    const prevLabel = closeBtn.getAttribute('aria-label');
-    closeBtn.title = 'Pop in remote';
-    closeBtn.setAttribute('aria-label', 'Pop in remote');
+    const prevTitle = collapseBtn.title;
+    const prevLabel = collapseBtn.getAttribute('aria-label');
+    const prevInnerHTML = collapseBtn.innerHTML;
+    collapseBtn.innerHTML = CARD_ICONS.popin;
+    collapseBtn.title = 'Pop in remote';
+    collapseBtn.setAttribute('aria-label', 'Pop in remote');
 
     const onCloseClick = (e) => {
         e.preventDefault();
         e.stopImmediatePropagation();
         RemoteExternalPopout.popIn();
     };
-    closeBtn.addEventListener('click', onCloseClick, true);
+    collapseBtn.addEventListener('click', onCloseClick, true);
 
-    return { onCloseClick, prevTitle, prevLabel };
+    return { onCloseClick, prevTitle, prevLabel, prevInnerHTML };
 }
 
 function updateBodyClasses() {
@@ -243,11 +245,12 @@ function popIn() {
 
     if (onKey && popDoc) popDoc.removeEventListener('keydown', onKey);
 
-    const closeBtn = popDoc?.getElementById('remote-module-close');
-    if (closeBtn && closeWire?.onCloseClick) {
-        closeBtn.removeEventListener('click', closeWire.onCloseClick, true);
-        closeBtn.title = closeWire.prevTitle || 'Close';
-        closeBtn.setAttribute('aria-label', closeWire.prevLabel || 'Close');
+    const collapseBtn = popDoc?.getElementById('remote-collapse-header-btn');
+    if (collapseBtn && closeWire?.onCloseClick) {
+        collapseBtn.removeEventListener('click', closeWire.onCloseClick, true);
+        collapseBtn.innerHTML = closeWire.prevInnerHTML || '';
+        collapseBtn.title = closeWire.prevTitle || 'Collapse remote';
+        collapseBtn.setAttribute('aria-label', closeWire.prevLabel || 'Collapse remote');
     }
 
     RemoteModule.returnFromExternal();

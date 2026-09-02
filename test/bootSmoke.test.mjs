@@ -22,7 +22,7 @@ const KNOWN_IDS = [
     'remote-shell-screens-footer', 'remote-panel-nav-group', 'browser-panel-nav-group', 'remote-panel-footer-nav-row',
     'remote-guide-toggle',
     'remote-external-popout-btn', 'remote-split-browser-btn', 'browser-split-browser-btn', 'browser-external-popout-btn',
-    'remote-module-pin', 'remote-module-close', 'remote-back-btn',
+    'remote-module-pin', 'remote-collapse-header-btn', 'remote-back-btn',
     'player-tile-topLeft', 'player-tile-center', 'player-tile-topRight',
     'player-tile-bottomLeft', 'player-tile-bottomRight', 'player-tile-bottomCenter',
     'tv-playback-surface-topLeft', 'tv-playback-surface-center', 'tv-playback-surface-topRight',

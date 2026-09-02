@@ -220,11 +220,6 @@ async function handleRemoteAction(action) {
             else mod.undock?.();
             break;
         }
-        case 'collapse-toggle': {
-            const mod = deps.getRemoteModule?.();
-            mod?.hide?.() ?? mod?.close?.();
-            break;
-        }
         case 'guide-toggle': {
             GuidePanel.toggle();
             break;
@@ -351,15 +346,6 @@ export function syncRemotePanel() {
         dockBtn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
         dockBtn.title = undocked ? 'Dock remote' : 'Undock remote';
         dockBtn.setAttribute('aria-label', dockBtn.title);
-    }
-
-    const collapseBtn = el('remote-collapse-btn');
-    if (collapseBtn && mod) {
-        collapseBtn.innerHTML = ACTION_ICONS.collapse;
-        const unhidden = mod.getMode?.() !== 'hidden';
-        collapseBtn.classList.toggle('is-module-unhidden', unhidden);
-        collapseBtn.title = unhidden ? 'Hide remote' : 'Show remote';
-        collapseBtn.setAttribute('aria-label', collapseBtn.title);
     }
 
     const guideBtn = el('remote-guide-toggle');
