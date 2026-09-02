@@ -185,10 +185,11 @@ test('safe loading does not assign player.channel before commit', async () => {
     }
 });
 
-test('safe loading aborts without transition when prepare is not ready', async () => {
+test('safe loading warm failure falls through to playChannel via transition', async () => {
     let aborted = false;
     let transitionCalled = false;
     let cancelCalled = false;
+    let playedChannel = null;
     const oldChannel = makeChannel('Old');
     const player = {
         switchGeneration: 0,
@@ -202,6 +203,7 @@ test('safe loading aborts without transition when prepare is not ready', async (
         isPrepareReadyWithFrame: () => false,
         cancelPrepare: () => { cancelCalled = true; },
         _abortSwitchIntent: () => { aborted = true; },
+        playChannel: async (ch) => { playedChannel = ch; },
         emitState: () => {},
         commitPreparedChannel: async () => {
             throw new Error('commit should not run');
@@ -210,8 +212,9 @@ test('safe loading aborts without transition when prepare is not ready', async (
     stubPlayOnSlotDeps(player);
 
     const origTransition = MultiView.withChannelSwitchTransition;
-    MultiView.withChannelSwitchTransition = async () => {
+    MultiView.withChannelSwitchTransition = async (_slotId, handlers) => {
         transitionCalled = true;
+        await handlers();
     };
 
     try {
@@ -223,10 +226,12 @@ test('safe loading aborts without transition when prepare is not ready', async (
             'test:Dead'
         );
 
-        assert.equal(transitionCalled, false);
+        // Warm failed → the favorite still starts via a normal attach (never
+        // leaves the user stuck on the old channel with only a toast).
+        assert.equal(transitionCalled, true);
         assert.equal(cancelCalled, true);
         assert.equal(aborted, true);
-        assert.equal(player.channel, oldChannel);
+        assert.equal(playedChannel?.name, 'Dead');
     } finally {
         MultiView.withChannelSwitchTransition = origTransition;
     }

@@ -21,6 +21,11 @@ import {
     shouldRetryPlayMuted,
     isHealthyWatchPlayback,
     shouldClearStaleBufferOnTimeupdate,
+    shouldFreshResume,
+    shouldRecoverStuckLoad,
+    STALLED_PAUSE_RESTART_MS,
+    STALLED_PAUSE_BEHIND_MS,
+    STUCK_LOAD_RECOVERY_MS,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -503,5 +508,104 @@ test('shouldClearStaleBufferOnTimeupdate recovers sticky hitch flags', () => {
         videoPaused: true,
         loading: true,
         loadPhase: 'buffering'
+    }), false);
+});
+
+test('shouldFreshResume keeps short pauses and cold-stale detection', () => {
+    const now = 100_000;
+    // No URL → fresh attach always (visible feedback, never silent dead click).
+    assert.equal(shouldFreshResume({ channelUrl: '' }), true);
+    // Non-live (VOD-ish) never fresh-restarts.
+    assert.equal(shouldFreshResume({
+        channelUrl: 'https://x/live.m3u8',
+        isLive: false,
+        pausedAt: now - 120_000,
+        behindLive: 99_999,
+        now
+    }), false);
+    // No known pause window → resume in place.
+    assert.equal(shouldFreshResume({
+        channelUrl: 'https://x/live.m3u8',
+        isLive: true,
+        pausedAt: 0,
+        behindLive: 99_999,
+        now
+    }), false);
+    // Short pause, even slightly behind live → keep parked-buffer resume.
+    assert.equal(shouldFreshResume({
+        channelUrl: 'https://x/live.m3u8',
+        isLive: true,
+        pausedAt: now - 5_000,
+        behindLive: 40_000,
+        now
+    }), false);
+    // Long pause + live wandered far → fresh attach at the live edge.
+    assert.equal(shouldFreshResume({
+        channelUrl: 'https://x/live.m3u8',
+        isLive: true,
+        pausedAt: now - STALLED_PAUSE_RESTART_MS - 1,
+        behindLive: STALLED_PAUSE_BEHIND_MS + 1,
+        now
+    }), true);
+    // Long pause but latency still small (browser held) → keep parked resume.
+    assert.equal(shouldFreshResume({
+        channelUrl: 'https://x/live.m3u8',
+        isLive: true,
+        pausedAt: now - STALLED_PAUSE_RESTART_MS - 1,
+        behindLive: 2_000,
+        now
+    }), false);
+});
+
+test('shouldRecoverStuckLoad only fires on a stalled in-flight load', () => {
+    const now = 50_000;
+    const stalled = { now, lastProgressAt: now - STUCK_LOAD_RECOVERY_MS - 1 };
+    // Stuck loading with play intent → recover.
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: true,
+        playing: false,
+        loading: true,
+        loadPhase: 'buffering',
+        ...stalled
+    }), true);
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: true,
+        playing: false,
+        loading: false,
+        loadPhase: 'connecting',
+        ...stalled
+    }), true);
+    // No progress marker → do not invent a recovery.
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: true,
+        playing: false,
+        loading: true,
+        loadPhase: 'buffering',
+        lastProgressAt: 0,
+        now
+    }), false);
+    // Actually playing/paused → never recover.
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: true,
+        playing: true,
+        loading: false,
+        loadPhase: 'idle',
+        ...stalled
+    }), false);
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: false,
+        playing: false,
+        loading: true,
+        loadPhase: 'buffering',
+        ...stalled
+    }), false);
+    // Not stalled yet → wait for the recovery window.
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: true,
+        playing: false,
+        loading: true,
+        loadPhase: 'buffering',
+        now,
+        lastProgressAt: now - STUCK_LOAD_RECOVERY_MS + 1000
     }), false);
 });

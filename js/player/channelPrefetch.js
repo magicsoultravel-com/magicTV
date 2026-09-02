@@ -4,6 +4,7 @@
 import { channelKey } from '../tvProviders/channelShape.js';
 import { resolveAdjacentChannel } from '../channelNav.js';
 import { ChannelPreloader } from './channelPreloader.js';
+import { shouldAllowPrefetch } from './loadBudget.js';
 
 /** @typedef {{ preloader: ChannelPreloader, video: HTMLVideoElement, channel: object, key: string }} PrefetchEntry */
 
@@ -14,8 +15,6 @@ const slotCache = new Map();
 const slotGeneration = new Map();
 
 const MAX_WARM_PER_SLOT = 2;
-/** Global cap on offscreen prefetch <video> elements (all slots). */
-const MAX_CONCURRENT_PREFETCH_VIDEOS = 6;
 
 function countPrefetchVideos() {
     let n = 0;
@@ -151,7 +150,12 @@ export async function refreshSlotPrefetch(slotId, player) {
 
     for (const { key, channel } of targets) {
         if (isStale()) return;
-        if (countPrefetchVideos() >= MAX_CONCURRENT_PREFETCH_VIDEOS) break;
+        // Never warm adjacent channels while any slot is loading/buffering or
+        // the tab is hidden — prefetch must yield to active playback.
+        if (!shouldAllowPrefetch({
+            count: countPrefetchVideos(),
+            hidden: typeof document !== 'undefined' && document.visibilityState === 'hidden'
+        })) break;
         if (map.has(key) && map.get(key)?.preloader?.isReady()) continue;
 
         if (map.has(key)) {

@@ -55,8 +55,14 @@ import {
     isAutoplayNotAllowedError,
     shouldRetryPlayMuted,
     isHealthyWatchPlayback,
-    shouldClearStaleBufferOnTimeupdate
+    shouldClearStaleBufferOnTimeupdate,
+    shouldFreshResume,
+    shouldRecoverStuckLoad
 } from './pauseBuffer.js';
+import {
+    takePausedFillTurn,
+    releasePausedFill
+} from './loadBudget.js';
 import { tvDebug } from './tvDebug.js';
 
 /** Max wall-clock seconds credited in a single flush (guards hidden-tab / stuck windows). */
@@ -199,6 +205,10 @@ export function createPlayerInstance(options) {
         /** Bumped on every transport action; stale play() results ignore older gens. */
         transportGen: 0,
         _parkRaf: 0,
+        /** Timestamp when the current pause began (0 = never paused this session). */
+        _enterPauseAt: 0,
+        /** True while this slot owns the lone paused-fill backfill turn. */
+        _pausedFillArmed: false,
 
         pausePhase: 'idle',
         /** True only after an explicit stop(); cleared on play/pause/load. */
@@ -1016,6 +1026,9 @@ export function createPlayerInstance(options) {
             this.playing = true;
             this.wantPlaying = true;
             this.connection = 'connected';
+            this._enterPauseAt = 0;
+            this._pausedFillArmed = false;
+            releasePausedFill(this.id);
             this.emitState();
 
             if (swapCompleted) {
@@ -1173,9 +1186,21 @@ export function createPlayerInstance(options) {
             const target = this.bufferSize || DEFAULT_BUFFER_SIZE;
             if (info.buffered >= target * 0.9) {
                 this.pausePhase = 'ready';
+                this._pausedFillArmed = false;
+                releasePausedFill(this.id);
             } else {
                 this.pausePhase = 'buffering';
-                if (this.hls) this.hls.startLoad();
+                // Only ONE paused slot backfills its buffer at a time (turn
+                // rotates via loadBudget) so paused refills cannot starve the
+                // active player's connections.
+                if (takePausedFillTurn(this.id)) {
+                    if (!this._pausedFillArmed) {
+                        if (this.hls) this.hls.startLoad();
+                        this._pausedFillArmed = true;
+                    }
+                } else {
+                    this._pausedFillArmed = false;
+                }
             }
             if (this.pausePhase !== prevPhase) {
                 this.emitState();
@@ -1250,11 +1275,26 @@ export function createPlayerInstance(options) {
         },
 
         /**
-         * Flip play/pause intent. Stuck resume (want && !playing) retries play.
+         * Flip play/pause intent. Stuck resume/load recovery is handled here:
+         * once a load intent has seen no progress, a repeated toggle restarts
+         * with a fresh attach instead of re-running play() on the dead engine.
          */
         toggle() {
             if (shouldPauseOnToggle(this.wantPlaying, this.playing)) {
                 this.pause();
+                return;
+            }
+            if (
+                shouldRecoverStuckLoad({
+                    wantPlaying: this.wantPlaying,
+                    playing: this.playing,
+                    loading: this.loading,
+                    loadPhase: this.loadPhase,
+                    lastProgressAt: this._loadLastProgressAt
+                })
+                && this.channel?.url_resolved
+            ) {
+                void this.playChannel(this.channel);
                 return;
             }
             this.resume();
@@ -1346,7 +1386,27 @@ export function createPlayerInstance(options) {
         resume() {
             this.resumeBlocked = false;
             this.stopped = false;
-            if (!this.channel?.url_resolved) return;
+
+            if (!this.channel?.url_resolved) {
+                // Never leave a silent dead click — fall through to a fresh
+                // attach so the user always sees loading/error feedback.
+                void this.playChannel(this.channel);
+                return;
+            }
+
+            const seek = this.getSeekInfo();
+            if (shouldFreshResume({
+                channelUrl: this.channel.url_resolved,
+                isLive: seek.isLive,
+                behindLive: seek.behindLive,
+                pausedAt: this._enterPauseAt
+            })) {
+                // Live wandered too far while paused — the parked buffer would
+                // spin; rejoin at the live edge with a fresh attach instead.
+                void this.playChannel(this.channel);
+                return;
+            }
+
             if (!(this.video?.src || this.hls)) {
                 void this.playChannel(this.channel);
                 return;
@@ -1406,6 +1466,8 @@ export function createPlayerInstance(options) {
         pause() {
             this._clearStuckLoadWatchdog();
             const gen = this.beginTransport(false);
+            this._enterPauseAt = Date.now();
+            this._pausedFillArmed = false;
             this.switchGeneration += 1;
             this.prepareGeneration += 1;
             this._preloader?.cancel();
@@ -1517,6 +1579,10 @@ export function createPlayerInstance(options) {
             this._loadLastProgressAt = Date.now();
             const transportAtStart = this.beginTransport(true);
             this.setPauseLiveSync(false);
+            // A fresh play supersedes any paused-buffer backfill turn.
+            this._enterPauseAt = 0;
+            this._pausedFillArmed = false;
+            releasePausedFill(this.id);
             // Every intentional PLAY arms a fresh channel-tile snap (even same URL).
             TileFrames.armLiveSnap(channel.url_resolved || '');
             this._armStuckLoadWatchdog();
@@ -1621,88 +1687,6 @@ export function createPlayerInstance(options) {
             }
         },
 
-        /**
-         * Resolve + attach a channel but leave the video paused (mosaic restore).
-         * Uses an existing PosterCache / posterDataUrl freeze-frame when present;
-         * does not invent frames via muted play→snap.
-         */
-        async loadChannelPaused(channelOrKey) {
-            this.init();
-            const generation = ++this.playGeneration;
-            let channel = typeof channelOrKey === 'object' && channelOrKey !== null
-                ? channelOrKey
-                : null;
-
-            if (!channel && typeof channelOrKey === 'string') {
-                const parsed = parseChannelKey(channelOrKey);
-                channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation !== this.playGeneration) return;
-            }
-
-            if (channel && !channel.url_resolved) {
-                const parsed = parseChannelKey(channelKey(channel));
-                channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation !== this.playGeneration) return;
-            }
-
-            const key = channelKey(channel);
-            if (!key || !channel) return;
-
-            this.loading = true;
-            this.loadPhase = 'connecting';
-            this.error = null;
-            this.resumeBlocked = false;
-            this.stopped = false;
-            this._armStuckLoadWatchdog();
-            this.emitState();
-
-            const desiredMuted = this.muted;
-            const prevPoster = this.posterDataUrl;
-
-            try {
-                if (!channel.url_resolved) {
-                    throw new Error('No stream URL');
-                }
-
-                this.channel = normalizeChannel(channel, channel.providerId) || channel;
-                // Keep last poster until real playback clears it.
-                await this.attachStream(channel.url_resolved, generation);
-                if (generation !== this.playGeneration) return;
-
-                this.posterDataUrl = prevPoster || this.posterDataUrl;
-                this.playing = false;
-                this.loading = false;
-                this.loadPhase = 'idle';
-                this.stopped = false;
-                this.beginTransport(false);
-                this.pausePhase = 'pausing';
-                this.setPauseLiveSync(true);
-                this.muted = desiredMuted;
-                this.applyAudioToVideo();
-                try { this.video?.pause(); } catch { /* ignore */ }
-                this.parkBehindBuffer();
-                if (this.posterDataUrl) {
-                    if (this.hls) this.hls.startLoad();
-                    this.emitState();
-                    this.updatePauseBuffer();
-                } else {
-                    this.pausePhase = 'ready';
-                    this.emitState();
-                }
-            } catch (e) {
-                if (generation !== this.playGeneration) return;
-                this.loading = false;
-                this.loadPhase = 'idle';
-                this.playing = false;
-                this.error = 'Stream unavailable';
-                this.channel = normalizeChannel(channel, channel.providerId) || channel;
-                this.posterDataUrl = this.posterDataUrl || prevPoster;
-                this.muted = desiredMuted;
-                this.applyAudioToVideo();
-                this.emitState();
-            }
-        },
-
         async stop({ clearChannel = false } = {}) {
             this._clearStuckLoadWatchdog();
             this.playGeneration += 1;
@@ -1742,6 +1726,9 @@ export function createPlayerInstance(options) {
             this.pausePhase = 'idle';
             this.stopped = true;
             this.posterDataUrl = null;
+            this._enterPauseAt = 0;
+            this._pausedFillArmed = false;
+            releasePausedFill(this.id);
             this.qualityMode = 'auto';
             this.qualityLevel = -1;
             this.qualityLabel = '—';

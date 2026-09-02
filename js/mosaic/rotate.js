@@ -20,6 +20,7 @@ import {
     captureSwapPlaybackState,
     applySwapPlaybackContinuity
 } from './swapPlayback.js';
+import { cancelSlotPrefetch } from '../player/channelPrefetch.js';
 
 /** Travel animation timing (matches the slide-mode easing language). */
 const ROTATE_TRAVEL_MS = 480;
@@ -197,6 +198,12 @@ export const rotateMethods = {
             if (key) this.rememberedSlotKeys[id] = key;
             else delete this.rememberedSlotKeys[id];
         });
+
+        // Move each moved player's <video> into its new slot surface BEFORE
+        // remount so mountAll's _syncVideoMount never destroys another
+        // player's stream still sitting in the pre-rotation surface.
+        ring.forEach((id) => cancelSlotPrefetch(id));
+        this.relocateOwnedSlotVideos?.();
 
         this.mountAll();
 

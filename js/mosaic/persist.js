@@ -208,26 +208,27 @@ export const persistMethods = {
                 const surface = el(`tv-playback-surface-${id}`);
                 if (surface) player.mountVideo(surface);
 
+                // Reload restore = STOPPED slate (same contract as stubs):
+                // no stream is attached, nothing buffers, and ▶ starts a fresh
+                // live attach. This avoids the old attach-then-pause path whose
+                // stale buffer spun on resume and delayed boot on stream waits.
+                player.stopped = true;
+                player.wantPlaying = false;
+                player.playing = false;
+                player.pausePhase = 'idle';
+                player.loading = false;
+                player.loadPhase = 'idle';
+                player.error = null;
+                this.rememberedSlotKeys[id] = entry.key;
+
                 const channel = await resolveEntry(entry);
                 if (!channel) {
                     player.channel = stubChannelFromEntry(entry);
                     player.emitState();
                     return;
                 }
-
-                if (!channel.url_resolved) {
-                    player.channel = channel;
-                    player.emitState();
-                    return;
-                }
-
-                this.rememberedSlotKeys[id] = entry.key;
-
-                await player.loadChannelPaused(channel);
-                player.muted = desiredMuted;
-                player.volume = slotVol;
-                if (slotVol > 0) player.lastVolume = slotVol;
-                player.applyAudioToVideo();
+                player.channel = channel;
+                player.emitState();
             };
 
             await Promise.all(SLOT_IDS.map((id) => restoreOne(id)));
@@ -237,6 +238,12 @@ export const persistMethods = {
             this.refreshTiles();
             this.getPrimary()?.emitState();
             this.persistSlots();
+            // Paint cached freeze-frames over the stopped tiles (same as stubs)
+            // so a restored slot shows its poster instead of a black box.
+            fetchStoredFramesForMosaic(mosaic, this.slots).then((cached) => {
+                const painted = applyStoredFramesToSlots(this.slots, cached);
+                if (painted) this.scheduleRefreshTiles();
+            }).catch(() => {});
             if (this.hasCustomPlacement()) {
                 requestAnimationFrame(() => this.applyFreeLayout());
             }

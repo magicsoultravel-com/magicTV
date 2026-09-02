@@ -376,15 +376,18 @@ function bindIdleActivity() {
 function playIntoTarget(channel) {
     const slotId = MultiView.statusSlotId || targetSlotId || 'center';
     TileFrames.setPlaybackBusy(true);
-    MultiView.playOnSlot(slotId, channel).catch((e) => {
-        const blocked = e?.name === 'NotAllowedError'
-            || String(e?.message || '').toLowerCase().includes('not allowed');
-        if (!blocked) showAppToast('Stream unavailable');
-        const player = slotId === 'center'
-            ? MultiView.getPrimary?.()
-            : MultiView.ensurePlayer?.(slotId);
-        if (!player?.playing) TileFrames.setPlaybackBusy(false);
-    });
+    MultiView.playOnSlot(slotId, channel)
+        .catch((e) => {
+            const blocked = e?.name === 'NotAllowedError'
+                || String(e?.message || '').toLowerCase().includes('not allowed');
+            if (!blocked) showAppToast('Stream unavailable');
+        })
+        .finally(() => {
+            const player = slotId === 'center'
+                ? MultiView.getPrimary?.()
+                : MultiView.ensurePlayer?.(slotId);
+            if (!player?.playing) TileFrames.setPlaybackBusy(false);
+        });
 }
 
 function getInPageHost() {

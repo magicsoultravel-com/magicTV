@@ -1,4 +1,5 @@
 import { canPlayNativeHls, isHlsUrl, loadHlsLibrary } from '../tvHls.js';
+import { shouldRestartHlsOnError } from './loadBudget.js';
 
 export const HLS_MAX_BUFFER_BYTES = 20 * 1024 * 1024;
 export const HLS_MAX_BITRATE = 5_000_000;
@@ -183,7 +184,12 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
         if (!ctx.hls) return;
         if (data.type === hls.constructor?.ErrorTypes?.NETWORK_ERROR
             || data.type === 'networkError') {
-            ctx.hls.startLoad();
+            // Throttle auto-restarts so a flapping stream cannot hammer the
+            // connection pool and starve sibling slots.
+            if (shouldRestartHlsOnError({ lastRestartedAt: ctx._lastHlsNetworkRestartAt })) {
+                ctx._lastHlsNetworkRestartAt = Date.now();
+                ctx.hls.startLoad();
+            }
         } else if (data.type === hls.constructor?.ErrorTypes?.MEDIA_ERROR
             || data.type === 'mediaError') {
             ctx.hls.recoverMediaError();

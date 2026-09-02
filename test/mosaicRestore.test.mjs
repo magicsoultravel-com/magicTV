@@ -151,3 +151,93 @@ test('applySavedSlotStubs does not run during deferred init', async () => {
         MultiView.applySavedSlotStubs = orig;
     }
 });
+test('restoreSlots restores saved slots as STOPPED (no stream attach)', async () => {
+    savePlayerState({
+        mosaicSlots: {
+            center: { key: 'iptv-org:Test', name: 'Test', muted: true, volume: 0.6 }
+        }
+    });
+
+    const emitted = [];
+    const makePlayer = (id) => ({
+        id,
+        video: null,
+        videoBack: null,
+        videoHolder: null,
+        muted: true,
+        volume: 1,
+        lastVolume: 1,
+        channel: null,
+        stopped: false,
+        wantPlaying: false,
+        playing: false,
+        pausePhase: 'idle',
+        loading: false,
+        loadPhase: 'idle',
+        error: null,
+        applyAudioToVideo() {},
+        mountVideo() {},
+        emitState() { emitted.push(id); }
+    });
+    const centerPlayer = makePlayer('center');
+
+    const ctx = {
+        slots: {
+            topLeft: { id: 'topLeft', enabled: false, player: null },
+            center: { id: 'center', enabled: true, player: centerPlayer },
+            topRight: { id: 'topRight', enabled: false, player: null },
+            bottomLeft: { id: 'bottomLeft', enabled: false, player: null },
+            bottomRight: { id: 'bottomRight', enabled: false, player: null },
+            bottomCenter: { id: 'bottomCenter', enabled: false, player: null }
+        },
+        slotsHydrated: false,
+        rememberedSlotKeys: {},
+        ensurePlayer: (id) => {
+            ctx.slots[id].player = ctx.slots[id].player || makePlayer(id);
+            return ctx.slots[id].player;
+        },
+        setSideEnabled() {},
+        syncLayout() {},
+        mountAll() {},
+        syncSettingsToggles() {},
+        refreshTiles() {},
+        scheduleRefreshTiles() {},
+        persistSlots() {},
+        getPrimary: () => ctx.slots.center.player,
+        hasCustomPlacement: () => false,
+        applyFreeLayout() {}
+    };
+
+    const { TvProviderRegistry } = await import('../js/tvProviders/registry.js');
+    const { persistMethods } = await import('../js/mosaic/persist.js');
+    const origGetChannel = TvProviderRegistry.getChannel;
+    TvProviderRegistry.getChannel = async () => ({
+        url_resolved: 'https://cdn.example/live.m3u8',
+        name: 'Resolved Test',
+        providerId: 'iptv-org',
+        channelId: 'Test',
+        countrycode: 'us'
+    });
+
+    try {
+        const restored = await persistMethods.restoreSlots.call(ctx);
+
+        assert.equal(restored, true);
+        assert.equal(ctx.rememberedSlotKeys.center, 'iptv-org:Test');
+        // Stopped contract: nothing attached, nothing buffering, error cleared.
+        assert.equal(centerPlayer.stopped, true);
+        assert.equal(centerPlayer.wantPlaying, false);
+        assert.equal(centerPlayer.playing, false);
+        assert.equal(centerPlayer.loading, false);
+        assert.equal(centerPlayer.loadPhase, 'idle');
+        assert.equal(centerPlayer.pausePhase, 'idle');
+        assert.equal(centerPlayer.error, null);
+        // Channel resolved on restore so ▶ has a URL to attach fresh.
+        assert.equal(centerPlayer.channel.url_resolved, 'https://cdn.example/live.m3u8');
+        assert.equal(centerPlayer.channel.name, 'Resolved Test');
+        assert.equal(emitted.includes('center'), true);
+        assert.equal(ctx.slotsHydrated, true);
+    } finally {
+        TvProviderRegistry.getChannel = origGetChannel;
+    }
+});

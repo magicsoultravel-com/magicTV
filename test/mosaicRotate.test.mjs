@@ -134,6 +134,7 @@ test('commitRotation rewires pointers, ids, stub keys and broadcasts', () => {
         mountAll() { calls.mountAll += 1; },
         persistSlots() { calls.persist += 1; },
         scheduleRefreshTiles() { calls.refresh += 1; },
+        relocateOwnedSlotVideos() { calls.relocate = (calls.relocate || 0) + 1; },
         syncScreenControls() {}
     };
 
@@ -171,6 +172,9 @@ test('commitRotation rewires pointers, ids, stub keys and broadcasts', () => {
         assert.equal(calls.mountAll, 1);
         assert.equal(calls.persist, 1);
         assert.equal(calls.refresh, 1);
+        // Phase 0: relocation pre-pass ran before the remount so _syncVideoMount
+        // never destroys the other player's lingering live video.
+        assert.equal(calls.relocate, 1);
         assert.equal(dispatched.length, 1);
         assert.equal(dispatched[0].type, 'tv:multiview_changed');
         assert.deepEqual(dispatched[0].detail, { primary: 'center', rotated: true });
@@ -187,6 +191,7 @@ test('commitRotation resumes remounted streams and refuses single-TV rings', () 
     b.playing = false;
     b.posterDataUrl = 'poster';
     const slots = makeSlots(['center', 'topLeft'], { center: a, topLeft: b });
+    let relocateCalls = 0;
 
     const ctx = {
         slots,
@@ -195,6 +200,7 @@ test('commitRotation resumes remounted streams and refuses single-TV rings', () 
             // mountVideo moves each <video>: browsers can drop play state.
             Object.values(slots).forEach((slot) => { if (slot.player) slot.player.playing = false; });
         },
+        relocateOwnedSlotVideos() { relocateCalls += 1; },
         persistSlots() {},
         scheduleRefreshTiles() {},
         syncScreenControls() {}
@@ -205,6 +211,8 @@ test('commitRotation resumes remounted streams and refuses single-TV rings', () 
     assert.equal(slots.topLeft.player, a);
     assert.equal(a.resumeCalls, 1);
     assert.equal(a.posterDataUrl, null);
+    // Phase 0: relocation pre-pass ran before remount.
+    assert.equal(relocateCalls, 1);
     // TV 2 had no stream playing — it must stay paused with its poster kept.
     assert.equal(slots.center.player, b);
     assert.equal(b.resumeCalls, 0);

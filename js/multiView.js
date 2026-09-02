@@ -19,14 +19,19 @@ import {
     VIEW_TRANSITION_LABELS
 } from './ui/viewTransitions.js';
 import { classifyTilePlayback } from './player/pauseBuffer.js';
-import { cancelSlotPrefetch } from './player/channelPrefetch.js';
+import { cancelSlotPrefetch, cancelAllPrefetch } from './player/channelPrefetch.js';
+import {
+    reportSlotLoading,
+    computeMosaicLaunchDelay
+} from './player/loadBudget.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
     MAX_MOSAIC_SLOTS,
     PLAY_FILL_ORDER,
     clearTilePlacementStyle,
-    slotIsOccupied
+    slotIsOccupied,
+    waitMs
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
 
@@ -449,7 +454,8 @@ export const MultiView = {
     },
 
     /**
-     * Boot hook: restore paused HLS on saved mosaic slots (replaces stub-only path).
+     * Boot hook: restore saved mosaic slots as stopped players (no stream
+     * attach — ▶ starts a fresh live attach on user play).
      * @returns {Promise<boolean>}
      */
     async hydrateMosaicFromSaved() {
@@ -485,7 +491,13 @@ export const MultiView = {
                 // primary HLS ticks keep mosaic buffer overlays fresh when another TV is focused.
                 return player === this.getStatusPlayer() || player === this.slots.center.player;
             },
-            onState: () => {
+            onState: (player) => {
+                reportSlotLoading(
+                    player?.id,
+                    player?.loading === true
+                    || player?.loadPhase === 'connecting'
+                    || player?.loadPhase === 'buffering'
+                );
                 this.scheduleRefreshTiles();
                 this.noteSlotPlayingForTiles(player);
             },
@@ -1196,10 +1208,17 @@ export const MultiView = {
             const bufferReady = await player.waitForPrepareReady(switchGen);
 
             if (!bufferReady) {
+                // Warm failed/stalled — never leave the user stuck on the old
+                // channel with only a toast. Fall through to a normal attach
+                // so the favorite still starts.
                 player.cancelPrepare();
                 player._abortSwitchIntent();
-                showAppToast('Could not load channel');
-                tvDebug('multiview', 'safe loading aborted — warm failed', { slot: id });
+                tvDebug('multiview', 'safe loading warm failed — fallback playChannel', { slot: id });
+                await this.withChannelSwitchTransition(
+                    id,
+                    () => player.playChannel(normalized),
+                    { skipIn: true }
+                );
                 return;
             }
 
@@ -1278,10 +1297,11 @@ export const MultiView = {
         const switchGen = player.switchGeneration;
         player._suppressErrorToast = true;
 
-        // Only bother with a background warm when there is a live picture to hold.
-        // Cold starts go straight to playChannel in the transition below.
-        if (hasVisibleContent) {
-            void player.startPrepareChannel(normalized, switchGen);
+        // Only Safe Loading benefits from a background warm (it waits for the
+        // staging buffer). Classic mode immediately falls back to playChannel,
+        // so starting a warm here would just double the HLS traffic per click.
+        if (hasVisibleContent && SettingsStore.getChanSwitchMode() === 'safeLoading') {
+            void player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
         }
 
         return this.withChannelSwitchTransition(
@@ -1386,8 +1406,8 @@ export const MultiView = {
         this.syncLayout();
         this.mountAll();
 
-        const plays = list.map((channel, i) => {
-            const slotId = PLAY_FILL_ORDER[i];
+        const plays = [];
+        const launchOne = (channel, slotId) => {
             const startMuted = slotId !== 'center';
             const player = this.ensurePlayer(slotId, { startMuted });
             if (!player) return Promise.resolve();
@@ -1403,9 +1423,27 @@ export const MultiView = {
                 if (!blocked) console.warn(`playChannelsOnMosaic ${slotId} failed`, err);
                 return null;
             });
-        });
+        };
 
-        await Promise.allSettled(plays);
+        // Batch launches compete with everything else: drop prefetch, mark
+        // playback busy, and stagger the fresh attaches so up to MAX_MOSAIC_SLOTS
+        // new manifests don't all slam the connection pool at once.
+        cancelAllPrefetch();
+        TileFrames.setPlaybackBusy(true);
+
+        try {
+            for (let i = 0; i < list.length; i++) {
+                const channel = list[i];
+                const slotId = PLAY_FILL_ORDER[i];
+                plays.push(launchOne(channel, slotId));
+                if (i < list.length - 1) {
+                    await waitMs(computeMosaicLaunchDelay(1));
+                }
+            }
+            await Promise.allSettled(plays);
+        } finally {
+            if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
+        }
         this.persistSlots();
         this.syncSettingsToggles();
         this.getPrimary()?.emitState();

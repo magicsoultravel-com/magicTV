@@ -6,6 +6,13 @@
 /** Seek only when headroom is below this fraction of bufferSize. */
 export const PARK_HEADROOM_RATIO = 0.9;
 
+/** Pause that lasts this long makes the parked live buffer stale. */
+export const STALLED_PAUSE_RESTART_MS = 30000;
+/** Live latency beyond this while paused declares the parked buffer roadkill. */
+export const STALLED_PAUSE_BEHIND_MS = 30000;
+/** Stuck-load recovery: no media progress for this long → fresh attach. */
+export const STUCK_LOAD_RECOVERY_MS = 5000;
+
 /**
  * Target currentTime so headroom ≈ bufferSize (park behind bufferedEnd).
  * @returns {number|null} seek target, or null if already parked / no range
@@ -148,6 +155,51 @@ export function resolveRestorePlayMute(savedMuted) {
         duringPlay: true,
         afterPlay: savedMuted !== false
     };
+}
+
+/**
+ * Resuming a live stream that sat paused long enough for the live edge to
+ * wander far past the parked buffer will spin (dead buffer, hls re-aligns at
+ * the next fragment boundary). Start a fresh attach instead.
+ */
+export function shouldFreshResume({
+    channelUrl = '',
+    isLive = true,
+    behindLive = null,
+    pausedAt = 0,
+    now = Date.now(),
+    maxStallMs = STALLED_PAUSE_RESTART_MS,
+    behindThreshold = STALLED_PAUSE_BEHIND_MS
+} = {}) {
+    if (!channelUrl) return true;
+    if (!isLive) return false;
+    if (pausedAt <= 0) return false;
+    const pausedFor = Math.max(0, now - pausedAt);
+    if (pausedFor < maxStallMs) return false;
+    return Number.isFinite(behindLive) && behindLive > behindThreshold;
+}
+
+/**
+ * A repeated toggle while a load intent is stuck (wantPlaying but no media
+ * progress for a while) must recover with a fresh attach — re-running
+ * video.play() on the same dead engine only spins.
+ */
+export function shouldRecoverStuckLoad({
+    wantPlaying = false,
+    playing = false,
+    loading = false,
+    loadPhase = 'idle',
+    lastProgressAt = 0,
+    now = Date.now(),
+    hardStallMs = STUCK_LOAD_RECOVERY_MS
+} = {}) {
+    if (wantPlaying !== true || playing === true) return false;
+    const inFlight = loading === true
+        || loadPhase === 'connecting'
+        || loadPhase === 'buffering';
+    if (!inFlight) return false;
+    if (lastProgressAt <= 0) return false;
+    return now - lastProgressAt >= hardStallMs;
 }
 
 /**

@@ -104,13 +104,16 @@ function activeChannelGrid() {
 function startPlayback(channel) {
     TileFrames.setPlaybackBusy(true);
     const slotId = MultiView.statusSlotId || 'center';
-    MultiView.playOnSlot(slotId, channel).catch((e) => {
-        const blocked = e?.name === 'NotAllowedError'
-            || String(e?.message || '').toLowerCase().includes('not allowed');
-        if (!blocked) showAppToast('Stream unavailable');
-        const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
-        if (!player?.playing) TileFrames.setPlaybackBusy(false);
-    });
+    MultiView.playOnSlot(slotId, channel)
+        .catch((e) => {
+            const blocked = e?.name === 'NotAllowedError'
+                || String(e?.message || '').toLowerCase().includes('not allowed');
+            if (!blocked) showAppToast('Stream unavailable');
+        })
+        .finally(() => {
+            const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
+            if (!player?.playing) TileFrames.setPlaybackBusy(false);
+        });
 }
 
 /**
