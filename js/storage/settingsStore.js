@@ -14,6 +14,10 @@ import {
 import { normalizeViewTransition, normalizeShutdownTransition } from '../ui/viewTransitions.js';
 import { normalizeRemoteTexture } from '../ui/remoteTextures.js';
 import {
+    normalizeRemoteButtonShape,
+    DEFAULT_REMOTE_BUTTON_SHAPE
+} from '../ui/remoteButtonShapes.js';
+import {
     DEFAULT_RECENTS_CAP,
     RECENTS_CAP_MIN,
     RECENTS_CAP_MAX,
@@ -249,6 +253,17 @@ export const SettingsStore = {
         return next;
     },
 
+    getRemoteButtonShape() {
+        const raw = readPersistedState();
+        return normalizeRemoteButtonShape(raw.remoteButtonShape);
+    },
+
+    setRemoteButtonShape(value) {
+        const next = normalizeRemoteButtonShape(value);
+        patchPersistedState({ remoteButtonShape: next });
+        return next;
+    },
+
     getCatalogLayout() {
         const raw = readPersistedState();
         return normalizeCatalogLayout(raw.catalogLayout);
@@ -324,6 +339,7 @@ export const SettingsStore = {
         const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
         const remoteIdleFadeSec = this.setRemoteIdleFadeSec(DEFAULT_REMOTE_IDLE_FADE_SEC);
         const remoteTexture = this.setRemoteTexture(DEFAULT_REMOTE_TEXTURE);
+        const remoteButtonShape = this.setRemoteButtonShape(DEFAULT_REMOTE_BUTTON_SHAPE);
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
         const activeTileStyle = this.setActiveTileStyle(DEFAULT_ACTIVE_TILE_STYLE);
         const visitedStyle = this.setVisitedStyle(DEFAULT_VISITED_STYLE);
@@ -340,6 +356,7 @@ export const SettingsStore = {
             remoteIdleDelaySec,
             remoteIdleFadeSec,
             remoteTexture,
+            remoteButtonShape,
             catalogLayout,
             activeTileStyle,
             visitedStyle,

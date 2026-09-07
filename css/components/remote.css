@@ -636,7 +636,8 @@ body.browser-shell-split #remote-shell {
 /* --- Round solid button chrome (magicTV-wide recipe; tokens in base.tv.css) ---
    ONE block for every scope (keypad, footer nav row, footer chrome, browser
    window controls): visible disc + ring at rest — the magic remote leads.
-   Raised at rest; recessed when pressed / toggled. */
+   Raised at rest; recessed when pressed / toggled.
+   Shape via data-remote-button-shape (default squircle). */
 .remote-panel__btn,
 .remote-panel__nav-btn {
     width: var(--remote-btn-size, 40px);
@@ -646,7 +647,7 @@ body.browser-shell-split #remote-shell {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 30%;
     border: 1px solid color-mix(in srgb, currentColor var(--btn-ring, 22%), transparent);
     background: color-mix(in srgb, currentColor var(--btn-tint, 10%), transparent);
     font-size: 0.85rem;
@@ -660,11 +661,72 @@ body.browser-shell-split #remote-shell {
     transition:
         background 0.15s ease,
         border-color 0.15s ease,
+        border-radius 0.15s ease,
         box-shadow 0.15s ease,
         transform 0.12s ease,
         color 0.15s ease,
         opacity 0.15s ease;
     will-change: transform;
+}
+
+[data-remote-button-shape="circle"] .remote-panel__btn,
+[data-remote-button-shape="circle"] .remote-panel__nav-btn {
+    border-radius: 50%;
+}
+
+[data-remote-button-shape="squircle"] .remote-panel__btn,
+[data-remote-button-shape="squircle"] .remote-panel__nav-btn {
+    border-radius: 30%;
+}
+
+[data-remote-button-shape="square"] .remote-panel__btn,
+[data-remote-button-shape="square"] .remote-panel__nav-btn {
+    border-radius: var(--tv-radius-sm, 6px);
+}
+
+[data-remote-button-shape="ninja"] .remote-panel__btn,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn {
+    border-radius: 30%;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+[data-remote-button-shape="ninja"] .remote-panel__btn:hover,
+[data-remote-button-shape="ninja"] .remote-panel__btn:focus-visible,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn:hover,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__btn:hover,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__btn:focus-visible,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__nav-btn:hover,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__nav-btn:focus-visible {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    transform: translateY(0);
+}
+
+[data-remote-button-shape="ninja"] .remote-panel__btn:active,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn:active,
+[data-remote-button-shape="ninja"] .remote-panel__btn.is-active,
+[data-remote-button-shape="ninja"] .remote-panel__btn.is-muted,
+[data-remote-button-shape="ninja"] .remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__btn:active,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__nav-btn:active,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__btn.is-active,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__btn.is-muted,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__nav-btn.is-active,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="ninja"] .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    transform: translateY(0);
+    opacity: 0.72;
 }
 
 .remote-panel__btn--stack {
@@ -1454,6 +1516,15 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
         inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
         inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
     transform: translateY(1px);
+}
+
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn.is-pink-active {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    transform: translateY(0);
+    opacity: 0.72;
 }
 
 /* Hide/collapse chevron on browser header — arrow down for collapse */

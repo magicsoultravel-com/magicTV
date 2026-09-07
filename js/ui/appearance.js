@@ -8,6 +8,7 @@ import { copyThemeAttributes } from './popoutWindows.js';
 import { showAppToast } from './toast.js';
 import { RemoteModule } from './remoteModule.js';
 import { REMOTE_TEXTURES } from './remoteTextures.js';
+import { REMOTE_BUTTON_SHAPES } from './remoteButtonShapes.js';
 import {
     THEME_COLOR_KEYS,
     applyFontToRoot,
@@ -306,6 +307,22 @@ export const Appearance = {
             });
         }
 
+        const remoteButtonShapeSelect = el('remote-button-shape-select');
+        if (remoteButtonShapeSelect && remoteButtonShapeSelect.dataset.bound !== '1') {
+            remoteButtonShapeSelect.dataset.bound = '1';
+            if (!remoteButtonShapeSelect.options?.length) {
+                remoteButtonShapeSelect.innerHTML = REMOTE_BUTTON_SHAPES
+                    .map((s) => `<option value="${s.id}">${s.label}</option>`)
+                    .join('');
+            }
+            remoteButtonShapeSelect.addEventListener('change', () => {
+                const shape = SettingsStore.setRemoteButtonShape(remoteButtonShapeSelect.value);
+                this.applyStyles();
+                const label = REMOTE_BUTTON_SHAPES.find((s) => s.id === shape)?.label || shape;
+                showAppToast(`Remote buttons: ${label}`);
+            });
+        }
+
         const activeTileSelect = el('active-tile-select');
         if (activeTileSelect && activeTileSelect.dataset.bound !== '1') {
             activeTileSelect.dataset.bound = '1';
@@ -362,6 +379,7 @@ export const Appearance = {
                     remoteIdleDelaySec,
                     remoteIdleFadeSec,
                     remoteTexture,
+                    remoteButtonShape,
                     activeTileStyle,
                     visitedStyle,
                     nonVisitedStyle,
@@ -379,6 +397,7 @@ export const Appearance = {
                     fadeSec: remoteIdleFadeSec
                 });
                 if (remoteTextureSelect) remoteTextureSelect.value = remoteTexture;
+                if (remoteButtonShapeSelect) remoteButtonShapeSelect.value = remoteButtonShape;
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
                 if (nonVisitedStyleSelect) nonVisitedStyleSelect.value = nonVisitedStyle;
@@ -454,6 +473,7 @@ export const Appearance = {
         root.style.setProperty('--tv-list-width', `${listWidth}px`);
         root.style.setProperty('--remote-module-opacity', String(remoteModuleOpacity / 100));
         root.setAttribute('data-remote-texture', SettingsStore.getRemoteTexture());
+        root.setAttribute('data-remote-button-shape', SettingsStore.getRemoteButtonShape());
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
         root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
@@ -571,6 +591,16 @@ export const Appearance = {
                     .join('');
             }
             remoteTextureSelect.value = SettingsStore.getRemoteTexture();
+        }
+
+        const remoteButtonShapeSelect = el('remote-button-shape-select');
+        if (remoteButtonShapeSelect) {
+            if (!remoteButtonShapeSelect.options?.length) {
+                remoteButtonShapeSelect.innerHTML = REMOTE_BUTTON_SHAPES
+                    .map((s) => `<option value="${s.id}">${s.label}</option>`)
+                    .join('');
+            }
+            remoteButtonShapeSelect.value = SettingsStore.getRemoteButtonShape();
         }
 
         const themeId = SettingsStore.getThemeId();
