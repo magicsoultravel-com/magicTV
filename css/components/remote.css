@@ -13,6 +13,10 @@
     );
     --guide-slide-duration: 0.55s;
     --guide-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Thin side-face extrusion (bottom-right by default; flips on dock-right) */
+    --remote-extrude: 5px;
+    --remote-extrude-face: color-mix(in srgb, var(--tv-bg-secondary, #141829) 48%, #000);
+    --remote-extrude-edge: color-mix(in srgb, var(--tv-bg-secondary, #141829) 58%, #000);
 }
 
 .remote-module-staging {
@@ -200,7 +204,11 @@ body.remote-dock-side-right .remote-dock-sheet {
     background: var(--tv-bg-secondary, #141829);
     border: 1px solid var(--tv-border, #2A2E3A);
     border-radius: 18px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+    /* Ambient drop + thin bottom-right extrusion face */
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.28),
+        var(--remote-extrude) var(--remote-extrude) 0 0 var(--remote-extrude-face),
+        calc(var(--remote-extrude) - 1px) calc(var(--remote-extrude) - 1px) 0 0 var(--remote-extrude-edge);
     overflow: hidden;
     pointer-events: auto;
     opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
@@ -209,6 +217,14 @@ body.remote-dock-side-right .remote-dock-sheet {
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
         min-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
     cursor: grab;
+}
+
+/* Dock / remote on the right — extrude bottom-left instead */
+body.remote-dock-side-right .remote-module__dialog {
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.28),
+        calc(var(--remote-extrude) * -1) var(--remote-extrude) 0 0 var(--remote-extrude-face),
+        calc((var(--remote-extrude) - 1px) * -1) calc(var(--remote-extrude) - 1px) 0 0 var(--remote-extrude-edge);
 }
 
 /* Idle fade uses opacity only — keep hosts hittable so hover can pause fade. */
@@ -619,7 +635,8 @@ body.browser-shell-split #remote-shell {
 
 /* --- Round solid button chrome (magicTV-wide recipe; tokens in base.tv.css) ---
    ONE block for every scope (keypad, footer nav row, footer chrome, browser
-   window controls): visible disc + ring at rest — the magic remote leads. */
+   window controls): visible disc + ring at rest — the magic remote leads.
+   Raised at rest; recessed when pressed / toggled. */
 .remote-panel__btn,
 .remote-panel__nav-btn {
     width: var(--remote-btn-size, 40px);
@@ -634,6 +651,20 @@ body.browser-shell-split #remote-shell {
     background: color-mix(in srgb, currentColor var(--btn-tint, 10%), transparent);
     font-size: 0.85rem;
     line-height: 1;
+    box-shadow:
+        0 3px 5px rgba(0, 0, 0, 0.45),
+        0 1px 0 color-mix(in srgb, currentColor 28%, transparent),
+        inset 0 1.5px 0 color-mix(in srgb, #fff 22%, transparent),
+        inset 0 -2.5px 4px color-mix(in srgb, #000 38%, transparent);
+    transform: translateY(0);
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.12s ease,
+        color 0.15s ease,
+        opacity 0.15s ease;
+    will-change: transform;
 }
 
 .remote-panel__btn--stack {
@@ -658,14 +689,49 @@ body.browser-shell-split #remote-shell {
     pointer-events: none;
 }
 
-/* Deliberate hover — brighten disc + ring (the keypad previously only
-   inherited a stray scale from .tv-controls__btn:hover). */
+/* Deliberate hover — brighten disc + ring; slight extra lift (no scale). */
 .remote-panel__btn:hover,
 .remote-panel__btn:focus-visible,
 .remote-panel__nav-btn:hover,
-.remote-panel__nav-btn:focus-visible {
+.remote-panel__nav-btn:focus-visible,
+.tv-controls__btn.remote-panel__btn:hover,
+.tv-controls__btn.remote-panel__btn:focus-visible,
+.tv-controls__btn.remote-panel__nav-btn:hover,
+.tv-controls__btn.remote-panel__nav-btn:focus-visible {
     background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
     border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
+    box-shadow:
+        0 4px 7px rgba(0, 0, 0, 0.48),
+        0 1px 0 color-mix(in srgb, currentColor 32%, transparent),
+        inset 0 1.5px 0 color-mix(in srgb, #fff 26%, transparent),
+        inset 0 -2.5px 4px color-mix(in srgb, #000 34%, transparent);
+    transform: translateY(0);
+}
+
+/* Recessed — native press and toggled latch (flatter, sunk into bezel). */
+.remote-panel__btn:active,
+.remote-panel__nav-btn:active,
+.remote-panel__btn.is-active,
+.remote-panel__btn.is-muted,
+.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+.remote-panel__nav-btn.is-active,
+.remote-panel__nav-btn.is-muted,
+.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+.tv-controls__btn.remote-panel__btn:active,
+.tv-controls__btn.remote-panel__nav-btn:active,
+.tv-controls__btn.remote-panel__btn.is-active,
+.tv-controls__btn.remote-panel__btn.is-muted,
+.tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+.tv-controls__btn.remote-panel__nav-btn.is-active,
+.tv-controls__btn.remote-panel__nav-btn.is-muted,
+.tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    box-shadow:
+        inset 0 3px 6px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
+        inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
+    transform: translateY(1px);
 }
 
 .remote-panel__nav-group {
@@ -1372,13 +1438,22 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
 .remote-panel__nav-btn.is-active {
     background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
-    transform: scale(var(--btn-press-scale, 1.04));
+    box-shadow:
+        inset 0 3px 6px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
+        inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
+    transform: translateY(1px);
 }
 
 .remote-panel__nav-btn.is-pink-active {
     color: var(--tv-secondary, #e879a9);
     background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    box-shadow:
+        inset 0 3px 6px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
+        inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
+    transform: translateY(1px);
 }
 
 /* Hide/collapse chevron on browser header — arrow down for collapse */
