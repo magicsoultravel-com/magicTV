@@ -1869,6 +1869,10 @@ export const MultiView = {
         if (swapSelect) {
             fillViewTransitionSelect(swapSelect, SettingsStore.getSwapTransition());
         }
+        const shutdownSelect = el('shutdown-transition-select');
+        if (shutdownSelect) {
+            fillViewTransitionSelect(shutdownSelect, SettingsStore.getShutdownTransition());
+        }
         this.syncScreenControls();
     },
 
@@ -1974,6 +1978,17 @@ export const MultiView = {
                 swapSelect.value = next;
                 const label = VIEW_TRANSITION_LABELS[next] || next;
                 showAppToast(`Channel switch: ${label}`);
+            });
+        }
+        const shutdownSelect = el('shutdown-transition-select');
+        if (shutdownSelect && shutdownSelect.dataset.bound !== '1') {
+            shutdownSelect.dataset.bound = '1';
+            fillViewTransitionSelect(shutdownSelect, SettingsStore.getShutdownTransition());
+            shutdownSelect.addEventListener('change', () => {
+                const next = SettingsStore.setShutdownTransition(shutdownSelect.value);
+                shutdownSelect.value = next;
+                const label = VIEW_TRANSITION_LABELS[next] || next;
+                showAppToast(`Shutdown: ${label}`);
             });
         }
         this.syncSettingsToggles();

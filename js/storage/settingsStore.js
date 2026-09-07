@@ -11,7 +11,7 @@ import {
     normalizeFontId,
     sanitizeThemeColors
 } from '../ui/themes.js';
-import { normalizeViewTransition } from '../ui/viewTransitions.js';
+import { normalizeViewTransition, normalizeShutdownTransition } from '../ui/viewTransitions.js';
 import { normalizeRemoteTexture } from '../ui/remoteTextures.js';
 import {
     DEFAULT_RECENTS_CAP,
@@ -28,7 +28,9 @@ import {
 export {
     VIEW_TRANSITIONS,
     DEFAULT_VIEW_TRANSITION,
-    normalizeViewTransition
+    DEFAULT_SHUTDOWN_TRANSITION,
+    normalizeViewTransition,
+    normalizeShutdownTransition
 } from '../ui/viewTransitions.js';
 
 const DEFAULT_TEXT_SIZE = 12;
@@ -424,6 +426,18 @@ export const SettingsStore = {
     setCatalogTransition(value) {
         const next = normalizeViewTransition(value);
         patchPersistedState({ catalogTransition: next });
+        return next;
+    },
+
+    getShutdownTransition() {
+        const raw = readPersistedState().shutdownTransition;
+        if (raw == null || raw === '') return normalizeShutdownTransition(undefined);
+        return normalizeShutdownTransition(raw);
+    },
+
+    setShutdownTransition(value) {
+        const next = normalizeShutdownTransition(value);
+        patchPersistedState({ shutdownTransition: next });
         return next;
     },
 

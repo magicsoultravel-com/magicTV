@@ -5,9 +5,11 @@ import { el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import {
     TILE_SWAP_DURATIONS,
+    POWER_STYLE_TRANSITIONS,
     resolveViewTransition,
     runWipeTransition
 } from '../ui/viewTransitions.js';
+import { runPowerStyleTransition } from '../ui/powerStyleTransition.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -123,6 +125,10 @@ export const swapMethods = {
             this.animateSwapWipe(sideId, mode);
             return;
         }
+        if (POWER_STYLE_TRANSITIONS.has(mode)) {
+            this.animateSwapPowerStyle(sideId, mode);
+            return;
+        }
         // fade shares tile CSS with crossfade naming when needed
         const tileMode = mode === 'fade' ? 'fade' : mode;
         if (!SWAP_DURATIONS[tileMode] && !SWAP_DURATIONS[mode]) {
@@ -183,6 +189,25 @@ export const swapMethods = {
                 scope: 'tiles',
                 fadeTargets: [centerTile, sideTile],
                 grainHosts: [centerTile, sideTile]
+            });
+        } finally {
+            this.swapBusy = false;
+        }
+    },
+
+    async animateSwapPowerStyle(sideId, mode) {
+        const centerTile = el('player-tile-center');
+        const sideTile = el(`player-tile-${sideId}`);
+        if (!centerTile || !sideTile) {
+            this.commitSwap(sideId);
+            return;
+        }
+        this.swapBusy = true;
+        try {
+            await runPowerStyleTransition(mode, {
+                phase: 'both',
+                hosts: [centerTile, sideTile],
+                onMidpoint: () => this.commitSwap(sideId)
             });
         } finally {
             this.swapBusy = false;

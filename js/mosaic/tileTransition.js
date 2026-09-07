@@ -5,9 +5,11 @@
 import { SettingsStore } from '../storage/settingsStore.js';
 import {
     TILE_SWAP_DURATIONS,
+    POWER_STYLE_TRANSITIONS,
     resolveViewTransition,
     runWipeTransition
 } from '../ui/viewTransitions.js';
+import { runPowerStyleTransition, clearPowerStyleHost } from '../ui/powerStyleTransition.js';
 import {
     prefersReducedMotion,
     waitMs,
@@ -82,6 +84,34 @@ export async function runTileContentTransition(tileEl, handlers, opts = {}) {
             return;
         }
 
+        if (POWER_STYLE_TRANSITIONS.has(mode)) {
+            const phase = skipOut && skipIn ? 'both'
+                : skipOut ? 'in'
+                    : skipIn ? 'out'
+                        : 'both';
+            if (skipOut && skipIn) {
+                await onCommit();
+                return;
+            }
+            if (phase === 'out') {
+                await runPowerStyleTransition(mode, { phase: 'out', host: tileEl });
+                await onCommit();
+                clearPowerStyleHost(tileEl);
+                return;
+            }
+            if (phase === 'in') {
+                await onCommit();
+                await runPowerStyleTransition(mode, { phase: 'in', host: tileEl });
+                return;
+            }
+            await runPowerStyleTransition(mode, {
+                phase: 'both',
+                host: tileEl,
+                onMidpoint: () => onCommit()
+            });
+            return;
+        }
+
         const tileMode = mode === 'fade' ? 'fade' : mode;
         if (!SWAP_DURATIONS[tileMode] && !SWAP_DURATIONS[mode]) {
             await onCommit();
@@ -125,6 +155,15 @@ export async function runTileContentTransition(tileEl, handlers, opts = {}) {
             scope: 'tiles',
             fadeTargets: [tileEl],
             grainHosts: [tileEl]
+        });
+        return;
+    }
+
+    if (POWER_STYLE_TRANSITIONS.has(mode)) {
+        await runPowerStyleTransition(mode, {
+            phase: 'both',
+            host: tileEl,
+            onMidpoint: () => onMidpoint?.()
         });
         return;
     }

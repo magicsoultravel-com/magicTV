@@ -20,6 +20,9 @@ export const VIEW_TRANSITIONS = [
     'slideright',
     'spiralin',
     'spiralout',
+    'classical',
+    't800',
+    't1000',
     'random'
 ];
 
@@ -39,10 +42,17 @@ export const VIEW_TRANSITION_LABELS = {
     slideright: 'Slide Right',
     spiralin: 'Spiral In',
     spiralout: 'Spiral Out',
+    classical: 'Classical',
+    t800: 'T-800',
+    t1000: 'T-1000',
     random: 'Random'
 };
 
 export const DEFAULT_VIEW_TRANSITION = 'random';
+export const DEFAULT_SHUTDOWN_TRANSITION = 'classical';
+
+/** Modes that use CRT / T2 power-style out→in choreography. */
+export const POWER_STYLE_TRANSITIONS = new Set(['classical', 't800', 't1000']);
 
 /** Concrete effects used by Random (visible modes only — no instant/random). */
 export const VIEW_TRANSITION_POOL = VIEW_TRANSITIONS.filter(
@@ -65,7 +75,19 @@ export const VIEW_MOTION = {
     slideleft: { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
     slideright: { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
     spiralin: { duration: 700, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' },
-    spiralout: { duration: 700, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' }
+    spiralout: { duration: 700, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' },
+    classical: { duration: 900, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+    t800: { duration: 1200, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    t1000: { duration: 1100, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+};
+
+/** Power-off out-only timings (same shapes, longer so the effect reads). */
+export const SHUTDOWN_MOTION = {
+    classical: { duration: 2800, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+    t800: { duration: 3600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    t1000: { duration: 3400, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    instant: { duration: 0, easing: 'linear' },
+    fade: { duration: 480, easing: 'ease' }
 };
 
 /** Half-phase durations for mosaic tile CSS swap animations. */
@@ -97,7 +119,14 @@ function shuffleInPlace(list) {
 }
 
 export function normalizeViewTransition(value) {
+    // Legacy combined Terminator mode → T-800 red vision.
+    if (value === 'terminator') return 't800';
     return VIEW_TRANSITIONS.includes(value) ? value : DEFAULT_VIEW_TRANSITION;
+}
+
+export function normalizeShutdownTransition(value) {
+    if (value === 'terminator') return 't800';
+    return VIEW_TRANSITIONS.includes(value) ? value : DEFAULT_SHUTDOWN_TRANSITION;
 }
 
 /**
@@ -274,6 +303,16 @@ function clearCatalogSurfaceStyles(surface, perspectiveParent) {
 export async function runCatalogPanelTransition(surface, mode, mutate) {
     if (!surface || typeof surface.animate !== 'function') {
         mutate?.();
+        return;
+    }
+
+    if (POWER_STYLE_TRANSITIONS.has(mode)) {
+        const { runPowerStyleTransition } = await import('./powerStyleTransition.js');
+        await runPowerStyleTransition(mode, {
+            phase: 'both',
+            host: surface,
+            onMidpoint: () => mutate?.()
+        });
         return;
     }
 

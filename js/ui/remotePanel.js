@@ -10,6 +10,14 @@ import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
 import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
 import { navigateChannel, navigateToChannelNumber } from '../channelNav.js';
 import { ChanBindPicker } from './chanBindPicker.js';
+import { SettingsStore } from '../storage/settingsStore.js';
+import {
+    resolveViewTransition
+} from './viewTransitions.js';
+import {
+    runShutdownTransition,
+    isShutdownTransitionBusy
+} from './powerStyleTransition.js';
 
 let deps = {
     switchTab: () => {},
@@ -22,6 +30,7 @@ const DIGIT_MAX_LEN = 4;
 
 let digitBuffer = '';
 let digitTimer = null;
+let powerOffBusy = false;
 
 export function syncRemoteNav(tabName) {
     const split = isSplit();
@@ -281,7 +290,18 @@ async function handleRemoteAction(action) {
         case 'power-off': {
             // Chrome only allows window.close() for script-opened windows (e.g. remote
             // OS popout). On a normal user tab it no-ops with no prompt — so always
-            // power down playback, then close when allowed, else tell the user.
+            // play shutdown animation, power down playback, then close when allowed.
+            if (powerOffBusy || isShutdownTransitionBusy()) break;
+            powerOffBusy = true;
+            try {
+                const mode = resolveViewTransition(
+                    SettingsStore.getShutdownTransition(),
+                    'shutdown'
+                );
+                await runShutdownTransition(mode);
+            } catch {
+                /* best-effort animation */
+            }
             try {
                 await MultiView.handleTileAction('center', 'stop-all');
             } catch {

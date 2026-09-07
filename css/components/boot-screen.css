@@ -121,7 +121,7 @@ html.is-booting #toast-container {
     position: fixed;
     bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
     right: max(2rem, env(safe-area-inset-right, 0px));
-    z-index: 9999;
+    z-index: 100000;
     pointer-events: none;
 }
 

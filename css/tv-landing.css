@@ -6,6 +6,7 @@
  * @import before the last line and keep the order identical to cascade intent.
  */
 @import "./components/boot-screen.css";
+@import "./components/shutdown-screen.css";
 @import "./components/layout.css";
 @import "./components/catalog.css";
 @import "./components/mosaic.css";
