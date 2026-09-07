@@ -6,6 +6,7 @@ export const REMOTE_BUTTON_SHAPES = [
     { id: 'square', label: 'Square' },
     { id: 'triangle-up', label: 'Triangles up' },
     { id: 'triangle-down', label: 'Triangles down' },
+    { id: 'triangles-alt', label: 'Triangles alternate' },
     { id: 'hexagon', label: 'Hexagon' },
     { id: 'rhombus', label: 'Rhombus' },
     { id: 'ninja', label: 'Ninja' }
