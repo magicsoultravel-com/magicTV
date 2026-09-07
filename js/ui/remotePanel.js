@@ -1,7 +1,6 @@
 /** Remote control panel — default view inside the remote module. */
 import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
-import { TvPlayer } from '../tvPlayer.js';
 import { ACTION_ICONS, CARD_ICONS, LAYOUT_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
@@ -263,12 +262,22 @@ async function handleRemoteAction(action) {
             }
             break;
         }
-        case 'vol-up':
-            MultiView.setSharedVolume((MultiView.sharedVolume ?? TvPlayer.volume ?? 0.85) + 0.05);
+        case 'vol-up': {
+            const player = MultiView.slots?.[slotId]?.player
+                || (slotId === 'center' ? MultiView.getPrimary?.() : null);
+            if (player?.channel) {
+                MultiView.setSlotVolume(slotId, (player.volume ?? 1) + 0.05);
+            }
             break;
-        case 'vol-down':
-            MultiView.setSharedVolume((MultiView.sharedVolume ?? TvPlayer.volume ?? 0.85) - 0.05);
+        }
+        case 'vol-down': {
+            const player = MultiView.slots?.[slotId]?.player
+                || (slotId === 'center' ? MultiView.getPrimary?.() : null);
+            if (player?.channel) {
+                MultiView.setSlotVolume(slotId, (player.volume ?? 1) - 0.05);
+            }
             break;
+        }
         case 'power-off': {
             // Chrome only allows window.close() for script-opened windows (e.g. remote
             // OS popout). On a normal user tab it no-ops with no prompt — so always

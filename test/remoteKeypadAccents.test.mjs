@@ -43,9 +43,22 @@ test('remote volume is one pill-height row split into half-height TV / Master', 
     assert.match(css, /\.remote-panel__volume-split::after\s*\{[^}]*height:\s*2px/s);
 
     const splitIdx = html.indexOf('id="remote-volume-split"');
+    const mosaicIdx = html.indexOf('id="remote-panel-mosaic-group"');
+    assert.ok(mosaicIdx > 0 && splitIdx > mosaicIdx, 'volume split sits below Multi-TV mosaic group');
+
     const tvIdx = html.indexOf('id="tv-volume-dial"', splitIdx);
     const masterIdx = html.indexOf('id="volume-dial"', splitIdx);
     assert.ok(tvIdx > splitIdx && masterIdx > tvIdx, 'TV dial precedes Master dial inside split');
+});
+
+test('mute button shows stacked TV volume percentage', () => {
+    assert.match(html, /id="remote-mute-btn"[^>]*remote-panel__btn--stack/);
+    assert.match(html, /id="remote-mute-vol-pct"[^>]*remote-panel__btn-pct/);
+});
+
+test('mute-all button shows stacked master volume percentage', () => {
+    assert.match(html, /id="remote-mute-all-btn"[^>]*remote-panel__btn--stack/);
+    assert.match(html, /id="remote-mute-all-vol-pct"[^>]*remote-panel__btn-pct/);
 });
 
 test('numpad digit rows use main-1 / main-2 / main-3 accents', () => {

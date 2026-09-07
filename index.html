@@ -541,7 +541,10 @@
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--digit tv-controls__btn--main-3" id="remote-digit-8" data-remote-action="digit-8" title="8" aria-label="8">8</button></div>
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--digit tv-controls__btn--main-3" id="remote-digit-9" data-remote-action="digit-9" title="9" aria-label="9">9</button></div>
                         <div class="remote-panel__cell">
-                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn remote-panel__btn is-muted" id="remote-mute-btn" data-remote-action="mute" title="Unmute" aria-label="Unmute" aria-pressed="true"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn remote-panel__btn remote-panel__btn--stack is-muted" id="remote-mute-btn" data-remote-action="mute" title="Unmute" aria-label="Unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                <span id="remote-mute-vol-pct" class="remote-panel__btn-pct" aria-hidden="true">85</span>
+                            </button>
                         </div>
                         <!-- Row: chan-down Play 0 Stop vol-down -->
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-3" data-remote-action="chan-down" title="Channel down" aria-label="Channel down"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 4 6 8l3.5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
@@ -551,23 +554,6 @@
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn remote-panel__btn--digit tv-controls__btn--main-1" id="remote-digit-0" data-remote-action="digit-0" title="0" aria-label="0">0</button></div>
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-1" data-remote-action="stop" title="Stop" aria-label="Stop"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><rect x="2" y="2" width="8" height="8" fill="currentColor"/></svg></button></div>
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-3" data-remote-action="vol-down" title="Volume down" aria-label="Volume down"><svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
-                        <!-- Volume: one pill row, split into half-height TV / Master -->
-                        <div class="remote-panel__cell remote-panel__cell--volume">
-                            <div class="remote-panel__volume-split" id="remote-volume-split">
-                                <label class="remote-volume-bar remote-volume-bar--tv" id="tv-volume-dial" for="tv-volume-slider" aria-label="TV volume">
-                                    <span class="remote-volume-bar__fill" aria-hidden="true"></span>
-                                    <span class="remote-volume-bar__role" aria-hidden="true">TV</span>
-                                    <span class="remote-volume-bar__pct" id="tv-volume-pct" aria-hidden="true">100</span>
-                                    <input type="range" class="remote-volume-bar__input" id="tv-volume-slider" min="0" max="100" value="100" aria-label="TV volume">
-                                </label>
-                                <label class="remote-volume-bar remote-volume-bar--master" id="volume-dial" for="volume-slider" aria-label="Master volume">
-                                    <span class="remote-volume-bar__fill" aria-hidden="true"></span>
-                                    <span class="remote-volume-bar__role" aria-hidden="true">Master</span>
-                                    <span class="remote-volume-bar__pct" id="volume-pct" aria-hidden="true">85</span>
-                                    <input type="range" class="remote-volume-bar__input" id="volume-slider" min="0" max="100" value="85" aria-label="Master volume">
-                                </label>
-                            </div>
-                        </div>
                         <!-- Chrome: popout fullscreen cast shareTV shareURL -->
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-2" data-remote-action="pip" title="Pop out" aria-label="Pop out"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><rect x="1.5" y="3.2" width="6.3" height="4.8" rx="0.6" fill="none" stroke="currentColor" stroke-width="0.85"/><path d="M7 4 10.6 1.4M10.6 1.4H8.6M10.6 1.4V3.4" fill="none" stroke="currentColor" stroke-width="0.85" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
                         <div class="remote-panel__cell"><button type="button" class="tv-controls__btn remote-panel__btn tv-controls__btn--main-2" data-remote-action="fullscreen" title="Fullscreen" aria-label="Fullscreen"><svg viewBox="0 0 12 12" width="12" height="12" focusable="false" vector-effect="non-scaling-stroke"><path d="M2.4 2.4h2.8M2.4 2.4v2.8M9.6 2.4H6.8M9.6 2.4v2.8M2.4 9.6h2.8M2.4 9.6V6.8M9.6 9.6H6.8M9.6 9.6V6.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
@@ -616,7 +602,27 @@
                                 <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn" id="remote-stop-all-btn" data-remote-action="stop-all" title="Stop all" aria-label="Stop all" aria-pressed="false"><svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="M6 2H1L4.8 6 1 10H6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="7.4" y="3.8" width="4.4" height="4.4" fill="currentColor"/></svg></button>
                             </div>
                             <div class="remote-panel__cell">
-                                <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn" id="remote-mute-all-btn" data-remote-action="mute-all" title="Mute all" aria-label="Mute all"><svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-mute-all-sigma" d="M6 2H1L4.8 6 1 10H6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 4.2H9.8l3.2-3.2v9.8l-3.2-3.2H7.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M12.4 5.1c.55.55.55 1.7 0 2.25M13.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="6.4" y1="1.3" x2="16.2" y2="10.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0"/></svg></button>
+                                <button type="button" class="tv-controls__btn tv-controls__btn--main-1 remote-panel__btn remote-panel__btn--stack" id="remote-mute-all-btn" data-remote-action="mute-all" title="Mute all" aria-label="Mute all">
+                                    <svg viewBox="0 0 18 12" width="18" height="12" focusable="false" aria-hidden="true"><path class="mosaic-mute-all-sigma" d="M6 2H1L4.8 6 1 10H6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 4.2H9.8l3.2-3.2v9.8l-3.2-3.2H7.2a.55.55 0 0 1-.55-.55V4.75a.55.55 0 0 1 .55-.55z" fill="currentColor"/><path class="mosaic-mute-all-wave" d="M12.4 5.1c.55.55.55 1.7 0 2.25M13.7 3.5c1.1 1.1 1.1 3.4 0 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="mosaic-mute-all-slash" x1="6.4" y1="1.3" x2="16.2" y2="10.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0"/></svg>
+                                    <span id="remote-mute-all-vol-pct" class="remote-panel__btn-pct" aria-hidden="true">85</span>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Volume: below Multi-TV row, above screens footer -->
+                        <div class="remote-panel__cell remote-panel__cell--volume">
+                            <div class="remote-panel__volume-split" id="remote-volume-split">
+                                <label class="remote-volume-bar remote-volume-bar--tv" id="tv-volume-dial" for="tv-volume-slider" aria-label="TV volume">
+                                    <span class="remote-volume-bar__fill" aria-hidden="true"></span>
+                                    <span class="remote-volume-bar__role" aria-hidden="true">TV</span>
+                                    <span class="remote-volume-bar__pct" id="tv-volume-pct" aria-hidden="true">100</span>
+                                    <input type="range" class="remote-volume-bar__input" id="tv-volume-slider" min="0" max="100" value="100" aria-label="TV volume">
+                                </label>
+                                <label class="remote-volume-bar remote-volume-bar--master" id="volume-dial" for="volume-slider" aria-label="Master volume">
+                                    <span class="remote-volume-bar__fill" aria-hidden="true"></span>
+                                    <span class="remote-volume-bar__role" aria-hidden="true">Master</span>
+                                    <span class="remote-volume-bar__pct" id="volume-pct" aria-hidden="true">85</span>
+                                    <input type="range" class="remote-volume-bar__input" id="volume-slider" min="0" max="100" value="85" aria-label="Master volume">
+                                </label>
                             </div>
                         </div>
                     </div>

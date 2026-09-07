@@ -636,6 +636,28 @@ body.browser-shell-split #remote-shell {
     line-height: 1;
 }
 
+.remote-panel__btn--stack {
+    flex-direction: column;
+    gap: 0.05rem;
+    padding: 0.15rem 0 0.1rem;
+}
+
+.remote-panel__btn--stack svg {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+}
+
+.remote-panel__btn-pct {
+    font-size: 0.55rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
 /* Deliberate hover — brighten disc + ring (the keypad previously only
    inherited a stray scale from .tv-controls__btn:hover). */
 .remote-panel__btn:hover,
