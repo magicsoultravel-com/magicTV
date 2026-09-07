@@ -663,6 +663,7 @@ body.browser-shell-split #remote-shell {
         border-color 0.15s ease,
         border-radius 0.15s ease,
         box-shadow 0.15s ease,
+        filter 0.15s ease,
         transform 0.12s ease,
         color 0.15s ease,
         opacity 0.15s ease;
@@ -684,12 +685,156 @@ body.browser-shell-split #remote-shell {
     border-radius: var(--tv-radius-sm, 6px);
 }
 
+/* Clip-path shapes — border follows the box, so drop it; depth via drop-shadow. */
+[data-remote-button-shape="triangle-up"] .remote-panel__btn,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn,
+[data-remote-button-shape="triangle-down"] .remote-panel__btn,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn,
+[data-remote-button-shape="hexagon"] .remote-panel__btn,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn,
+[data-remote-button-shape="rhombus"] .remote-panel__btn,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn {
+    border-radius: 0;
+    border-color: transparent;
+    box-shadow: none;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+[data-remote-button-shape="triangle-up"] .remote-panel__btn,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn {
+    clip-path: polygon(50% 4%, 2% 96%, 98% 96%);
+}
+
+[data-remote-button-shape="triangle-down"] .remote-panel__btn,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn {
+    clip-path: polygon(2% 4%, 98% 4%, 50% 96%);
+}
+
+[data-remote-button-shape="hexagon"] .remote-panel__btn,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn {
+    clip-path: polygon(25% 2%, 75% 2%, 98% 50%, 75% 98%, 25% 98%, 2% 50%);
+}
+
+[data-remote-button-shape="rhombus"] .remote-panel__btn,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn {
+    clip-path: polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%);
+}
+
+[data-remote-button-shape="triangle-up"] .remote-panel__btn:hover,
+[data-remote-button-shape="triangle-up"] .remote-panel__btn:focus-visible,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn:hover,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="triangle-down"] .remote-panel__btn:hover,
+[data-remote-button-shape="triangle-down"] .remote-panel__btn:focus-visible,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn:hover,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="hexagon"] .remote-panel__btn:hover,
+[data-remote-button-shape="hexagon"] .remote-panel__btn:focus-visible,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn:hover,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="rhombus"] .remote-panel__btn:hover,
+[data-remote-button-shape="rhombus"] .remote-panel__btn:focus-visible,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn:hover,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__btn:hover,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__btn:focus-visible,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__nav-btn:hover,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__btn:hover,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__btn:focus-visible,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__nav-btn:hover,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__btn:hover,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__btn:focus-visible,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__nav-btn:hover,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__nav-btn:focus-visible,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__btn:hover,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__btn:focus-visible,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__nav-btn:hover,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__nav-btn:focus-visible {
+    border-color: transparent;
+    box-shadow: none;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.5));
+}
+
+[data-remote-button-shape="triangle-up"] .remote-panel__btn:active,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn:active,
+[data-remote-button-shape="triangle-up"] .remote-panel__btn.is-active,
+[data-remote-button-shape="triangle-up"] .remote-panel__btn.is-muted,
+[data-remote-button-shape="triangle-up"] .remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-down"] .remote-panel__btn:active,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn:active,
+[data-remote-button-shape="triangle-down"] .remote-panel__btn.is-active,
+[data-remote-button-shape="triangle-down"] .remote-panel__btn.is-muted,
+[data-remote-button-shape="triangle-down"] .remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="hexagon"] .remote-panel__btn:active,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn:active,
+[data-remote-button-shape="hexagon"] .remote-panel__btn.is-active,
+[data-remote-button-shape="hexagon"] .remote-panel__btn.is-muted,
+[data-remote-button-shape="hexagon"] .remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="rhombus"] .remote-panel__btn:active,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn:active,
+[data-remote-button-shape="rhombus"] .remote-panel__btn.is-active,
+[data-remote-button-shape="rhombus"] .remote-panel__btn.is-muted,
+[data-remote-button-shape="rhombus"] .remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__btn:active,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__nav-btn:active,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__btn.is-active,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__btn.is-muted,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__nav-btn.is-active,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="triangle-up"] .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__btn:active,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__nav-btn:active,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__btn.is-active,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__btn.is-muted,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__nav-btn.is-active,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="triangle-down"] .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__btn:active,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__nav-btn:active,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__btn.is-active,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__btn.is-muted,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__nav-btn.is-active,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="hexagon"] .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__btn:active,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__nav-btn:active,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__btn.is-active,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__btn.is-muted,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__nav-btn.is-active,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__nav-btn.is-muted,
+[data-remote-button-shape="rhombus"] .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    border-color: transparent;
+    box-shadow: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+    transform: translateY(1px);
+}
+
 [data-remote-button-shape="ninja"] .remote-panel__btn,
 [data-remote-button-shape="ninja"] .remote-panel__nav-btn {
     border-radius: 30%;
     border-color: transparent;
     background: transparent;
     box-shadow: none;
+    filter: none;
+    clip-path: none;
 }
 
 [data-remote-button-shape="ninja"] .remote-panel__btn:hover,
@@ -703,6 +848,7 @@ body.browser-shell-split #remote-shell {
     border-color: transparent;
     background: transparent;
     box-shadow: none;
+    filter: none;
     transform: translateY(0);
 }
 
@@ -725,6 +871,7 @@ body.browser-shell-split #remote-shell {
     border-color: transparent;
     background: transparent;
     box-shadow: none;
+    filter: none;
     transform: translateY(0);
     opacity: 0.72;
 }
@@ -1523,8 +1670,23 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     background: transparent;
     border-color: transparent;
     box-shadow: none;
+    filter: none;
     transform: translateY(0);
     opacity: 0.72;
+}
+
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn.is-pink-active,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn.is-pink-active,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="hexagon"] .remote-panel__nav-btn.is-pink-active,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn.is-active,
+[data-remote-button-shape="rhombus"] .remote-panel__nav-btn.is-pink-active {
+    border-color: transparent;
+    box-shadow: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+    transform: translateY(1px);
 }
 
 /* Hide/collapse chevron on browser header — arrow down for collapse */

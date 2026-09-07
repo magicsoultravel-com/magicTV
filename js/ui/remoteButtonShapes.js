@@ -4,6 +4,10 @@ export const REMOTE_BUTTON_SHAPES = [
     { id: 'circle', label: 'Circle' },
     { id: 'squircle', label: 'Squircle' },
     { id: 'square', label: 'Square' },
+    { id: 'triangle-up', label: 'Triangles up' },
+    { id: 'triangle-down', label: 'Triangles down' },
+    { id: 'hexagon', label: 'Hexagon' },
+    { id: 'rhombus', label: 'Rhombus' },
     { id: 'ninja', label: 'Ninja' }
 ];
 
