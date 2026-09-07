@@ -642,6 +642,10 @@ body.browser-shell-split #remote-shell {
     display: contents;
 }
 
+.remote-panel__mosaic-group {
+    display: contents;
+}
+
 .remote-panel__footer-screens {
     position: relative;
     width: 100%;
@@ -1080,6 +1084,18 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     min-height: var(--remote-btn-size, 40px);
 }
 
+.remote-panel__cell--spacer {
+    pointer-events: none;
+}
+
+.remote-panel__btn--digit {
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    line-height: 1;
+}
+
 .remote-panel__cell--slider,
 .remote-panel__cell--volume {
     grid-column: 1 / -1;
@@ -1087,6 +1103,11 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     align-items: center;
     justify-content: stretch;
     min-height: var(--remote-btn-size, 40px);
+}
+
+.remote-panel__cell--volume > .remote-volume-bar {
+    width: 100%;
+    min-width: 0;
 }
 
 .remote-panel__volume-stack {

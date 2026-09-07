@@ -128,3 +128,42 @@ export async function navigateChannel(slotId, direction) {
     await MultiView.playOnSlot(slotId, result.channel);
     return true;
 }
+
+/**
+ * Tune a slot to a 1-based bind-scope channel number (favorites / folder index).
+ * @param {string} slotId
+ * @param {number} number
+ * @returns {Promise<boolean>}
+ */
+export async function navigateToChannelNumber(slotId, number) {
+    const { showAppToast } = await import('./ui/toast.js');
+    const n = Math.floor(Number(number));
+    if (!Number.isFinite(n) || n < 1 || n > 9999) {
+        showAppToast('Invalid channel number');
+        return false;
+    }
+
+    const scope = FavoritesRecents.getChanBindScope(slotId);
+    const { keys } = buildChannelIndex(scope);
+    if (!keys.length) {
+        showAppToast('No channels bound');
+        return false;
+    }
+
+    const key = keys[n - 1];
+    if (!key) {
+        showAppToast(`No channel ${n}`);
+        return false;
+    }
+
+    const parsed = parseChannelKey(key);
+    const channel = await TvProviderRegistry.getChannel(parsed);
+    if (!channel?.url_resolved) {
+        showAppToast(`No channel ${n}`);
+        return false;
+    }
+
+    const { MultiView } = await import('./multiView.js');
+    await MultiView.playOnSlot(slotId, channel);
+    return true;
+}

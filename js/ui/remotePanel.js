@@ -2,15 +2,13 @@
 import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
-import { ACTION_ICONS, CARD_ICONS, LAYOUT_ICONS } from './icons.js';
-import { FavoritesRecents } from '../storage/favoritesRecents.js';
+import { ACTION_ICONS, LAYOUT_ICONS } from './icons.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
 import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
 import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
-import { navigateChannel } from '../channelNav.js';
-import { playRandomChannel, playRandomChannels } from '../randomChannel.js';
+import { navigateChannel, navigateToChannelNumber } from '../channelNav.js';
 import { ChanBindPicker } from './chanBindPicker.js';
 
 let deps = {
@@ -19,6 +17,11 @@ let deps = {
 };
 
 const REMOTE_KEYPAD_NAV_TABS = new Set(['remote', 'browse', 'favorites', 'recents', 'settings']);
+const DIGIT_COMMIT_MS = 1500;
+const DIGIT_MAX_LEN = 4;
+
+let digitBuffer = '';
+let digitTimer = null;
 
 export function syncRemoteNav(tabName) {
     const split = isSplit();
@@ -50,7 +53,7 @@ function syncNavPlacement(tabName) {
 
     const footerNavRow = el('remote-panel-footer-nav-row');
     const browserNav = el('browser-panel-nav-group');
-    const volumeCell = grid.querySelector('.remote-panel__cell--volume');
+    const mosaicGroup = el('remote-panel-mosaic-group');
     const split = isSplit();
     const joined = !split;
     const browserTab = tabName !== 'remote';
@@ -69,10 +72,10 @@ function syncNavPlacement(tabName) {
         return;
     }
 
-    // Keep browser-related icons at end of remote keypad (before volume), never at start.
-    if (volumeCell) {
-        if (navGroup.parentElement !== grid || navGroup.nextElementSibling !== volumeCell) {
-            grid.insertBefore(navGroup, volumeCell);
+    // Keep catalog nav immediately before mosaic controls (after volumes / chrome).
+    if (mosaicGroup) {
+        if (navGroup.parentElement !== grid || navGroup.nextElementSibling !== mosaicGroup) {
+            grid.insertBefore(navGroup, mosaicGroup);
         }
     } else if (navGroup.parentElement !== grid) {
         grid.appendChild(navGroup);
@@ -84,7 +87,60 @@ function syncNavPlacement(tabName) {
     }
 }
 
+function clearDigitBuffer({ restoreBar = true } = {}) {
+    digitBuffer = '';
+    if (digitTimer) {
+        clearTimeout(digitTimer);
+        digitTimer = null;
+    }
+    if (restoreBar) syncRemoteChannelBar();
+}
+
+function previewDigitEntry() {
+    const bar = el('remote-channel-bar');
+    const nameEl = el('remote-channel-name');
+    const flagEl = el('remote-channel-flag');
+    if (!digitBuffer) return;
+    if (bar) bar.classList.remove('is-hidden');
+    if (nameEl) nameEl.textContent = digitBuffer;
+    if (flagEl) flagEl.textContent = '';
+}
+
+async function commitDigitBuffer() {
+    const raw = digitBuffer;
+    clearDigitBuffer({ restoreBar: false });
+    if (!raw) {
+        syncRemoteChannelBar();
+        return;
+    }
+    const n = parseInt(raw, 10);
+    const slotId = MultiView.statusSlotId || 'center';
+    await navigateToChannelNumber(slotId, n);
+    syncRemoteChannelBar();
+    syncRemotePanel();
+}
+
+function appendDigit(digitChar) {
+    if (digitBuffer.length >= DIGIT_MAX_LEN) return;
+    digitBuffer += digitChar;
+    previewDigitEntry();
+    if (digitTimer) clearTimeout(digitTimer);
+    if (digitBuffer.length >= DIGIT_MAX_LEN) {
+        void commitDigitBuffer();
+        return;
+    }
+    digitTimer = setTimeout(() => {
+        digitTimer = null;
+        void commitDigitBuffer();
+    }, DIGIT_COMMIT_MS);
+}
+
 export function syncRemoteChannelBar(_tabName) {
+    if (digitBuffer) {
+        previewDigitEntry();
+        return;
+    }
+
     const bar = el('remote-channel-bar');
     const nameEl = el('remote-channel-name');
     const flagEl = el('remote-channel-flag');
@@ -186,6 +242,12 @@ function bindLayoutPicker() {
 async function handleRemoteAction(action) {
     const slotId = MultiView.statusSlotId || 'center';
     try {
+        if (typeof action === 'string' && action.startsWith('digit-')) {
+            const digit = action.slice('digit-'.length);
+            if (/^\d$/.test(digit)) appendDigit(digit);
+            return;
+        }
+
         switch (action) {
         case 'share-copy-stream': {
             const channel = focusedChannel();
@@ -206,17 +268,20 @@ async function handleRemoteAction(action) {
         case 'vol-down':
             MultiView.setSharedVolume((MultiView.sharedVolume ?? TvPlayer.volume ?? 0.85) - 0.05);
             break;
+        case 'power-off':
+            try {
+                window.close();
+            } catch {
+                /* browsers may block closing tabs not opened by script */
+            }
+            break;
         case 'chan-up':
+            clearDigitBuffer({ restoreBar: false });
             await navigateChannel(slotId, 'up');
             break;
         case 'chan-down':
+            clearDigitBuffer({ restoreBar: false });
             await navigateChannel(slotId, 'down');
-            break;
-        case 'random':
-            await playRandomChannel(slotId);
-            break;
-        case 'random-all':
-            await playRandomChannels();
             break;
         case 'chan-bind-toggle':
             break;
@@ -230,7 +295,7 @@ async function handleRemoteAction(action) {
         }
         default:
             await MultiView.handleTileAction(
-                action === 'reset' || action === 'mute-all' || action === 'stop-all' || action === 'play-all' ? 'center' : slotId,
+                action === 'mute-all' || action === 'stop-all' || action === 'play-all' ? 'center' : slotId,
                 action
             );
         }
@@ -266,28 +331,10 @@ export function syncRemotePanel() {
         if (slash) slash.style.opacity = audible ? '0' : '1';
     }
 
-    const favBtn = el('remote-fav-btn');
-    if (favBtn) {
-        if (player?.channel) {
-            const isFav = FavoritesRecents.isFavorite(player.channel);
-            favBtn.classList.toggle('is-active', isFav);
-            favBtn.innerHTML = isFav ? CARD_ICONS.starFilled : CARD_ICONS.star;
-            favBtn.setAttribute('aria-pressed', String(isFav));
-            favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
-        } else {
-            favBtn.classList.remove('is-active');
-            favBtn.innerHTML = CARD_ICONS.star;
-            favBtn.setAttribute('aria-pressed', 'false');
-            favBtn.title = 'Add to favorites';
-        }
-        favBtn.setAttribute('aria-label', favBtn.title);
-    }
-
+    // Hide share buttons only (keep cells) so the chrome row does not reflow.
     queryAllInApp('.remote-share-btn').forEach((btn) => {
         const show = Boolean(player?.channel);
         btn.classList.toggle('is-hidden', !show);
-        const cell = btn.closest('.remote-panel__cell');
-        if (cell) cell.classList.toggle('is-hidden', !show);
     });
 
     const muteAllActive = MultiView.isMuteAllActive?.() ?? false;
@@ -324,8 +371,6 @@ export function syncRemotePanel() {
         stopAllBtn.classList.toggle('is-hidden', !anyPlaying);
         stopAllBtn.setAttribute('aria-disabled', String(!anyPlaying));
         stopAllBtn.setAttribute('aria-pressed', String(anyPlaying));
-        const stopCell = typeof stopAllBtn.closest === 'function' ? stopAllBtn.closest('.remote-panel__cell') : null;
-        if (stopCell) stopCell.classList.toggle('is-hidden', !anyPlaying);
     }
 
     // Rotate TVs — only meaningful (and only visible) with 2+ screens.
@@ -335,11 +380,8 @@ export function syncRemotePanel() {
             ?? Object.values(MultiView.slots || {}).filter((slot) => slot?.enabled).length;
         const showRotate = tvCount > 1;
         rotateBtn.classList.toggle('is-hidden', !showRotate);
-        const rotateCell = rotateBtn.closest('.remote-panel__cell');
-        if (rotateCell) rotateCell.classList.toggle('is-hidden', !showRotate);
     }
 
-    const mod = deps.getRemoteModule?.();
     const guideBtn = el('remote-guide-toggle');
     if (guideBtn) {
         const visible = GuidePanel.isVisible();
