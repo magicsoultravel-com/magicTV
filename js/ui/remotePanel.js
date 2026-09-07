@@ -2,7 +2,8 @@
 import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
-import { ACTION_ICONS, LAYOUT_ICONS } from './icons.js';
+import { ACTION_ICONS, CARD_ICONS, LAYOUT_ICONS } from './icons.js';
+import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
@@ -268,13 +269,27 @@ async function handleRemoteAction(action) {
         case 'vol-down':
             MultiView.setSharedVolume((MultiView.sharedVolume ?? TvPlayer.volume ?? 0.85) - 0.05);
             break;
-        case 'power-off':
+        case 'power-off': {
+            // Chrome only allows window.close() for script-opened windows (e.g. remote
+            // OS popout). On a normal user tab it no-ops with no prompt — so always
+            // power down playback, then close when allowed, else tell the user.
             try {
-                window.close();
+                await MultiView.handleTileAction('center', 'stop-all');
             } catch {
-                /* browsers may block closing tabs not opened by script */
+                /* best-effort shutdown */
+            }
+            const win = typeof window !== 'undefined' ? window : null;
+            try {
+                win?.close?.();
+            } catch {
+                /* ignore */
+            }
+            if (win && !win.closed) {
+                const { showAppToast } = await import('./toast.js');
+                showAppToast('Close this tab to power off');
             }
             break;
+        }
         case 'chan-up':
             clearDigitBuffer({ restoreBar: false });
             await navigateChannel(slotId, 'up');
@@ -336,6 +351,23 @@ export function syncRemotePanel() {
         const show = Boolean(player?.channel);
         btn.classList.toggle('is-hidden', !show);
     });
+
+    const favBtn = el('remote-fav-btn');
+    if (favBtn) {
+        if (player?.channel) {
+            const isFav = FavoritesRecents.isFavorite(player.channel);
+            favBtn.classList.toggle('is-active', isFav);
+            favBtn.innerHTML = isFav ? CARD_ICONS.starFilled : CARD_ICONS.star;
+            favBtn.setAttribute('aria-pressed', String(isFav));
+            favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+        } else {
+            favBtn.classList.remove('is-active');
+            favBtn.innerHTML = CARD_ICONS.star;
+            favBtn.setAttribute('aria-pressed', 'false');
+            favBtn.title = 'Add to favorites';
+        }
+        favBtn.setAttribute('aria-label', favBtn.title);
+    }
 
     const muteAllActive = MultiView.isMuteAllActive?.() ?? false;
     const muteAllBtn = el('remote-mute-all-btn');

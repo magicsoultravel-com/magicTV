@@ -43,7 +43,7 @@ const KNOWN_IDS = [
     'reset-appearance-btn', 'appearance-preview-tile',
     'mosaic-reset-btn', 'mosaic-mute-all-btn', 'mosaic-play-all-btn', 'mosaic-stop-all-btn',
     'remote-layout-picker-btn', 'remote-layout-picker-popout', 'remote-layout-picker-wrap',
-    'remote-panel-mosaic-group', 'remote-power-btn',
+    'remote-panel-mosaic-group', 'remote-power-btn', 'remote-fav-btn', 'remote-volume-split',
     'remote-digit-0', 'remote-digit-1', 'remote-digit-2', 'remote-digit-3', 'remote-digit-4',
     'remote-digit-5', 'remote-digit-6', 'remote-digit-7', 'remote-digit-8', 'remote-digit-9',
     'remote-mute-all-btn', 'remote-play-all-btn', 'remote-stop-all-btn', 'remote-play-btn', 'remote-mute-btn',
