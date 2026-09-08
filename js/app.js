@@ -30,6 +30,11 @@ import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
 import { ChanBindPicker } from './ui/chanBindPicker.js';
 import { applyCatalogFilterInput } from './ui/catalogFilterState.js';
+import {
+    openCatalogToolPopout,
+    closeAllCatalogToolPopouts,
+    isCatalogToolPopoutEventTarget
+} from './ui/catalogToolPopouts.js';
 import { loadPlayerState, DEFAULT_SORT_BY, DEFAULT_SORT_DIR, DEFAULT_CATEGORY_FILTER } from './storage/playerState.js';
 import {
     fillViewTransitionSelect,
@@ -229,33 +234,27 @@ function bindTabBarPopups() {
     const categorySelect = el('category-filter');
     const sortBtn = el('sort-btn');
     const sortSelect = el('sort-select');
+    const panels = [filterInput, categorySelect, sortSelect];
 
-    const closePopups = () => {
-        if (filterInput) filterInput.classList.remove('is-visible');
-        if (categorySelect) categorySelect.classList.remove('is-visible');
-        if (sortSelect) sortSelect.classList.remove('is-visible');
-    };
+    const closePopups = () => closeAllCatalogToolPopouts(...panels);
 
-    const togglePopup = (target) => {
-        const wasOpen = target?.classList.contains('is-visible');
+    const togglePopup = (panel, anchorBtn) => {
+        const wasOpen = panel?.classList.contains('is-visible');
         closePopups();
-        if (!wasOpen) target?.classList.add('is-visible');
+        if (!wasOpen) openCatalogToolPopout(panel, anchorBtn);
     };
 
-    // Click outside closes all popups
     document.addEventListener('click', (e) => {
-        if (e.target.closest('.tv-tab-popup')) return;
-        if (e.target.closest('.tv-tab--filter-input')) return;
-        if (e.target.closest('.tv-tab--category')) return;
-        if (e.target.closest('.tv-tab--sort')) return;
-        if (e.target.closest('#sort-dir-btn')) return;
+        if (isCatalogToolPopoutEventTarget(e.target)) return;
         closePopups();
     });
+
+    window.addEventListener('resize', closePopups);
 
     if (filterBtn) {
         filterBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            togglePopup(filterInput);
+            togglePopup(filterInput, filterBtn);
             if (filterInput?.classList.contains('is-visible')) filterInput.focus();
         });
     }
@@ -263,14 +262,14 @@ function bindTabBarPopups() {
     if (categoryBtn) {
         categoryBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            togglePopup(categorySelect);
+            togglePopup(categorySelect, categoryBtn);
         });
     }
 
     if (sortBtn) {
         sortBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            togglePopup(sortSelect);
+            togglePopup(sortSelect, sortBtn);
         });
     }
 }

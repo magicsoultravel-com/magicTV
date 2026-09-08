@@ -1,5 +1,5 @@
 /**
- * Static CSS budgets for remote button chrome + catalog tool popups.
+ * Static CSS budgets for remote button chrome + catalog tool popouts.
  * Reads remote.css — does not boot the app.
  */
 import { test } from 'node:test';
@@ -45,23 +45,17 @@ test('shared remote button base does not transition filter or promote will-chang
     assert.doesNotMatch(transition[1], /\bbox-shadow\b/);
 });
 
-test('catalog tools open filter/category/sort popouts above the buttons', () => {
+test('catalog filter/category/sort are portaled out of the footer when open', () => {
+    assert.match(css, /portaled to document\.body/);
+    assert.match(css, /body\s*>\s*\.is-catalog-tool-popout\.tv-tab--category/);
     assert.match(
         css,
-        /\.remote-module__catalog-tools\s+\.tv-tab--filter-input[\s\S]*?bottom:\s*calc\(100%\s*\+\s*0\.35rem\)/
+        /\.remote-panel__footer-chrome\s*\{[^}]*overflow-y:\s*hidden/s
     );
-    assert.match(
-        css,
-        /\.remote-module__catalog-tools\s+\.tv-tab--category[\s\S]*?z-index:\s*9000/
-    );
-    assert.match(
-        css,
-        /\.remote-panel__footer-chrome\s*\{[^}]*overflow:\s*visible/s
-    );
-    // Must not force downward opening into the footer chrome.
+    // Failed approach: keep them inside footer with overflow visible.
     assert.doesNotMatch(
         css,
-        /\.remote-module__catalog-tools\s+\.tv-tab--filter-input[\s\S]{0,120}?top:\s*calc\(100%/
+        /\.remote-panel__footer-chrome\s*\{[^}]*overflow:\s*visible/s
     );
 });
 
