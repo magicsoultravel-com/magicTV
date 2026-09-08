@@ -440,15 +440,27 @@ body.browser-shell-split #remote-shell {
 .remote-module__chrome {
     position: relative;
     flex: 0 0 auto;
-    padding: 2.35rem var(--tv-spacing-md, 1rem) 0.35rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.45rem var(--tv-spacing-md, 1rem) 0;
     text-align: center;
 }
 
-.remote-module__power {
-    position: absolute;
-    top: 0.4rem;
-    left: var(--tv-spacing-md, 1rem);
-    z-index: 2;
+.remote-module__chrome-row {
+    display: grid;
+    grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
+    gap: var(--remote-grid-gap, 0.4rem);
+    justify-content: stretch;
+    width: min(100%, var(--remote-min-width, 260px));
+}
+
+.remote-module__chrome-row .remote-panel__cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--remote-btn-size, 40px);
 }
 
 .remote-module__brand {
@@ -643,8 +655,8 @@ body.browser-shell-split #remote-shell {
 }
 
 /* --- Round solid button chrome (magicTV-wide recipe; tokens in base.tv.css) ---
-   Opaque solid face (shell textures do not show through) + ring outline +
-   raised/recessed depth. Shape via data-remote-button-shape (default squircle). */
+   Flat opaque face (shell textures do not show through) + soft ring.
+   Shape via data-remote-button-shape (default squircle). */
 .remote-panel__btn,
 .remote-panel__nav-btn {
     width: var(--remote-btn-size, 40px);
@@ -655,17 +667,13 @@ body.browser-shell-split #remote-shell {
     align-items: center;
     justify-content: center;
     border-radius: 42%;
-    border: 1px solid color-mix(in srgb, currentColor var(--btn-ring, 22%), transparent);
-    background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
+    border: 1px solid color-mix(in srgb, currentColor var(--btn-ring, 14%), transparent);
+    background: color-mix(in srgb, currentColor 9%, var(--remote-btn-face));
     font-size: 0.85rem;
     line-height: 1;
-    box-shadow:
-        0 3px 5px rgba(0, 0, 0, 0.45),
-        0 1px 0 color-mix(in srgb, currentColor 28%, transparent),
-        inset 0 1.5px 0 color-mix(in srgb, #fff 22%, transparent),
-        inset 0 -2.5px 4px color-mix(in srgb, #000 38%, transparent);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
     transform: translateY(0);
-    /* No box-shadow/filter transitions — multi-layer shadows are expensive to interpolate. */
+    /* No box-shadow/filter transitions — shadows are expensive to interpolate. */
     transition:
         background 0.15s ease,
         border-color 0.15s ease,
@@ -725,26 +733,11 @@ body.browser-shell-split #remote-shell {
     content: "";
     position: absolute;
     inset: 0;
-    z-index: 0;
     pointer-events: none;
     background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
     box-shadow:
         inset 0 1.5px 0 color-mix(in srgb, #fff 22%, transparent),
         inset 0 -2.5px 4px color-mix(in srgb, #000 38%, transparent);
-}
-
-[data-remote-button-shape="triangle-up"] .remote-panel__btn > *,
-[data-remote-button-shape="triangle-up"] .remote-panel__nav-btn > *,
-[data-remote-button-shape="triangle-down"] .remote-panel__btn > *,
-[data-remote-button-shape="triangle-down"] .remote-panel__nav-btn > *,
-[data-remote-button-shape="triangles-alt"] .remote-panel__btn > *,
-[data-remote-button-shape="triangles-alt"] .remote-panel__nav-btn > *,
-[data-remote-button-shape="hexagon"] .remote-panel__btn > *,
-[data-remote-button-shape="hexagon"] .remote-panel__nav-btn > *,
-[data-remote-button-shape="rhombus"] .remote-panel__btn > *,
-[data-remote-button-shape="rhombus"] .remote-panel__nav-btn > * {
-    position: relative;
-    z-index: 1;
 }
 
 [data-remote-button-shape="triangle-up"] .remote-panel__btn::before,
@@ -1089,7 +1082,7 @@ body.browser-shell-split #remote-shell {
     pointer-events: none;
 }
 
-/* Deliberate hover — solid face brightens + stronger ring (no scale). */
+/* Deliberate hover — face brightens + stronger ring (no scale). */
 .remote-panel__btn:hover,
 .remote-panel__btn:focus-visible,
 .remote-panel__nav-btn:hover,
@@ -1098,17 +1091,13 @@ body.browser-shell-split #remote-shell {
 .tv-controls__btn.remote-panel__btn:focus-visible,
 .tv-controls__btn.remote-panel__nav-btn:hover,
 .tv-controls__btn.remote-panel__nav-btn:focus-visible {
-    background: color-mix(in srgb, currentColor 24%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
-    box-shadow:
-        0 4px 7px rgba(0, 0, 0, 0.48),
-        0 1px 0 color-mix(in srgb, currentColor 32%, transparent),
-        inset 0 1.5px 0 color-mix(in srgb, #fff 26%, transparent),
-        inset 0 -2.5px 4px color-mix(in srgb, #000 34%, transparent);
+    background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 28%), transparent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
     transform: translateY(0);
 }
 
-/* Recessed — native press and toggled latch (flatter, sunk into bezel). */
+/* Pressed / toggled — slightly deeper tint, no bevel. */
 .remote-panel__btn:active,
 .remote-panel__nav-btn:active,
 .remote-panel__btn.is-active,
@@ -1125,12 +1114,9 @@ body.browser-shell-split #remote-shell {
 .tv-controls__btn.remote-panel__nav-btn.is-active,
 .tv-controls__btn.remote-panel__nav-btn.is-muted,
 .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
-    background: color-mix(in srgb, currentColor 28%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
-    box-shadow:
-        inset 0 3px 6px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
-        inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
+    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
     transform: translateY(1px);
 }
 
@@ -1545,7 +1531,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--tv-spacing-sm) var(--tv-spacing-md) var(--tv-spacing-md);
+    padding: var(--remote-grid-gap, 0.4rem) var(--tv-spacing-md) var(--tv-spacing-md);
     box-sizing: border-box;
 }
 
@@ -1836,23 +1822,17 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
 /* legacy volume row removed from remote keypad — dial uses .remote-volume-bar */
 
 .remote-panel__nav-btn.is-active {
-    background: color-mix(in srgb, currentColor 28%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
-    box-shadow:
-        inset 0 3px 6px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
-        inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
+    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
     transform: translateY(1px);
 }
 
 .remote-panel__nav-btn.is-pink-active {
     color: var(--tv-secondary, #e879a9);
-    background: color-mix(in srgb, currentColor 28%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
-    box-shadow:
-        inset 0 3px 6px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
-        inset 0 -1px 0 color-mix(in srgb, #fff 8%, transparent);
+    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
     transform: translateY(1px);
 }
 
