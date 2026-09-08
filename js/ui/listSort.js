@@ -301,11 +301,15 @@ export const ListSort = {
         if (catSelect.innerHTML !== html) catSelect.innerHTML = html;
 
         const value = deps.appState?.categoryFilter?.[ctx] || '';
-        if (value && [...catSelect.options].some((o) => o.value === value)) {
+        const known = value && [...catSelect.options].some((o) => o.value === value);
+        if (known) {
             catSelect.value = value;
         } else {
             catSelect.value = '';
-            if (value && deps.appState) deps.appState.categoryFilter[ctx] = '';
+            // Don't wipe a saved filter while the category map hasn't hydrated yet.
+            if (value && deps.appState && categoryNameMap.size > 0) {
+                deps.appState.categoryFilter[ctx] = '';
+            }
         }
 
         const pressed = Boolean(catSelect.value);

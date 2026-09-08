@@ -658,16 +658,14 @@ body.browser-shell-split #remote-shell {
         inset 0 1.5px 0 color-mix(in srgb, #fff 22%, transparent),
         inset 0 -2.5px 4px color-mix(in srgb, #000 38%, transparent);
     transform: translateY(0);
+    /* No box-shadow/filter transitions — multi-layer shadows are expensive to interpolate. */
     transition:
         background 0.15s ease,
         border-color 0.15s ease,
         border-radius 0.15s ease,
-        box-shadow 0.15s ease,
-        filter 0.15s ease,
         transform 0.12s ease,
         color 0.15s ease,
         opacity 0.15s ease;
-    will-change: transform;
 }
 
 [data-remote-button-shape="circle"] .remote-panel__btn,
@@ -701,14 +699,9 @@ body.browser-shell-split #remote-shell {
     border-color: transparent;
     background: transparent;
     box-shadow: none;
-    /* Accent ring matching circle/square border strength + soft depth */
+    /* Thin accent ring + soft depth (keep ≤2 drop-shadows — stacked filters are costly). */
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 55%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 55%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 55%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 55%, transparent))
+        drop-shadow(0 0 0.8px color-mix(in srgb, currentColor 70%, transparent))
         drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 
@@ -895,12 +888,7 @@ body.browser-shell-split #remote-shell {
     background: transparent;
     box-shadow: none;
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 88%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 88%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 70%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 70%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 70%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 70%, transparent))
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 85%, transparent))
         drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 
@@ -916,12 +904,7 @@ body.browser-shell-split #remote-shell {
     background: transparent;
     box-shadow: none;
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 88%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 88%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 70%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 70%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 70%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 70%, transparent))
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 85%, transparent))
         drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 
@@ -993,12 +976,7 @@ body.browser-shell-split #remote-shell {
     background: transparent;
     box-shadow: none;
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 75%, transparent))
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
     transform: translateY(1px);
 }
@@ -1023,12 +1001,7 @@ body.browser-shell-split #remote-shell {
     background: transparent;
     box-shadow: none;
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 75%, transparent))
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
     transform: translateY(1px);
 }
@@ -1898,12 +1871,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     background: transparent;
     box-shadow: none;
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 75%, transparent))
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
     transform: translateY(1px);
 }
@@ -1914,12 +1882,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     background: transparent;
     box-shadow: none;
     filter:
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(0 0 0.55px color-mix(in srgb, currentColor 90%, transparent))
-        drop-shadow(1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(-1px 0 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 1px 0 color-mix(in srgb, currentColor 75%, transparent))
-        drop-shadow(0 -1px 0 color-mix(in srgb, currentColor 75%, transparent))
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
     transform: translateY(1px);
 }
@@ -1938,6 +1901,27 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     position: relative;
     align-items: center;
     justify-content: center;
+}
+
+/* Catalog footer clips upward popups (overflow-x:auto on footer-chrome).
+   Open filter/category/sort downward like chan-bind. */
+.remote-module__catalog-tools .tv-tab--filter-input,
+.remote-module__catalog-tools .tv-tab--category,
+.remote-module__catalog-tools .tv-tab--sort {
+    top: calc(100% + 4px);
+    bottom: auto;
+    transform: translateY(-10px);
+}
+
+.remote-module__catalog-tools .tv-tab--filter-input.is-visible,
+.remote-module__catalog-tools .tv-tab--category.is-visible,
+.remote-module__catalog-tools .tv-tab--sort.is-visible {
+    transform: translateY(0);
+}
+
+.remote-panel__footer-tools-row,
+.remote-module__catalog-tools {
+    overflow: visible;
 }
 
 /* (footer-chrome circular chrome folded into the unified round-button block

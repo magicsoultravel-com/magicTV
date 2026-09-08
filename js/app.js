@@ -29,6 +29,7 @@ import { warmGuideIndex } from './epg/epgService.js';
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
 import { ListSort } from './ui/listSort.js';
 import { ChanBindPicker } from './ui/chanBindPicker.js';
+import { applyCatalogFilterInput } from './ui/catalogFilterState.js';
 import { loadPlayerState, DEFAULT_SORT_BY, DEFAULT_SORT_DIR, DEFAULT_CATEGORY_FILTER } from './storage/playerState.js';
 import {
     fillViewTransitionSelect,
@@ -545,11 +546,11 @@ function switchTab(tabName) {
     TileFrames.syncLiveRefresh(currentRefreshKey());
     ListSort.syncSortControls();
     if (tabName === 'favorites') {
-        appState.favFilter = currentFilter();
+        applyCatalogFilterInput(el('search-countries'), 'favorites', appState);
         ChannelGrid.refreshFavorites();
         restoreActiveTabScroll('favorites');
     } else if (tabName === 'recents') {
-        appState.recentsFilter = currentFilter();
+        applyCatalogFilterInput(el('search-countries'), 'recents', appState);
         ChannelGrid.refreshRecents();
         restoreActiveTabScroll('recents');
     } else if (tabName === 'browse') {
