@@ -348,6 +348,9 @@ body.remote-dock-side-right .remote-module__dialog {
 
 .module-shell__footer {
     flex: 0 0 auto;
+    overflow: visible;
+    position: relative;
+    z-index: 5;
 }
 
 /* Joined: remote + browser shells share catalog; nav moves to footer on browser tabs */
@@ -590,7 +593,10 @@ body.browser-shell-split #remote-shell {
     justify-content: center;
     gap: 0.45rem 0.65rem;
     width: 100%;
-    overflow-x: auto;
+    /* Visible so catalog tool popouts can float above into the list area.
+       Horizontal scroll lives on the nav row if needed — overflow-x:auto here
+       would clip overflow-y and squash those popouts. */
+    overflow: visible;
 }
 
 .remote-panel__footer-tools-row {
@@ -617,7 +623,10 @@ body.browser-shell-split #remote-shell {
     justify-content: center;
     gap: var(--remote-grid-gap, 0.4rem);
     width: auto;
+    max-width: 100%;
     flex: 0 0 auto;
+    overflow-x: auto;
+    overflow-y: visible;
 }
 
 .remote-panel__footer-nav-row .remote-panel__nav-group {
@@ -1903,20 +1912,29 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     justify-content: center;
 }
 
-/* Catalog footer clips upward popups (overflow-x:auto on footer-chrome).
-   Open filter/category/sort downward like chan-bind. */
+/* Catalog filter / category / sort — float above the button (layout-popout style). */
 .remote-module__catalog-tools .tv-tab--filter-input,
 .remote-module__catalog-tools .tv-tab--category,
 .remote-module__catalog-tools .tv-tab--sort {
-    top: calc(100% + 4px);
-    bottom: auto;
-    transform: translateY(-10px);
+    bottom: calc(100% + 0.35rem);
+    top: auto;
+    right: 50%;
+    left: auto;
+    transform: translateX(50%) translateY(6px);
+    z-index: 9000;
+    min-width: 11rem;
+    max-width: min(18rem, 70vw);
+    padding: 0.4rem 0.55rem;
+    border-radius: 8px;
+    background: var(--tv-bg-secondary, #12151f);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .remote-module__catalog-tools .tv-tab--filter-input.is-visible,
 .remote-module__catalog-tools .tv-tab--category.is-visible,
 .remote-module__catalog-tools .tv-tab--sort.is-visible {
-    transform: translateY(0);
+    transform: translateX(50%) translateY(0);
 }
 
 .remote-panel__footer-tools-row,

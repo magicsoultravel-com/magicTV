@@ -45,18 +45,23 @@ test('shared remote button base does not transition filter or promote will-chang
     assert.doesNotMatch(transition[1], /\bbox-shadow\b/);
 });
 
-test('catalog tools open filter/category/sort popups downward', () => {
+test('catalog tools open filter/category/sort popouts above the buttons', () => {
     assert.match(
         css,
-        /\.remote-module__catalog-tools\s+\.tv-tab--filter-input[\s\S]*?top:\s*calc\(100%\s*\+\s*4px\)/
+        /\.remote-module__catalog-tools\s+\.tv-tab--filter-input[\s\S]*?bottom:\s*calc\(100%\s*\+\s*0\.35rem\)/
     );
     assert.match(
         css,
-        /\.remote-module__catalog-tools\s+\.tv-tab--category[\s\S]*?bottom:\s*auto/
+        /\.remote-module__catalog-tools\s+\.tv-tab--category[\s\S]*?z-index:\s*9000/
     );
     assert.match(
         css,
-        /\.remote-module__catalog-tools\s+\.tv-tab--sort[\s\S]*?top:\s*calc\(100%\s*\+\s*4px\)/
+        /\.remote-panel__footer-chrome\s*\{[^}]*overflow:\s*visible/s
+    );
+    // Must not force downward opening into the footer chrome.
+    assert.doesNotMatch(
+        css,
+        /\.remote-module__catalog-tools\s+\.tv-tab--filter-input[\s\S]{0,120}?top:\s*calc\(100%/
     );
 });
 
