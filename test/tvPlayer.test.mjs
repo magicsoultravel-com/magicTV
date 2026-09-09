@@ -280,7 +280,7 @@ test('visited channels persist alongside recents after playback-record path', ()
     TvPlayer.pushRecent('iptv-org:CNN.us', CHANNEL);
     const raw = JSON.parse(store.get('matrix_tv_state'));
     // pushRecent alone does not mark visited; the player calls markVisited explicitly.
-    assert.equal(raw.visitedChannels.length, 0);
+    assert.equal((raw.visitedChannels || []).length, 0);
     TvPlayer.markVisited('iptv-org:CNN.us');
     assert.equal(TvPlayer.isVisited('iptv-org:CNN.us'), true);
 });

@@ -482,91 +482,152 @@ export function loadPlayerState() {
     }
 }
 
+const KNOWN_PLAYER_PATCH_KEYS = new Set([
+    'favorites',
+    'favoritesMeta',
+    'favoriteFolders',
+    'favoritesRootOrder',
+    'chanBindScopeBySlot',
+    'chanBindScope',
+    'recents',
+    'recentsMeta',
+    'visitedChannels',
+    'visitedChannelsMeta',
+    'hiddenChannels',
+    'hiddenChannelsMeta',
+    'watchStatsMeta',
+    'volume',
+    'lastChannelKey',
+    'lastChannelName',
+    'wasPlaying',
+    'bufferSize',
+    'mosaicSlots',
+    'mosaicPlacement',
+    'mosaicLayoutMode',
+    'remoteModule',
+    'channelPicker',
+    'sortBy',
+    'sortDir',
+    'categoryFilter'
+]);
+
 /**
- * Patch player fields onto the shared blob. Re-derives recents keys and
- * filters favoritesMeta to match favorites when those fields are present.
+ * Patch player fields onto the shared blob. Writes only keys present in `patch`
+ * (plus fields re-derived from those keys) so unrelated writers cannot clobber
+ * folders / layout / other library state via a stale full snapshot.
  */
 export function savePlayerState(patch) {
+    if (!patch || typeof patch !== 'object') return readPersistedState();
+
     const current = loadPlayerState();
     const merged = { ...current, ...patch };
-    if (merged.recentsMeta) {
+    const payload = {};
+
+    if ('recentsMeta' in patch) {
+        merged.recentsMeta = Array.isArray(merged.recentsMeta) ? merged.recentsMeta : [];
         merged.recents = merged.recentsMeta.map((e) => e.key);
+        payload.recentsMeta = merged.recentsMeta;
+        payload.recents = merged.recents;
+    } else if ('recents' in patch) {
+        payload.recents = Array.isArray(merged.recents) ? merged.recents : [];
     }
-    if (merged.favorites) {
-        merged.favoritesMeta = normalizeFavoritesMeta(merged.favorites, merged.favoritesMeta);
-    }
-    if (merged.favorites || merged.favoriteFolders || merged.favoritesRootOrder) {
-        merged.favoriteFolders = normalizeFavoriteFolders(merged.favorites, merged.favoriteFolders);
-        merged.favoritesRootOrder = normalizeFavoritesRootOrder(
-            merged.favorites,
-            merged.favoriteFolders,
-            merged.favoritesRootOrder
-        );
-        merged.chanBindScopeBySlot = normalizeChanBindScopeBySlot(
-            merged.chanBindScopeBySlot,
-            merged.favoriteFolders,
-            merged.chanBindScope
-        );
+
+    const patchFavorites = 'favorites' in patch || 'favoritesMeta' in patch;
+    const patchFolders = 'favoriteFolders' in patch;
+    const patchRootOrder = 'favoritesRootOrder' in patch;
+
+    if (patchFavorites || patchFolders || patchRootOrder) {
+        if (patchFavorites) {
+            merged.favoritesMeta = normalizeFavoritesMeta(merged.favorites, merged.favoritesMeta);
+            payload.favorites = merged.favorites;
+            payload.favoritesMeta = merged.favoritesMeta;
+        }
+        // Favorites or folder mutations can drop/move items — re-derive folders + root order.
+        if (patchFavorites || patchFolders) {
+            merged.favoriteFolders = normalizeFavoriteFolders(
+                merged.favorites,
+                merged.favoriteFolders
+            );
+            payload.favoriteFolders = merged.favoriteFolders;
+        }
+        if (patchFavorites || patchFolders || patchRootOrder) {
+            merged.favoritesRootOrder = normalizeFavoritesRootOrder(
+                merged.favorites,
+                merged.favoriteFolders,
+                merged.favoritesRootOrder
+            );
+            payload.favoritesRootOrder = merged.favoritesRootOrder;
+        }
+        // Chan-bind can point at folders; re-validate when favorites/folders change.
+        if (patchFavorites || patchFolders || 'chanBindScopeBySlot' in patch || 'chanBindScope' in patch) {
+            merged.chanBindScopeBySlot = normalizeChanBindScopeBySlot(
+                merged.chanBindScopeBySlot,
+                merged.favoriteFolders,
+                merged.chanBindScope
+            );
+            payload.chanBindScopeBySlot = merged.chanBindScopeBySlot;
+            if ('chanBindScope' in patch) payload.chanBindScope = undefined;
+        }
     } else if ('chanBindScopeBySlot' in patch || 'chanBindScope' in patch) {
         merged.chanBindScopeBySlot = normalizeChanBindScopeBySlot(
             merged.chanBindScopeBySlot,
             merged.favoriteFolders,
             merged.chanBindScope
         );
+        payload.chanBindScopeBySlot = merged.chanBindScopeBySlot;
+        if ('chanBindScope' in patch) payload.chanBindScope = undefined;
     }
-    if (merged.hiddenChannels) {
-        merged.hiddenChannelsMeta = normalizeHiddenMeta(merged.hiddenChannels, merged.hiddenChannelsMeta);
+
+    if ('hiddenChannels' in patch || 'hiddenChannelsMeta' in patch) {
+        merged.hiddenChannelsMeta = normalizeHiddenMeta(
+            merged.hiddenChannels,
+            merged.hiddenChannelsMeta
+        );
+        payload.hiddenChannels = merged.hiddenChannels;
+        payload.hiddenChannelsMeta = merged.hiddenChannelsMeta;
     }
-    if (merged.visitedChannels) {
-        merged.visitedChannels = normalizeVisitedChannels({ visitedChannels: merged.visitedChannels });
-        merged.visitedChannelsMeta = normalizeVisitedMeta(merged.visitedChannels, merged.visitedChannelsMeta);
+
+    if ('visitedChannels' in patch || 'visitedChannelsMeta' in patch) {
+        merged.visitedChannels = normalizeVisitedChannels({
+            visitedChannels: merged.visitedChannels
+        });
+        merged.visitedChannelsMeta = normalizeVisitedMeta(
+            merged.visitedChannels,
+            merged.visitedChannelsMeta
+        );
+        payload.visitedChannels = merged.visitedChannels;
+        payload.visitedChannelsMeta = merged.visitedChannelsMeta;
     }
-    const sortBy = normalizeSortBy(merged.sortBy);
-    const sortDir = normalizeSortDir(merged.sortDir);
-    const categoryFilter = normalizeCategoryFilter(merged.categoryFilter);
-    const payload = {
-        favorites: merged.favorites,
-        favoritesMeta: merged.favoritesMeta,
-        favoriteFolders: merged.favoriteFolders,
-        favoritesRootOrder: merged.favoritesRootOrder,
-        chanBindScopeBySlot: merged.chanBindScopeBySlot,
-        recents: merged.recents,
-        recentsMeta: merged.recentsMeta,
-        visitedChannels: merged.visitedChannels,
-        visitedChannelsMeta: merged.visitedChannelsMeta,
-        hiddenChannels: merged.hiddenChannels,
-        hiddenChannelsMeta: merged.hiddenChannelsMeta,
-        volume: merged.volume,
-        lastChannelKey: merged.lastChannelKey,
-        lastChannelName: merged.lastChannelName,
-        wasPlaying: merged.wasPlaying,
-        bufferSize: merged.bufferSize,
-        mosaicSlots: merged.mosaicSlots || {},
-        mosaicPlacement: merged.mosaicPlacement || {},
-        mosaicLayoutMode: normalizeMosaicLayoutMode(merged.mosaicLayoutMode),
-        remoteModule: normalizeRemoteModule(merged.remoteModule, merged.channelPicker),
-        channelPicker: normalizeChannelPicker(merged.channelPicker),
-        sortBy,
-        sortDir,
-        categoryFilter
-    };
+
     if ('watchStatsMeta' in patch) {
         payload.watchStatsMeta = normalizeWatchStatsMeta(merged.watchStatsMeta);
     }
-    return patchPersistedState({
-        ...payload,
-        ...Object.fromEntries(
-            Object.entries(patch).filter(([k]) => !(
-                k === 'favorites' || k === 'favoritesMeta' || k === 'favoriteFolders'
-                || k === 'favoritesRootOrder' || k === 'chanBindScopeBySlot' || k === 'recents'
-                || k === 'recentsMeta' || k === 'visitedChannels' || k === 'visitedChannelsMeta'
-                || k === 'hiddenChannels' || k === 'hiddenChannelsMeta' || k === 'watchStatsMeta'
-                || k === 'volume' || k === 'lastChannelKey'
-                || k === 'lastChannelName' || k === 'wasPlaying' || k === 'bufferSize'
-                || k === 'mosaicSlots' || k === 'mosaicPlacement' || k === 'mosaicLayoutMode'
-                || k === 'remoteModule' || k === 'channelPicker'
-                || k === 'sortBy' || k === 'sortDir' || k === 'categoryFilter'
-            ))
-        )
-    });
+
+    if ('volume' in patch) payload.volume = merged.volume;
+    if ('lastChannelKey' in patch) payload.lastChannelKey = merged.lastChannelKey;
+    if ('lastChannelName' in patch) payload.lastChannelName = merged.lastChannelName;
+    if ('wasPlaying' in patch) payload.wasPlaying = merged.wasPlaying;
+    if ('bufferSize' in patch) payload.bufferSize = merged.bufferSize;
+    if ('mosaicSlots' in patch) payload.mosaicSlots = merged.mosaicSlots || {};
+    if ('mosaicPlacement' in patch) payload.mosaicPlacement = merged.mosaicPlacement || {};
+    if ('mosaicLayoutMode' in patch) {
+        payload.mosaicLayoutMode = normalizeMosaicLayoutMode(merged.mosaicLayoutMode);
+    }
+    if ('remoteModule' in patch || 'channelPicker' in patch) {
+        payload.remoteModule = normalizeRemoteModule(merged.remoteModule, merged.channelPicker);
+        if ('channelPicker' in patch) {
+            payload.channelPicker = normalizeChannelPicker(merged.channelPicker);
+        }
+    }
+    if ('sortBy' in patch) payload.sortBy = normalizeSortBy(merged.sortBy);
+    if ('sortDir' in patch) payload.sortDir = normalizeSortDir(merged.sortDir);
+    if ('categoryFilter' in patch) {
+        payload.categoryFilter = normalizeCategoryFilter(merged.categoryFilter);
+    }
+
+    for (const [key, value] of Object.entries(patch)) {
+        if (!KNOWN_PLAYER_PATCH_KEYS.has(key)) payload[key] = value;
+    }
+
+    return patchPersistedState(payload);
 }
