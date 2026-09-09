@@ -186,13 +186,18 @@ export const freeLayoutMethods = {
         if (e.target.closest?.('.tv-player-tile__vol-rocker')) return;
         if (e.target.closest?.('.tv-player-tile__chan-rocker')) return;
         if (e.target.closest?.('[data-quality-wrap]')) return;
-        if (this.swapBusy) return;
 
         const tile = e.target.closest?.('.tv-player-tile');
         if (!tile || tile.classList.contains('is-hidden')) return;
         const slotId = tile.getAttribute('data-slot');
         if (!slotId || !SLOT_IDS.includes(slotId)) return;
         if (!this.slots[slotId]?.enabled) return;
+
+        // During mosaic swap/rotate, still allow click-to-focus without starting a drag.
+        if (this.swapBusy) {
+            this.maybeRetargetChannelPicker?.(slotId);
+            return;
+        }
 
         const mosaic = el('player-mosaic');
         if (!mosaic) return;

@@ -381,10 +381,17 @@ function resolveEffectiveTarget(preferred) {
     return 'center';
 }
 
-/** Reconcile persisted remote target with MultiView.statusSlotId; MultiView owns the tile ring. */
+/**
+ * Reconcile remote target with MultiView focus.
+ * Live statusSlotId wins when highlightable so syncLayout cannot snap focus
+ * back to a stale targetSlotId while the user is switching screens.
+ */
 function syncTargetHighlight() {
-    if (mode !== 'hidden' && targetSlotId) {
-        const effective = resolveEffectiveTarget(targetSlotId);
+    if (mode !== 'hidden') {
+        const status = MultiView.statusSlotId;
+        const effective = (status && isSlotHighlightable(status))
+            ? status
+            : resolveEffectiveTarget(targetSlotId || status || 'center');
         if (effective !== targetSlotId) {
             targetSlotId = effective;
             persistState({ targetSlotId: effective, open: true, mode });

@@ -30,6 +30,8 @@ const DIGIT_MAX_LEN = 4;
 
 let digitBuffer = '';
 let digitTimer = null;
+/** Slot that owned the digit entry when the first digit was pressed. */
+let digitTargetSlotId = null;
 let powerOffBusy = false;
 
 export function syncRemoteNav(tabName) {
@@ -98,6 +100,7 @@ function syncNavPlacement(tabName) {
 
 function clearDigitBuffer({ restoreBar = true } = {}) {
     digitBuffer = '';
+    digitTargetSlotId = null;
     if (digitTimer) {
         clearTimeout(digitTimer);
         digitTimer = null;
@@ -117,13 +120,13 @@ function previewDigitEntry() {
 
 async function commitDigitBuffer() {
     const raw = digitBuffer;
+    const slotId = digitTargetSlotId || MultiView.statusSlotId || 'center';
     clearDigitBuffer({ restoreBar: false });
     if (!raw) {
         syncRemoteChannelBar();
         return;
     }
     const n = parseInt(raw, 10);
-    const slotId = MultiView.statusSlotId || 'center';
     await navigateToChannelNumber(slotId, n);
     syncRemoteChannelBar();
     syncRemotePanel();
@@ -131,6 +134,9 @@ async function commitDigitBuffer() {
 
 function appendDigit(digitChar) {
     if (digitBuffer.length >= DIGIT_MAX_LEN) return;
+    if (!digitBuffer) {
+        digitTargetSlotId = MultiView.statusSlotId || 'center';
+    }
     digitBuffer += digitChar;
     previewDigitEntry();
     if (digitTimer) clearTimeout(digitTimer);
@@ -144,6 +150,16 @@ function appendDigit(digitChar) {
     }, DIGIT_COMMIT_MS);
 }
 
+/** Prefer a preparing (tuning) slot for the bar label so focus moves do not mislabel an in-flight switch. */
+function resolveChannelBarSlotId() {
+    const focused = MultiView.statusSlotId || 'center';
+    if (MultiView.slots?.[focused]?.player?.preparing) return focused;
+    for (const [id, slot] of Object.entries(MultiView.slots || {})) {
+        if (slot?.enabled && slot.player?.preparing) return id;
+    }
+    return focused;
+}
+
 export function syncRemoteChannelBar(_tabName) {
     if (digitBuffer) {
         previewDigitEntry();
@@ -153,8 +169,8 @@ export function syncRemoteChannelBar(_tabName) {
     const bar = el('remote-channel-bar');
     const nameEl = el('remote-channel-name');
     const flagEl = el('remote-channel-flag');
-    const slotId = MultiView.statusSlotId || 'center';
-    // Use the focused slot only — do not fall back to center's channel (would mislabel TV N).
+    const slotId = resolveChannelBarSlotId();
+    // Use the bar slot only — do not fall back to center's channel (would mislabel TV N).
     const slot = MultiView.slots?.[slotId];
     const player = slot?.player || (slotId === 'center' ? MultiView.getPrimary?.() : null);
     const channel = player?.channel;

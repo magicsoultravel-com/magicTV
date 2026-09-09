@@ -117,7 +117,11 @@ function startPlayback(channel) {
             if (!blocked) showAppToast('Stream unavailable');
         })
         .finally(() => {
-            const player = MultiView.getStatusPlayer?.() || MultiView.getPrimary?.();
+            // Clear busy from the slot that started playback — not live focus
+            // (user may have switched screens while this load was in flight).
+            const player = slotId === 'center'
+                ? MultiView.getPrimary?.()
+                : MultiView.ensurePlayer?.(slotId);
             if (!player?.playing) TileFrames.setPlaybackBusy(false);
         });
 }

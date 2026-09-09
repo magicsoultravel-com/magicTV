@@ -460,3 +460,81 @@ test('remote channel bar labels the focused TV without falling back to center', 
     assert.equal(channelName.textContent, '');
     assert.ok(channelBar.classList.contains('is-hidden'));
 });
+
+test('syncTargetHighlight follows live focus instead of snapping back to stale remote target', async () => {
+    const { doc, tiles } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topRight.enabled = true;
+    MultiView.slots.topLeft.player = makePlayer('A');
+    MultiView.slots.topRight.player = makePlayer('B');
+    MultiView.slots.center.player = MultiView.slots.center.player || makePlayer('Main');
+
+    RemoteModule.init({ switchTab: () => {} });
+    RemoteModule.open({ slotId: 'topLeft', mode: 'docked', focusClose: false });
+    assert.equal(RemoteModule.getTargetSlotId(), 'topLeft');
+
+    // User focuses another screen (strip / tile) before remote retarget settles.
+    MultiView.setStatusSlot('topRight');
+    RemoteModule.syncTargetHighlight();
+
+    assert.equal(MultiView.statusSlotId, 'topRight');
+    assert.equal(RemoteModule.getTargetSlotId(), 'topRight');
+    assert.ok(tiles.topRight.classList.contains('is-channel-picker-target'));
+    assert.equal(tiles.topLeft.classList.contains('is-channel-picker-target'), false);
+
+    RemoteModule.close();
+    // Settle chrome/retarget microtasks before afterEach clears document.
+    await new Promise((r) => setTimeout(r, 80));
+});
+
+test('focusScreen then syncLayout keeps catalog play target on the newly focused TV', async () => {
+    const { doc, tiles } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topRight.enabled = true;
+    MultiView.slots.topLeft.player = makePlayer('A');
+    MultiView.slots.topRight.player = makePlayer('B');
+    MultiView.slots.center.player = MultiView.slots.center.player || makePlayer('Main');
+
+    RemoteModule.init({ switchTab: () => {} });
+    RemoteModule.open({ slotId: 'topLeft', mode: 'docked', focusClose: false });
+
+    MultiView.focusScreen('topRight');
+    // Layout sync used to re-apply stale targetSlotId and steal focus back.
+    MultiView.syncLayout?.();
+    // Allow async syncTargetHighlight import from syncLayout to settle.
+    await new Promise((r) => setTimeout(r, 20));
+    RemoteModule.syncTargetHighlight();
+
+    assert.equal(MultiView.statusSlotId, 'topRight');
+    assert.equal(RemoteModule.getTargetSlotId(), 'topRight');
+    assert.ok(tiles.topRight.classList.contains('is-channel-picker-target'));
+    // Catalog / remote play resolves the same way playIntoTarget does.
+    const playSlot = MultiView.statusSlotId || RemoteModule.getTargetSlotId() || 'center';
+    assert.equal(playSlot, 'topRight');
+
+    RemoteModule.close();
+    await new Promise((r) => setTimeout(r, 50));
+});
+
+test('remote channel bar labels Tuning on the preparing slot even after focus moves', async () => {
+    const { doc, channelBar, channelName } = buildDom();
+    globalThis.document = doc;
+
+    MultiView.slots.center.player = makePlayer('CenterCh');
+    MultiView.slots.topLeft.enabled = true;
+    MultiView.slots.topLeft.player = makePlayer('CornerCh');
+    MultiView.slots.topLeft.player.preparing = true;
+    MultiView.slots.topRight.enabled = true;
+    MultiView.slots.topRight.player = makePlayer('Other');
+
+    const { syncRemoteChannelBar } = await import('../js/ui/remotePanel.js');
+
+    MultiView.statusSlotId = 'topRight';
+    syncRemoteChannelBar();
+    assert.equal(channelName.textContent, 'TV 2 · Tuning…');
+    assert.equal(channelBar.classList.contains('is-hidden'), false);
+});

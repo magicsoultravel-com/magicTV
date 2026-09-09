@@ -74,6 +74,13 @@ const SCREEN_SETTERS = {
 
 const SCREEN_ADD_ORDER = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 
+/** Cached chrome modules so focus switches do not re-await dynamic imports. */
+let _statusChromeMods = null;
+let _statusChromePromise = null;
+/** Cached remote module so focus can retarget synchronously after first load. */
+let _remoteModuleRef = null;
+let _remoteModulePromise = null;
+
 const SCREEN_LABELS = {
     center: '1',
     topLeft: '2',
@@ -173,19 +180,34 @@ export const MultiView = {
     /** Refresh remote bar / panel + page header for the focused screen (no broadcast required). */
     syncStatusChrome() {
         if (typeof document === 'undefined') return;
-        import('./ui/remotePanel.js').then(({ syncRemotePanel, syncRemoteChannelBar }) => {
-            syncRemotePanel?.();
-            syncRemoteChannelBar?.();
-        }).catch(() => {});
-        import('./ui/playerChrome.js').then(({ PlayerChrome }) => {
-            PlayerChrome.updateNowPlayingHeader?.();
-        }).catch(() => {});
-        import('./ui/volumeDial.js').then(({ syncVolumeDial }) => {
-            syncVolumeDial?.();
-        }).catch(() => {});
-        import('./ui/chanBindPicker.js').then(({ syncBindButtons }) => {
-            syncBindButtons?.();
-        }).catch(() => {});
+        const safe = (fn) => {
+            try { fn(); } catch { /* chrome may not be fully wired in tests / early boot */ }
+        };
+        const apply = (mods) => {
+            // Drop late async resolves after tests tear down document (parallel suites).
+            if (typeof document === 'undefined') return;
+            safe(() => mods.remotePanel?.syncRemotePanel?.());
+            safe(() => mods.remotePanel?.syncRemoteChannelBar?.());
+            safe(() => mods.playerChrome?.PlayerChrome?.updateNowPlayingHeader?.());
+            safe(() => mods.volumeDial?.syncVolumeDial?.());
+            safe(() => mods.chanBindPicker?.syncBindButtons?.());
+        };
+        if (_statusChromeMods) {
+            apply(_statusChromeMods);
+            return;
+        }
+        if (!_statusChromePromise) {
+            _statusChromePromise = Promise.all([
+                import('./ui/remotePanel.js'),
+                import('./ui/playerChrome.js'),
+                import('./ui/volumeDial.js'),
+                import('./ui/chanBindPicker.js')
+            ]).then(([remotePanel, playerChrome, volumeDial, chanBindPicker]) => {
+                _statusChromeMods = { remotePanel, playerChrome, volumeDial, chanBindPicker };
+                return _statusChromeMods;
+            });
+        }
+        _statusChromePromise.then(apply).catch(() => {});
     },
 
     /**
@@ -840,16 +862,28 @@ export const MultiView = {
         }
     },
 
-    async maybeRetargetChannelPicker(slotId) {
+    maybeRetargetChannelPicker(slotId) {
         if (!slotId || !this.slots[slotId]?.enabled) return;
         this.setStatusSlot(slotId);
-        try {
-            const { RemoteModule } = await import('./ui/remoteModule.js');
+        const apply = (RemoteModule) => {
+            if (typeof document === 'undefined') return;
+            // Drop stale async results if the user already focused elsewhere.
+            if (this.statusSlotId !== slotId) return;
             if (!RemoteModule.isOpen()) return;
             RemoteModule.retarget(slotId);
-        } catch {
-            /* ignore */
+        };
+        if (_remoteModuleRef) {
+            apply(_remoteModuleRef);
+            return;
         }
+        if (!_remoteModulePromise) {
+            _remoteModulePromise = import('./ui/remoteModule.js')
+                .then((m) => {
+                    _remoteModuleRef = m.RemoteModule;
+                    return _remoteModuleRef;
+                });
+        }
+        _remoteModulePromise.then(apply).catch(() => {});
     },
 
     async handleTileAction(slotId, action, { target = 'local' } = {}) {
@@ -1082,8 +1116,14 @@ export const MultiView = {
         if (typeof document !== 'undefined') {
             import('./ui/remoteModule.js')
                 .then(({ RemoteModule }) => {
-                    RemoteModule.syncTargetHighlight?.();
-                    import('./ui/remotePanel.js').then(({ RemotePanel }) => RemotePanel.syncRemotePanel?.()).catch(() => {});
+                    if (typeof document === 'undefined') return;
+                    try {
+                        RemoteModule.syncTargetHighlight?.();
+                    } catch { /* ignore */ }
+                    import('./ui/remotePanel.js').then(({ RemotePanel }) => {
+                        if (typeof document === 'undefined') return;
+                        try { RemotePanel.syncRemotePanel?.(); } catch { /* ignore */ }
+                    }).catch(() => {});
                 })
                 .catch(() => {});
         }

@@ -81,8 +81,13 @@ export const swapMethods = {
         const callbacks = typeof handlers === 'function'
             ? { onMidpoint: handlers }
             : (handlers || {});
+        const id = slotId || 'center';
+        if (!this._channelSwitchBusy) this._channelSwitchBusy = new Set();
 
-        if (this.swapBusy) {
+        // Mosaic swap/rotate still owns global swapBusy. Channel switches use a
+        // per-slot lock so TV A tuning never blocks focusing or animating TV B.
+        const skipExclusive = this.swapBusy || this._channelSwitchBusy.has(id);
+        if (skipExclusive) {
             if (callbacks.onPrepare && callbacks.onCommit) {
                 void Promise.resolve(callbacks.onPrepare?.());
                 await callbacks.onCommit?.();
@@ -91,9 +96,9 @@ export const swapMethods = {
             }
             return;
         }
-        const tile = el(`player-tile-${slotId || 'center'}`);
+        const tile = el(`player-tile-${id}`);
         const mode = resolveChannelSwitchMode(this);
-        this.swapBusy = true;
+        this._channelSwitchBusy.add(id);
         try {
             await runTileContentTransition(tile, callbacks, {
                 mode,
@@ -101,7 +106,7 @@ export const swapMethods = {
                 skipIn: opts.skipIn === true
             });
         } finally {
-            this.swapBusy = false;
+            this._channelSwitchBusy.delete(id);
         }
     },
 
