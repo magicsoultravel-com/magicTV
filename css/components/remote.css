@@ -1275,6 +1275,16 @@ body.browser-shell-split #remote-shell {
     opacity: 1;
 }
 
+/* Browser header refresh — spin while the active view reloads. */
+#browser-refresh-btn.is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+#browser-refresh-btn.is-loading svg {
+    animation: spin 0.8s linear infinite;
+}
+
 .tv-module__action.tv-module__action--echo {
     opacity: 0.5;
     color: var(--tv-text-secondary);

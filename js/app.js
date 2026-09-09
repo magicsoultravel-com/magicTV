@@ -417,6 +417,80 @@ function bindCatalogLayout() {
     });
 }
 
+/** Browser header quick action — refresh the page the user is on.
+ * Visible only on per-country browse + favorites + recents (never on the
+ * countries list). Restores the deleted `refresh-btn` behavior (9007e54 →
+ * removed in 4edc59d), scoped to the new browser module header. */
+function isBrowserRefreshableView() {
+    if (appState.activeTab === 'favorites') return true;
+    if (appState.activeTab === 'recents') return true;
+    return appState.activeTab === 'browse' && appState.browseCountry != null;
+}
+
+function syncBrowserRefreshBtn() {
+    const btn = el('browser-refresh-btn');
+    if (!btn) return;
+    const visible = isBrowserRefreshableView();
+    btn.classList.toggle('is-hidden', !visible);
+    if (!visible) return;
+    if (!btn.innerHTML) btn.innerHTML = ACTION_ICONS.refresh;
+    const where = appState.activeTab === 'browse'
+        ? (appState.browseCountry || 'this country')
+        : appState.activeTab;
+    const label = `Refresh ${where}`;
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+}
+
+let browserRefreshInFlight = false;
+
+async function handleBrowserRefresh() {
+    if (browserRefreshInFlight) return;
+    if (!isBrowserRefreshableView()) return;
+    browserRefreshInFlight = true;
+    const btn = el('browser-refresh-btn');
+    btn?.classList.add('is-loading');
+    showAppToast('Refreshing…');
+    try {
+        const tab = appState.activeTab;
+        const viewKey = currentRefreshKey();
+        if (tab === 'browse') {
+            await BrowseView.refreshBrowseCountry();
+            stampRefreshView(viewKey);
+            const grid = activeChannelGrid();
+            if (grid) await TileFrames.refresh(grid, { viewKey });
+        } else if (tab === 'favorites') {
+            await ChannelGrid.refreshFavorites(true);
+            stampRefreshView('favorites');
+            const grid = activeChannelGrid();
+            if (grid) await TileFrames.refresh(grid, { viewKey: 'favorites' });
+        } else if (tab === 'recents') {
+            await ChannelGrid.refreshRecents(true);
+            stampRefreshView('recents');
+            const grid = activeChannelGrid();
+            if (grid) await TileFrames.refresh(grid, { viewKey: 'recents' });
+        }
+        showAppToast('✅ Refreshed');
+    } catch {
+        showAppToast('Refresh failed — try again');
+    } finally {
+        browserRefreshInFlight = false;
+        btn?.classList.remove('is-loading');
+        syncBrowserRefreshBtn();
+    }
+}
+
+function bindBrowserRefreshBtn() {
+    const btn = el('browser-refresh-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.innerHTML = ACTION_ICONS.refresh;
+    syncBrowserRefreshBtn();
+    btn.addEventListener('click', () => {
+        handleBrowserRefresh();
+    });
+}
+
 function bindPlayFavoritesMosaic() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn || btn.dataset.bound === '1') return;
@@ -567,6 +641,7 @@ function switchTab(tabName) {
     syncPlayFavoritesMosaicBtn();
     syncCreateFavoriteFolderBtn();
     syncCatalogLayoutBtn();
+    syncBrowserRefreshBtn();
     RemoteExternalPopout.syncBtn();
     RemoteModule.syncSplitChromeButtons?.();
     RemotePanel.syncRemotePanel();
@@ -667,10 +742,12 @@ async function init() {
         bindPlayFavoritesMosaic();
         bindCreateFavoriteFolderBtn();
         bindCatalogLayout();
+        bindBrowserRefreshBtn();
         ChanBindPicker.bind();
         syncPlayFavoritesMosaicBtn();
         syncCreateFavoriteFolderBtn();
         syncCatalogLayoutBtn();
+        syncBrowserRefreshBtn();
         syncRemoteTabChrome();
         switchTab('remote');
         if (GuidePanel.isVisible()) {

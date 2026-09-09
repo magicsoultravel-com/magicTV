@@ -18,7 +18,7 @@ const KNOWN_IDS = [
     'remote-module', 'remote-module-dialog', 'remote-module-host',
     'browser-module', 'browser-module-dialog', 'browser-module-host',
     'browser-dock-tab', 'browser-dock-sheet', 'browser-dock-host',
-    'browser-dock-toggle', 'browser-collapse-header-btn',
+    'browser-dock-toggle', 'browser-collapse-header-btn', 'browser-refresh-btn',
     'remote-shell-screens-footer', 'remote-panel-nav-group', 'browser-panel-nav-group', 'remote-panel-footer-nav-row',
     'remote-guide-toggle',
     'remote-external-popout-btn', 'remote-split-browser-btn', 'remote-dock-toggle', 'browser-split-browser-btn', 'browser-external-popout-btn',
