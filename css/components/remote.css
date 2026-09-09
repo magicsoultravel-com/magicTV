@@ -444,16 +444,19 @@ body.browser-shell-split #remote-shell {
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.45rem var(--tv-spacing-md, 1rem) 0;
+    padding: 1.8rem var(--tv-spacing-md, 1rem) 0.4rem;
     text-align: center;
 }
 
 .remote-module__chrome-row {
-    display: grid;
-    grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
-    gap: var(--remote-grid-gap, 0.4rem);
-    justify-content: stretch;
-    width: min(100%, var(--remote-min-width, 260px));
+    position: absolute;
+    top: -1.2rem;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: auto;
 }
 
 .remote-module__chrome-row .remote-panel__cell {
