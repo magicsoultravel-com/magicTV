@@ -7,13 +7,13 @@ import { showAppToast } from './ui/toast.js';
 import { TvPip } from './tvPip.js';
 import { TileFrames } from './tileFrames.js';
 import { SettingsStore } from './storage/settingsStore.js';
-import { ChannelGrid } from './ui/channelGrid.js';
+import { ChannelGrid, getFavoritesMosaicQueue } from './ui/channelGrid.js';
 import { FavoritesFolders } from './ui/favoritesFolders.js';
 import { BrowseView } from './browse/browseView.js';
 import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
-import { MultiView, MAX_MOSAIC_SLOTS } from './multiView.js';
-import { SLOT_IDS, slotIsOccupied } from './mosaic/constants.js';
+import { MultiView } from './multiView.js';
+import { SLOT_IDS, MAX_MOSAIC_SLOTS, slotIsOccupied } from './mosaic/constants.js';
 import { parseDeepLink, resolveDeepLinkChannel, chooseSharedPlayTarget } from './share/shareChannel.js';
 import { TvClock } from './ui/tvClock.js';
 import { RemoteModule } from './ui/remoteModule.js';
@@ -335,13 +335,6 @@ function withBrowseDrillTransition(mutate) {
 }
 
 
-function matchesFavFilter(ch, q) {
-    if (!q) return true;
-    const name = (ch?.name || '').toLowerCase();
-    const id = (ch?.channelId || '').toLowerCase();
-    return name.includes(q) || id.includes(q);
-}
-
 function syncPlayFavoritesMosaicBtn() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn) return;
@@ -500,17 +493,19 @@ function bindPlayFavoritesMosaic() {
     btn.setAttribute('aria-label', btn.title);
 
     btn.addEventListener('click', () => {
-        const filter = appState.favFilter || currentFilter();
-        const list = (appState.favoritesList || [])
-            .filter((ch) => matchesFavFilter(ch, filter))
-            .slice(0, MAX_MOSAIC_SLOTS);
+        // Play from where the user is browsing: folder contents when inside a
+        // favorites folder, loose root channels when at the favorites root.
+        // getFavoritesMosaicQueue mirrors the grid's display order (text
+        // filter + category filter + hidden + sort) and caps at first 5.
+        const { list, folderName } = getFavoritesMosaicQueue({ fallbackFilter: currentFilter() });
         if (!list.length) {
-            showAppToast('No favorites to play');
+            showAppToast('No channels to play in this view');
             return;
         }
         MultiView.playChannelsOnMosaic(list)
             .then(() => {
-                showAppToast(`Playing ${list.length} favorite${list.length === 1 ? '' : 's'}`);
+                const where = folderName ? ` from ${folderName}` : '';
+                showAppToast(`Playing ${list.length} channel${list.length === 1 ? '' : 's'}${where}`);
             })
             .catch((e) => {
                 console.error('play favorites mosaic failed', e);
