@@ -183,8 +183,7 @@
 }
 
 .remote-panel__btn--stack svg {
-    width: 12px;
-    height: 12px;
+    /* Keep HTML width/height (mute 14×14, mute-all 18×14) — don't shrink for the % slot. */
     flex: 0 0 auto;
 }
 
