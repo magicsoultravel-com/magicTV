@@ -1,0 +1,985 @@
+/** @css {part}: remote panel grid, volume, footer, popout */
+/* Deliberate hover — face brightens + stronger ring (no scale). */
+.remote-panel__btn:hover,
+.remote-panel__btn:focus-visible,
+.remote-panel__nav-btn:hover,
+.remote-panel__nav-btn:focus-visible,
+.tv-controls__btn.remote-panel__btn:hover,
+.tv-controls__btn.remote-panel__btn:focus-visible,
+.tv-controls__btn.remote-panel__nav-btn:hover,
+.tv-controls__btn.remote-panel__nav-btn:focus-visible {
+    background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 28%), transparent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+    transform: translateY(0);
+}
+
+/* Pressed / toggled — slightly deeper tint, no bevel. */
+.remote-panel__btn:active,
+.remote-panel__nav-btn:active,
+.remote-panel__btn.is-active,
+.remote-panel__btn.is-muted,
+.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+.remote-panel__nav-btn.is-active,
+.remote-panel__nav-btn.is-muted,
+.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]),
+.tv-controls__btn.remote-panel__btn:active,
+.tv-controls__btn.remote-panel__nav-btn:active,
+.tv-controls__btn.remote-panel__btn.is-active,
+.tv-controls__btn.remote-panel__btn.is-muted,
+.tv-controls__btn.remote-panel__btn[aria-pressed="true"]:not([aria-pressed="false"]),
+.tv-controls__btn.remote-panel__nav-btn.is-active,
+.tv-controls__btn.remote-panel__nav-btn.is-muted,
+.tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+    transform: translateY(1px);
+}
+
+.remote-panel__nav-group {
+    display: contents;
+}
+
+.remote-panel__mosaic-group {
+    display: contents;
+}
+
+.remote-panel__footer-screens {
+    position: relative;
+    width: 100%;
+    padding-top: 0.35rem;
+    min-height: 0;
+}
+
+.remote-panel__footer-screens.is-screens-expanded {
+    --strip-tile-w: 7.25rem;
+    --strip-tile-h: 4.1rem;
+    padding-top: 1.15rem;
+    padding-bottom: 0.75rem;
+    min-height: calc(2 * var(--strip-tile-h) + 1.9rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="1"] {
+    --strip-tile-w: 11rem;
+    --strip-tile-h: 6.2rem;
+    min-height: calc(var(--strip-tile-h) + 1.9rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="2"] {
+    --strip-tile-w: 9.25rem;
+    --strip-tile-h: 5.2rem;
+    min-height: calc(var(--strip-tile-h) + 1.9rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="3"] {
+    --strip-tile-w: 8rem;
+    --strip-tile-h: 4.5rem;
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="4"] {
+    --strip-tile-w: 7.5rem;
+    --strip-tile-h: 4.2rem;
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="5"] {
+    --strip-tile-w: 6.75rem;
+    --strip-tile-h: 3.8rem;
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="6"] {
+    --strip-tile-w: 6rem;
+    --strip-tile-h: 3.4rem;
+}
+
+.remote-module__host > .tv-module__actions--remote-end,
+.remote-dock-sheet__inner > .tv-module__actions--remote-end,
+.remote-module__host > .tv-module__actions--browser-end,
+.remote-dock-sheet__inner > .tv-module__actions--browser-end,
+.browser-module .remote-module__host > .tv-module__actions--browser-end,
+.browser-dock-sheet__inner > .tv-module__actions--browser-end {
+    position: absolute;
+    top: 0.35rem;
+    z-index: 6;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.remote-module__host > .tv-module__actions--remote-end,
+.remote-dock-sheet__inner > .tv-module__actions--remote-end {
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
+}
+
+.remote-module__host > .tv-module__actions--browser-end,
+.remote-dock-sheet__inner > .tv-module__actions--browser-end {
+    left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
+    right: auto;
+}
+
+.remote-module__host > .tv-module__actions--remote-end:only-of-type,
+.remote-dock-sheet__inner > .tv-module__actions--remote-end:only-of-type {
+    left: var(--tv-spacing-sm, 0.5rem);
+}
+
+.remote-module__host > .tv-module__actions--start,
+.remote-dock-sheet__inner > .tv-module__actions--start,
+.browser-dock-sheet__inner > .tv-module__actions--start {
+    position: absolute;
+    top: 0.35rem;
+    left: var(--tv-spacing-sm, 0.5rem);
+    z-index: 6;
+    pointer-events: auto;
+}
+
+.tv-module__action {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--tv-text-secondary);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.tv-module__action svg {
+    display: block;
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+}
+
+/* Unify every module quick-action glyph (remote + browser) to the same subtle
+   stroke weight and size as the pop-out icons, so all icons look identical. */
+.tv-module__action svg :where(path, rect, circle, ellipse, line, polyline, polygon) {
+    stroke-width: 0.95;
+}
+
+.tv-module__action:hover,
+.tv-module__action:focus-visible {
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    color: var(--tv-main-1);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
+    opacity: 1;
+}
+
+/* Browser header refresh — spin while the active view reloads. */
+#browser-refresh-btn.is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+#browser-refresh-btn.is-loading svg {
+    animation: spin 0.8s linear infinite;
+}
+
+.tv-module__action.tv-module__action--echo {
+    opacity: 0.5;
+    color: var(--tv-text-secondary);
+    background: transparent;
+    border-color: transparent;
+}
+
+.tv-module__action.tv-module__action--echo:hover,
+.tv-module__action.tv-module__action--echo:focus-visible {
+    opacity: 1;
+    color: var(--tv-main-1);
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
+}
+
+.tv-module__action.tv-module__action--echo.is-active,
+.tv-module__action.tv-module__action--echo[aria-pressed="true"]:not([aria-pressed="false"]) {
+    opacity: 0.88;
+    color: var(--tv-main-2, #00FF88);
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+}
+
+/* Any toggled module quick-action (pin, layout toggle, …) — shared pressed
+   disc + ring; the accent color is set per-button by the rules above. */
+.tv-module__action.is-active,
+.tv-module__action[aria-pressed="true"]:not([aria-pressed="false"]) {
+    opacity: 0.88;
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    transform: scale(var(--btn-press-scale, 1.04));
+}
+
+/* Module quick actions: reveal on the remote / browser module top bars only
+   while the user is hovering (or keyboard-focusing) that particular module.
+   Hidden (non-interactive) by default on pointer devices; always visible on touch. */
+@media (hover: hover) {
+    .remote-module__host > .tv-module__actions,
+    .remote-dock-sheet__inner > .tv-module__actions,
+    .browser-module .remote-module__host > .tv-module__actions,
+    .browser-dock-sheet__inner > .tv-module__actions {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+
+    .remote-module__host:hover > .tv-module__actions,
+    .remote-module__host:focus-within > .tv-module__actions,
+    .remote-dock-sheet__inner:hover > .tv-module__actions,
+    .remote-dock-sheet__inner:focus-within > .tv-module__actions,
+    .browser-module .remote-module__host:hover > .tv-module__actions,
+    .browser-module .remote-module__host:focus-within > .tv-module__actions,
+    .browser-dock-sheet__inner:hover > .tv-module__actions,
+    .browser-dock-sheet__inner:focus-within > .tv-module__actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+.tv-module__body,
+.remote-module__host .tv-module__body,
+.remote-dock-sheet__inner .tv-module__body {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.remote-module__host .tv-panel.is-active,
+.remote-dock-sheet__inner .tv-panel.is-active {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.remote-module__resize {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    z-index: 12;
+    touch-action: none;
+    display: block;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--tv-main-1) 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tv-main-1) 55%, transparent);
+    opacity: 0.42;
+    box-sizing: border-box;
+}
+
+.remote-module__resize:hover {
+    opacity: 0.85;
+}
+
+.remote-module__resize[data-remote-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+.remote-module__resize[data-remote-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
+.remote-module__resize[data-remote-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+.remote-module__resize[data-remote-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+
+.remote-module__resize[data-browser-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+.remote-module__resize[data-browser-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
+.remote-module__resize[data-browser-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+.remote-module__resize[data-browser-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+
+/* Browser window + layout controls — same circular row as nav/tools when split */
+.browser-window-controls,
+.layout-window-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    width: auto;
+    padding: 0;
+}
+
+.browser-window-controls.is-hidden,
+.layout-window-controls.is-hidden {
+    display: none !important;
+}
+
+.catalog-root.module-layout--split #remote-shell.module-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#remote-shell .remote-shell__footer {
+    flex: 0 0 auto;
+    padding: 0 var(--tv-spacing-md, 1rem) var(--tv-spacing-md, 1rem);
+    border-top: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    background: color-mix(in srgb, var(--tv-bg-secondary) 92%, transparent);
+}
+
+/* --- Bottom-right browser dock (mirrors remote bottom-left) --- */
+.browser-dock-tab {
+    position: fixed;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    left: auto;
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    top: auto;
+    z-index: 8501;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--remote-min-width, 260px) * 2);
+    max-width: calc(100vw - 1.5rem);
+    min-height: 0;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-bottom: none;
+    border-right: 1px solid var(--tv-border, #2A2E3A);
+    border-radius: 18px 18px 0 0;
+    background: var(--tv-bg-secondary, #141829);
+    color: var(--tv-text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.28);
+    pointer-events: auto;
+    transform: none;
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    transition: transform 0.25s ease, opacity 0.15s ease;
+    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
+}
+
+body:not(.browser-hidden-tab) .browser-dock-tab,
+body.browser-docked-expanded .browser-dock-tab {
+    display: none;
+}
+
+body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
+    display: flex;
+}
+
+.browser-dock-tab__brand {
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+    text-transform: lowercase;
+    opacity: 0.72;
+    font-weight: 600;
+}
+
+.browser-dock-tab.is-active {
+    border-color: var(--tv-main-2, #00FF88);
+    color: var(--tv-main-2, #00FF88);
+}
+
+.browser-dock-sheet {
+    position: fixed;
+    top: auto;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    left: auto;
+    bottom: 0;
+    z-index: 8500;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: calc(var(--remote-min-width, 260px) * 2);
+    height: 0;
+    max-width: calc(100vw - 1.5rem);
+    max-height: 85vh;
+    background: transparent;
+    transform: translateY(100%);
+    transform-origin: bottom right;
+    transition: transform 0.25s ease;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.browser-dock-sheet.is-expanded {
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.browser-dock-sheet.is-expanded .browser-dock-sheet__inner {
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-bottom: none;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.browser-dock-sheet.is-collapsed:not(.is-expanded) {
+    height: 0 !important;
+    width: auto;
+}
+
+.browser-dock-sheet__resize {
+    flex: 0 0 6px;
+    cursor: row-resize;
+    touch-action: none;
+    align-self: stretch;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tv-border) 60%, transparent));
+}
+
+.browser-dock-sheet__resize.is-dragging {
+    background: var(--tv-main-2, #00FF88);
+}
+
+.browser-dock-sheet__inner {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--tv-bg-secondary, #141829);
+    border-radius: 18px 18px 0 0;
+    border: none;
+    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
+}
+
+body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--browser-end,
+.browser-module .remote-module__host > .tv-module__actions--browser-end {
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
+}
+
+.remote-dock-sheet__inner > .tv-module__actions--browser-end {
+    left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
+    right: auto;
+}
+
+/* Remote control panel */
+.remote-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--remote-grid-gap, 0.4rem) var(--tv-spacing-md) var(--tv-spacing-md);
+    box-sizing: border-box;
+}
+
+.remote-module__scroll > .tv-panel {
+    display: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.remote-module__scroll > .tv-panel.is-active {
+    display: flex;
+    flex-direction: column;
+}
+
+.remote-module__shell.is-subview .remote-panel {
+    display: none !important;
+}
+
+.remote-panel__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
+    gap: var(--remote-grid-gap, 0.4rem);
+    justify-content: stretch;
+    width: min(100%, var(--remote-min-width, 260px));
+}
+
+.remote-panel__cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--remote-btn-size, 40px);
+}
+
+.remote-panel__cell--spacer {
+    pointer-events: none;
+}
+
+.remote-panel__btn--digit {
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    line-height: 1;
+}
+
+.remote-panel__cell--slider,
+.remote-panel__cell--volume {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: stretch;
+    min-height: var(--remote-btn-size, 40px);
+}
+
+.remote-panel__volume-split {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    height: var(--remote-btn-size, 40px);
+    min-height: var(--remote-btn-size, 40px);
+    border-radius: calc(var(--remote-btn-size, 40px) / 2);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+/* Theme accent-3 hairline between TV / Master halves */
+.remote-panel__volume-split::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    background: var(--tv-main-3);
+    pointer-events: none;
+    z-index: 3;
+}
+
+.remote-panel__volume-split > .remote-volume-bar {
+    flex: 1 1 50%;
+    width: 100%;
+    min-width: 0;
+    height: 50%;
+    min-height: 0;
+    border-radius: 0;
+}
+
+.remote-panel__volume-split > .remote-volume-bar--tv {
+    border-bottom-width: 0;
+}
+
+.remote-panel__volume-split > .remote-volume-bar--master {
+    border-top-width: 0;
+}
+
+.remote-panel__volume-split .remote-volume-bar__role {
+    left: 0.65rem;
+    font-size: 0.55rem;
+}
+
+.remote-panel__volume-split .remote-volume-bar__pct {
+    font-size: 0.65rem;
+}
+
+.remote-panel__cell--volume > .remote-volume-bar {
+    width: 100%;
+    min-width: 0;
+}
+
+.remote-panel__volume-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.remote-volume-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--remote-btn-size, 40px);
+    min-height: var(--remote-btn-size, 40px);
+    border-radius: calc(var(--remote-btn-size, 40px) / 2);
+    border: 1px solid color-mix(in srgb, var(--volume-accent, var(--tv-main-1, #00FF88)) 22%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    cursor: pointer;
+    overflow: hidden;
+    --volume-fill: 0.85;
+    --volume-accent: var(--tv-main-1, #00FF88);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.remote-volume-bar--tv {
+    --volume-accent: var(--tv-main-1);
+}
+
+.remote-volume-bar--master {
+    --volume-accent: var(--tv-main-2);
+}
+
+.remote-volume-bar:hover,
+.remote-volume-bar:focus-within {
+    border-color: color-mix(in srgb, var(--volume-accent, var(--tv-main-1, #00FF88)) 45%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--volume-accent, var(--tv-main-1, #00FF88)) 18%, transparent);
+}
+
+.remote-volume-bar__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--volume-fill, 0) * 100%);
+    background: var(--volume-accent, var(--tv-main-1, #00FF88));
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.remote-volume-bar__role,
+.remote-volume-bar__pct {
+    position: relative;
+    z-index: 1;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--tv-text-secondary);
+    pointer-events: none;
+}
+
+.remote-volume-bar__role {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--tv-text-muted, var(--tv-text-secondary));
+}
+
+.remote-volume-bar__input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+.remote-volume-bar__input::-webkit-slider-runnable-track {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    height: 100%;
+}
+
+.remote-volume-bar__input::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.remote-volume-bar__input::-moz-range-track {
+    background: transparent;
+    border: none;
+    height: 100%;
+}
+
+.remote-volume-bar__input::-moz-range-thumb {
+    width: 0;
+    height: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.remote-panel__cell--nav {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.remote-panel__footer-nav.remote-panel__cell--nav {
+    display: flex;
+    justify-content: center;
+    width: auto;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+}
+
+.remote-panel__footer-nav .remote-panel__nav-btn,
+.remote-module__catalog-tools .remote-panel__nav-btn,
+.browser-window-controls .remote-panel__nav-btn,
+.layout-window-controls .remote-panel__nav-btn {
+    flex: 0 0 var(--remote-btn-size, 40px);
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+}
+
+.remote-panel__footer-screens .tv-controls__screens {
+    justify-content: center;
+    margin-left: 0;
+    flex-direction: row-reverse;
+    gap: var(--tv-spacing-sm);
+}
+
+.remote-panel__cell--screens,
+.remote-panel__footer-screens.remote-panel__cell--screens {
+    grid-column: 1 / -1;
+}
+
+/* (.remote-panel__btn / .remote-panel__nav-btn round-button chrome — rest,
+   hover and sizes — now lives in the single unified block near the top of
+   this file; bare class selectors cover the keypad and every footer scope.) */
+
+.remote-panel__volume {
+    width: 100%;
+    min-width: 0;
+    margin-right: 0;
+}
+
+.remote-panel__volume .tv-controls__volume-slider {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+}
+
+.remote-panel__nav-btn.is-active {
+    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+    transform: translateY(1px);
+}
+
+.remote-panel__nav-btn.is-pink-active {
+    color: var(--tv-secondary, #e879a9);
+    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+    transform: translateY(1px);
+}
+
+[data-remote-button-shape="ninja"] .remote-panel__nav-btn:is(.is-active, .is-pink-active) {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    filter: none;
+    transform: translateY(0);
+    opacity: 0.72;
+}
+
+:is([data-remote-button-shape="triangle-up"], [data-remote-button-shape="triangle-down"], [data-remote-button-shape="hexagon"], [data-remote-button-shape="rhombus"]) .remote-panel__nav-btn:is(.is-active, .is-pink-active) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    filter:
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+    transform: translateY(1px);
+}
+
+[data-remote-button-shape="triangles-alt"] .remote-panel__nav-btn:is(.is-active, .is-pink-active) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    filter:
+        drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+    transform: translateY(1px);
+}
+
+/* Hide/collapse chevron on browser header — arrow down for collapse */
+#browser-collapse-header-btn svg {
+    transition: transform 0.2s ease;
+}
+
+.remote-module__catalog-tools .tv-tab-popup,
+.remote-module__catalog-tools #sort-dir-btn,
+.remote-module__catalog-tools #back-btn,
+.remote-module__catalog-tools #play-favorites-mosaic-btn,
+.remote-module__catalog-tools #create-favorite-folder-btn {
+    display: inline-flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Filter/category/sort live in the button strip when closed; when open they are
+   portaled to document.body (.is-catalog-tool-popout) so the footer never clips them. */
+.remote-module__catalog-tools .tv-tab--filter-input,
+.remote-module__catalog-tools .tv-tab--category,
+.remote-module__catalog-tools .tv-tab--sort {
+    /* Keep collapsed panels out of strip layout / scroll metrics. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: none;
+}
+
+.remote-panel__footer-tools-row,
+.remote-module__catalog-tools,
+.remote-module__footer {
+    overflow-x: hidden;
+    overflow-y: hidden;
+}
+
+body > .is-catalog-tool-popout.tv-tab--filter-input,
+body > .is-catalog-tool-popout.tv-tab--category,
+body > .is-catalog-tool-popout.tv-tab--sort {
+    clip: auto;
+    overflow: visible;
+    white-space: normal;
+    height: auto;
+    margin: 0;
+    padding: 0.45rem 0.6rem;
+    border-radius: 8px;
+    background: var(--tv-bg-secondary, #12151f);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    opacity: 1;
+    pointer-events: auto;
+    font-size: 0.875rem;
+    color: var(--tv-text-primary, #e8eaef);
+}
+
+/* (footer-chrome circular chrome folded into the unified round-button block
+   near the top of this file — bare class selectors cover it.) */
+
+body.remote-docked-expanded .remote-dock-tab {
+    display: none;
+}
+
+/* --- Remote external popout (Document PiP / popup window) --- */
+
+.remote-popout-body {
+    margin: 0;
+    min-height: 100vh;
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    background: var(--tv-bg-primary, #0a0c14);
+    color: var(--tv-text-primary, #e8eaef);
+    overflow: hidden;
+    opacity: 1 !important;
+}
+
+.remote-popout-body > .remote-module__host {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    opacity: 1 !important;
+}
+
+.remote-popout-body > .remote-module__host > .tv-module__body,
+.remote-popout-body > .remote-module__host > #tv-catalog-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 1 !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+body.remote-external-popout-active--full .remote-dock-tab,
+body.remote-external-popout-active--full .remote-dock-sheet,
+body.remote-external-popout-active--full #remote-module,
+body.remote-external-popout-active--full .remote-module__dialog {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.remote-popout-placeholder {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    border: 1px dashed color-mix(in srgb, #60a5fa 55%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--tv-bg-secondary, #141829) 88%, transparent);
+    overflow: hidden;
+}
+
+.remote-popout-placeholder.is-popout-locked .remote-popout-placeholder__body {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.remote-popout-placeholder__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid var(--tv-border, #2A2E3A);
+    position: relative;
+    z-index: 7;
+    pointer-events: auto;
+}
+
+.remote-popout-placeholder__title {
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+    opacity: 0.72;
+    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.remote-popout-placeholder__spacer {
+    flex: 1;
+}
+
+.remote-popout-placeholder__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.remote-popout-placeholder__body {
+    flex: 1;
+    min-height: 4rem;
+}
+
+.remote-popout-lock-overlay {
+    z-index: 6;
+}
+
+.remote-popout-lock-overlay .note-popout-lock-icon {
+    pointer-events: auto;
+}
+
+#remote-external-popout-btn.is-active {
+    color: var(--tv-main-2, #93c5fd);
+}
+
+/* Dock ghost fix — hide collapsed / inactive dock chrome */
+body.remote-undocked-open .remote-dock-sheet,
+body.remote-undocked-open .remote-dock-tab {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.remote-dock-sheet:not(.is-expanded):not(.is-collapsing) .remote-dock-sheet__inner {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+

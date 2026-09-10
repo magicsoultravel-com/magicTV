@@ -486,7 +486,7 @@ test('playOnSlot cancels slot prefetch for classic mode at switch start', async 
     const fs = await import('node:fs');
     const path = await import('node:path');
     const src = fs.readFileSync(
-        path.join(process.cwd(), 'js/multiView.js'),
+        path.join(process.cwd(), 'js/mosaic/playback.js'),
         'utf8'
     );
     assert.match(src, /cancelSlotPrefetch\(id\)/);

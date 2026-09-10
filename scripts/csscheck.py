@@ -5,7 +5,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FILES = [ROOT / "css/tv-landing.css"] + sorted((ROOT / "css/components").glob("*.css"))
+FILES = [ROOT / "css/tv-landing.css"] + sorted(
+    list((ROOT / "css/components").glob("*.css"))
+    + list((ROOT / "css/components").glob("**/*.css"))
+)
+# de-dupe while preserving order
+_seen = set()
+FILES = [p for p in FILES if not (p in _seen or _seen.add(p))]
 
 
 def strip_non_code(src: str) -> str:

@@ -72,7 +72,8 @@ magicTV/
 │       ├── player.css       # Player slots, playback surfaces, swap animations, controls
 │       ├── settings.css     # Settings panels, appearance controls, responsive tweaks
 │       ├── modals.css       # Channel picker modal, tab-bar popups
-│       └── remote.css       # Remote module, textures, external popouts (PiP/popup)
+│       ├── remote.css       # Aggregator → remote/*.css (shell, shapes, panel, textures, pickers)
+│       └── remote/          # Remote module parts (shell, shapes, panel, textures, pickers)
 ├── js/
 │   ├── app.js             # Main app logic (tabs, events, state)
 │   ├── tvPlayer.js        # HLS player state machine (extracted)

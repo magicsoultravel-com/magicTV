@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readCssWithImports } from './helpers/readCssWithImports.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
@@ -35,7 +36,7 @@ test('remote volume is one pill-height row split into half-height TV / Master', 
     const volumeCells = html.match(/class="remote-panel__cell remote-panel__cell--volume"/g) || [];
     assert.equal(volumeCells.length, 1, 'exactly one volume grid cell');
 
-    const css = readFileSync(join(root, 'css/components/remote.css'), 'utf8');
+    const css = readCssWithImports(join(root, 'css/components/remote.css'));
     assert.match(css, /\.remote-panel__volume-split\s*\{[^}]*flex-direction:\s*column/s);
     assert.match(css, /\.remote-panel__volume-split\s*\{[^}]*height:\s*var\(--remote-btn-size/s);
     assert.match(css, /\.remote-panel__volume-split\s*>\s*\.remote-volume-bar\s*\{[^}]*height:\s*50%/s);

@@ -1,0 +1,88 @@
+/** @css {part}: remote shell textures */
+/* --- Remote shell textures (theme supplies color) --- */
+
+.remote-module__shell {
+    position: relative;
+    isolation: isolate;
+}
+
+.remote-module__shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+}
+
+.remote-module__shell > * > * {
+    position: relative;
+    z-index: 1;
+}
+
+[data-remote-texture="none"] .remote-module__shell::before {
+    display: none;
+}
+
+[data-remote-texture="carbon"] .remote-module__shell::before {
+    opacity: 0.16;
+    background-image:
+        repeating-linear-gradient(
+            45deg,
+            transparent 0 3px,
+            color-mix(in srgb, var(--tv-text-primary) 22%, transparent) 3px 4px
+        ),
+        repeating-linear-gradient(
+            -45deg,
+            transparent 0 3px,
+            color-mix(in srgb, var(--tv-text-primary) 14%, transparent) 3px 4px
+        );
+}
+
+[data-remote-texture="brushed"] .remote-module__shell::before {
+    opacity: 0.12;
+    background-image: repeating-linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--tv-text-primary) 10%, transparent) 0 1px,
+        transparent 1px 3px
+    );
+}
+
+[data-remote-texture="noise"] .remote-module__shell::before {
+    opacity: 0.1;
+    background-image:
+        radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--tv-text-primary) 18%, transparent) 0 0.6px, transparent 0.7px),
+        radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--tv-text-primary) 14%, transparent) 0 0.5px, transparent 0.6px),
+        radial-gradient(circle at 40% 80%, color-mix(in srgb, var(--tv-text-primary) 12%, transparent) 0 0.55px, transparent 0.65px);
+    background-size: 4px 4px, 5px 5px, 6px 6px;
+}
+
+[data-remote-texture="grid"] .remote-module__shell::before {
+    opacity: 0.11;
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--tv-text-primary) 16%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--tv-text-primary) 16%, transparent) 1px, transparent 1px);
+    background-size: 14px 14px;
+}
+
+[data-remote-texture="dots"] .remote-module__shell::before {
+    opacity: 0.13;
+    background-image: radial-gradient(
+        circle,
+        color-mix(in srgb, var(--tv-text-primary) 28%, transparent) 0 0.55px,
+        transparent 0.6px
+    );
+    background-size: 6px 6px;
+}
+
+[data-remote-texture="weave"] .remote-module__shell::before {
+    opacity: 0.12;
+    background-image:
+        repeating-linear-gradient(0deg, transparent 0 7px, color-mix(in srgb, var(--tv-text-primary) 12%, transparent) 7px 8px),
+        repeating-linear-gradient(90deg, transparent 0 7px, color-mix(in srgb, var(--tv-text-primary) 10%, transparent) 7px 8px);
+}
+
+.remote-popout-body .remote-module__shell::before {
+    border-radius: 0;
+}
+

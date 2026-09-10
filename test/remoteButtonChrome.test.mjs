@@ -1,15 +1,15 @@
 /**
  * Static CSS budgets for remote button chrome + catalog tool popouts.
- * Reads remote.css — does not boot the app.
+ * Reads remote.css (and nested @imports) — does not boot the app.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readCssWithImports } from './helpers/readCssWithImports.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const css = readFileSync(join(root, 'css/components/remote.css'), 'utf8');
+const css = readCssWithImports(join(root, 'css/components/remote.css'));
 
 /** Max drop-shadow() calls inside any single filter: declaration. */
 function maxDropShadowsPerFilter(source) {
@@ -61,7 +61,7 @@ test('catalog filter/category/sort are portaled out of the footer when open', ()
 
 test('ninja shape still strips button chrome', () => {
     const ninja = css.match(
-        /\[data-remote-button-shape="ninja"\]\s+\.remote-panel__btn,\s*\n\[data-remote-button-shape="ninja"\]\s+\.remote-panel__nav-btn\s*\{[^}]+\}/
+        /\[data-remote-button-shape="ninja"\]\s+:is\(\.remote-panel__btn,\s*\.remote-panel__nav-btn\)\s*\{[^}]+\}/
     );
     assert.ok(ninja, 'missing ninja shape block');
     assert.match(ninja[0], /filter:\s*none/);

@@ -1,7 +1,5 @@
-import { TvProviderRegistry } from '../tvProviders/registry.js';
 import {
     channelKey,
-    parseChannelKey,
     normalizeChannel
 } from '../tvProviders/channelShape.js';
 import {
@@ -13,7 +11,6 @@ import {
 } from '../storage/playerState.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import {
-    addWatchSeconds,
     registerWatchAccrualFlusher,
     unregisterWatchAccrualFlusher,
     registerWatchAccrualAborter,
@@ -26,8 +23,6 @@ import {
     applyQualityMode,
     listQualityLevels,
     formatQualityLabel,
-    bindHlsPlaybackHandlers,
-    syncHlsPlaybackState,
     LIVE_MAX_LATENCY_DURATION_COUNT
 } from './hlsAttach.js';
 import { snapshotVideoPoster, snapshotVideoFrame } from '../tiles/streamCapture.js';
@@ -36,16 +31,12 @@ import { PosterCache } from '../storage/posterCache.js';
 import { FrameCache } from '../storage/frameCache.js';
 import { ChannelPreloader, PRELOAD_STALL_MS } from './channelPreloader.js';
 import {
-    consumePrefetched,
     cancelSlotPrefetch,
-    evictPrefetchedKey,
     scheduleSlotPrefetch
 } from './channelPrefetch.js';
 import {
     computeParkBehindTime,
     computeResumeSeekTime,
-    shouldAcceptPlayingEvent,
-    shouldAcceptPauseEvent,
     shouldClearWasPlayingOnAutoplayBlock,
     shouldPauseOnToggle,
     shouldClearWantPlayingOnPlayFail,
@@ -53,9 +44,6 @@ import {
     shouldContinuePlayAfterAttach,
     shouldBumpPlayGenerationOnPause,
     isAutoplayNotAllowedError,
-    shouldRetryPlayMuted,
-    isHealthyWatchPlayback,
-    shouldClearStaleBufferOnTimeupdate,
     shouldFreshResume,
     shouldRecoverStuckLoad
 } from './pauseBuffer.js';
@@ -64,9 +52,14 @@ import {
     releasePausedFill
 } from './loadBudget.js';
 import { tvDebug } from './tvDebug.js';
-
-/** Max wall-clock seconds credited in a single flush (guards hidden-tab / stuck windows). */
-const WATCH_ACCRUAL_FLUSH_CAP_SEC = 30;
+import { createWatchAccrualControllers } from './watchAccrual.js';
+import { bindPlayerVideoEvents } from './videoEvents.js';
+import {
+    attachPrepareCommitMethods,
+    resolveChannelInput,
+    playAfterAttach,
+    tryMutedAutoplayRetry
+} from './prepareCommit.js';
 
 /** No load progress for this long while wanting play ⇒ stall (then one hls.startLoad retry). */
 const STUCK_LOAD_STALL_MS = PRELOAD_STALL_MS;
@@ -96,68 +89,11 @@ export function createPlayerInstance(options) {
         shouldRecordRecents = () => true
     } = options;
 
-    const watchPlaybackState = () => ({
-        hasChannel: Boolean(player.channel),
-        playing: player.playing,
-        loading: player.loading,
-        loadPhase: player.loadPhase,
-        wantPlaying: player.wantPlaying,
-        error: player.error,
-        pausePhase: player.pausePhase,
-        stopped: player.stopped,
-        posterDataUrl: player.posterDataUrl
-    });
-
-    const endWatchAccrual = (credit = true) => {
-        if (!player.watchAccrueStartedAt || !player.watchAccrueKey) return;
-        if (credit) {
-            const elapsed = Math.min(
-                (Date.now() - player.watchAccrueStartedAt) / 1000,
-                WATCH_ACCRUAL_FLUSH_CAP_SEC
-            );
-            if (elapsed > 0) {
-                addWatchSeconds(player.watchAccrueKey, elapsed, player.channel);
-            }
-        }
-        player.watchAccrueKey = null;
-        player.watchAccrueStartedAt = null;
-    };
-
-    const flushWatchAccrual = () => endWatchAccrual(true);
-
-    const abortWatchAccrual = () => endWatchAccrual(false);
-
-    const syncWatchAccrual = () => {
-        if (!shouldRecordRecents()) return;
-        const key = channelKey(player.channel);
-        if (!key) {
-            flushWatchAccrual();
-            return;
-        }
-        if (isHealthyWatchPlayback(watchPlaybackState())) {
-            if (player.watchAccrueKey === key && player.watchAccrueStartedAt) {
-                const openFor = (Date.now() - player.watchAccrueStartedAt) / 1000;
-                // Bank periodically so long sessions aren't lost to the per-flush safety cap.
-                if (openFor < WATCH_ACCRUAL_FLUSH_CAP_SEC) return;
-                flushWatchAccrual();
-                player.watchAccrueKey = key;
-                player.watchAccrueStartedAt = Date.now();
-                return;
-            }
-            flushWatchAccrual();
-            player.watchAccrueKey = key;
-            player.watchAccrueStartedAt = Date.now();
-            return;
-        }
-        flushWatchAccrual();
-    };
-
-    const snapshotWatchAccrual = () => {
-        flushWatchAccrual();
-        // Do not restart accrual while hidden — wall-clock would inflate in the background.
-        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-        syncWatchAccrual();
-    };
+    /** @type {ReturnType<typeof createWatchAccrualControllers>} */
+    let watchCtrl;
+    const syncWatchAccrual = () => watchCtrl.syncWatchAccrual();
+    const abortWatchAccrual = () => watchCtrl.abortWatchAccrual();
+    const snapshotWatchAccrual = () => watchCtrl.snapshotWatchAccrual();
 
     const player = {
         id,
@@ -226,135 +162,7 @@ export function createPlayerInstance(options) {
         _stuckLoadTick: null,
 
         _bindVideoEvents(videoEl) {
-            if (!videoEl) return;
-            const isActive = () => videoEl === this.video;
-
-            videoEl.addEventListener('loadstart', () => {
-                if (!isActive()) return;
-                this._noteLoadProgress('loadstart');
-                this.loadPhase = 'connecting';
-                this.emitState();
-            });
-            videoEl.addEventListener('canplay', () => {
-                if (!isActive()) return;
-                this._noteLoadProgress('canplay');
-                if (this.loadPhase !== 'idle') {
-                    this.loadPhase = 'idle';
-                    this.emitState();
-                }
-            });
-            videoEl.addEventListener('canplaythrough', () => {
-                if (!isActive()) return;
-                this._noteLoadProgress('canplaythrough');
-                if (this.loading) {
-                    this.loading = false;
-                    this.emitState();
-                }
-                this._clearStuckLoadWatchdog();
-            });
-            videoEl.addEventListener('playing', () => {
-                if (!isActive()) return;
-                this._clearStuckLoadWatchdog();
-                if (!shouldAcceptPlayingEvent(this.wantPlaying)) {
-                    return;
-                }
-                this.playing = true;
-                this.loading = false;
-                this.loadPhase = 'idle';
-                this.pausePhase = 'idle';
-                this.stopped = false;
-                this.error = null;
-                this.resumeBlocked = false;
-                this.posterDataUrl = null;
-                if (shouldRecordRecents()) savePlayerState({ wasPlaying: true });
-                const key = channelKey(this.channel);
-                if (shouldRecordRecents() && key && this.recentRecordedForKey !== key) {
-                    this.recentRecordedForKey = key;
-                    FavoritesRecents.pushRecent(key, this.channel);
-                    FavoritesRecents.markVisited(key, this.channel);
-                }
-                this.emitState();
-                scheduleSlotPrefetch(this.id, this);
-            });
-            videoEl.addEventListener('timeupdate', () => {
-                if (!isActive()) return;
-                this._noteLoadProgress('timeupdate');
-                if (this.pausePhase !== 'idle') {
-                    this.updatePauseBuffer();
-                }
-                if (shouldClearStaleBufferOnTimeupdate({
-                    wantPlaying: this.wantPlaying,
-                    playing: this.playing,
-                    videoPaused: this.video?.paused !== false,
-                    loading: this.loading,
-                    loadPhase: this.loadPhase
-                })) {
-                    this.loading = false;
-                    this.loadPhase = 'idle';
-                    this.emitState();
-                    return;
-                }
-                this._clearStuckLoadWatchdog();
-                syncWatchAccrual();
-            });
-            videoEl.addEventListener('progress', () => {
-                if (!isActive()) return;
-                this._noteLoadProgress('progress');
-                if (this.pausePhase !== 'idle') {
-                    this.updatePauseBuffer();
-                }
-                this._clearStuckLoadWatchdog();
-            });
-            videoEl.addEventListener('pause', () => {
-                if (!isActive()) return;
-                if (!shouldAcceptPauseEvent(this.wantPlaying)) {
-                    return;
-                }
-                this.playing = false;
-                if (this.pausePhase !== 'idle') {
-                    this.updatePauseBuffer();
-                }
-                this.emitState();
-            });
-            videoEl.addEventListener('waiting', () => {
-                if (!isActive()) return;
-                if (this.wantPlaying !== true) return;
-                this.loading = true;
-                this.loadPhase = 'buffering';
-                if (this.pausePhase !== 'idle') {
-                    this.pausePhase = 'buffering';
-                }
-                this._armStuckLoadWatchdog();
-                this.emitState();
-            });
-            videoEl.addEventListener('stalled', () => {
-                if (!isActive()) return;
-                if (this.wantPlaying !== true) return;
-                if (this.playing || this.loading) {
-                    this.loadPhase = 'buffering';
-                    if (this.pausePhase !== 'idle') {
-                        this.pausePhase = 'buffering';
-                    }
-                    this._armStuckLoadWatchdog();
-                    this.emitState();
-                }
-            });
-            videoEl.addEventListener('error', () => {
-                if (!isActive()) return;
-                this._clearStuckLoadWatchdog();
-                this.loading = false;
-                this.loadPhase = 'idle';
-                this.playing = false;
-                this.error = 'Stream unavailable';
-                this.emitState();
-            });
-            videoEl.addEventListener('ended', () => {
-                if (!isActive()) return;
-                this._clearStuckLoadWatchdog();
-                this.playing = false;
-                this.loadPhase = 'idle';
-                this.emitState();
-            });
+            bindPlayerVideoEvents(this, videoEl, { shouldRecordRecents, syncWatchAccrual });
         },
 
         init() {
@@ -619,426 +427,6 @@ export function createPlayerInstance(options) {
                 this.video.muted = false;
                 this.video.volume = heard;
             }
-        },
-
-        async _resolveChannelInput(channelOrKey, generation) {
-            let channel = typeof channelOrKey === 'object' && channelOrKey !== null
-                ? channelOrKey
-                : null;
-
-            if (!channel && typeof channelOrKey === 'string') {
-                const parsed = parseChannelKey(channelOrKey);
-                channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation != null && generation !== this.switchGeneration) {
-                    return null;
-                }
-            }
-
-            if (channel && !channel.url_resolved) {
-                const parsed = parseChannelKey(channelKey(channel));
-                channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation != null && generation !== this.switchGeneration) {
-                    return null;
-                }
-            }
-
-            const key = channelKey(channel);
-            if (!key || !channel?.url_resolved) return null;
-            return { channel, key };
-        },
-
-        _adoptPrefetchedStaging(prefetched) {
-            if (!prefetched?.video) return false;
-            this._preloader.cancel();
-            const discarded = this.videoBack;
-            this.videoBack = prefetched.video;
-            if (discarded && discarded !== prefetched.video && discarded !== this.video) {
-                // Remove the orphaned staging element instead of parking it in the holder —
-                // otherwise every prefetched handoff leaks a <video> into the hidden holder.
-                try { discarded.pause(); } catch { /* ignore */ }
-                discarded.removeAttribute('src');
-                try { discarded.load(); } catch { /* ignore */ }
-                discarded.remove?.();
-            }
-            if (this.videoMount && this.videoBack.parentElement === this.videoMount) {
-                if (this.videoHolder) this.videoHolder.appendChild(this.videoBack);
-            }
-            this.videoBack.classList.add('tv-video--staging');
-            this.videoBack.muted = true;
-            this.videoBack.defaultMuted = true;
-            if (this.videoBack.parentElement !== this.videoHolder) {
-                this.videoHolder.appendChild(this.videoBack);
-            }
-            this._bindVideoEvents(prefetched.video);
-            this._preloader.adoptPrepared({
-                video: this.videoBack,
-                hls: prefetched.hls,
-                channel: prefetched.channel,
-                url: prefetched.channel?.url_resolved || ''
-            });
-            return true;
-        },
-
-        /**
-         * Whether the staging buffer is warmed and ready to swap in.
-         * @returns {boolean}
-         */
-        isPrepareReady() {
-            return this._preloader?.isReady() === true;
-        },
-
-        /**
-         * Staging buffer warmed enough to swap — readyState ≥ 2 (decoded data), dimensions optional.
-         * @returns {boolean}
-         */
-        isPrepareReadyWithFrame() {
-            if (!this.isPrepareReady()) return false;
-            const staging = this.videoBack;
-            return Boolean(staging && staging.readyState >= 2);
-        },
-
-        /**
-         * Wait for in-flight warm-up; returns when ready, stalled, or superseded.
-         * @param {number} [switchGen]
-         * @returns {Promise<boolean>}
-         */
-        async waitForPrepareReady(switchGen) {
-            if (switchGen != null && switchGen !== this.switchGeneration) return false;
-            if (this.isPrepareReadyWithFrame()) return true;
-
-            const promise = this._preparePromise;
-            if (promise) {
-                try {
-                    await promise;
-                } catch { /* warm failed */ }
-            }
-
-            if (switchGen != null && switchGen !== this.switchGeneration) return false;
-
-            if (this.isPrepareReadyWithFrame()) return true;
-
-            const preloader = this._preloader;
-            if (preloader?.isMakingProgress?.()) {
-                const deadline = Date.now() + PRELOAD_STALL_MS;
-                while (Date.now() < deadline) {
-                    if (switchGen != null && switchGen !== this.switchGeneration) return false;
-                    if (this.isPrepareReadyWithFrame()) return true;
-                    if (!preloader.isMakingProgress()) break;
-                    await new Promise((r) => setTimeout(r, 80));
-                }
-            }
-
-            return this.isPrepareReadyWithFrame();
-        },
-
-        async _awaitPrepareReady(switchGen) {
-            await this.waitForPrepareReady(switchGen);
-        },
-
-        /**
-         * Internal warm-up worker for startPrepareChannel.
-         * @param {object|string} channelOrKey
-         * @param {number} switchGen
-         * @param {{ suppressUi?: boolean }} [opts]
-         * @returns {Promise<boolean>}
-         */
-        async _runPrepare(channelOrKey, switchGen, { suppressUi = false } = {}) {
-            const prepareGen = this.prepareGeneration;
-            const isStale = () => switchGen !== this.switchGeneration
-                || prepareGen !== this.prepareGeneration;
-            const resolved = await this._resolveChannelInput(channelOrKey, switchGen);
-            if (!resolved || isStale()) return false;
-
-            const { channel, key } = resolved;
-            const prefetched = consumePrefetched(this.id, key);
-            if (prefetched && this._adoptPrefetchedStaging(prefetched)) {
-                this.preparedTarget = channel;
-                if (!suppressUi) {
-                    this.preparing = false;
-                    this.emitState();
-                }
-                return true;
-            }
-
-            this._preloader.cancel();
-            this.preparedTarget = channel;
-            if (!suppressUi) {
-                this.preparing = true;
-                this.emitState();
-            }
-
-            // Warm the staging element while RENDERED but offscreen. Browsers throttle
-            // media inside display:none subtrees (the videoHolder is is-hidden), leaving
-            // warm-ups to always time out. Prefetch already does this on <body>; mirror it.
-            let movedToBody = false;
-            const back = this.videoBack;
-            if (back) {
-                const doBody = typeof document !== 'undefined' && document.body;
-                if (doBody && back.parentElement !== document.body) {
-                    try {
-                        document.body.appendChild(back);
-                        back.classList.add('tv-video--staging');
-                        back.classList.remove('tv-video--prefetch');
-                        back.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:160px;height:90px;opacity:0;pointer-events:none;';
-                        movedToBody = true;
-                    } catch { /* keep holder */ }
-                }
-            }
-
-            const ok = await this._preloader.warmChannel(back, channel, {
-                isStale
-            });
-
-            if (isStale()) return false;
-
-            if (!movedToBody && back) {
-                // Ensure staging styling so a promoted front video is visible later.
-                back.classList.add('tv-video--staging');
-                back.classList.remove('tv-video--prefetch');
-            }
-            if (!suppressUi) {
-                this.preparing = false;
-                if (ok) this.preparedTarget = channel;
-                else this.preparedTarget = null;
-                this.emitState();
-            } else if (!ok) {
-                this.preparedTarget = null;
-            } else {
-                this.preparedTarget = channel;
-            }
-            return ok;
-        },
-
-        /**
-         * Cancel offscreen warm-up without touching the visible stream.
-         */
-        cancelPrepare() {
-            this.prepareGeneration += 1;
-            this._preloader?.cancel();
-            this._preparePromise = null;
-            this.preparing = false;
-            this.preparedTarget = null;
-        },
-
-        /**
-         * Kick off background warm-up (non-blocking). Idempotent per switchGeneration.
-         * @param {object|string} channelOrKey
-         * @param {number} switchGen
-         * @param {{ suppressUi?: boolean }} [opts]
-         * @returns {Promise<boolean>}
-         */
-        startPrepareChannel(channelOrKey, switchGen, opts = {}) {
-            this.init();
-            if (switchGen != null && switchGen !== this.switchGeneration) {
-                return Promise.resolve(false);
-            }
-            if (this._preparePromise && this._prepareSwitchGen === switchGen) {
-                return this._preparePromise;
-            }
-
-            this.prepareGeneration += 1;
-            this._prepareSwitchGen = switchGen;
-            this._preparePromise = this._runPrepare(channelOrKey, switchGen, opts).finally(() => {
-                if (this._prepareSwitchGen === switchGen) {
-                    this._preparePromise = null;
-                }
-            });
-            return this._preparePromise;
-        },
-
-        /**
-         * @deprecated Use startPrepareChannel — kept for callers that await warm-up.
-         */
-        prepareChannel(channelOrKey, switchGen) {
-            const gen = switchGen ?? ++this.switchGeneration;
-            return this.startPrepareChannel(channelOrKey, gen);
-        },
-
-        /**
-         * Swap the warmed staging buffer into the visible player.
-         * Falls back to playChannel when warm-up did not complete.
-         * @param {object|string} [channelOrKey]
-         * @param {number} [switchGen]
-         * @param {{ allowFallback?: boolean }} [opts]
-         * @returns {Promise<boolean|void>}
-         */
-        async commitPreparedChannel(channelOrKey, switchGen, opts = {}) {
-            const allowFallback = opts.allowFallback !== false;
-            this.init();
-            if (switchGen != null && switchGen !== this.switchGeneration) return false;
-            this._clearStuckLoadWatchdog();
-
-            await this._awaitPrepareReady(switchGen);
-            if (switchGen != null && switchGen !== this.switchGeneration) return false;
-
-            const fallbackInput = channelOrKey || this.preparedTarget;
-            const fallbackResolved = fallbackInput
-                ? await this._resolveChannelInput(fallbackInput, switchGen)
-                : null;
-
-            if (!this._preloader.isReady()) {
-                if (fallbackResolved?.channel) {
-                    if (switchGen != null && switchGen !== this.switchGeneration) return false;
-                    if (!allowFallback) return this._failPreparedSwitch(switchGen);
-                    return this._fallbackPlayChannel(fallbackResolved.channel);
-                }
-                return this._failPreparedSwitch(switchGen);
-            }
-
-            const stagingVideo = this.videoBack;
-            if (!(stagingVideo && stagingVideo.readyState >= 2)) {
-                return this._failPreparedSwitch(switchGen);
-            }
-
-            const generation = ++this.playGeneration;
-            this._stuckLoadRetried = false;
-            this._loadLastProgressAt = Date.now();
-            const taken = this._preloader.takeover();
-            const channel = taken.channel || fallbackResolved?.channel;
-            const key = channelKey(channel);
-            if (!key || !channel?.url_resolved) {
-                if (fallbackResolved?.channel) {
-                    if (switchGen != null && switchGen !== this.switchGeneration) return false;
-                    if (!allowFallback) return this._failPreparedSwitch(switchGen);
-                    return this._fallbackPlayChannel(fallbackResolved.channel);
-                }
-                return this._failPreparedSwitch(switchGen);
-            }
-
-            if (switchGen != null && switchGen !== this.switchGeneration) return false;
-
-            this.recentRecordedForKey = null;
-            this.error = null;
-            this.resumeBlocked = false;
-            this.stopped = false;
-            this.pausePhase = 'idle';
-            const transportAtStart = this.beginTransport(true);
-            this.setPauseLiveSync(false);
-            TileFrames.armLiveSnap(channel.url_resolved || '');
-
-            let swapCompleted = false;
-
-            await this.destroyHls();
-            try { this.video?.pause(); } catch { /* ignore */ }
-
-            await this._exitPresentationBeforeSwap();
-
-            const oldFront = this.video;
-            this.video = this.videoBack;
-            this.videoBack = oldFront;
-            this.hls = taken.hls;
-            if (this.hls) {
-                applyHlsBufferConfig(this.hls, this.getBufferSize());
-                this.qualityMode = applyQualityMode(this.hls, this.qualityMode);
-                // Re-wire live handling so the taken-over stream stays healthy:
-                // fatal errors surface as error state + retry, non-fatal errors
-                // call startLoad()/recoverMediaError(), and quality/latency updates
-                // keep flowing. Without this the promoted hls is a dead shell whose
-                // warm-up handlers were already consumed by the preloader.
-                this._onPlaybackFatal = null;
-                bindHlsPlaybackHandlers(this, this.hls, generation);
-                syncHlsPlaybackState(this, this.hls, this.video);
-            }
-
-            this._recycleStagingVideo();
-            this._promoteFrontVideo();
-            if (this.videoMount) {
-                this.videoMount.classList.remove('is-hidden');
-                this._syncVideoMount();
-            }
-            if (this.videoMount !== this.videoHolder) {
-                this.videoHolder.classList.add('is-hidden');
-            }
-
-            this.channel = normalizeChannel(channel, channel.providerId) || channel;
-            this.preparing = false;
-            this.preparedTarget = null;
-            swapCompleted = true;
-
-            if (shouldRecordRecents()) {
-                savePlayerState({
-                    lastChannelKey: key,
-                    lastChannelName: channel.name || ''
-                });
-            }
-
-            const v = this.video;
-            if (!(v && v.readyState >= 2)) {
-                return this._failPreparedSwitch(switchGen);
-            }
-
-            this.loading = false;
-            this.loadPhase = 'idle';
-            this.posterDataUrl = null;
-
-            const playPromoted = async () => {
-                try {
-                    await this.video.play();
-                } catch (playErr) {
-                    if (!shouldContinuePlayAfterAttach({
-                        generation,
-                        playGeneration: this.playGeneration,
-                        wantPlaying: this.wantPlaying,
-                        transportGen: this.transportGen,
-                        transportAtStart
-                    })) {
-                        return false;
-                    }
-                    if (shouldRetryPlayMuted({
-                        blocked: isAutoplayNotAllowedError(playErr),
-                        muted: this.muted
-                    })) {
-                        this.muted = true;
-                        this.applyAudioToVideo();
-                        await this.video.play();
-                        return true;
-                    }
-                    if (playErr?.name === 'AbortError') {
-                        await new Promise((r) => setTimeout(r, 50));
-                        await this.video.play();
-                        return true;
-                    }
-                    throw playErr;
-                }
-                return true;
-            };
-
-            try {
-                const played = await playPromoted();
-                if (!played) return false;
-            } catch {
-                return this._failPreparedSwitch(switchGen);
-            }
-
-            this._refreshAudioAfterSwap();
-
-            if (!shouldContinuePlayAfterAttach({
-                generation,
-                playGeneration: this.playGeneration,
-                wantPlaying: this.wantPlaying,
-                transportGen: this.transportGen,
-                transportAtStart
-            })) {
-                try { this.video?.pause(); } catch { /* ignore */ }
-                return this._failPreparedSwitch(switchGen);
-            }
-
-            this.playing = true;
-            this.wantPlaying = true;
-            this.connection = 'connected';
-            this._enterPauseAt = 0;
-            this._pausedFillArmed = false;
-            releasePausedFill(this.id);
-            this.emitState();
-
-            if (swapCompleted) {
-                if (switchGen == null || switchGen === this.switchGeneration) {
-                    evictPrefetchedKey(this.id, key);
-                    scheduleSlotPrefetch(this.id, this);
-                }
-                return true;
-            }
-            return false;
         },
 
         emitState() {
@@ -1337,25 +725,19 @@ export function createPlayerInstance(options) {
                         });
                         return;
                     }
-                    if (
-                        shouldRetryPlayMuted({
-                            blocked: isAutoplayNotAllowedError(err),
-                            muted: this.muted
-                        })
-                    ) {
-                        this.muted = true;
-                        this.applyAudioToVideo();
-                        const mutedPlay = video.play();
-                        mutedPlay?.then(() => {
-                            if (gen !== this.transportGen || !this.wantPlaying) {
-                                try { video.pause(); } catch { /* ignore */ }
-                            }
-                        }).catch(() => {
-                            if (gen !== this.transportGen || !this.wantPlaying) return;
+                    void tryMutedAutoplayRetry(this, err).then((retried) => {
+                        if (!retried) {
                             this._failResume(gen);
-                        });
-                        return;
-                    }
+                            return;
+                        }
+                        if (gen !== this.transportGen || !this.wantPlaying) {
+                            try { video.pause(); } catch { /* ignore */ }
+                        }
+                    }).catch(() => {
+                        if (gen !== this.transportGen || !this.wantPlaying) return;
+                        this._failResume(gen);
+                    });
+                    return;
                     this._failResume(gen);
                 });
             };
@@ -1549,24 +931,15 @@ export function createPlayerInstance(options) {
             this.preparing = false;
             this.preparedTarget = null;
             const generation = ++this.playGeneration;
-            let channel = typeof channelOrKey === 'object' && channelOrKey !== null
-                ? channelOrKey
-                : null;
 
-            if (!channel && typeof channelOrKey === 'string') {
-                const parsed = parseChannelKey(channelOrKey);
-                channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation !== this.playGeneration) return;
-            }
-
-            if (channel && !channel.url_resolved) {
-                const parsed = parseChannelKey(channelKey(channel));
-                channel = await TvProviderRegistry.getChannel(parsed);
-                if (generation !== this.playGeneration) return;
-            }
-
-            const key = channelKey(channel);
-            if (!key || !channel) return;
+            const resolved = await resolveChannelInput(
+                this,
+                channelOrKey,
+                () => generation === this.playGeneration,
+                { requireUrl: false }
+            );
+            if (!resolved) return;
+            const { channel, key } = resolved;
 
             this.recentRecordedForKey = null;
             this.loading = true;
@@ -1617,45 +990,13 @@ export function createPlayerInstance(options) {
                     return;
                 }
                 this.applyAudioToVideo();
-                try {
-                    await this.video.play();
-                } catch (playErr) {
-                    if (!shouldContinuePlayAfterAttach({
-                        generation,
-                        playGeneration: this.playGeneration,
-                        wantPlaying: this.wantPlaying,
-                        transportGen: this.transportGen,
-                        transportAtStart
-                    })) {
-                        if (generation === this.playGeneration && !this.wantPlaying) {
-                            this.loading = false;
-                            this.loadPhase = 'idle';
-                        }
-                        return;
-                    }
-                    if (shouldRetryPlayMuted({
-                        blocked: isAutoplayNotAllowedError(playErr),
-                        muted: this.muted
-                    })) {
-                        this.muted = true;
-                        this.applyAudioToVideo();
-                        await this.video.play();
-                    } else {
-                        throw playErr;
-                    }
-                }
-                if (!shouldContinuePlayAfterAttach({
-                    generation,
-                    playGeneration: this.playGeneration,
-                    wantPlaying: this.wantPlaying,
-                    transportGen: this.transportGen,
-                    transportAtStart
-                })) {
-                    try { this.video?.pause(); } catch { /* ignore */ }
+                const played = await playAfterAttach(this, { generation, transportAtStart });
+                if (!played) {
                     if (generation === this.playGeneration && !this.wantPlaying) {
                         this.loading = false;
                         this.loadPhase = 'idle';
                     }
+                    try { this.video?.pause(); } catch { /* ignore */ }
                     return;
                 }
                 scheduleSlotPrefetch(this.id, this);
@@ -1761,6 +1102,12 @@ export function createPlayerInstance(options) {
             this._preloader = null;
         }
     };
+
+    attachPrepareCommitMethods(player, { shouldRecordRecents });
+    watchCtrl = createWatchAccrualControllers({
+        getPlayer: () => player,
+        shouldRecordRecents
+    });
 
     return player;
 }
