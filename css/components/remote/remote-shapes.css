@@ -11,7 +11,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 42%;
+    border-radius: 48%;
     border: 1px solid color-mix(in srgb, currentColor var(--btn-ring, 14%), transparent);
     background: color-mix(in srgb, currentColor 9%, var(--remote-btn-face));
     font-size: 0.85rem;
@@ -33,7 +33,7 @@
 }
 
 [data-remote-button-shape="squircle"] :is(.remote-panel__btn, .remote-panel__nav-btn) {
-    border-radius: 42%;
+    border-radius: 48%;
 }
 
 [data-remote-button-shape="square"] :is(.remote-panel__btn, .remote-panel__nav-btn) {
@@ -57,6 +57,7 @@
     content: "";
     position: absolute;
     inset: 0;
+    z-index: -1;
     pointer-events: none;
     background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
     box-shadow:

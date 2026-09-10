@@ -68,3 +68,25 @@ test('ninja shape still strips button chrome', () => {
     assert.match(ninja[0], /background:\s*transparent/);
     assert.match(ninja[0], /box-shadow:\s*none/);
 });
+
+test('clip-path shape ::before sits under button content', () => {
+    const before = css.match(
+        /:is\(\[data-remote-button-shape="triangle-up"\].*?\[data-remote-button-shape="rhombus"\]\)\s+:is\(\.remote-panel__btn,\s*\.remote-panel__nav-btn\)::before\s*\{[^}]+\}/s
+    );
+    assert.ok(before, 'missing shared clip-path ::before block');
+    assert.match(before[0], /z-index:\s*-1/);
+});
+
+test('squircle is rounder toward circle (48%)', () => {
+    const base = css.match(
+        /\.remote-panel__btn,\s*\n\.remote-panel__nav-btn\s*\{[^}]+\}/
+    );
+    assert.ok(base, 'missing shared .remote-panel__btn / __nav-btn block');
+    assert.match(base[0], /border-radius:\s*48%/);
+
+    const squircle = css.match(
+        /\[data-remote-button-shape="squircle"\]\s+:is\(\.remote-panel__btn,\s*\.remote-panel__nav-btn\)\s*\{[^}]+\}/
+    );
+    assert.ok(squircle, 'missing squircle shape block');
+    assert.match(squircle[0], /border-radius:\s*48%/);
+});
