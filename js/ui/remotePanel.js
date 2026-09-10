@@ -201,8 +201,38 @@ function closeLayoutPicker() {
     const btn = el('remote-layout-picker-btn');
     const popout = el('remote-layout-picker-popout');
     wrap?.classList.remove('is-open');
+    wrap?.style.removeProperty('--layout-popout-shift');
     btn?.setAttribute('aria-expanded', 'false');
     popout?.setAttribute('aria-hidden', 'true');
+}
+
+const LAYOUT_POPOUT_INSET_PX = 8;
+
+/** Shift centered layout popout so it stays inside the remote dialog/panel. */
+function clampLayoutPopout(wrap, popout) {
+    if (!wrap || !popout) return;
+    wrap.style.removeProperty('--layout-popout-shift');
+    const root = wrap.closest('.remote-module__dialog') || el('remote-panel');
+    if (!root) return;
+
+    const rootRect = root.getBoundingClientRect();
+    const popRect = popout.getBoundingClientRect();
+    const minLeft = rootRect.left + LAYOUT_POPOUT_INSET_PX;
+    const maxRight = rootRect.right - LAYOUT_POPOUT_INSET_PX;
+    const innerW = maxRight - minLeft;
+
+    let shift = 0;
+    if (popRect.width >= innerW) {
+        shift = minLeft - popRect.left;
+    } else if (popRect.left < minLeft) {
+        shift = minLeft - popRect.left;
+    } else if (popRect.right > maxRight) {
+        shift = maxRight - popRect.right;
+    }
+
+    if (shift !== 0) {
+        wrap.style.setProperty('--layout-popout-shift', `${Math.round(shift)}px`);
+    }
 }
 
 export function syncLayoutPicker() {
@@ -239,7 +269,9 @@ function bindLayoutPicker() {
         }
         wrap.classList.add('is-open');
         btn.setAttribute('aria-expanded', 'true');
-        el('remote-layout-picker-popout')?.setAttribute('aria-hidden', 'false');
+        const popout = el('remote-layout-picker-popout');
+        popout?.setAttribute('aria-hidden', 'false');
+        clampLayoutPopout(wrap, popout);
     });
 
     wrap.querySelectorAll('[data-layout-mode]').forEach((opt) => {

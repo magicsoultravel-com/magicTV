@@ -104,3 +104,14 @@ test('clip-path activated ::before uses --btn-tint-active', () => {
         /::before[\s\S]{0,200}currentColor\s+var\(--btn-tint-active\)/
     );
 });
+
+test('layout popout transform uses --layout-popout-shift clamp var', () => {
+    assert.match(
+        css,
+        /\.remote-panel__layout-popout\s*\{[^}]*translateX\(calc\(-50%\s*\+\s*var\(--layout-popout-shift,\s*0px\)\)\)/s
+    );
+    assert.match(
+        css,
+        /\.remote-panel__layout-wrap\.is-open\s+\.remote-panel__layout-popout\s*\{[^}]*translateX\(calc\(-50%\s*\+\s*var\(--layout-popout-shift,\s*0px\)\)\)/s
+    );
+});

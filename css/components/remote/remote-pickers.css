@@ -83,7 +83,7 @@
     position: absolute;
     bottom: calc(100% + 0.35rem);
     left: 50%;
-    transform: translateX(-50%) translateY(4px);
+    transform: translateX(calc(-50% + var(--layout-popout-shift, 0px))) translateY(4px);
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -108,7 +108,7 @@
 }
 
 .remote-panel__layout-wrap.is-open .remote-panel__layout-popout {
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(calc(-50% + var(--layout-popout-shift, 0px))) translateY(0);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
