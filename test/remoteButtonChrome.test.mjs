@@ -90,3 +90,17 @@ test('squircle is rounder toward circle (48%)', () => {
     assert.ok(squircle, 'missing squircle shape block');
     assert.match(squircle[0], /border-radius:\s*48%/);
 });
+
+test('remote activated chrome uses shared btn tint/ring/press tokens', () => {
+    assert.match(css, /currentColor\s+var\(--btn-tint-active\)/);
+    assert.match(css, /currentColor\s+var\(--btn-ring-active\)/);
+    assert.match(css, /transform:\s*scale\(var\(--btn-press-scale\)\)/);
+    assert.doesNotMatch(css, /transform:\s*translateY\(1px\)/);
+});
+
+test('clip-path activated ::before uses --btn-tint-active', () => {
+    assert.match(
+        css,
+        /::before[\s\S]{0,200}currentColor\s+var\(--btn-tint-active\)/
+    );
+});

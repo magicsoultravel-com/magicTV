@@ -1019,20 +1019,6 @@
     z-index: 9000;
 }
 
-/* Chan-bind toggles — accent color flip only; the pressed disc + ring come
-   from the shared toggled recipe (.tv-controls__btn / .ui-icon-btn rules). */
-.tv-player-tile__chan-bind-btn.is-bound-folder,
-.tv-player-tile__chan-bind-btn[aria-pressed="true"] {
-    color: var(--tv-main-3-flip, #fff);
-}
-
-#remote-chan-bind-btn.is-bound-folder,
-#remote-chan-bind-btn[aria-pressed="true"]:not(.is-active),
-#catalog-chan-bind-btn.is-bound-folder,
-#catalog-chan-bind-btn[aria-pressed="true"]:not(.is-active) {
-    color: var(--tv-main-3-flip, #fff);
-}
-
 .tv-player-tile__hover {
     position: absolute;
     left: 50%;
@@ -1326,14 +1312,17 @@
     transform: scale(var(--btn-press-scale, 1.04));
 }
 
-.tv-controls__btn--main-1.is-active,
-.tv-controls__btn--main-1.is-muted { color: var(--tv-main-1-flip); }
+.tv-controls__btn--main-1:is(.is-active, .is-muted, [aria-pressed="true"]:not([aria-pressed="false"])) {
+    color: var(--tv-main-1-flip);
+}
 
-.tv-controls__btn--main-2.is-active,
-.tv-controls__btn--main-2.is-muted { color: var(--tv-main-2-flip); }
+.tv-controls__btn--main-2:is(.is-active, .is-muted, [aria-pressed="true"]:not([aria-pressed="false"])) {
+    color: var(--tv-main-2-flip);
+}
 
-.tv-controls__btn--main-3.is-active,
-.tv-controls__btn--main-3.is-muted { color: var(--tv-main-3-flip); }
+.tv-controls__btn--main-3:is(.is-active, .is-muted, [aria-pressed="true"]:not([aria-pressed="false"])) {
+    color: var(--tv-main-3-flip);
+}
 
 /* Compact volume section */
 .tv-controls__volume {

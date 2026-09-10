@@ -123,6 +123,6 @@
 }
 
 .remote-panel__layout-option.is-active {
-    background: color-mix(in srgb, var(--tv-main-1) 22%, transparent);
-    border-color: color-mix(in srgb, var(--tv-main-1) 45%, transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
 }

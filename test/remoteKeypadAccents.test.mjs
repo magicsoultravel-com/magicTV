@@ -88,3 +88,25 @@ test('power lives in shell chrome; guide/fav occupy first keypad row ends', () =
     assert.match(html, /id="remote-digit-3"[\s\S]*?id="remote-fav-btn"/);
     assert.match(buttonChunk('remote-fav-btn'), /data-remote-action="fav"/);
 });
+
+test('remote mosaic mute/play/stop-all match TV mosaic main-2 accents', () => {
+    for (const id of ['remote-mute-all-btn', 'remote-play-all-btn', 'remote-stop-all-btn']) {
+        assert.match(buttonChunk(id), /tv-controls__btn--main-2/);
+    }
+    for (const id of ['mosaic-mute-all-btn', 'mosaic-play-all-btn', 'mosaic-stop-all-btn']) {
+        assert.match(buttonChunk(id), /tv-controls__btn--main-2/);
+    }
+});
+
+test('accent flip includes aria-pressed for all main-N variants', () => {
+    const playerCss = readFileSync(join(root, 'css/components/player.css'), 'utf8');
+    for (const n of [1, 2, 3]) {
+        const flip = playerCss.match(
+            new RegExp(
+                String.raw`\.tv-controls__btn--main-${n}:is\(\.is-active,\s*\.is-muted,\s*\[aria-pressed="true"\]:not\(\[aria-pressed="false"\]\)\)\s*\{[^}]*color:\s*var\(--tv-main-${n}-flip\)`,
+                's'
+            )
+        );
+        assert.ok(flip, `missing main-${n} flip rule with aria-pressed`);
+    }
+});

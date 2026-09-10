@@ -1,5 +1,5 @@
 /** @css {part}: remote panel grid, volume, footer, popout */
-/* Deliberate hover — face brightens + stronger ring (no scale). */
+/* Deliberate hover — face brightens + stronger ring; press scale matches TV. */
 .remote-panel__btn:hover,
 .remote-panel__btn:focus-visible,
 .remote-panel__nav-btn:hover,
@@ -8,13 +8,13 @@
 .tv-controls__btn.remote-panel__btn:focus-visible,
 .tv-controls__btn.remote-panel__nav-btn:hover,
 .tv-controls__btn.remote-panel__nav-btn:focus-visible {
-    background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 28%), transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover), var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover), transparent);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
-    transform: translateY(0);
+    transform: scale(var(--btn-press-scale));
 }
 
-/* Pressed / toggled — slightly deeper tint, no bevel. */
+/* Pressed / toggled — shared tint/ring tokens + press scale (solid face mix). */
 .remote-panel__btn:active,
 .remote-panel__nav-btn:active,
 .remote-panel__btn.is-active,
@@ -31,10 +31,10 @@
 .tv-controls__btn.remote-panel__nav-btn.is-active,
 .tv-controls__btn.remote-panel__nav-btn.is-muted,
 .tv-controls__btn.remote-panel__nav-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
-    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
-    transform: translateY(1px);
+    transform: scale(var(--btn-press-scale));
 }
 
 .remote-panel__nav-group {
@@ -746,19 +746,12 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     min-width: 0;
 }
 
-.remote-panel__nav-btn.is-active {
-    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
-    transform: translateY(1px);
-}
-
 .remote-panel__nav-btn.is-pink-active {
     color: var(--tv-secondary, #e879a9);
-    background: color-mix(in srgb, currentColor 20%, var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 36%), transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
-    transform: translateY(1px);
+    transform: scale(var(--btn-press-scale));
 }
 
 [data-remote-button-shape="ninja"] .remote-panel__nav-btn:is(.is-active, .is-pink-active) {
@@ -777,7 +770,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     filter:
         drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
-    transform: translateY(1px);
+    transform: scale(var(--btn-press-scale));
 }
 
 [data-remote-button-shape="triangles-alt"] .remote-panel__nav-btn:is(.is-active, .is-pink-active) {
@@ -787,7 +780,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     filter:
         drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
-    transform: translateY(1px);
+    transform: scale(var(--btn-press-scale));
 }
 
 /* Hide/collapse chevron on browser header — arrow down for collapse */

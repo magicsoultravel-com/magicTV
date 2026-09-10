@@ -12,12 +12,12 @@
     align-items: center;
     justify-content: center;
     border-radius: 48%;
-    border: 1px solid color-mix(in srgb, currentColor var(--btn-ring, 14%), transparent);
-    background: color-mix(in srgb, currentColor 9%, var(--remote-btn-face));
+    border: 1px solid color-mix(in srgb, currentColor var(--btn-ring), transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint), var(--remote-btn-face));
     font-size: 0.85rem;
     line-height: 1;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
-    transform: translateY(0);
+    transform: scale(1);
     /* No box-shadow/filter transitions — shadows are expensive to interpolate. */
     transition:
         background 0.15s ease,
@@ -59,7 +59,7 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background: color-mix(in srgb, currentColor 16%, var(--remote-btn-face));
+    background: color-mix(in srgb, currentColor var(--btn-tint), var(--remote-btn-face));
     box-shadow:
         inset 0 1.5px 0 color-mix(in srgb, #fff 22%, transparent),
         inset 0 -2.5px 4px color-mix(in srgb, #000 38%, transparent);
@@ -97,11 +97,11 @@
 
 
 :is([data-remote-button-shape="triangle-up"], [data-remote-button-shape="triangle-down"], [data-remote-button-shape="triangles-alt"], [data-remote-button-shape="hexagon"], [data-remote-button-shape="rhombus"]) :is(.remote-panel__btn, .remote-panel__nav-btn):is(:hover, :focus-visible)::before {
-    background: color-mix(in srgb, currentColor 24%, var(--remote-btn-face));
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover), var(--remote-btn-face));
 }
 
 :is([data-remote-button-shape="triangle-up"], [data-remote-button-shape="triangle-down"], [data-remote-button-shape="triangles-alt"], [data-remote-button-shape="hexagon"], [data-remote-button-shape="rhombus"]) :is(.remote-panel__btn, .remote-panel__nav-btn):is(:active, .is-active, .is-muted, [aria-pressed="true"]:not([aria-pressed="false"]), .is-pink-active)::before {
-    background: color-mix(in srgb, currentColor 28%, var(--remote-btn-face));
+    background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
     box-shadow:
         inset 0 3px 6px rgba(0, 0, 0, 0.55),
         inset 0 1px 0 color-mix(in srgb, #000 50%, transparent),
@@ -133,7 +133,7 @@
     filter:
         drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
-    transform: translateY(1px);
+    transform: scale(var(--btn-press-scale));
 }
 
 [data-remote-button-shape="triangles-alt"] :is(.remote-panel__btn, .remote-panel__nav-btn, .tv-controls__btn.remote-panel__btn, .tv-controls__btn.remote-panel__nav-btn):is(:active, .is-active, .is-muted, [aria-pressed="true"]:not([aria-pressed="false"])) {
@@ -143,7 +143,7 @@
     filter:
         drop-shadow(0 0 0.9px color-mix(in srgb, currentColor 88%, transparent))
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
-    transform: translateY(1px);
+    transform: scale(var(--btn-press-scale));
 }
 
 [data-remote-button-shape="ninja"] :is(.remote-panel__btn, .remote-panel__nav-btn) {
