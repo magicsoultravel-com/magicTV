@@ -25,6 +25,8 @@ const DEFAULT_SHEET_HEIGHT_FALLBACK = 0.62;
 let bound = false;
 let pinned = false;
 let ensureBrowserCatalog = () => {};
+/** @type {(tab: string) => void} */
+let switchTab = () => {};
 /** @type {'hidden'|'docked'|'undocked'} */
 let uiMode = 'hidden';
 /** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetH?: number } | null} */
@@ -445,11 +447,11 @@ function bindOnce() {
             return;
         }
         if (e.target.closest?.('[data-browser-module-drag]')) {
-            if (e.target.closest?.('button')) return;
+            if (e.target.closest?.('button, .remote-module__brand')) return;
             beginGesture(e, 'drag');
             return;
         }
-        if (e.target.closest?.('button, input, select, textarea, a, .channel-tile, .country-tile, .tv-controls__screen-btn, .tv-controls__add-screen-btn, [data-browser-resize]')) {
+        if (e.target.closest?.('button, input, select, textarea, a, .channel-tile, .country-tile, .tv-controls__screen-btn, .tv-controls__add-screen-btn, [data-browser-resize], .remote-module__brand')) {
             return;
         }
         beginGesture(e, 'drag');
@@ -490,10 +492,13 @@ function bindOnce() {
     document.addEventListener('click', (e) => {
         const brand = e.target?.closest?.('#browser-shell > .module-shell__chrome > .remote-module__brand');
         if (!brand) return;
-        if (!isSplit() || uiMode === 'hidden') return;
         if (dialogEl()?.classList.contains('is-dragging')) return;
         e.preventDefault();
-        BrowserModule.hide();
+        if (isSplit() && uiMode !== 'hidden') {
+            BrowserModule.hide();
+        } else if (!isSplit()) {
+            switchTab('remote');
+        }
     });
 
     window.addEventListener('resize', () => {
@@ -518,8 +523,9 @@ function tearDownHosts() {
 }
 
 export const BrowserModule = {
-    init({ ensureBrowserCatalog: ensureFn } = {}) {
+    init({ ensureBrowserCatalog: ensureFn, switchTab: switchTabFn } = {}) {
         if (typeof ensureFn === 'function') ensureBrowserCatalog = ensureFn;
+        if (typeof switchTabFn === 'function') switchTab = switchTabFn;
         bindOnce();
         syncActionButtons();
         setDockExpanded(false);

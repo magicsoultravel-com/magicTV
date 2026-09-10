@@ -240,12 +240,18 @@ function bindTabBarPopups() {
     const sortSelect = el('sort-select');
     const panels = [filterInput, categorySelect, sortSelect];
 
-    const closePopups = () => closeAllCatalogToolPopouts(...panels);
+    const closePopups = () => {
+        closeAllCatalogToolPopouts(...panels);
+        categoryBtn?.setAttribute('aria-expanded', 'false');
+    };
 
     const togglePopup = (panel, anchorBtn) => {
         const wasOpen = panel?.classList.contains('is-visible');
         closePopups();
-        if (!wasOpen) openCatalogToolPopout(panel, anchorBtn);
+        if (!wasOpen) {
+            openCatalogToolPopout(panel, anchorBtn);
+            if (anchorBtn === categoryBtn) categoryBtn.setAttribute('aria-expanded', 'true');
+        }
     };
 
     document.addEventListener('click', (e) => {
@@ -269,6 +275,10 @@ function bindTabBarPopups() {
             togglePopup(categorySelect, categoryBtn);
         });
     }
+
+    categorySelect?.addEventListener('category-menu:close', () => {
+        closePopups();
+    });
 
     if (sortBtn) {
         sortBtn.addEventListener('click', (e) => {

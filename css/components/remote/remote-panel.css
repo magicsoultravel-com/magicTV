@@ -117,7 +117,14 @@
 
 .remote-module__host > .tv-module__actions--browser-end,
 .remote-dock-sheet__inner > .tv-module__actions--browser-end {
-    left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
+}
+
+/* Merged browser tabs: Remote chrome moves left so it doesn't sit on top of browser actions. */
+.catalog-root.module-layout--joined:not(.is-remote-view) .remote-module__host > .tv-module__actions--remote-end,
+.catalog-root.module-layout--joined:not(.is-remote-view) .remote-dock-sheet__inner > .tv-module__actions--remote-end {
+    left: var(--tv-spacing-sm, 0.5rem);
     right: auto;
 }
 
@@ -214,6 +221,26 @@
     background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
     transform: scale(var(--btn-press-scale, 1.04));
+}
+
+/* List/tiles toggle — icon swap only; stay as subtle as sibling quick actions. */
+#catalog-layout-btn.is-active,
+#catalog-layout-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    background: transparent;
+    border-color: transparent;
+    color: var(--tv-text-secondary);
+    opacity: 0.5;
+    transform: none;
+}
+
+#catalog-layout-btn:hover,
+#catalog-layout-btn:focus-visible,
+#catalog-layout-btn.is-active:hover,
+#catalog-layout-btn[aria-pressed="true"]:not([aria-pressed="false"]):hover {
+    color: var(--tv-main-1);
+    opacity: 1;
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
 }
 
 /* Module quick actions: reveal on the remote / browser module top bars only
@@ -446,11 +473,6 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
 .browser-module .remote-module__host > .tv-module__actions--browser-end {
     left: auto;
     right: var(--tv-spacing-sm, 0.5rem);
-}
-
-.remote-dock-sheet__inner > .tv-module__actions--browser-end {
-    left: calc(var(--tv-spacing-sm, 0.5rem) + 7.5rem);
-    right: auto;
 }
 
 /* Remote control panel */
@@ -845,6 +867,12 @@ body > .is-catalog-tool-popout.tv-tab--sort {
     color: var(--tv-text-primary, #e8eaef);
 }
 
+body > .is-catalog-tool-popout.tv-tab--category {
+    max-height: min(50vh, 280px);
+    overflow-y: auto;
+    padding: 0.35rem;
+}
+
 /* (footer-chrome circular chrome folded into the unified round-button block
    near the top of this file — bare class selectors cover it.) */
 
@@ -959,8 +987,24 @@ body.remote-external-popout-active--full .remote-module__dialog {
     pointer-events: auto;
 }
 
-#remote-external-popout-btn.is-active {
-    color: var(--tv-main-2, #93c5fd);
+/* Popped-out state: keep the same subtle weight as idle siblings (icon swap is enough). */
+#remote-external-popout-btn.is-active,
+#remote-external-popout-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    color: var(--tv-text-secondary);
+    opacity: 0.5;
+    background: transparent;
+    border-color: transparent;
+    transform: none;
+}
+
+#remote-external-popout-btn.is-active:hover,
+#remote-external-popout-btn[aria-pressed="true"]:not([aria-pressed="false"]):hover,
+#remote-external-popout-btn.is-active:focus-visible,
+#remote-external-popout-btn[aria-pressed="true"]:not([aria-pressed="false"]):focus-visible {
+    color: var(--tv-main-1);
+    opacity: 1;
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
 }
 
 /* Dock ghost fix — hide collapsed / inactive dock chrome */

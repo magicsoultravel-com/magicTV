@@ -1,5 +1,5 @@
 import { el, escapeHtml } from '../tvUtils.js';
-import { ACTION_ICONS } from './icons.js';
+import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import {
     savePlayerState,
     DEFAULT_SORT_BY,
@@ -32,6 +32,7 @@ export const SORT_OPTIONS = {
 
 /** Contexts that show the category filter dropdown. */
 const CATEGORY_FILTER_CONTEXTS = new Set(['channels', 'favorites', 'recents']);
+const CATEGORY_FILTER_KEYS = ['channels', 'favorites', 'recents'];
 
 let deps = {
     appState: null,
@@ -40,6 +41,30 @@ let deps = {
 };
 
 let categoryNameMap = new Map();
+
+/** Shared category id across browse channels / favorites / recents. */
+export function getSharedCategoryFilter(appState = deps.appState) {
+    if (!appState?.categoryFilter) return '';
+    for (const key of CATEGORY_FILTER_KEYS) {
+        const value = appState.categoryFilter[key];
+        if (typeof value === 'string' && value) return value;
+    }
+    return '';
+}
+
+/** Write the same category id into every catalog context and return it. */
+export function setSharedCategoryFilter(appState, categoryId) {
+    if (!appState) return '';
+    const value = typeof categoryId === 'string' ? categoryId : '';
+    if (!appState.categoryFilter || typeof appState.categoryFilter !== 'object') {
+        appState.categoryFilter = { channels: value, favorites: value, recents: value };
+    } else {
+        for (const key of CATEGORY_FILTER_KEYS) {
+            appState.categoryFilter[key] = value;
+        }
+    }
+    return value;
+}
 
 function dirMul(dir) {
     return dir === 'desc' ? -1 : 1;
@@ -114,7 +139,7 @@ export function getSortPrefs(appState = deps.appState) {
 export function getCategoryFilterValue(appState = deps.appState) {
     const ctx = currentSortContext(appState);
     if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx) || !appState) return '';
-    return appState.categoryFilter?.[ctx] || '';
+    return getSharedCategoryFilter(appState);
 }
 
 export function compareCountries(a, b, sortBy, sortDir) {
@@ -172,16 +197,49 @@ function persistListPrefs() {
     });
 }
 
-function buildCategoryOptionsHtml() {
+function buildCategoryMenuHtml(selectedId) {
     const entries = [...categoryNameMap.entries()]
         .filter(([id]) => id && id !== 'radio')
         .map(([id, name]) => ({ id, label: name || id }))
         .sort((a, b) => a.label.localeCompare(b.label));
-    const opts = [`<option value="">All categories</option>`];
-    for (const e of entries) {
-        opts.push(`<option value="${escapeHtml(e.id)}">${escapeHtml(e.label)}</option>`);
+
+    const rows = [{ id: '', label: 'All categories' }, ...entries];
+    return rows.map((e) => {
+        const selected = e.id === selectedId;
+        const clear = selected && e.id
+            ? `<button type="button" class="category-menu__clear" data-category-clear="1" title="Clear category filter" aria-label="Clear category filter">${CARD_ICONS.close}</button>`
+            : '';
+        return `
+            <div class="category-menu__option${selected ? ' is-selected' : ''}"
+                 role="option"
+                 tabindex="0"
+                 data-category-id="${escapeHtml(e.id)}"
+                 aria-selected="${selected ? 'true' : 'false'}">
+                <span class="category-menu__label">${escapeHtml(e.label)}</span>
+                ${clear}
+            </div>
+        `;
+    }).join('');
+}
+
+function applyCategorySelection(categoryId, { closePopout = true } = {}) {
+    const ctx = currentSortContext();
+    if (!deps.appState) return;
+    setSharedCategoryFilter(deps.appState, categoryId || '');
+    persistListPrefs();
+    ListSort.syncCategoryFilterControls();
+    if (ctx && CATEGORY_FILTER_CONTEXTS.has(ctx)) {
+        deps.onCategoryFilterChanged(ctx);
     }
-    return opts.join('');
+    if (closePopout) {
+        const panel = el('category-filter');
+        if (panel) {
+            panel.classList.remove('is-visible');
+            // Defer to catalogToolPopouts when available via class cleanup in app click-away;
+            // local hide keeps UX snappy after pick/clear.
+            panel.dispatchEvent(new CustomEvent('category-menu:close', { bubbles: true }));
+        }
+    }
 }
 
 export const ListSort = {
@@ -194,9 +252,14 @@ export const ListSort = {
         if (appState) {
             appState.sortBy = { ...DEFAULT_SORT_BY, ...(appState.sortBy || {}) };
             appState.sortDir = { ...DEFAULT_SORT_DIR, ...(appState.sortDir || {}) };
+            // Coalesce any legacy per-tab values into one shared filter.
+            const shared = getSharedCategoryFilter({
+                categoryFilter: { ...DEFAULT_CATEGORY_FILTER, ...(appState.categoryFilter || {}) }
+            });
             appState.categoryFilter = {
-                ...DEFAULT_CATEGORY_FILTER,
-                ...(appState.categoryFilter || {})
+                channels: shared,
+                favorites: shared,
+                recents: shared
             };
         }
     },
@@ -204,7 +267,7 @@ export const ListSort = {
     bind() {
         const select = el('sort-select');
         const dirBtn = el('sort-dir-btn');
-        const catSelect = el('category-filter');
+        const catMenu = el('category-filter');
         if (select) {
             select.addEventListener('change', () => {
                 const { context } = getSortPrefs();
@@ -225,14 +288,28 @@ export const ListSort = {
                 deps.onSortChanged(context, { dirOnly: true });
             });
         }
-        if (catSelect) {
-            catSelect.addEventListener('change', () => {
-                const ctx = currentSortContext();
-                if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx) || !deps.appState) return;
-                deps.appState.categoryFilter[ctx] = catSelect.value || '';
-                persistListPrefs();
-                this.syncCategoryFilterControls();
-                deps.onCategoryFilterChanged(ctx);
+        if (catMenu && catMenu.dataset.bound !== '1') {
+            catMenu.dataset.bound = '1';
+            catMenu.addEventListener('click', (e) => {
+                const clearBtn = e.target.closest?.('[data-category-clear]');
+                if (clearBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    applyCategorySelection('', { closePopout: true });
+                    return;
+                }
+                const option = e.target.closest?.('.category-menu__option');
+                if (!option || !catMenu.contains(option)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                applyCategorySelection(option.getAttribute('data-category-id') || '', { closePopout: true });
+            });
+            catMenu.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const option = e.target.closest?.('.category-menu__option');
+                if (!option || !catMenu.contains(option)) return;
+                e.preventDefault();
+                applyCategorySelection(option.getAttribute('data-category-id') || '', { closePopout: true });
             });
         }
     },
@@ -277,45 +354,52 @@ export const ListSort = {
     },
 
     syncCategoryFilterControls() {
-        const catSelect = el('category-filter');
+        const catMenu = el('category-filter');
         const catBtn = el('category-btn');
-        const catPopup = catBtn?.closest('.tv-tab-popup') || catSelect?.closest('.tv-tab-popup');
-        if (!catSelect) return;
+        const catPopup = catBtn?.closest('.tv-tab-popup') || catMenu?.closest('.tv-tab-popup');
+        if (!catMenu) return;
         const ctx = currentSortContext();
         if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx)) {
-            catSelect.classList.add('is-hidden');
-            catSelect.classList.remove('is-visible');
+            catMenu.classList.add('is-hidden');
+            catMenu.classList.remove('is-visible');
             if (catBtn) {
                 catBtn.classList.add('is-hidden');
                 catBtn.classList.remove('is-active');
                 catBtn.setAttribute('aria-pressed', 'false');
+                catBtn.setAttribute('aria-expanded', 'false');
+                catBtn.title = 'Filter by category';
+                catBtn.setAttribute('aria-label', 'Filter by category');
             }
             if (catPopup) catPopup.classList.add('is-hidden');
             return;
         }
 
-        catSelect.classList.remove('is-hidden');
+        catMenu.classList.remove('is-hidden');
         if (catBtn) catBtn.classList.remove('is-hidden');
         if (catPopup) catPopup.classList.remove('is-hidden');
-        const html = buildCategoryOptionsHtml();
-        if (catSelect.innerHTML !== html) catSelect.innerHTML = html;
 
-        const value = deps.appState?.categoryFilter?.[ctx] || '';
-        const known = value && [...catSelect.options].some((o) => o.value === value);
-        if (known) {
-            catSelect.value = value;
-        } else {
-            catSelect.value = '';
-            // Don't wipe a saved filter while the category map hasn't hydrated yet.
-            if (value && deps.appState && categoryNameMap.size > 0) {
-                deps.appState.categoryFilter[ctx] = '';
-            }
+        let value = getSharedCategoryFilter(deps.appState);
+        const known = !value || categoryNameMap.has(value);
+        // Don't wipe a saved filter while the category map hasn't hydrated yet.
+        if (value && !known && categoryNameMap.size > 0) {
+            setSharedCategoryFilter(deps.appState, '');
+            value = '';
         }
 
-        const pressed = Boolean(catSelect.value);
+        const html = buildCategoryMenuHtml(known ? value : '');
+        if (catMenu.innerHTML !== html) catMenu.innerHTML = html;
+
+        const pressed = Boolean(value && known);
+        const selectedLabel = pressed
+            ? (categoryNameMap.get(value) || value)
+            : 'All categories';
         if (catBtn) {
             catBtn.classList.toggle('is-active', pressed);
             catBtn.setAttribute('aria-pressed', String(pressed));
+            catBtn.setAttribute('aria-expanded', String(catMenu.classList.contains('is-visible')));
+            const label = pressed ? `Category: ${selectedLabel}` : 'Filter by category';
+            catBtn.title = label;
+            catBtn.setAttribute('aria-label', label);
         }
     }
 };

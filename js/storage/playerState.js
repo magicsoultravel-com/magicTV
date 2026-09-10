@@ -93,13 +93,25 @@ function normalizeSortDir(raw) {
 }
 
 function normalizeCategoryFilter(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const out = { ...DEFAULT_CATEGORY_FILTER };
-    for (const key of CATEGORY_FILTER_KEYS) {
-        const value = src[key];
-        if (typeof value === 'string') out[key] = value;
+    // Shared across browse channels / favorites / recents. Migrate older
+    // per-tab values by taking the first non-empty string.
+    let shared = '';
+    if (typeof raw === 'string') {
+        shared = raw;
+    } else if (raw && typeof raw === 'object') {
+        for (const key of CATEGORY_FILTER_KEYS) {
+            const value = raw[key];
+            if (typeof value === 'string' && value) {
+                shared = value;
+                break;
+            }
+        }
     }
-    return out;
+    return {
+        channels: shared,
+        favorites: shared,
+        recents: shared
+    };
 }
 
 function migrateRecentsMeta(raw) {

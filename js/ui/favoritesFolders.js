@@ -141,7 +141,25 @@ function wireFolderTiles(container) {
     container.dataset.folderWired = '1';
 
     container.addEventListener('click', (e) => {
-        if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
+        const editBtn = e.target.closest?.('.favorite-folder-tile__edit-btn');
+        const deleteBtn = e.target.closest?.('.favorite-folder-tile__delete-btn');
+        const actionTile = editBtn?.closest?.('.favorite-folder-tile')
+            || deleteBtn?.closest?.('.favorite-folder-tile');
+        const actionFolderId = actionTile?.dataset.folderId;
+
+        if (editBtn && actionFolderId) {
+            e.preventDefault();
+            e.stopPropagation();
+            renameFavoriteFolder(actionFolderId);
+            return;
+        }
+        if (deleteBtn && actionFolderId) {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteFavoriteFolder(actionFolderId);
+            return;
+        }
+
         const tile = e.target.closest?.('.favorite-folder-tile');
         if (!tile || !container.contains(tile)) return;
         const folderId = tile.dataset.folderId;
@@ -153,7 +171,14 @@ function wireFolderTiles(container) {
     }, true);
 
     container.addEventListener('pointerup', (e) => {
-        if (e.target.closest?.('.favorite-folder-tile__edit-btn, .favorite-folder-tile__delete-btn')) return;
+        const editBtn = e.target.closest?.('.favorite-folder-tile__edit-btn');
+        const deleteBtn = e.target.closest?.('.favorite-folder-tile__delete-btn');
+        if (editBtn || deleteBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+
         const tile = e.target.closest?.('.favorite-folder-tile');
         if (!tile || !container.contains(tile)) return;
         const folderId = tile.dataset.folderId;
@@ -175,33 +200,6 @@ function wireFolderTiles(container) {
         e.preventDefault();
         e.stopPropagation();
         openFavoriteFolder(folderId);
-    });
-
-    container.querySelectorAll('.favorite-folder-tile').forEach((tile) => {
-        const folderId = tile.dataset.folderId;
-        if (!folderId) return;
-
-        const editBtn = tile.querySelector('.favorite-folder-tile__edit-btn');
-        editBtn?.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            renameFavoriteFolder(folderId);
-        }, true);
-        editBtn?.addEventListener('pointerup', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, true);
-
-        const deleteBtn = tile.querySelector('.favorite-folder-tile__delete-btn');
-        deleteBtn?.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            deleteFavoriteFolder(folderId);
-        }, true);
-        deleteBtn?.addEventListener('pointerup', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, true);
     });
 }
 

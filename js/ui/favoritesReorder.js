@@ -10,6 +10,19 @@ const INSERT_HYSTERESIS_PX = 10;
 
 const GRID_ITEM_SELECTOR = '.channel-tile, .favorite-folder-tile, .favorite-folder-parent-tile';
 
+/**
+ * Convert a viewport tile rect into left/top for `position: fixed` inside a
+ * possibly-transformed containing block (e.g. dock sheet).
+ * @param {{ left: number, top: number }} tileRect
+ * @param {{ left: number, top: number }} fixedOriginRect where left:0/top:0 lands
+ */
+export function dragFloatOffset(tileRect, fixedOriginRect) {
+    return {
+        left: tileRect.left - (fixedOriginRect?.left || 0),
+        top: tileRect.top - (fixedOriginRect?.top || 0)
+    };
+}
+
 let deps = {
     getAppState: () => null,
     isReorderEnabled: () => true,
@@ -190,10 +203,17 @@ function beginDrag(s) {
 
     tile.style.width = `${rect.width}px`;
     tile.style.height = `${rect.height}px`;
-    tile.style.left = `${rect.left}px`;
-    tile.style.top = `${rect.top}px`;
-    tile.style.transform = 'translate3d(0, 0, 0)';
+    // Fixed is relative to a transformed ancestor (dock sheet). Probe the
+    // containing-block origin after floating so left/top stay under the pointer.
     tile.classList.add('is-drag-float');
+    tile.style.left = '0px';
+    tile.style.top = '0px';
+    tile.style.transform = 'none';
+    const fixedOrigin = tile.getBoundingClientRect();
+    const floatPos = dragFloatOffset(rect, fixedOrigin);
+    tile.style.left = `${floatPos.left}px`;
+    tile.style.top = `${floatPos.top}px`;
+    tile.style.transform = 'translate3d(0, 0, 0)';
 
     cacheSlotGeometry(s);
 }

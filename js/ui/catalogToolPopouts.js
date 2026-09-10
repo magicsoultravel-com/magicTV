@@ -94,6 +94,7 @@ export function isCatalogToolPopoutEventTarget(target) {
         || target.closest('.is-catalog-tool-popout')
         || target.closest('.tv-tab--filter-input')
         || target.closest('.tv-tab--category')
+        || target.closest('.category-menu__clear')
         || target.closest('.tv-tab--sort')
         || target.closest('#sort-dir-btn')
     );

@@ -595,7 +595,9 @@ function handleLayoutToggleClick(e) {
     e.preventDefault();
     if (mode === 'hidden') return;
     const wasSplit = isSplit();
-    toggleSplitBrowser({ hostKind: 'undocked' });
+    // Mirror Remote's host: docked remote → docked browser, undocked → undocked.
+    const hostKind = mode === 'docked' ? 'docked' : 'undocked';
+    toggleSplitBrowser({ hostKind });
     if (!wasSplit) deps.switchTab?.('browse');
     window.dispatchEvent(new CustomEvent('remote:layout_changed', {
         detail: { mode: wasSplit ? 'joined' : 'split' }
@@ -1082,7 +1084,10 @@ export const RemoteModule = {
             switchTab: deps.switchTabNav || deps.switchTab,
             getRemoteModule: () => RemoteModule
         });
-        BrowserModule.init({ ensureBrowserCatalog: deps.ensureBrowserCatalog });
+        BrowserModule.init({
+            ensureBrowserCatalog: deps.ensureBrowserCatalog,
+            switchTab: deps.switchTab
+        });
         bindOnce();
         syncBrowseButtons();
         syncSplitChromeButtons();

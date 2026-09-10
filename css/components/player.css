@@ -1291,7 +1291,7 @@
     border-radius: 50%;
     border-color: transparent;
     background: transparent;
-    color: var(--tv-text-primary);
+    color: var(--tv-text-secondary);
 }
 
 /* Accent variants — color only. Shape, disc and ring shades come from the
