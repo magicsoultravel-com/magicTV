@@ -66,8 +66,40 @@ const ACTIVE_TILE_STYLES = ['none', 'wave', 'pulse', 'visualizer'];
 export const CHAN_SWITCH_MODES = ['classic', 'safeLoading'];
 const DEFAULT_CHAN_SWITCH_MODE = 'classic';
 
+/** Shell header chrome vs collapsed brand watermark. */
+export const HEADER_MODES = ['full', 'colorMark', 'greyMark', 'greyMarkBehind'];
+export const HEADER_MARK_MODES = ['colorMark', 'greyMark', 'greyMarkBehind'];
+export const DEFAULT_HEADER_MODE = 'colorMark';
+export const DEFAULT_LAST_HEADER_MARK = 'colorMark';
+export const HEADER_MODE_LABELS = {
+    full: 'Full header',
+    colorMark: 'Color mark',
+    greyMark: 'Grey mark',
+    greyMarkBehind: 'Grey mark (behind)'
+};
+
 function normalizeChanSwitchMode(value) {
     return CHAN_SWITCH_MODES.includes(value) ? value : DEFAULT_CHAN_SWITCH_MODE;
+}
+
+export function normalizeHeaderMode(value) {
+    return HEADER_MODES.includes(value) ? value : DEFAULT_HEADER_MODE;
+}
+
+export function normalizeLastHeaderMark(value) {
+    return HEADER_MARK_MODES.includes(value) ? value : DEFAULT_LAST_HEADER_MARK;
+}
+
+export function isHeaderMarkMode(value) {
+    return HEADER_MARK_MODES.includes(value);
+}
+
+function resolveHeaderModeFromRaw(raw) {
+    if (!raw || typeof raw !== 'object') return DEFAULT_HEADER_MODE;
+    if (raw.headerMode != null) return normalizeHeaderMode(raw.headerMode);
+    if (raw.headerCollapsed === true) return 'colorMark';
+    if (raw.headerCollapsed === false) return 'full';
+    return DEFAULT_HEADER_MODE;
 }
 
 function clampTextSize(value) {
@@ -516,14 +548,48 @@ export const SettingsStore = {
         };
     },
 
-    getHeaderCollapsed() {
-        const raw = readPersistedState();
-        return raw.headerCollapsed === true;
+    getHeaderMode() {
+        return resolveHeaderModeFromRaw(readPersistedState());
     },
 
-    setHeaderCollapsed(value) {
-        const next = value === true;
-        patchPersistedState({ headerCollapsed: next });
+    setHeaderMode(value) {
+        const next = normalizeHeaderMode(value);
+        const patch = {
+            headerMode: next,
+            headerCollapsed: next !== 'full'
+        };
+        if (isHeaderMarkMode(next)) {
+            patch.lastHeaderMark = next;
+        }
+        patchPersistedState(patch);
         return next;
+    },
+
+    getLastHeaderMark() {
+        const raw = readPersistedState();
+        if (raw.lastHeaderMark != null) return normalizeLastHeaderMark(raw.lastHeaderMark);
+        const mode = resolveHeaderModeFromRaw(raw);
+        return isHeaderMarkMode(mode) ? mode : DEFAULT_LAST_HEADER_MARK;
+    },
+
+    setLastHeaderMark(value) {
+        const next = normalizeLastHeaderMark(value);
+        patchPersistedState({ lastHeaderMark: next });
+        return next;
+    },
+
+    /** @deprecated Prefer getHeaderMode(); kept as collapsed === mode !== 'full'. */
+    getHeaderCollapsed() {
+        return this.getHeaderMode() !== 'full';
+    },
+
+    /** @deprecated Prefer setHeaderMode(); maps true → last mark, false → full. */
+    setHeaderCollapsed(value) {
+        if (value === true) {
+            this.setHeaderMode(this.getLastHeaderMark());
+            return true;
+        }
+        this.setHeaderMode('full');
+        return false;
     }
 };
