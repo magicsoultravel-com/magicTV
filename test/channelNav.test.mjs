@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import { buildChannelIndex, navigateToChannelNumber } from '../js/channelNav.js';
 import { FavoritesRecents } from '../js/storage/favoritesRecents.js';
 import { TvProviderRegistry } from '../js/tvProviders/registry.js';
-import * as toastMod from '../js/ui/toast.js';
 import { MultiView } from '../js/multiView.js';
 
 function stubMethod(obj, key, impl) {
@@ -53,9 +52,9 @@ test('buildChannelIndex folder scope uses folder items only', () => {
 
 test('navigateToChannelNumber rejects out-of-range and missing numbers', async () => {
     const toasts = [];
-    const restoreToast = stubMethod(toastMod, 'showAppToast', (msg) => {
+    const showToast = (msg) => {
         toasts.push(msg);
-    });
+    };
 
     const restoreScope = stubMethod(
         FavoritesRecents,
@@ -70,13 +69,12 @@ test('navigateToChannelNumber rejects out-of-range and missing numbers', async (
     );
 
     try {
-        assert.equal(await navigateToChannelNumber('center', 0), false);
-        assert.equal(await navigateToChannelNumber('center', 10000), false);
-        assert.equal(await navigateToChannelNumber('center', 2), false);
+        assert.equal(await navigateToChannelNumber('center', 0, { showToast }), false);
+        assert.equal(await navigateToChannelNumber('center', 10000, { showToast }), false);
+        assert.equal(await navigateToChannelNumber('center', 2, { showToast }), false);
         assert.ok(toasts.some((t) => /Invalid channel number/.test(t)));
         assert.ok(toasts.some((t) => /No channel 2/.test(t)));
     } finally {
-        restoreToast();
         restoreScope();
         restoreFolders();
         restoreRoot();

@@ -110,10 +110,11 @@ export async function resolveAdjacentChannel({ slotId, direction, bindScope }) {
  * Navigate chan up/down on a slot.
  * @param {string} slotId
  * @param {'up' | 'down'} direction
+ * @param {{ showToast?: Function }} [options] optional toast override (test seam)
  * @returns {Promise<boolean>} true if channel changed
  */
-export async function navigateChannel(slotId, direction) {
-    const { showAppToast } = await import('./ui/toast.js');
+export async function navigateChannel(slotId, direction, { showToast = null } = {}) {
+    const showAppToast = showToast || (await import('./ui/toast.js')).showAppToast;
     const result = await resolveAdjacentChannel({ slotId, direction });
     if (!result) {
         const { keys } = buildChannelIndex(FavoritesRecents.getChanBindScope(slotId));
@@ -133,10 +134,11 @@ export async function navigateChannel(slotId, direction) {
  * Tune a slot to a 1-based bind-scope channel number (favorites / folder index).
  * @param {string} slotId
  * @param {number} number
+ * @param {{ showToast?: Function }} [options] optional toast override (test seam)
  * @returns {Promise<boolean>}
  */
-export async function navigateToChannelNumber(slotId, number) {
-    const { showAppToast } = await import('./ui/toast.js');
+export async function navigateToChannelNumber(slotId, number, { showToast = null } = {}) {
+    const showAppToast = showToast || (await import('./ui/toast.js')).showAppToast;
     const n = Math.floor(Number(number));
     if (!Number.isFinite(n) || n < 1 || n > 9999) {
         showAppToast('Invalid channel number');

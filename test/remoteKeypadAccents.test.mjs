@@ -52,12 +52,12 @@ test('remote volume is one pill-height row split into half-height TV / Master', 
 });
 
 test('mute button shows stacked TV volume percentage', () => {
-    assert.match(html, /id="remote-mute-btn"[^>]*remote-panel__btn--stack/);
+    assert.match(buttonChunk('remote-mute-btn'), /remote-panel__btn--stack/);
     assert.match(html, /id="remote-mute-vol-pct"[^>]*remote-panel__btn-pct/);
 });
 
 test('mute-all button shows stacked master volume percentage', () => {
-    assert.match(html, /id="remote-mute-all-btn"[^>]*remote-panel__btn--stack/);
+    assert.match(buttonChunk('remote-mute-all-btn'), /remote-panel__btn--stack/);
     assert.match(html, /id="remote-mute-all-vol-pct"[^>]*remote-panel__btn-pct/);
 });
 

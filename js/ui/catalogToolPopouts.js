@@ -88,7 +88,7 @@ export function closeAllCatalogToolPopouts(...panels) {
 }
 
 export function isCatalogToolPopoutEventTarget(target) {
-    if (!(target instanceof Element)) return false;
+    if (!target || typeof target.closest !== 'function') return false;
     return Boolean(
         target.closest('.tv-tab-popup')
         || target.closest('.is-catalog-tool-popout')
