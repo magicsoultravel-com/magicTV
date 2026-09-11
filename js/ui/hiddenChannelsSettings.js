@@ -38,5 +38,5 @@ export const HiddenChannelsSettings = createSettingsListBrowser({
     actionBtnSelector: '.channel-tile__unhide-btn',
     onRemove: (ch) => TvPlayer.unhideChannel(ch),
     removeToast: 'Channel restored',
-    afterRemove: () => ChannelGrid.refreshVisibleCatalog()
+    afterRemove: (ch) => ChannelGrid.revealChannelTiles(ch)
 });

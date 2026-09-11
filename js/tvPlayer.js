@@ -185,15 +185,12 @@ export const TvPlayer = {
     },
 
     hideChannel(channel) {
-        const hidden = HiddenChannels.hideChannel(channel);
-        if (hidden) this.emitState();
-        return hidden;
+        // Catalog metadata only — do not emit player state (avoids mosaic/catalog flashes).
+        return HiddenChannels.hideChannel(channel);
     },
 
     unhideChannel(channelOrKey) {
-        const visible = HiddenChannels.unhideChannel(channelOrKey);
-        if (visible) this.emitState();
-        return visible;
+        return HiddenChannels.unhideChannel(channelOrKey);
     },
 
     getHiddenMeta() {

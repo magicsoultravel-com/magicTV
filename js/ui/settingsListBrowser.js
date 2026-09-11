@@ -45,7 +45,7 @@ function groupByCountry(meta, countryNameFn) {
  * @param {string} config.actionBtnSelector
  * @param {(ch: object) => boolean} config.onRemove
  * @param {string} config.removeToast
- * @param {() => void} [config.afterRemove]
+ * @param {(ch: object) => void} [config.afterRemove]
  */
 export function createSettingsListBrowser(config) {
     let deps = {
@@ -85,10 +85,17 @@ export function createSettingsListBrowser(config) {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (config.onRemove(ch)) {
-                    showAppToast(config.removeToast);
-                    config.afterRemove?.();
-                    api.refresh();
+                if (!config.onRemove(ch)) return;
+                showAppToast(config.removeToast);
+                const tile = btn.closest('.channel-tile');
+                tile?.remove();
+                updateSummaryCount();
+                config.afterRemove?.(ch);
+                const channelsEl = el(config.channelsId);
+                const remaining = channelsEl?.querySelectorAll('.channel-tile') || [];
+                if (!remaining.length) {
+                    // Country group emptied — return to country list (one targeted re-render).
+                    api.showCountries();
                 }
             });
             btn.addEventListener('keydown', (e) => e.stopPropagation());

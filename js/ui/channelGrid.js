@@ -137,6 +137,13 @@ function syncFavoritesReorder(enabled) {
     grid.classList.toggle('is-sort-locked', !enabled);
 }
 
+function escapeAttrSelector(value) {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(value);
+    }
+    return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function wireTiles(container, channels) {
     if (!container) return;
     container.querySelectorAll('.channel-tile').forEach(tile => {
@@ -476,12 +483,120 @@ export const ChannelGrid = {
         }
     },
 
+    /**
+     * Remove matching channel tiles from the active catalog grid without rebuilding
+     * siblings (preserves frame captures / scroll). Falls back to full refresh if
+     * the active container is missing.
+     * @returns {boolean} true if handled without full rebuild, false to signal fallback
+     */
+    removeChannelTiles(channelOrKey) {
+        const appState = deps.appState;
+        const key = typeof channelOrKey === 'string' ? channelOrKey : channelKey(channelOrKey);
+        if (!appState || !key) return false;
+
+        let container = null;
+        if (appState.activeTab === 'favorites') {
+            container = el('favorites-grid');
+        } else if (appState.activeTab === 'recents') {
+            container = el('recents-grid');
+        } else if (appState.activeTab === 'browse' && appState.browseCountry) {
+            container = el('channels-container');
+        } else {
+            return true;
+        }
+
+        if (!container) return false;
+
+        const escaped = escapeAttrSelector(key);
+        const tiles = container.querySelectorAll(`.channel-tile[data-channel="${escaped}"]`);
+        if (!tiles.length) return true;
+        tiles.forEach((tile) => tile.remove());
+
+        if (appState.activeTab === 'favorites') {
+            const hasFolders = container.querySelector('.favorite-folder-tile');
+            const hasChannels = container.querySelector('.channel-tile');
+            if (!hasFolders && !hasChannels) {
+                // Empty root or empty folder view — one full render for empty/parent chrome.
+                this.renderFavorites();
+            }
+            return true;
+        }
+
+        if (appState.activeTab === 'recents') {
+            if (!container.querySelector('.channel-tile')) {
+                const remaining = filterVisibleChannels(appState.recentsList || [])
+                    .filter((ch) => matchesFilter(ch, appState.recentsFilter)
+                        && channelHasCategory(ch, appState.categoryFilter?.recents || ''));
+                if (!remaining.length) {
+                    if (!(appState.recentsList || []).length) {
+                        const empty = el('recents-empty');
+                        container.innerHTML = '';
+                        empty?.classList.remove('is-hidden');
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><p class="empty-state__text">No channels match</p></div>';
+                    }
+                }
+            }
+            return true;
+        }
+
+        // browse country — keep browseChannels intact so unhide can restore without refetch
+        if (!container.querySelector('.channel-tile')) {
+            container.innerHTML = '<div class="empty-state"><p class="empty-state__text">No channels</p></div>';
+        }
+        return true;
+    },
+
+    /**
+     * After unhide: put the channel tile back in the active catalog if it belongs
+     * there, without wiping sibling tiles when we can insert in place.
+     */
+    revealChannelTiles(channelOrKey) {
+        const appState = deps.appState;
+        const key = typeof channelOrKey === 'string' ? channelOrKey : channelKey(channelOrKey);
+        if (!appState || !key || HiddenChannels.isHidden(key)) return;
+
+        if (appState.activeTab === 'favorites' || appState.activeTab === 'recents') {
+            // Fav/recents grids mix folders / sort chrome — one targeted re-render is safest.
+            this.refreshVisibleCatalog();
+            return;
+        }
+
+        if (appState.activeTab !== 'browse' || !appState.browseCountry) return;
+
+        const container = el('channels-container');
+        if (!container) return;
+        const escaped = escapeAttrSelector(key);
+        if (container.querySelector(`.channel-tile[data-channel="${escaped}"]`)) return;
+
+        const visible = filterVisibleChannels(appState.browseChannels || []);
+        const idx = visible.findIndex((c) => channelKey(c) === key);
+        if (idx < 0) return;
+
+        const channel = visible[idx];
+        container.querySelector('.empty-state')?.remove();
+        const html = tileHtml(channel);
+        const existing = [...container.querySelectorAll('.channel-tile')];
+        if (!existing.length || idx >= existing.length) {
+            container.insertAdjacentHTML('beforeend', html);
+        } else {
+            existing[idx].insertAdjacentHTML('beforebegin', html);
+        }
+        wireTiles(container, [channel]);
+        TileFrames.observe(container, { viewKey: deps.getRefreshKey?.() || null });
+        Appearance.applyToTiles(container);
+        this.syncPlayingTiles();
+        this.syncVisitedTiles();
+    },
+
     hideChannel(ch) {
         if (!ch) return false;
         const hidden = TvPlayer.hideChannel(ch);
         if (!hidden) return false;
         showAppToast('Channel hidden');
-        this.refreshVisibleCatalog();
+        if (!this.removeChannelTiles(ch)) {
+            this.refreshVisibleCatalog();
+        }
         return true;
     },
 
