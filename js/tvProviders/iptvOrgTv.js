@@ -8,6 +8,56 @@ const IPTV_CATEGORIES_URL = 'https://iptv-org.github.io/api/categories.json';
 const IPTV_BLOCKLIST_URL = 'https://iptv-org.github.io/api/blocklist.json';
 const CACHE_KEY = 'matrix_tv_iptv_cache';
 
+/** Hard ceiling for any catalog fetch so boot/browse never hang on a stalled CDN. */
+const DEFAULT_CATALOG_FETCH_TIMEOUT_MS = 12000;
+let catalogFetchTimeoutMs = DEFAULT_CATALOG_FETCH_TIMEOUT_MS;
+
+/** Test seam: shrink the timeout so unit/boot tests don't wait out the real value. */
+export function setCatalogFetchTimeoutMs(ms) {
+    catalogFetchTimeoutMs = Math.max(1, Number(ms) || DEFAULT_CATALOG_FETCH_TIMEOUT_MS);
+}
+
+/**
+ * Race a fetch against a wall-clock deadline. A stalled connection (no bytes,
+ * no headers, never resolving) must NOT hold the boot screen or a search host
+ * hostage — the caller decides what to do once the deadline wins.
+ */
+function withTimeout(promise, ms, label) {
+    return new Promise((resolve, reject) => {
+        let done = false;
+        const timer = setTimeout(() => {
+            if (done) return;
+            done = true;
+            reject(new Error(`Catalog fetch timed out after ${ms}ms: ${label}`));
+        }, ms);
+        promise.then(
+            (value) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (err) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                reject(err);
+            }
+        );
+    });
+}
+
+/**
+ * Empty catalog served when the network is unreachable. Callers must be able
+ * to boot, browse an empty/offline state, and refresh manually — never throw.
+ */
+const EMPTY_CATALOG = Object.freeze({
+    channels: [],
+    countryList: [],
+    byId: new Map(),
+    byCountry: new Map()
+});
+
 // In-memory catalog + last successful (re)load timestamp. After the first
 // load the catalog is served from memory for tab switches/searches — no
 // IndexedDB reads, no hydration — so favorites/recents tiles render instantly.
@@ -63,7 +113,7 @@ async function ensureCategoryNameMap() {
     if (categoryMapPromise) return categoryMapPromise;
     categoryMapPromise = (async () => {
         try {
-            const res = await fetch(IPTV_CATEGORIES_URL);
+            const res = await withTimeout(fetch(IPTV_CATEGORIES_URL), catalogFetchTimeoutMs, 'category-names');
             if (res.ok) applyCategoryNames(await res.json());
         } catch {
             /* keep empty map */
@@ -150,11 +200,11 @@ async function readCachedCatalog(refresh) {
 
 async function fetchCatalogFromNetwork() {
     const [channelsRes, streamsRes, countriesRes, categoriesRes, blocklistRes] = await Promise.all([
-        fetch(IPTV_CHANNELS_URL),
-        fetch(IPTV_STREAMS_URL),
-        fetch(IPTV_COUNTRIES_URL),
-        fetch(IPTV_CATEGORIES_URL),
-        fetch(IPTV_BLOCKLIST_URL)
+        withTimeout(fetch(IPTV_CHANNELS_URL), catalogFetchTimeoutMs, 'channels'),
+        withTimeout(fetch(IPTV_STREAMS_URL), catalogFetchTimeoutMs, 'streams'),
+        withTimeout(fetch(IPTV_COUNTRIES_URL), catalogFetchTimeoutMs, 'countries'),
+        withTimeout(fetch(IPTV_CATEGORIES_URL), catalogFetchTimeoutMs, 'categories'),
+        withTimeout(fetch(IPTV_BLOCKLIST_URL), catalogFetchTimeoutMs, 'blocklist')
     ]);
 
     if (!channelsRes.ok || !streamsRes.ok) {
@@ -248,7 +298,20 @@ async function loadCatalog(refresh = false) {
 
     if (catalogNetworkPromise) return catalogNetworkPromise;
 
-    catalogNetworkPromise = fetchCatalogFromNetwork().finally(() => {
+    // The network must NEVER hang (or throw through) a boot / search path.
+    // On any failure, serve an empty catalog so callers degrade to stubs and
+    // empty states; the next manual refresh (refresh=true) retries the network.
+    catalogNetworkPromise = (async () => {
+        try {
+            const catalog = await fetchCatalogFromNetwork();
+            catalogMemory = catalog;
+            return catalog;
+        } catch (err) {
+            console.warn('[magicTV] Catalog network load failed; using empty catalog:', err?.message || err);
+            catalogMemory = EMPTY_CATALOG;
+            return EMPTY_CATALOG;
+        }
+    })().finally(() => {
         catalogNetworkPromise = null;
     });
     return catalogNetworkPromise;

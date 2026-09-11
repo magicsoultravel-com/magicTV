@@ -693,7 +693,13 @@ async function init() {
         sessionRepaired = true;
     }
 
-    const hasSession = collectSessionTiles().length > 0;
+    let hasSession = false;
+    try {
+        hasSession = collectSessionTiles().length > 0;
+    } catch (err) {
+        console.warn('[magicTV] Session tile scan failed:', err);
+        hasSession = false;
+    }
     const reveal = async () => {
         if (revealed) return;
         revealed = true;
@@ -786,6 +792,15 @@ async function init() {
 
         window.addEventListener('tv:state_changed', (e) => PlayerChrome.onPlayerStateChanged(e));
 
+        // Clear the boot cover FIRST — restore/hydrate below may have to wait on
+        // the catalog (now bounded by an internal timeout), and the boot screen
+        // must never be held hostage by the network.
+        await reveal();
+
+        if (sessionRepaired) {
+            showAppToast('Session data repaired — some layout was reset');
+        }
+
         await restoreLastChannelMeta();
         PlayerChrome.updateNowPlayingHeader();
 
@@ -810,12 +825,6 @@ async function init() {
             RemoteModule.syncSplitChromeButtons?.();
             if (isSplit()) ensureBrowserCatalogVisible();
         });
-
-        await reveal();
-
-        if (sessionRepaired) {
-            showAppToast('Session data repaired — some layout was reset');
-        }
 
         if (hasSession) {
             const modalDone = ResumeSessionModal.maybeShow();

@@ -18,6 +18,13 @@ const DB_NAME = 'magicnotes_cache_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'cache_store';
 
+/**
+ * Legacy localStorage→IndexedDB migration guard. localStorage is capped near
+ * 5MB per origin, so anything larger is not a legit legacy catalog — and a
+ * monster/corrupt value must never be synchronously parsed on the boot path.
+ */
+const LEGACY_MIGRATE_MAX_CHARS = 4 * 1024 * 1024;
+
 let dbPromise = null;
 let memoryFallback = null;
 
@@ -42,6 +49,15 @@ function openDb() {
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => {
+            memoryFallback = new Map();
+            dbPromise = null;
+            resolve(null);
+        };
+        req.onblocked = () => {
+            // A pending version change on another connection (e.g. a stale tab
+            // holding an old DB version) can block this open forever. Treat it
+            // like a failure and fall back to in-memory so boot/cache reads
+            // never hang on an IndexedDB open that will never resolve.
             memoryFallback = new Map();
             dbPromise = null;
             resolve(null);
@@ -88,7 +104,10 @@ async function get(key, legacyKey) {
     if (legacyKey && typeof localStorage !== 'undefined') {
         try {
             const raw = localStorage.getItem(legacyKey);
-            if (raw !== null) {
+            // Skip absurdly large values entirely — a >4MB localStorage entry is
+            // not a legit legacy cache (quota is ~5MB/origin), and JSON-parsing /
+            // writing it synchronously on every boot would stall the boot path.
+            if (raw !== null && raw.length <= LEGACY_MIGRATE_MAX_CHARS) {
                 let value;
                 try {
                     value = JSON.parse(raw);
