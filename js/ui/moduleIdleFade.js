@@ -1,41 +1,33 @@
 /**
- * Per-shell idle fade (Remote / Browser).
- * Same settings (delay/duration); independent timers and hover pause when split.
+ * Whole-UI idle fade (header, remote/browser modules, dock tabs, tile chrome).
+ * One timer + one CSS multiplier; hover over chrome hosts pauses the fade.
  */
 import { SettingsStore } from '../storage/settingsStore.js';
-import { isSplit } from './moduleLayout.js';
 
-const REMOTE_HOSTS = '#remote-module, #remote-dock-sheet, #remote-dock-tab';
-const BROWSER_HOSTS = '#browser-module, #browser-dock-sheet, #browser-dock-tab';
+const UI_HOSTS = [
+    '.tv-header',
+    '#remote-module',
+    '#remote-dock-sheet',
+    '#remote-dock-tab',
+    '#browser-module',
+    '#browser-dock-sheet',
+    '#browser-dock-tab'
+].join(', ');
 
-/** @type {Record<string, {
+const CSS_VAR = '--ui-idle-opacity-mult';
+const FADED_CLASS = 'ui-idle-faded';
+
+/** @type {{
  *   delayTimer: ReturnType<typeof setTimeout> | null,
  *   fadeRaf: number | null,
  *   mult: number,
- *   hovering: boolean,
- *   cssVar: string,
- *   fadedClass: string,
- *   hosts: string
- * }>} */
-const shells = {
-    remote: {
-        delayTimer: null,
-        fadeRaf: null,
-        mult: 1,
-        hovering: false,
-        cssVar: '--remote-idle-opacity-mult',
-        fadedClass: 'remote-idle-faded',
-        hosts: REMOTE_HOSTS
-    },
-    browser: {
-        delayTimer: null,
-        fadeRaf: null,
-        mult: 1,
-        hovering: false,
-        cssVar: '--browser-idle-opacity-mult',
-        fadedClass: 'browser-idle-faded',
-        hosts: BROWSER_HOSTS
-    }
+ *   hovering: boolean
+ * }} */
+const state = {
+    delayTimer: null,
+    fadeRaf: null,
+    mult: 1,
+    hovering: false
 };
 
 let bound = false;
@@ -48,129 +40,90 @@ function getSettings() {
     };
 }
 
-function clearTimers(id) {
-    const s = shells[id];
-    if (!s) return;
-    if (s.delayTimer) {
-        clearTimeout(s.delayTimer);
-        s.delayTimer = null;
+function clearTimers() {
+    if (state.delayTimer) {
+        clearTimeout(state.delayTimer);
+        state.delayTimer = null;
     }
-    if (s.fadeRaf) {
-        cancelAnimationFrame(s.fadeRaf);
-        s.fadeRaf = null;
+    if (state.fadeRaf) {
+        cancelAnimationFrame(state.fadeRaf);
+        state.fadeRaf = null;
     }
 }
 
-function updateCss(id) {
-    const s = shells[id];
-    if (!s || typeof document === 'undefined') return;
-    const effective = s.hovering ? 1 : s.mult;
-    document.documentElement.style.setProperty(s.cssVar, String(effective));
-    document.body.classList.toggle(s.fadedClass, s.mult <= 0.01 && !s.hovering);
+function updateCss() {
+    if (typeof document === 'undefined') return;
+    const effective = state.hovering ? 1 : state.mult;
+    document.documentElement.style.setProperty(CSS_VAR, String(effective));
+    document.body.classList.toggle(FADED_CLASS, state.mult <= 0.01 && !state.hovering);
 }
 
-function applyMult(id, mult) {
-    const s = shells[id];
-    if (!s) return;
-    s.mult = Math.max(0, Math.min(1, mult));
-    updateCss(id);
+function applyMult(mult) {
+    state.mult = Math.max(0, Math.min(1, mult));
+    updateCss();
 }
 
-function startFadeOut(id, fadeMs) {
-    const s = shells[id];
-    if (!s || s.hovering) return;
+function startFadeOut(fadeMs) {
+    if (state.hovering) return;
     const start = performance.now();
     const tick = (now) => {
-        if (s.hovering) {
-            s.fadeRaf = null;
-            applyMult(id, 1);
+        if (state.hovering) {
+            state.fadeRaf = null;
+            applyMult(1);
             return;
         }
         const t = fadeMs <= 0 ? 1 : Math.min(1, (now - start) / fadeMs);
-        applyMult(id, 1 - t);
-        if (t < 1) s.fadeRaf = requestAnimationFrame(tick);
-        else s.fadeRaf = null;
+        applyMult(1 - t);
+        if (t < 1) state.fadeRaf = requestAnimationFrame(tick);
+        else state.fadeRaf = null;
     };
-    s.fadeRaf = requestAnimationFrame(tick);
+    state.fadeRaf = requestAnimationFrame(tick);
 }
 
-function schedule(id) {
-    clearTimers(id);
-    const s = shells[id];
-    if (!s) return;
-    if (id === 'browser' && !isSplit()) {
-        applyMult(id, 1);
-        return;
-    }
+function schedule() {
+    clearTimers();
     // Avoid importing RemoteExternalPopout (cycle with remoteModule). Body class is the SSOT signal.
-    if (id === 'remote' && document.body?.classList?.contains('remote-external-popout-active')) {
-        applyMult(id, 1);
+    if (document.body?.classList?.contains('remote-external-popout-active')) {
+        applyMult(1);
         return;
     }
     const { enabled, delayMs, fadeMs } = getSettings();
-    if (!enabled) {
-        applyMult(id, 1);
+    if (!enabled || state.hovering) {
+        applyMult(1);
         return;
     }
-    if (s.hovering) {
-        applyMult(id, 1);
-        return;
-    }
-    applyMult(id, 1);
-    s.delayTimer = setTimeout(() => startFadeOut(id, fadeMs), delayMs);
+    applyMult(1);
+    state.delayTimer = setTimeout(() => startFadeOut(fadeMs), delayMs);
 }
 
-function wake(id) {
-    const s = shells[id];
-    if (!s) return;
-    clearTimers(id);
-    applyMult(id, 1);
-    schedule(id);
+function wake() {
+    clearTimers();
+    applyMult(1);
+    schedule();
 }
 
-function shellFromEventTarget(target) {
-    if (!target?.closest) return null;
-    if (target.closest(BROWSER_HOSTS)) return 'browser';
-    if (target.closest(REMOTE_HOSTS)) return 'remote';
-    return null;
-}
-
-function onPointerDown(e) {
-    const id = shellFromEventTarget(e.target);
-    if (id) wake(id);
-    else if (!isSplit()) wake('remote');
-}
-
-function onKeyActivity() {
-    wake('remote');
-    if (isSplit()) wake('browser');
-}
-
-function setHovering(id, hovering) {
-    const s = shells[id];
-    if (!s) return;
-    s.hovering = hovering === true;
-    if (s.hovering) {
-        clearTimers(id);
-        applyMult(id, 1);
+function setHovering(hovering) {
+    state.hovering = hovering === true;
+    if (state.hovering) {
+        clearTimers();
+        applyMult(1);
     } else {
-        updateCss(id);
-        schedule(id);
+        updateCss();
+        schedule();
     }
 }
 
-function bindHover(id) {
-    const s = shells[id];
+function bindHover() {
     document.addEventListener('pointerover', (e) => {
-        if (!e.target.closest?.(s.hosts)) return;
-        if (s.hovering) return;
-        setHovering(id, true);
+        if (!e.target.closest?.(UI_HOSTS)) return;
+        if (state.hovering) return;
+        setHovering(true);
     }, true);
     document.addEventListener('pointerout', (e) => {
-        if (!e.target.closest?.(s.hosts)) return;
+        if (!e.target.closest?.(UI_HOSTS)) return;
         const related = e.relatedTarget;
-        if (related && typeof related.closest === 'function' && related.closest(s.hosts)) return;
-        setHovering(id, false);
+        if (related && typeof related.closest === 'function' && related.closest(UI_HOSTS)) return;
+        setHovering(false);
     }, true);
 }
 
@@ -178,42 +131,30 @@ export const ModuleIdleFade = {
     init() {
         if (bound || typeof document === 'undefined') return;
         bound = true;
-        document.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true });
-        document.addEventListener('touchstart', onPointerDown, { capture: true, passive: true });
-        document.addEventListener('wheel', onPointerDown, { capture: true, passive: true });
-        document.addEventListener('keydown', onKeyActivity, { capture: true, passive: true });
-        bindHover('remote');
-        bindHover('browser');
-        applyMult('remote', 1);
-        applyMult('browser', 1);
-        schedule('remote');
-        if (isSplit()) schedule('browser');
+        document.addEventListener('pointerdown', wake, { capture: true, passive: true });
+        document.addEventListener('touchstart', wake, { capture: true, passive: true });
+        document.addEventListener('wheel', wake, { capture: true, passive: true });
+        document.addEventListener('pointermove', wake, { capture: true, passive: true });
+        document.addEventListener('keydown', wake, { capture: true, passive: true });
+        bindHover();
+        applyMult(1);
+        schedule();
     },
 
     wakeRemote() {
-        wake('remote');
+        wake();
     },
 
     wakeBrowser() {
-        if (isSplit()) wake('browser');
-        else applyMult('browser', 1);
+        wake();
     },
 
-    /** Call after split/join so the right shells are scheduled. */
+    /** Call after split/join so fade reschedules with the current layout. */
     syncForLayout() {
-        if (isSplit()) {
-            schedule('remote');
-            schedule('browser');
-        } else {
-            clearTimers('browser');
-            applyMult('browser', 1);
-            schedule('remote');
-        }
+        schedule();
     },
 
     resetAll() {
-        wake('remote');
-        if (isSplit()) wake('browser');
-        else applyMult('browser', 1);
+        wake();
     }
 };

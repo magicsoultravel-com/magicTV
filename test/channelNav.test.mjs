@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildChannelIndex, navigateToChannelNumber } from '../js/channelNav.js';
+import { buildChannelIndex, navigateToChannelNumber, chanNumberAccentDigits, tvLabelAccentChars } from '../js/channelNav.js';
 import { FavoritesRecents } from '../js/storage/favoritesRecents.js';
 import { TvProviderRegistry } from '../js/tvProviders/registry.js';
 import { MultiView } from '../js/multiView.js';
@@ -16,6 +16,35 @@ function stubMethod(obj, key, impl) {
         obj[key] = prev;
     };
 }
+
+test('chanNumberAccentDigits prefers digit accents and avoids repeats within 2–3 digits', () => {
+    assert.deepEqual(chanNumberAccentDigits(1), [{ digit: '1', accent: 1 }]);
+    assert.deepEqual(chanNumberAccentDigits(2), [{ digit: '2', accent: 2 }]);
+    assert.deepEqual(chanNumberAccentDigits(12), [
+        { digit: '1', accent: 1 },
+        { digit: '2', accent: 2 }
+    ]);
+    // Same preferred digit would collide — second digit shifts.
+    assert.deepEqual(chanNumberAccentDigits(11), [
+        { digit: '1', accent: 1 },
+        { digit: '1', accent: 2 }
+    ]);
+    const three = chanNumberAccentDigits(111);
+    assert.equal(three.length, 3);
+    assert.deepEqual(new Set(three.map((p) => p.accent)), new Set([1, 2, 3]));
+    const mixed = chanNumberAccentDigits(247);
+    assert.deepEqual(new Set(mixed.map((p) => p.accent)).size, mixed.length);
+});
+
+test('tvLabelAccentChars colors T/V/# with unique rotated accents per screen', () => {
+    const tv1 = tvLabelAccentChars(1);
+    assert.deepEqual(tv1.map((p) => p.char), ['T', 'V', '1']);
+    assert.deepEqual(new Set(tv1.map((p) => p.accent)), new Set([1, 2, 3]));
+    const tv2 = tvLabelAccentChars(2);
+    assert.deepEqual(tv2.map((p) => p.char), ['T', 'V', '2']);
+    assert.notDeepEqual(tv1.map((p) => p.accent), tv2.map((p) => p.accent));
+    assert.deepEqual(new Set(tv2.map((p) => p.accent)), new Set([1, 2, 3]));
+});
 
 test('buildChannelIndex assigns 1-based numbers from favorites root order', () => {
     const restoreFolders = stubMethod(FavoritesRecents, 'getFavoriteFolders', () => []);

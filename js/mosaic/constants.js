@@ -10,6 +10,16 @@ export const SLOT_IDS = ['topLeft', 'center', 'topRight', 'bottomLeft', 'bottomR
 export const MAX_MOSAIC_SLOTS = 6;
 export const PLAY_FILL_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
 
+/** 1-based TV labels matching remote/guide screen numbering. */
+export const SLOT_SCREEN_LABELS = Object.freeze({
+    center: '1',
+    topLeft: '2',
+    topRight: '3',
+    bottomLeft: '4',
+    bottomRight: '5',
+    bottomCenter: '6'
+});
+
 export const DRAG_THRESHOLD_PX = 6;
 export const RESIZE_MIN_W = 72;
 export const RESIZE_MIN_H = 64;

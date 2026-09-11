@@ -18,7 +18,8 @@ import {
     CORNER_IDS,
     SLOT_IDS,
     MAX_MOSAIC_SLOTS,
-    clearTilePlacementStyle
+    clearTilePlacementStyle,
+    SLOT_SCREEN_LABELS
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
 import { swapMethods } from './mosaic/swap.js';
@@ -33,7 +34,7 @@ import { ChanBindPicker } from './ui/chanBindPicker.js';
 import { ChromecastManager } from './cast/chromecastManager.js';
 import { registerMosaicSlotState } from './mosaic/slotOccupancy.js';
 
-export { MAX_MOSAIC_SLOTS };
+export { MAX_MOSAIC_SLOTS, SLOT_SCREEN_LABELS };
 
 const SCREEN_GETTERS = {
     topLeft: () => SettingsStore.getScreenTopLeft(),
@@ -50,17 +51,6 @@ const SCREEN_SETTERS = {
     bottomRight: (v) => SettingsStore.setScreenBottomRight(v),
     bottomCenter: (v) => SettingsStore.setScreenBottomCenter(v)
 };
-
-const SCREEN_LABELS = {
-    center: '1',
-    topLeft: '2',
-    topRight: '3',
-    bottomLeft: '4',
-    bottomRight: '5',
-    bottomCenter: '6'
-};
-
-export const SLOT_SCREEN_LABELS = SCREEN_LABELS;
 
 function savedVolume() {
     return loadPlayerState().volume || 0.85;
@@ -276,42 +266,6 @@ export const MultiView = {
         mosaic.addEventListener('pointerdown', (e) => this.onTilePointerDown(e));
 
         mosaic.addEventListener('click', (e) => {
-            const qualityOpt = e.target.closest?.('[data-quality-mode]');
-            if (qualityOpt) {
-                e.stopPropagation();
-                e.preventDefault();
-                const tile = qualityOpt.closest?.('.tv-player-tile');
-                const slotId = tile?.getAttribute('data-slot');
-                const modeAttr = qualityOpt.getAttribute('data-quality-mode');
-                if (!slotId || modeAttr == null) return;
-                const mode = modeAttr === 'auto' ? 'auto' : Number(modeAttr);
-                this.slots[slotId]?.player?.setQualityMode?.(mode);
-                const wrap = qualityOpt.closest?.('[data-quality-wrap]');
-                wrap?.classList.remove('is-open');
-                wrap?.querySelector?.('[data-tile-action="quality"]')
-                    ?.setAttribute('aria-expanded', 'false');
-                return;
-            }
-
-            const qualityBtn = e.target.closest?.('[data-tile-action="quality"]');
-            if (qualityBtn) {
-                e.stopPropagation();
-                e.preventDefault();
-                const wrap = qualityBtn.closest?.('[data-quality-wrap]');
-                if (!wrap) return;
-                const open = !wrap.classList.contains('is-open');
-                mosaic.querySelectorAll('[data-quality-wrap].is-open').forEach((el) => {
-                    if (el !== wrap) {
-                        el.classList.remove('is-open');
-                        el.querySelector('[data-tile-action="quality"]')
-                            ?.setAttribute('aria-expanded', 'false');
-                    }
-                });
-                wrap.classList.toggle('is-open', open);
-                qualityBtn.setAttribute('aria-expanded', String(open));
-                return;
-            }
-
             const castToggle = e.target.closest?.('[data-cast-toggle]');
             if (castToggle) {
                 e.stopPropagation();
@@ -335,18 +289,6 @@ export const MultiView = {
             }
             // Tile focus (z-raise / pinned picker retarget) is handled on pointerup when the gesture was a click.
         });
-
-        if (!this._qualityOutsideBound) {
-            this._qualityOutsideBound = true;
-            document.addEventListener('pointerdown', (e) => {
-                if (e.target.closest?.('[data-quality-wrap]')) return;
-                mosaic.querySelectorAll('[data-quality-wrap].is-open').forEach((wrap) => {
-                    wrap.classList.remove('is-open');
-                    wrap.querySelector('[data-tile-action="quality"]')
-                        ?.setAttribute('aria-expanded', 'false');
-                });
-            });
-        }
 
         mosaic.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;

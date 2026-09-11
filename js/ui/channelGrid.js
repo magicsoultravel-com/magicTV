@@ -11,7 +11,7 @@ import { FavoritesReorder } from './favoritesReorder.js';
 import { FavoritesFolders } from './favoritesFolders.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
-import { buildChannelIndex } from '../channelNav.js';
+import { buildChannelIndex, chanNumberAccentHtml } from '../channelNav.js';
 
 const wiredTiles = new WeakSet();
 
@@ -30,7 +30,7 @@ function tileHtml(ch, opts = {}) {
     const refreshLabel = 'Refresh preview';
     const chanNum = Number.isFinite(opts.chanNumber) ? opts.chanNumber : null;
     const chanNumHtml = chanNum != null
-        ? `<span class="channel-tile__chan-num" aria-hidden="true">${chanNum}</span>`
+        ? `<span class="channel-tile__chan-num" aria-hidden="true">${chanNumberAccentHtml(chanNum)}</span>`
         : '';
     return `
         <div class="channel-tile${isVisited ? ' is-visited' : ''}" data-channel="${escapeHtml(channelKey(ch))}" role="button" tabindex="0" data-url="${escapeHtml(ch.url_resolved || '')}" data-logo="${escapeHtml(ch.logo || '')}">

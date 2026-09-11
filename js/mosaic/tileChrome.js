@@ -11,7 +11,8 @@ import { channelKey } from '../tvProviders/channelShape.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { classifyTilePlayback } from '../player/pauseBuffer.js';
 import { ChromecastManager } from '../cast/chromecastManager.js';
-import { SLOT_IDS, slotIsOccupied } from './constants.js';
+import { buildChannelIndex, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
+import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
 
 function pipSupported() {
     return typeof document !== 'undefined'
@@ -229,6 +230,21 @@ export const tileChromeMethods = {
 
     refreshTiles() {
         if (typeof document === 'undefined') return;
+        /** @type {Map<string, Map<string, number>>} */
+        const numberMaps = new Map();
+        const numbersForSlot = (slotId) => {
+            const scope = FavoritesRecents.getChanBindScope(slotId);
+            const cacheKey = scope?.mode === 'folder'
+                ? `folder:${scope.folderId || ''}`
+                : 'favorites';
+            let map = numberMaps.get(cacheKey);
+            if (!map) {
+                map = buildChannelIndex(scope).numberByKey;
+                numberMaps.set(cacheKey, map);
+            }
+            return map;
+        };
+        const multiTv = SLOT_IDS.filter((sid) => sid === 'center' || this.slots[sid]?.enabled).length >= 2;
         SLOT_IDS.forEach((id) => {
             const tile = el(`player-tile-${id}`);
             const slot = this.slots[id];
@@ -253,6 +269,32 @@ export const tileChromeMethods = {
                 error: player?.error || null
             });
 
+            const enabled = id === 'center' || slot.enabled === true;
+            const tvIdEl = tile.querySelector('.tv-player-tile__tv-id');
+            if (tvIdEl) {
+                if (multiTv && enabled) {
+                    const label = SLOT_SCREEN_LABELS[id] || '1';
+                    const parts = tvLabelAccentChars(label);
+                    const fingerprint = parts.map((p) => `${p.char}:${p.accent}`).join('');
+                    if (tvIdEl.dataset.tvFingerprint !== fingerprint) {
+                        tvIdEl.dataset.tvFingerprint = fingerprint;
+                        tvIdEl.replaceChildren(
+                            ...parts.map(({ char, accent }) => {
+                                const span = document.createElement('span');
+                                span.dataset.accent = String(accent);
+                                span.textContent = char;
+                                return span;
+                            })
+                        );
+                    }
+                    tvIdEl.setAttribute('aria-label', `TV ${label}`);
+                    tvIdEl.classList.remove('is-hidden');
+                } else {
+                    tvIdEl.replaceChildren();
+                    delete tvIdEl.dataset.tvFingerprint;
+                    tvIdEl.classList.add('is-hidden');
+                }
+            }
             tile.classList.toggle('is-empty', !hasChannel);
             tile.classList.toggle('is-playing', uiPlaying);
             tile.classList.toggle('is-loading', uiLoading);
@@ -280,6 +322,7 @@ export const tileChromeMethods = {
                 const name = (player?.channel?.name || '').trim();
                 const nameTextEl = nameEl.querySelector('.tv-player-tile__name-text');
                 const flagEl = nameEl.querySelector('.tv-player-tile__flag');
+                const chanNumEl = nameEl.querySelector('.tv-player-tile__chan-num');
                 if (hasChannel && name) {
                     if (nameTextEl) nameTextEl.textContent = name;
                     else nameEl.textContent = name;
@@ -287,11 +330,33 @@ export const tileChromeMethods = {
                         const code = player?.channel?.countrycode || '';
                         flagEl.textContent = code ? countryFlagEmoji(code) : '';
                     }
+                    if (chanNumEl) {
+                        const num = numbersForSlot(id).get(channelKey(player.channel));
+                        if (Number.isFinite(num)) {
+                            const parts = chanNumberAccentDigits(num);
+                            chanNumEl.replaceChildren(
+                                ...parts.map(({ digit, accent }) => {
+                                    const span = document.createElement('span');
+                                    span.dataset.accent = String(accent);
+                                    span.textContent = digit;
+                                    return span;
+                                })
+                            );
+                            chanNumEl.classList.remove('is-hidden');
+                        } else {
+                            chanNumEl.replaceChildren();
+                            chanNumEl.classList.add('is-hidden');
+                        }
+                    }
                     nameEl.classList.remove('is-hidden');
                 } else {
                     if (nameTextEl) nameTextEl.textContent = '';
                     else nameEl.textContent = '';
                     if (flagEl) flagEl.textContent = '';
+                    if (chanNumEl) {
+                        chanNumEl.replaceChildren();
+                        chanNumEl.classList.add('is-hidden');
+                    }
                     nameEl.classList.add('is-hidden');
                 }
             }
@@ -320,7 +385,6 @@ export const tileChromeMethods = {
                 }
             }
 
-            this.syncTileQualityMenu(tile, player);
             this.syncTileCastUi(tile, id, player);
         });
         this.syncMosaicChrome();
@@ -370,10 +434,6 @@ export const tileChromeMethods = {
 
         const intentPlaying = player?.wantPlaying === true || player?.playing === true;
         const showAudio = this.isSlotAudible(player);
-        const audioEl = tile.querySelector('.tv-player-tile__audio');
-        if (audioEl) {
-            audioEl.classList.toggle('is-hidden', !showAudio);
-        }
 
         tile.querySelectorAll('[data-controls-row="local"] [data-tile-action]').forEach((btn) => {
             this.syncTileControlButton(btn, player, slotId, {
@@ -445,51 +505,6 @@ export const tileChromeMethods = {
                 : ACTION_ICONS.pictureInPicture;
             btn.title = active ? 'Pop in' : 'Pop out';
             btn.setAttribute('aria-label', active ? 'Pop in' : 'Pop out');
-        }
-    },
-
-    syncTileQualityMenu(tile, player) {
-        const popup = tile?.querySelector?.('.tv-player-tile__quality-popup');
-        const btn = tile?.querySelector?.('[data-tile-action="quality"]');
-        if (!popup || !btn) return;
-
-        const levels = player?.getQualityLevels?.() || [];
-        const mode = player?.qualityMode ?? 'auto';
-        const modeKey = mode === 'auto' ? 'auto' : String(mode);
-        const fingerprint = `${modeKey}:${levels.map((l) => `${l.index}:${l.label}`).join(',')}`;
-
-        if (popup.dataset.qualityFingerprint !== fingerprint) {
-            popup.dataset.qualityFingerprint = fingerprint;
-            const ordered = [...levels].sort((a, b) => b.index - a.index);
-            const parts = [
-                `<button type="button" class="tv-player-tile__quality-option${mode === 'auto' ? ' is-selected' : ''}" role="menuitemradio" aria-checked="${mode === 'auto'}" data-quality-mode="auto">Auto</button>`
-            ];
-            for (const level of ordered) {
-                const selected = mode !== 'auto' && Number(mode) === level.index;
-                parts.push(
-                    `<button type="button" class="tv-player-tile__quality-option${selected ? ' is-selected' : ''}" role="menuitemradio" aria-checked="${selected}" data-quality-mode="${level.index}">${level.label}</button>`
-                );
-            }
-            popup.innerHTML = parts.join('');
-        } else {
-            popup.querySelectorAll('[data-quality-mode]').forEach((opt) => {
-                const selected = opt.getAttribute('data-quality-mode') === modeKey;
-                opt.classList.toggle('is-selected', selected);
-                opt.setAttribute('aria-checked', String(selected));
-            });
-        }
-
-        const hasStream = Boolean(player?.channel);
-        btn.disabled = !hasStream;
-        if (!hasStream) {
-            btn.title = 'Quality';
-        } else if (mode === 'auto') {
-            const live = player.qualityLabel && player.qualityLabel !== '—'
-                ? ` (${player.qualityLabel})`
-                : '';
-            btn.title = `Quality: Auto${live}`;
-        } else {
-            btn.title = `Quality: ${player.qualityLabel || '—'}`;
         }
     }
 };

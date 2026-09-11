@@ -107,15 +107,30 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     font-size: 0.62rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
     line-height: 1.2;
     text-align: center;
-    color: var(--tv-text-primary, #f2f2f2);
     background: rgba(0, 0, 0, 0.55);
     border: 1px solid color-mix(in srgb, var(--tv-border) 50%, transparent);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
     user-select: none;
+}
+
+.channel-tile__chan-num > [data-accent="1"] {
+    color: var(--tv-main-1, #00FFFF);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-1, #00FFFF) 40%, transparent);
+}
+
+.channel-tile__chan-num > [data-accent="2"] {
+    color: var(--tv-main-2, #00FF88);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-2, #00FF88) 40%, transparent);
+}
+
+.channel-tile__chan-num > [data-accent="3"] {
+    color: var(--tv-main-3, #FF00FF);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-3, #FF00FF) 40%, transparent);
 }
 
 #favorites-grid .channel-tile:hover .channel-tile__chan-num,

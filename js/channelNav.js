@@ -44,6 +44,70 @@ export function buildChannelIndex(bindScope) {
 }
 
 /**
+ * Prefer accent from digit value (1/4/7→1, 2/5/8→2, 3/6/9/0→3), then
+ * reassign so no accent repeats within a 1–3 digit channel number.
+ * @param {number} num
+ * @returns {{ digit: string, accent: 1|2|3 }[]}
+ */
+export function chanNumberAccentDigits(num) {
+    const n = Math.floor(Number(num));
+    if (!Number.isFinite(n) || n < 0) return [];
+    const chars = String(n).split('');
+    const used = new Set();
+    let prev = 0;
+    return chars.map((digit) => {
+        const d = Number(digit);
+        let accent = /** @type {1|2|3} */ (d === 0 ? 3 : ((d - 1) % 3) + 1);
+        if (used.size < 3) {
+            let guard = 0;
+            while (used.has(accent) && guard < 3) {
+                accent = /** @type {1|2|3} */ ((accent % 3) + 1);
+                guard += 1;
+            }
+            used.add(accent);
+        } else if (accent === prev) {
+            accent = /** @type {1|2|3} */ ((accent % 3) + 1);
+        }
+        prev = accent;
+        return { digit, accent };
+    });
+}
+
+/**
+ * Colored digit spans for a channel number (TV overlay / catalog tiles).
+ * @param {number} num
+ * @returns {string}
+ */
+export function chanNumberAccentHtml(num) {
+    return chanNumberAccentDigits(num)
+        .map(({ digit, accent }) => `<span data-accent="${accent}">${digit}</span>`)
+        .join('');
+}
+
+/**
+ * Accent the three TV-label characters (T, V, #) with a rotated palette so
+ * each screen gets a distinct color order and no accent repeats within the label.
+ * @param {string|number} screenNum 1-based TV index
+ * @returns {{ char: string, accent: 1|2|3 }[]}
+ */
+export function tvLabelAccentChars(screenNum) {
+    const n = Math.max(1, Math.floor(Number(screenNum)) || 1);
+    const rot = (n - 1) % 3;
+    /** @type {(1|2|3)[]} */
+    const accents = [1, 2, 3];
+    const ordered = /** @type {(1|2|3)[]} */ ([
+        accents[rot],
+        accents[(rot + 1) % 3],
+        accents[(rot + 2) % 3]
+    ]);
+    return [
+        { char: 'T', accent: ordered[0] },
+        { char: 'V', accent: ordered[1] },
+        { char: String(n), accent: ordered[2] }
+    ];
+}
+
+/**
  * Walk bind-scope keys to the next/previous candidate ref (no catalog fetch).
  * @param {{ slotId: string, direction: 'up' | 'down', bindScope?: ChanBindScope }} opts
  * @returns {{ key: string, number: number } | null}

@@ -6,8 +6,9 @@
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--tv-radius-lg);
     overflow: visible;
-    border: 1px solid var(--tv-border-light);
+    border: 1px solid color-mix(in srgb, var(--tv-border-light) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
     position: relative;
+    transition: border-color 0.15s ease;
 }
 
 .tv-player-slot.is-hidden {
@@ -47,7 +48,7 @@
     position: relative;
     min-width: 0;
     min-height: 0;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgb(255 255 255 / calc(0.1 * var(--ui-idle-opacity-mult, 1)));
     border-radius: 8px;
     overflow: hidden;
     background: #000;
@@ -59,8 +60,8 @@
 
 .tv-player-tile:hover,
 .tv-player-tile:focus-within {
-    border-color: var(--tv-primary);
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) 15%, transparent);
+    border-color: color-mix(in srgb, var(--tv-primary) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) calc(15% * var(--ui-idle-opacity-mult, 1)), transparent);
     overflow: visible;
     /* Tile raised just above hover controls (7400), below remote UI (8500+). */
     z-index: 7500;
@@ -69,10 +70,10 @@
 /* Mosaic tile highlight while browsing for a target screen or hovering the screen strip. */
 .tv-player-tile.is-channel-picker-target,
 .tv-player-tile.is-screen-strip-hover {
-    border-color: var(--tv-primary);
+    border-color: color-mix(in srgb, var(--tv-primary) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
     box-shadow:
-        0 0 0 2px color-mix(in srgb, var(--tv-primary) 55%, transparent),
-        0 6px 22px color-mix(in srgb, var(--tv-primary) 28%, transparent);
+        0 0 0 2px color-mix(in srgb, var(--tv-primary) calc(55% * var(--ui-idle-opacity-mult, 1)), transparent),
+        0 6px 22px color-mix(in srgb, var(--tv-primary) calc(28% * var(--ui-idle-opacity-mult, 1)), transparent);
 }
 
 .tv-player-tile.is-hidden {
@@ -111,7 +112,7 @@
 .tv-player-tile:focus-within .tv-player-tile__resize,
 .tv-player-tile.is-resizing .tv-player-tile__resize,
 .tv-player-mosaic.is-free-layout .tv-player-tile.is-placed:hover .tv-player-tile__resize {
-    opacity: 1;
+    opacity: var(--ui-idle-opacity-mult, 1);
 }
 
 .tv-player-tile__resize[data-resize="n"],
@@ -284,8 +285,8 @@
 .tv-player-tile.tv-swap--flip .tv-player-tile__empty,
 .tv-player-tile.tv-swap--flip .tv-player-tile__playback-state,
 .tv-player-tile.tv-swap--flip .tv-player-tile__name,
+.tv-player-tile.tv-swap--flip .tv-player-tile__tv-id,
 .tv-player-tile.tv-swap--flip .tv-player-tile__corner,
-.tv-player-tile.tv-swap--flip .tv-player-tile__quality,
 .tv-player-tile.tv-swap--flip .tv-player-tile__hover,
 .tv-player-tile.tv-swap--flip .tv-player-tile__vol-rocker,
 .tv-player-tile.tv-swap--flip .tv-player-tile__chan-rocker {
@@ -668,21 +669,98 @@
 .tv-player-tile__name {
     position: absolute;
     top: 0.35rem;
-    left: 0.4rem;
+    /* Clear the NW resize grab handle (12px corner). */
+    left: 1.2rem;
     z-index: 3;
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    max-width: calc(100% - 3.25rem);
+    max-width: calc(100% - 4rem);
     padding: 0.15rem 0.35rem;
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.72);
-    color: #f2f2f2;
+    color: var(--tv-text-secondary, #B3B3B3);
     font-size: 0.7rem;
     line-height: 1.2;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
+}
+
+.tv-player-tile__chan-num {
+    flex-shrink: 0;
+    margin-right: 0.15rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.tv-player-tile__chan-num > [data-accent="1"] {
+    color: var(--tv-main-1, #00FFFF);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-1, #00FFFF) 45%, transparent);
+}
+
+.tv-player-tile__chan-num > [data-accent="2"] {
+    color: var(--tv-main-2, #00FF88);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-2, #00FF88) 45%, transparent);
+}
+
+.tv-player-tile__chan-num > [data-accent="3"] {
+    color: var(--tv-main-3, #FF00FF);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-3, #FF00FF) 45%, transparent);
+}
+
+.tv-player-tile__chan-num.is-hidden {
+    display: none;
+}
+
+.tv-player-tile__tv-id {
+    position: absolute;
+    top: 0.35rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.02em;
+    padding: 0.12rem 0.35rem;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.72);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    user-select: none;
+}
+
+.tv-player-tile__tv-id > [data-accent="1"] {
+    color: var(--tv-main-1, #00FFFF);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-1, #00FFFF) 45%, transparent);
+}
+
+.tv-player-tile__tv-id > [data-accent="2"] {
+    color: var(--tv-main-2, #00FF88);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-2, #00FF88) 45%, transparent);
+}
+
+.tv-player-tile__tv-id > [data-accent="3"] {
+    color: var(--tv-main-3, #FF00FF);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tv-main-3, #FF00FF) 45%, transparent);
+}
+
+.tv-player-tile:hover .tv-player-tile__tv-id:not(.is-hidden),
+.tv-player-tile:focus-within .tv-player-tile__tv-id:not(.is-hidden),
+.tv-player-tile.is-channel-picker-target .tv-player-tile__tv-id:not(.is-hidden),
+.tv-player-tile.is-screen-strip-hover .tv-player-tile__tv-id:not(.is-hidden) {
+    opacity: var(--ui-idle-opacity-mult, 1);
+}
+
+.tv-player-tile__tv-id.is-hidden {
+    display: none;
 }
 
 .tv-player-tile__name-text {
@@ -701,7 +779,7 @@
 
 .tv-player-tile:hover .tv-player-tile__name:not(.is-hidden),
 .tv-player-tile:focus-within .tv-player-tile__name:not(.is-hidden) {
-    opacity: 1;
+    opacity: var(--ui-idle-opacity-mult, 1);
 }
 
 .tv-player-tile__echo {
@@ -716,7 +794,7 @@
     padding: 0.2rem 0.4rem;
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.72);
-    color: #d8dbe6;
+    color: var(--tv-text-secondary, #B3B3B3);
     font-size: 0.65rem;
     line-height: 1.25;
     font-variant-numeric: tabular-nums;
@@ -728,7 +806,7 @@
 .tv-player-tile:hover .tv-player-tile__echo:not(.is-hidden),
 .tv-player-tile:focus-within .tv-player-tile__echo:not(.is-hidden),
 .tv-player-tile.is-channel-picker-target .tv-player-tile__echo:not(.is-hidden) {
-    opacity: 0.92;
+    opacity: calc(0.92 * var(--ui-idle-opacity-mult, 1));
 }
 
 .tv-player-tile__echo.is-hidden {
@@ -739,104 +817,10 @@
     display: none;
 }
 
-.tv-player-tile__buffer,
 .tv-player-tile__quality-echo {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.tv-player-tile__quality {
-    position: absolute;
-    top: 0.3rem;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    z-index: 4;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s ease;
-}
-
-.tv-player-tile:hover .tv-player-tile__quality,
-.tv-player-tile:focus-within .tv-player-tile__quality,
-.tv-player-tile__quality.is-open {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.tv-player-tile__quality-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.72);
-    color: #f2f2f2;
-    cursor: pointer;
-    transition: background 0.15s ease, transform 0.1s ease;
-}
-
-.tv-player-tile__quality-btn:hover,
-.tv-player-tile__quality.is-open .tv-player-tile__quality-btn {
-    background: rgba(0, 0, 0, 0.9);
-    transform: scale(1.05);
-}
-
-.tv-player-tile__quality-btn:disabled {
-    opacity: 0.45;
-    cursor: default;
-    transform: none;
-}
-
-.tv-player-tile__quality-popup {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 7.5rem;
-    max-height: 12rem;
-    overflow-y: auto;
-    padding: 0.25rem;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.88);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-    display: none;
-    flex-direction: column;
-    gap: 0.1rem;
-}
-
-.tv-player-tile__quality:hover .tv-player-tile__quality-popup,
-.tv-player-tile__quality:focus-within .tv-player-tile__quality-popup,
-.tv-player-tile__quality.is-open .tv-player-tile__quality-popup {
-    display: flex;
-}
-
-.tv-player-tile__quality-option {
-    display: block;
-    width: 100%;
-    padding: 0.3rem 0.45rem;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: #f2f2f2;
-    font-size: 0.7rem;
-    text-align: left;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.tv-player-tile__quality-option:hover,
-.tv-player-tile__quality-option:focus-visible {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.tv-player-tile__quality-option.is-selected {
-    background: rgba(255, 255, 255, 0.18);
-    font-weight: 600;
 }
 
 .tv-player-tile__corner {
@@ -861,7 +845,7 @@
     border: none;
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.72);
-    color: #f2f2f2;
+    color: var(--tv-text-secondary, #B3B3B3);
     cursor: pointer;
     opacity: 0;
     pointer-events: none;
@@ -871,44 +855,13 @@
 
 .tv-player-tile:not(.is-primary):hover .tv-player-tile__dismiss,
 .tv-player-tile:not(.is-primary):focus-within .tv-player-tile__dismiss {
-    opacity: 1;
+    opacity: var(--ui-idle-opacity-mult, 1);
     pointer-events: auto;
 }
 
 .tv-player-tile__dismiss:hover {
     background: rgba(160, 40, 40, 0.9);
     transform: scale(1.05);
-}
-
-.tv-player-tile__audio {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.72);
-    color: #f2f2f2;
-    cursor: pointer;
-    pointer-events: none;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.tv-player-tile__audio:not(.is-hidden) {
-    display: flex;
-    pointer-events: auto;
-}
-
-.tv-player-tile__audio:hover {
-    background: rgba(0, 0, 0, 0.9);
-    color: #fff;
-}
-
-.tv-player-tile__audio.is-hidden {
-    display: none;
-    pointer-events: none;
 }
 
 /* Per-TV side rockers — vol (left) and channel (right); 3 equal rows */
@@ -947,7 +900,7 @@
 .tv-player-tile.is-selected .tv-player-tile__rocker,
 .tv-player-tile.is-channel-picker-target .tv-player-tile__rocker,
 .tv-player-tile.is-screen-strip-hover .tv-player-tile__rocker {
-    opacity: 1;
+    opacity: var(--ui-idle-opacity-mult, 1);
     pointer-events: auto;
 }
 
@@ -956,7 +909,7 @@
     .tv-player-tile.is-selected .tv-player-tile__rocker,
     .tv-player-tile.is-channel-picker-target .tv-player-tile__rocker,
     .tv-player-tile.is-screen-strip-hover .tv-player-tile__rocker {
-        opacity: 1;
+        opacity: var(--ui-idle-opacity-mult, 1);
         pointer-events: auto;
     }
 }
@@ -1150,7 +1103,7 @@
 .tv-player-tile.is-selected .tv-player-tile__hover,
 .tv-player-tile.is-channel-picker-target .tv-player-tile__hover,
 .tv-player-tile.is-screen-strip-hover .tv-player-tile__hover {
-    opacity: 1;
+    opacity: var(--ui-idle-opacity-mult, 1);
     pointer-events: auto;
 }
 
@@ -1159,7 +1112,7 @@
     .tv-player-tile.is-selected .tv-player-tile__hover,
     .tv-player-tile.is-channel-picker-target .tv-player-tile__hover,
     .tv-player-tile.is-screen-strip-hover .tv-player-tile__hover {
-        opacity: 1;
+        opacity: var(--ui-idle-opacity-mult, 1);
         pointer-events: auto;
     }
 }

@@ -51,7 +51,7 @@
         border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
         box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
-    opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
 }
 
 .remote-dock-tab:hover,
@@ -159,7 +159,7 @@ body.remote-dock-side-right .remote-dock-sheet {
     overflow: hidden;
     background: var(--tv-bg-secondary, #141829);
     border-radius: 18px 18px 0 0;
-    opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
     transition: opacity 0.15s ease;
 }
 
@@ -213,7 +213,7 @@ body.remote-dock-side-right .remote-dock-sheet {
         calc(var(--remote-extrude) - 1px) calc(var(--remote-extrude) - 1px) 0 0 var(--remote-extrude-edge);
     overflow: hidden;
     pointer-events: auto;
-    opacity: calc(var(--remote-module-opacity, 1) * var(--remote-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
     transition:
         opacity 0.15s ease,
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
@@ -434,7 +434,7 @@ body.browser-shell-split #remote-shell {
 .browser-module .remote-module__dialog {
     /* same chrome language as remote float */
     min-width: var(--remote-min-width, 260px);
-    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
 }
 
 .remote-module__chrome {

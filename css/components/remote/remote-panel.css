@@ -374,7 +374,7 @@
     writing-mode: horizontal-tb;
     text-orientation: mixed;
     transition: transform 0.25s ease, opacity 0.15s ease;
-    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
 }
 
 body:not(.browser-hidden-tab) .browser-dock-tab,
@@ -466,7 +466,7 @@ body.browser-hidden-tab .browser-dock-tab:not(.is-hidden) {
     background: var(--tv-bg-secondary, #141829);
     border-radius: 18px 18px 0 0;
     border: none;
-    opacity: calc(var(--remote-module-opacity, 1) * var(--browser-idle-opacity-mult, 1));
+    opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
 }
 
 body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--browser-end,

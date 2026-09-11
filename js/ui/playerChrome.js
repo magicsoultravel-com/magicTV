@@ -124,7 +124,7 @@ export const PlayerChrome = {
 
         syncVolumeDial(state);
 
-        this.updateBufferQuality();
+        this.updateQualityEcho();
         RemotePanel.syncRemotePanel?.();
         syncRemoteChannelBar?.(deps.appState?.activeTab || 'remote');
 
@@ -150,15 +150,7 @@ export const PlayerChrome = {
         }
     },
 
-    updateBufferQuality() {
-        const formatBuffer = (player) => {
-            const channel = player?.channel;
-            const loadPhase = player?.loadPhase;
-            if (!channel || loadPhase === 'idle') return 'Buffer: —';
-            const buf = player.getBufferInfo?.() || { buffered: 0 };
-            return `Buffer: ${(buf.buffered || 0).toFixed(1)}s`;
-        };
-
+    updateQualityEcho() {
         const formatQuality = (player) => {
             const channel = player?.channel;
             if (!channel) return 'Quality: —';
@@ -166,11 +158,6 @@ export const PlayerChrome = {
             if (!label || label === '—') {
                 const h = player?.video?.videoHeight;
                 if (h > 0) label = `${h}p`;
-            }
-            if (player?.qualityMode === 'auto') {
-                return label && label !== '—'
-                    ? `Quality: Auto (${label})`
-                    : 'Quality: Auto';
             }
             return `Quality: ${label || '—'}`;
         };
@@ -183,11 +170,9 @@ export const PlayerChrome = {
             const enabled = id === 'center' || slot?.enabled;
             const player = enabled ? (slot?.player || (id === 'center' ? MultiView.getPrimary?.() : null)) : null;
             const echo = tile.querySelector('.tv-player-tile__echo');
-            const bufferEl = tile.querySelector('.tv-player-tile__buffer');
             const qualityEl = tile.querySelector('.tv-player-tile__quality-echo');
             const hasChannel = Boolean(player?.channel);
             echo?.classList.toggle('is-hidden', !enabled || !hasChannel);
-            if (bufferEl) bufferEl.textContent = formatBuffer(player);
             if (qualityEl) qualityEl.textContent = formatQuality(player);
         }
     }

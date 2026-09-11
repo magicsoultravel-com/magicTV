@@ -35,8 +35,8 @@ const KNOWN_IDS = [
     'volume-slider', 'volume-dial',
     'tv-volume-slider', 'tv-volume-dial', 'tv-volume-pct',
     'countries-container', 'channels-container',
-    'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty'
-'buffer-size-select',
+    'favorites-grid', 'favorites-empty', 'recents-grid', 'recents-empty',
+    'buffer-size-select',
     'chan-switch-mode-select',
     'swap-transition-select',
     'text-size-slider', 'text-size-value',
@@ -136,4 +136,81 @@ function waitFor(fn, timeout = 5000) {
         })();
     });
 }
-];
+
+before(async () => {
+    setCatalogFetchTimeoutMs(80);
+
+    const els = new Map(KNOWN_IDS.map((id) => [id, makeEl(id)]));
+    const bootEl = els.get('boot-screen');
+    const countriesEl = els.get('countries-container');
+
+    globalThis.document = {
+        readyState: 'complete',
+        body: makeEl('body'),
+        head: makeEl('head'),
+        documentElement: makeEl('html'),
+        createElement: (tag) => makeEl(tag),
+        getElementById: (id) => els.get(id) || null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener: () => {}
+    };
+    globalThis.document.documentElement.classList.add('is-booting');
+    globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+    globalThis.window = {
+        dispatchEvent: () => true,
+        addEventListener: () => {},
+        matchMedia: () => ({ matches: true }),
+        setTimeout: (fn, ms) => setTimeout(fn, ms),
+        clearTimeout: (t) => clearTimeout(t)
+    };
+    globalThis.CustomEvent = class CustomEvent {
+        constructor(type, options = {}) {
+            this.type = type;
+            this.detail = options.detail;
+        }
+    };
+    globalThis.localStorage = {
+        _m: new Map(),
+        getItem(k) { return this._m.has(k) ? this._m.get(k) : null; },
+        setItem(k, v) { this._m.set(k, String(v)); },
+        removeItem(k) { this._m.delete(k); }
+    };
+    // Returning user: seed a saved last channel + mosaic slot so restore hits catalog.
+    globalThis.localStorage.setItem('matrix_tv_state', JSON.stringify({
+        lastChannel: 'BBC:us',
+        lastName: 'BBC',
+        lastCountry: 'us',
+        mosaicSlots: {
+            center: { channelKey: 'BBC:us', enabled: true }
+        }
+    }));
+    // Stalled CDN: accepted connection, no bytes.
+    globalThis.fetch = () => new Promise(() => {});
+    globalThis.indexedDB = undefined;
+
+    const onRejection = (err) => { bootError = err; };
+    process.on('unhandledRejection', onRejection);
+
+    const origErr = console.error;
+    console.error = () => {};
+    try {
+        await import('../js/app.js');
+        await waitFor(() => bootEl._removed || !document.documentElement.classList.contains('is-booting'));
+        bootCleared = bootEl._removed || !document.documentElement.classList.contains('is-booting');
+        await waitFor(() => countriesEl._ready, 8000);
+        countriesRendered = countriesEl._ready;
+    } finally {
+        console.error = origErr;
+        process.removeListener('unhandledRejection', onRejection);
+    }
+    if (bootError) throw bootError;
+});
+
+test('returning-user boot clears the cover even when the catalog network stalls', () => {
+    assert.equal(bootCleared, true, 'boot cover must clear before catalog restore finishes');
+});
+
+test('returning-user boot still reaches a ready countries container after catalog timeout', () => {
+    assert.equal(countriesRendered, true, 'countries container should render after degraded catalog');
+});

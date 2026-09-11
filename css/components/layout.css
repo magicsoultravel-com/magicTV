@@ -69,6 +69,13 @@
     --tv-header-collapse-ms: 380ms;
     --tv-header-collapse-ease: cubic-bezier(0.4, 0, 0.2, 1);
     max-height: 280px;
+    /* Header bar chrome softens with UI idle fade; brand/watermark is excluded. */
+    border-bottom-color: color-mix(in srgb, var(--tv-border) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--tv-primary) calc(5% * var(--ui-idle-opacity-mult, 1)), transparent) 0%,
+        color-mix(in srgb, var(--tv-secondary) calc(3% * var(--ui-idle-opacity-mult, 1)), transparent) 100%
+    );
     transition:
         max-height var(--tv-header-collapse-ms) var(--tv-header-collapse-ease),
         padding var(--tv-header-collapse-ms) var(--tv-header-collapse-ease),
@@ -78,6 +85,7 @@
 
 .tv-channel-info,
 .tv-clock-zone {
+    opacity: var(--ui-idle-opacity-mult, 1);
     transition:
         opacity 280ms var(--tv-header-collapse-ease, cubic-bezier(0.4, 0, 0.2, 1)),
         visibility 280ms var(--tv-header-collapse-ease, cubic-bezier(0.4, 0, 0.2, 1));

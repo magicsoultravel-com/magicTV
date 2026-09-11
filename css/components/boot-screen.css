@@ -6,8 +6,7 @@
    Smooth, crisp icon rendering across all viewports. */
 .ui-icon,
 .tv-controls__btn svg,
-.tv-player-tile__dismiss svg,
-.tv-player-tile__audio svg {
+.tv-player-tile__dismiss svg {
     shape-rendering: geometricPrecision;
     vector-effect: none;
     width: auto;
@@ -24,9 +23,7 @@
 .tv-controls__btn svg ellipse,
 .tv-controls__btn svg line,
 .tv-player-tile__dismiss svg circle,
-.tv-player-tile__dismiss svg path,
-.tv-player-tile__audio svg circle,
-.tv-player-tile__audio svg path {
+.tv-player-tile__dismiss svg path {
     vector-effect: non-scaling-stroke;
 }
 
