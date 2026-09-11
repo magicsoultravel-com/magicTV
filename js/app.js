@@ -45,6 +45,7 @@ import { primeBootScreen, revealBootScreen, fadeOutBootCover, revealAppBehind } 
 import { ResumeSessionModal, collectSessionTiles } from './ui/resumeSessionModal.js';
 import { initHeaderCollapse } from './ui/headerCollapse.js';
 import { UserDataSettings } from './ui/userDataSettings.js';
+import { migratePersistedState } from './storage/stateMigration.js';
 
 let appState = {
     countries: [],
@@ -683,6 +684,15 @@ function bindViewTransitionSelect() {
 
 async function init() {
     let revealed = false;
+    let sessionRepaired = false;
+    try {
+        const migration = migratePersistedState();
+        sessionRepaired = migration.repaired === true;
+    } catch (err) {
+        console.warn('[magicTV] State migration failed:', err);
+        sessionRepaired = true;
+    }
+
     const hasSession = collectSessionTiles().length > 0;
     const reveal = async () => {
         if (revealed) return;
@@ -803,6 +813,10 @@ async function init() {
 
         await reveal();
 
+        if (sessionRepaired) {
+            showAppToast('Session data repaired — some layout was reset');
+        }
+
         if (hasSession) {
             const modalDone = ResumeSessionModal.maybeShow();
             await revealAppBehind();
@@ -815,6 +829,13 @@ async function init() {
 
         await countriesPromise;
         warmGuideIndex().catch(() => {});
+    } catch (err) {
+        console.warn('[magicTV] Boot failed; revealing UI with safe defaults:', err);
+        try {
+            showAppToast('Session data repaired — some layout was reset');
+        } catch {
+            /* toast may be unavailable mid-boot */
+        }
     } finally {
         await reveal();
     }

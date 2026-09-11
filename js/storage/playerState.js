@@ -117,9 +117,11 @@ function normalizeCategoryFilter(raw) {
 function migrateRecentsMeta(raw) {
     if (Array.isArray(raw.recentsMeta) && raw.recentsMeta.length) {
         return raw.recentsMeta.map((entry) => {
+            if (entry == null) return null;
             if (typeof entry === 'string') {
                 return { key: migrateFavoriteRef(entry), name: '', logo: '', countrycode: '', at: 0 };
             }
+            if (typeof entry !== 'object') return null;
             return {
                 key: migrateFavoriteRef(entry.key),
                 name: entry.name || '',
@@ -127,7 +129,7 @@ function migrateRecentsMeta(raw) {
                 countrycode: entry.countrycode || '',
                 at: Number.isFinite(entry.at) ? entry.at : 0
             };
-        }).filter((e) => e.key);
+        }).filter((e) => e?.key);
     }
     if (Array.isArray(raw.recents)) {
         return raw.recents.map((key) => ({
@@ -448,7 +450,7 @@ export function loadPlayerState() {
             hiddenChannelsMeta,
             watchStatsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
-            lastChannelKey: raw.lastChannelKey || null,
+            lastChannelKey: raw.lastChannelKey ? migrateFavoriteRef(raw.lastChannelKey) : null,
             lastChannelName: raw.lastChannelName || '',
             wasPlaying: raw.wasPlaying === true,
             bufferSize: Number.isFinite(raw.bufferSize)
