@@ -726,7 +726,7 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active .catalog-root.module-lay
 }
 
 html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .module-shell__chrome {
-    padding: 0.15rem 0.5rem;
+    padding: 0.1rem 0.35rem;
     flex-shrink: 0;
 }
 
@@ -741,7 +741,7 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active #recents-panel {
 
 html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-module__footer,
 html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .remote-module__footer {
-    padding: 0.15rem 0.35rem;
+    padding: 0.1rem 0.35rem;
 }
 
 html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__resize {
