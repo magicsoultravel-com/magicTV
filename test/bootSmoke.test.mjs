@@ -68,7 +68,8 @@ const KNOWN_IDS = [
     'preview-list-flag',
     'resume-session-modal',
     'resume-session-dialog',
-    'resume-session-list'
+    'resume-session-list',
+    'resume-session-shortcuts'
 ];
 function makeEl(id = '') {
     const el = {

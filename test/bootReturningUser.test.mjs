@@ -74,6 +74,7 @@ const KNOWN_IDS = [
     'resume-session-modal',
     'resume-session-dialog',
     'resume-session-list',
+    'resume-session-shortcuts',
     // The boot cover itself — used to assert it gets removed.
     'boot-screen'
 ];

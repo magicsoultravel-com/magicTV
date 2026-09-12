@@ -16,6 +16,8 @@ let resolveClose = null;
 /** @type {Element | null} */
 let previousFocus = null;
 let bound = false;
+/** @type {{ kind: 'tab', tab: string } | { kind: 'action', action: string } | null} */
+let pendingShortcut = null;
 
 /**
  * @returns {{ slotId: string, channelName: string, channelKey: string, isLastActive: boolean }[]}
@@ -171,6 +173,20 @@ async function onListClick(e) {
     } catch { /* play errors surfaced by player */ }
 }
 
+async function onShortcutClick(e) {
+    const btn = e.target.closest?.('[data-remote-action], [data-remote-nav]');
+    if (!btn || !el('resume-session-shortcuts')?.contains(btn)) return;
+
+    const action = btn.getAttribute('data-remote-action');
+    const tab = btn.getAttribute('data-remote-nav');
+    // Stash intent for app boot to apply AFTER RemoteModule.restoreOpenIfNeeded(),
+    // which would otherwise force tab back to "remote".
+    if (tab) pendingShortcut = { kind: 'tab', tab };
+    else if (action) pendingShortcut = { kind: 'action', action };
+    else pendingShortcut = null;
+    finishClose();
+}
+
 function bindOnce() {
     if (bound) return;
     bound = true;
@@ -178,6 +194,17 @@ function bindOnce() {
         node.addEventListener('click', () => finishClose());
     });
     el('resume-session-list')?.addEventListener('click', onListClick);
+    el('resume-session-shortcuts')?.addEventListener('click', onShortcutClick);
+}
+
+/**
+ * Consume a welcome-shortcut destination chosen before the modal closed.
+ * @returns {{ kind: 'tab', tab: string } | { kind: 'action', action: string } | null}
+ */
+export function takePendingShortcut() {
+    const next = pendingShortcut;
+    pendingShortcut = null;
+    return next;
 }
 
 /** @returns {Promise<void>} */
@@ -186,6 +213,7 @@ export function maybeShow() {
     if (!tiles.length) return Promise.resolve();
 
     bindOnce();
+    pendingShortcut = null;
 
     return new Promise((resolve) => {
         resolveClose = resolve;
@@ -203,4 +231,9 @@ export function maybeShow() {
     });
 }
 
-export const ResumeSessionModal = { maybeShow, collectSessionTiles, close: finishClose };
+export const ResumeSessionModal = {
+    maybeShow,
+    collectSessionTiles,
+    close: finishClose,
+    takePendingShortcut
+};

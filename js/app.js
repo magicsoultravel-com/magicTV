@@ -670,6 +670,42 @@ function switchTabAnimated(tabName) {
 
 export { switchTab, ensureBrowserCatalogVisible };
 
+/**
+ * Apply a welcome-screen shortcut after restoreOpenIfNeeded so it is not
+ * overwritten by the default "remote" tab restore.
+ */
+async function applyResumeWelcomeShortcut() {
+    const intent = ResumeSessionModal.takePendingShortcut?.();
+    if (!intent) return;
+
+    try {
+        if (intent.kind === 'tab' && intent.tab) {
+            if (RemoteModule.isOpen?.()) {
+                switchTab(intent.tab);
+                if (BROWSER_TABS.includes(intent.tab) && isSplit()) {
+                    ensureBrowserCatalogVisible();
+                    RemoteModule.focusBrowserWindow?.();
+                }
+            } else {
+                RemoteModule.open({ tab: intent.tab, focusClose: false });
+            }
+            return;
+        }
+
+        if (intent.kind === 'action' && intent.action === 'guide-toggle') {
+            // Open the guide section directly (do not toggle closed if already visible).
+            GuidePanel.setVisible(true);
+            return;
+        }
+
+        if (intent.kind === 'action' && intent.action) {
+            await RemotePanel.handleRemoteAction(intent.action);
+        }
+    } catch {
+        /* destination errors are surfaced by remote/player UI */
+    }
+}
+
 function bindViewTransitionSelect() {
     const select = el('catalog-transition-select');
     if (!select || select.dataset.bound === '1') return;
@@ -833,6 +869,7 @@ async function init() {
         }
 
         RemoteModule.restoreOpenIfNeeded();
+        await applyResumeWelcomeShortcut();
 
         await playSharedDeepLink();
 
