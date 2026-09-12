@@ -1676,7 +1676,8 @@
     gap: var(--tv-spacing-sm);
 }
 
-/* Letterbox / empty-screen fills become see-through when enabled in Appearance. */
+/* Letterbox / empty-screen fills become see-through when enabled in Appearance.
+   --tv-empty-space-transparency is 0–1 (0%–100% transparent). */
 html[data-tv-empty-space-transparent="true"] .tv-player-tile,
 html[data-tv-empty-space-transparent="true"] .tv-player-tile .tv-playback-surface,
 html[data-tv-empty-space-transparent="true"] .tv-playback-surface,
@@ -1686,6 +1687,6 @@ html[data-tv-empty-space-transparent="true"] .tv-player-tile__empty,
 html[data-tv-empty-space-transparent="true"] .tv-player-tile__poster,
 html[data-tv-empty-space-transparent="true"] .tv-rotate-clone,
 html[data-tv-empty-space-transparent="true"] .tv-player-video {
-    background: transparent;
+    background: rgb(0 0 0 / calc(1 - var(--tv-empty-space-transparency, 1)));
 }
 

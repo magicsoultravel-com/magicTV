@@ -54,6 +54,9 @@ const REMOTE_MODULE_OPACITY_MIN = 33;
 const REMOTE_MODULE_OPACITY_MAX = 100;
 const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
 const DEFAULT_TV_EMPTY_SPACE_TRANSPARENT = false;
+const DEFAULT_TV_EMPTY_SPACE_TRANSPARENCY = 100;
+const TV_EMPTY_SPACE_TRANSPARENCY_MIN = 0;
+const TV_EMPTY_SPACE_TRANSPARENCY_MAX = 100;
 const DEFAULT_REMOTE_IDLE_DELAY_SEC = 10;
 const DEFAULT_REMOTE_IDLE_FADE_SEC = 10;
 const REMOTE_IDLE_DELAY_MIN = 0;
@@ -129,6 +132,15 @@ function clampRemoteModuleOpacity(value) {
     return Math.min(
         REMOTE_MODULE_OPACITY_MAX,
         Math.max(REMOTE_MODULE_OPACITY_MIN, Math.round(n))
+    );
+}
+
+function clampTvEmptySpaceTransparency(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_TV_EMPTY_SPACE_TRANSPARENCY;
+    return Math.min(
+        TV_EMPTY_SPACE_TRANSPARENCY_MAX,
+        Math.max(TV_EMPTY_SPACE_TRANSPARENCY_MIN, Math.round(n))
     );
 }
 
@@ -262,6 +274,19 @@ export const SettingsStore = {
         return next;
     },
 
+    getTvEmptySpaceTransparency() {
+        const raw = readPersistedState();
+        return raw.tvEmptySpaceTransparency != null
+            ? clampTvEmptySpaceTransparency(raw.tvEmptySpaceTransparency)
+            : DEFAULT_TV_EMPTY_SPACE_TRANSPARENCY;
+    },
+
+    setTvEmptySpaceTransparency(value) {
+        const clampedValue = clampTvEmptySpaceTransparency(value);
+        patchPersistedState({ tvEmptySpaceTransparency: clampedValue });
+        return clampedValue;
+    },
+
     getRemoteIdleDelaySec() {
         const raw = readPersistedState();
         return raw.remoteIdleDelaySec != null
@@ -383,6 +408,7 @@ export const SettingsStore = {
         const remoteModuleOpacity = this.setRemoteModuleOpacity(DEFAULT_REMOTE_MODULE_OPACITY);
         const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
         const tvEmptySpaceTransparent = this.setTvEmptySpaceTransparent(DEFAULT_TV_EMPTY_SPACE_TRANSPARENT);
+        const tvEmptySpaceTransparency = this.setTvEmptySpaceTransparency(DEFAULT_TV_EMPTY_SPACE_TRANSPARENCY);
         const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
         const remoteIdleFadeSec = this.setRemoteIdleFadeSec(DEFAULT_REMOTE_IDLE_FADE_SEC);
         const remoteTexture = this.setRemoteTexture(DEFAULT_REMOTE_TEXTURE);
@@ -401,6 +427,7 @@ export const SettingsStore = {
             remoteModuleOpacity,
             remoteIdleFadeEnabled,
             tvEmptySpaceTransparent,
+            tvEmptySpaceTransparency,
             remoteIdleDelaySec,
             remoteIdleFadeSec,
             remoteTexture,

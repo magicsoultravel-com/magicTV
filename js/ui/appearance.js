@@ -51,6 +51,19 @@ function syncRemoteIdleFadeUi({ enabled, delaySec, fadeSec }) {
     if (idleFadeSlider) idleFadeSlider.setAttribute('aria-valuetext', `${fadeSec}s`);
 }
 
+function syncTvEmptySpaceTransparencyUi({ enabled, pct }) {
+    const toggle = el('tv-empty-space-transparent');
+    const slider = el('tv-empty-space-transparency-slider');
+    const value = el('tv-empty-space-transparency-value');
+    if (toggle) toggle.checked = enabled === true;
+    if (slider) {
+        slider.value = String(pct);
+        slider.disabled = enabled !== true;
+        slider.setAttribute('aria-valuetext', `${pct}%`);
+    }
+    if (value) value.textContent = `${pct}%`;
+}
+
 function setFontPickerOpen(open) {
     const trigger = el('font-picker-trigger');
     const menu = el('font-picker-menu');
@@ -304,10 +317,26 @@ export const Appearance = {
         }
 
         const tvEmptySpaceTransparent = el('tv-empty-space-transparent');
+        const tvEmptySpaceTransparencySlider = el('tv-empty-space-transparency-slider');
         if (tvEmptySpaceTransparent && tvEmptySpaceTransparent.dataset.bound !== '1') {
             tvEmptySpaceTransparent.dataset.bound = '1';
             tvEmptySpaceTransparent.addEventListener('change', () => {
-                SettingsStore.setTvEmptySpaceTransparent(tvEmptySpaceTransparent.checked);
+                const enabled = SettingsStore.setTvEmptySpaceTransparent(tvEmptySpaceTransparent.checked);
+                syncTvEmptySpaceTransparencyUi({
+                    enabled,
+                    pct: SettingsStore.getTvEmptySpaceTransparency()
+                });
+                this.applyStyles();
+            });
+        }
+        if (tvEmptySpaceTransparencySlider && tvEmptySpaceTransparencySlider.dataset.bound !== '1') {
+            tvEmptySpaceTransparencySlider.dataset.bound = '1';
+            tvEmptySpaceTransparencySlider.addEventListener('input', () => {
+                const pct = SettingsStore.setTvEmptySpaceTransparency(Number(tvEmptySpaceTransparencySlider.value));
+                syncTvEmptySpaceTransparencyUi({
+                    enabled: SettingsStore.getTvEmptySpaceTransparent(),
+                    pct
+                });
                 this.applyStyles();
             });
         }
@@ -356,6 +385,7 @@ export const Appearance = {
                     remoteModuleOpacity,
                     remoteIdleFadeEnabled,
                     tvEmptySpaceTransparent,
+                    tvEmptySpaceTransparency,
                     remoteIdleDelaySec,
                     remoteIdleFadeSec,
                     remoteTexture,
@@ -376,8 +406,10 @@ export const Appearance = {
                     delaySec: remoteIdleDelaySec,
                     fadeSec: remoteIdleFadeSec
                 });
-                const tvEmptySpaceTransparentEl = el('tv-empty-space-transparent');
-                if (tvEmptySpaceTransparentEl) tvEmptySpaceTransparentEl.checked = tvEmptySpaceTransparent === true;
+                syncTvEmptySpaceTransparencyUi({
+                    enabled: tvEmptySpaceTransparent,
+                    pct: tvEmptySpaceTransparency
+                });
                 if (remoteTextureSelect) remoteTextureSelect.value = remoteTexture;
                 if (remoteButtonShapeSelect) remoteButtonShapeSelect.value = remoteButtonShape;
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
@@ -464,6 +496,10 @@ export const Appearance = {
         root.setAttribute(
             'data-tv-empty-space-transparent',
             SettingsStore.getTvEmptySpaceTransparent() ? 'true' : 'false'
+        );
+        root.style.setProperty(
+            '--tv-empty-space-transparency',
+            String(SettingsStore.getTvEmptySpaceTransparency() / 100)
         );
         applyThemeColorsToRoot(colors, root);
         applyFontToRoot(fontId, root);
@@ -601,10 +637,10 @@ export const Appearance = {
             activeTileSelect.value = activeTileStyle;
         }
 
-        const tvEmptySpaceTransparent = el('tv-empty-space-transparent');
-        if (tvEmptySpaceTransparent) {
-            tvEmptySpaceTransparent.checked = SettingsStore.getTvEmptySpaceTransparent();
-        }
+        syncTvEmptySpaceTransparencyUi({
+            enabled: SettingsStore.getTvEmptySpaceTransparent(),
+            pct: SettingsStore.getTvEmptySpaceTransparency()
+        });
 
         const visitedStyle = SettingsStore.getVisitedStyle();
         const visitedStyleSelect = el('visited-style-select');
