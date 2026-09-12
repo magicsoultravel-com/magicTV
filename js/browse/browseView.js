@@ -6,6 +6,7 @@ import { ChannelGrid } from '../ui/channelGrid.js';
 import { TileFrames } from '../tileFrames.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap, sortChannelList } from '../ui/listSort.js';
+import { marqueeInnerHtml } from '../ui/marquee.js';
 
 const PAGE_SIZE = 60;
 
@@ -129,7 +130,7 @@ export const BrowseView = {
         <div class="country-tile" data-country="${escapeHtml(c.iso_3166_1 || '')}" role="button" tabindex="0">
             <div class="country-tile__icon">${countryFlagEmoji(c.iso_3166_1)}</div>
             <div class="country-tile__body">
-                <h3 class="country-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(c.name)}</span></span></h3>
+                <h3 class="country-tile__name">${marqueeInnerHtml(c.name)}</h3>
                 <div class="country-tile__count">${c.stationcount || 0} channels</div>
             </div>
         </div>

@@ -13,6 +13,7 @@ import { classifyTilePlayback } from '../player/pauseBuffer.js';
 import { ChromecastManager } from '../cast/chromecastManager.js';
 import { buildChannelIndex, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
 import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
+import { setMarqueeText } from '../ui/marquee.js';
 
 function pipSupported() {
     return typeof document !== 'undefined'
@@ -324,7 +325,7 @@ export const tileChromeMethods = {
                 const flagEl = nameEl.querySelector('.tv-player-tile__flag');
                 const chanNumEl = nameEl.querySelector('.tv-player-tile__chan-num');
                 if (hasChannel && name) {
-                    if (nameTextEl) nameTextEl.textContent = name;
+                    if (nameTextEl) setMarqueeText(nameTextEl, name);
                     else nameEl.textContent = name;
                     if (flagEl) {
                         const code = player?.channel?.countrycode || '';
@@ -350,7 +351,7 @@ export const tileChromeMethods = {
                     }
                     nameEl.classList.remove('is-hidden');
                 } else {
-                    if (nameTextEl) nameTextEl.textContent = '';
+                    if (nameTextEl) setMarqueeText(nameTextEl, '');
                     else nameEl.textContent = '';
                     if (flagEl) flagEl.textContent = '';
                     if (chanNumEl) {

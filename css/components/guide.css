@@ -476,11 +476,15 @@ body.remote-undocked-open.remote-wing-open .guide-wing {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 300px;
+    flex-shrink: 0;
+}
+
+.tv-header-channel-name,
+.tv-header-channel-name .marquee-text {
     background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    flex-shrink: 0;
 }
 
 .tv-header-channel-flag {

@@ -9,6 +9,7 @@ import { SLOT_IDS } from '../mosaic/constants.js';
 import { ACTION_ICONS } from './icons.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import { WingPanel } from './wingPanel.js';
+import { applyMarquee, marqueeInnerHtml, setMarqueeText } from './marquee.js';
 
 const GUIDE_REFRESH_ICON = ACTION_ICONS.refresh;
 const GUIDE_UNAVAILABLE_ICON = ACTION_ICONS.guideUnavailable;
@@ -242,7 +243,7 @@ function dayTabsHtml(slotId, dayOffset) {
 
 function renderScreenSection(slotId, { channel, result, scheduleResult = null, dayOffset = 0 }) {
     const label = SLOT_SCREEN_LABELS[slotId] || slotId;
-    const channelName = channel?.name ? escapeHtml(channel.name) : '—';
+    const channelName = channel?.name || '—';
     const unavailable = isGuideUnavailable(result, channel);
     const { now, next, meta } = statusLine(result, channel);
     const scheduleEmpty = unavailable ? '' : scheduleMessage(scheduleResult);
@@ -254,7 +255,7 @@ function renderScreenSection(slotId, { channel, result, scheduleResult = null, d
         <div class="guide-screen__head-row">
             <button type="button" class="guide-screen__hit" data-guide-slot="${escapeHtml(slotId)}" aria-expanded="false">
                 <span class="guide-screen__badge">TV ${escapeHtml(label)}</span>
-                <span class="guide-screen__channel">${channelName}</span>
+                <span class="guide-screen__channel">${marqueeInnerHtml(channelName)}</span>
             </button>
             ${unavailable ? noGuideIconHtml(unavailableHint(result, channel)) : ''}
             ${refreshButtonHtml(slotId, label)}
@@ -289,7 +290,7 @@ function patchSlotSection(section, slotId, { channel, result, scheduleResult, da
 
     const { now, next, meta } = statusLine(result, channel);
     syncSlotAvailability(section, result, channel);
-    if (channelEl) channelEl.textContent = channel?.name || '—';
+    if (channelEl) setMarqueeText(channelEl, channel?.name || '—');
     if (nowEl && !isGuideUnavailable(result, channel)) nowEl.textContent = now;
     if (nextEl && !isGuideUnavailable(result, channel)) nextEl.textContent = next;
 
@@ -503,6 +504,7 @@ function renderGuideScreens(slotResults) {
 
     lastSlotResults = filtered;
     syncExpandedLayout(filtered);
+    applyMarquee(container);
 }
 
 function shouldLoadGuide() {

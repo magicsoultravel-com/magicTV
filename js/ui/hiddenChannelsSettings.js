@@ -4,6 +4,7 @@ import { countryFlagEmoji, escapeHtml } from '../tvUtils.js';
 import { CARD_ICONS } from './icons.js';
 import { ChannelGrid } from './channelGrid.js';
 import { createSettingsListBrowser } from './settingsListBrowser.js';
+import { marqueeInnerHtml } from './marquee.js';
 
 function hiddenSettingsTileHtml(ch) {
     const initial = (ch.name || '?')[0].toUpperCase();
@@ -19,7 +20,7 @@ function hiddenSettingsTileHtml(ch) {
                 </div>
             </div>
             <div class="channel-tile__body">
-                <h3 class="channel-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(ch.name || 'Unknown')}</span></span></h3>
+                <h3 class="channel-tile__name">${marqueeInnerHtml(ch.name || 'Unknown')}</h3>
                 <span class="channel-tile__flag">${countryFlagEmoji(ch.countrycode)}</span>
             </div>
         </div>

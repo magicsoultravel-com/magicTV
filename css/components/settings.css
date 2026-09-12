@@ -383,6 +383,9 @@ html[data-channel-layout="list"] .channel-grid .channel-tile__name,
 html[data-channel-layout="list"] .country-grid .country-tile__name {
     font-size: 0.75rem;
     line-height: 1.2;
+    min-width: 0;
+    flex: 1 1 auto;
+    width: auto;
 }
 
 html[data-channel-layout="list"] .channel-grid .channel-tile__body,
@@ -440,6 +443,9 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-parent-tile__lab
 html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__name {
     font-size: 0.75rem;
     line-height: 1.2;
+    min-width: 0;
+    flex: 1 1 auto;
+    width: auto;
 }
 
 html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__body {
@@ -473,7 +479,7 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     height: 14px;
 }
 
-/* Channel tile body - with text clipping when narrow */
+/* Channel tile body — name host is the overflow clip box */
 .channel-tile__body {
     min-width: 0;
     overflow: hidden;
@@ -481,32 +487,36 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
 
 /* Tile names use rem so they follow the root text-size scale */
 .channel-tile__name,
-.country-tile__name {
+.country-tile__name,
+.favorite-folder-tile__name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 0.8rem;
+    min-width: 0;
+    max-width: 100%;
+    align-self: stretch;
 }
 
-/* Duplicate-text marquee — never shows whitespace because two copies of the
-   text sit side by side, and the track scrolls by exactly 50% (one copy). */
-.channel-tile.narrow .channel-tile__name,
-.country-tile.narrow .country-tile__name {
+/* Duplicate-text marquee — two copies; track scrolls by 50% (one copy). */
+.is-marquee {
     overflow: hidden;
     text-overflow: clip;
 }
 
-.channel-tile.narrow .marquee-track,
-.country-tile.narrow .marquee-track {
+.is-marquee .marquee-track {
     display: inline-flex;
     white-space: nowrap;
-    will-change: transform;
     animation: marquee-dup 4s linear infinite alternate;
 }
 
-.channel-tile.narrow .marquee-text,
-.country-tile.narrow .marquee-text {
+.is-marquee .marquee-text {
     flex-shrink: 0;
+}
+
+.is-marquee:hover .marquee-track,
+.is-marquee:focus-within .marquee-track {
+    animation-play-state: paused;
 }
 
 @keyframes marquee-dup {

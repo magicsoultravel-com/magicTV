@@ -12,6 +12,7 @@ import { FavoritesFolders } from './favoritesFolders.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
 import { buildChannelIndex, chanNumberAccentHtml } from '../channelNav.js';
+import { marqueeInnerHtml } from './marquee.js';
 
 const wiredTiles = new WeakSet();
 
@@ -48,7 +49,7 @@ function tileHtml(ch, opts = {}) {
                 </div>
             </div>
             <div class="channel-tile__body">
-                <h3 class="channel-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(ch.name || 'Unknown')}</span></span></h3>
+                <h3 class="channel-tile__name">${marqueeInnerHtml(ch.name || 'Unknown')}</h3>
                 <span class="channel-tile__flag">${countryFlagEmoji(ch.countrycode)}</span>
             </div>
         </div>

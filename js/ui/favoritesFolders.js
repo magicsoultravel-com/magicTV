@@ -2,6 +2,7 @@ import { TvPlayer } from '../tvPlayer.js';
 import { escapeHtml, el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { CARD_ICONS } from './icons.js';
+import { marqueeInnerHtml } from './marquee.js';
 
 let deps = {
     getAppState: () => null,
@@ -27,7 +28,7 @@ export function folderTileHtml(folder) {
             <button type="button" class="favorite-folder-tile__delete-btn" title="Delete folder" aria-label="Delete folder">${CARD_ICONS.folderDelete}</button>
             <div class="favorite-folder-tile__icon" aria-hidden="true">${CARD_ICONS.folder}</div>
             <div class="favorite-folder-tile__body">
-                <h3 class="favorite-folder-tile__name">${escapeHtml(folder.name || 'Folder')}</h3>
+                <h3 class="favorite-folder-tile__name">${marqueeInnerHtml(folder.name || 'Folder')}</h3>
                 <div class="favorite-folder-tile__count">${label}</div>
             </div>
         </div>

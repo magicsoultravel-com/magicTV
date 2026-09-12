@@ -685,10 +685,6 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     font-size: 0.7rem;
 }
 
-/* Narrow tile marquee behavior — no scrollbar, text animates */
-.channel-tile.narrow .channel-tile__name {
-    display: block; /* override the hide */
-}
 .channel-tile__icon {
     width: 40px;
     height: 40px;

@@ -9,6 +9,7 @@ import { channelKey } from '../tvProviders/channelShape.js';
 import { RemotePanel, syncRemoteChannelBar } from './remotePanel.js';
 import { updateProgrammeHeader } from './guidePanel.js';
 import { syncVolumeDial } from './volumeDial.js';
+import { setMarqueeText } from './marquee.js';
 
 let deps = {
     appState: null
@@ -86,13 +87,13 @@ export const PlayerChrome = {
 
         if (!name && !channel) {
             if (headerInfo) headerInfo.classList.add('is-hidden');
-            if (headerName) headerName.textContent = '';
+            if (headerName) setMarqueeText(headerName, '');
             if (headerFlag) headerFlag.textContent = '';
             return;
         }
 
         if (headerInfo) headerInfo.classList.remove('is-hidden');
-        if (headerName) headerName.textContent = name || 'Unknown';
+        if (headerName) setMarqueeText(headerName, name || 'Unknown');
         if (headerFlag) headerFlag.textContent = country ? countryFlagEmoji(country) : '';
 
         updateProgrammeHeader().catch(() => {});

@@ -5,6 +5,7 @@ import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
 import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { Appearance } from './appearance.js';
+import { marqueeInnerHtml } from './marquee.js';
 
 function metaToChannel(entry) {
     const parsed = parseChannelKey(entry.key);
@@ -147,7 +148,7 @@ export function createSettingsListBrowser(config) {
             <div class="country-tile" data-country="${escapeHtml(code)}" role="button" tabindex="0">
                 <div class="country-tile__icon">${countryFlagEmoji(code)}</div>
                 <div class="country-tile__body">
-                    <h3 class="country-tile__name"><span class="marquee-track"><span class="marquee-text">${escapeHtml(countryName(code))}</span></span></h3>
+                    <h3 class="country-tile__name">${marqueeInnerHtml(countryName(code))}</h3>
                     <div class="country-tile__count">${count} ${escapeHtml(config.emptyLabel)}</div>
                 </div>
             </div>

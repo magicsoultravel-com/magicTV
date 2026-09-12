@@ -8,6 +8,7 @@ import { resolveSavedMosaicMap } from '../mosaic/persist.js';
 import { PLAY_FILL_ORDER } from '../mosaic/constants.js';
 import { fetchStoredFramesForMosaic, resolveStoredFrameDataUrl, collectFrameLookupKeys } from '../mosaic/frameLookup.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
+import { applyMarquee, marqueeInnerHtml } from './marquee.js';
 
 let open = false;
 /** @type {(() => void) | null} */
@@ -100,11 +101,12 @@ function renderList(tiles, posterMap = new Map()) {
                     ${posterHtml}
                     <span class="resume-session__tile-fallback${fallbackClass}" aria-hidden="true">${escapeHtml(initial)}</span>
                     <span class="resume-session__tile-screen">TV ${escapeHtml(screenNum)}</span>
-                    <span class="resume-session__tile-name">${escapeHtml(channelName)}</span>
+                    <span class="resume-session__tile-name">${marqueeInnerHtml(channelName)}</span>
                 </span>
             </button>
         </li>`;
     }).join('');
+    applyMarquee(listEl);
 }
 
 async function loadPosters(tiles) {

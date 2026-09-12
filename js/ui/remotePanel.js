@@ -11,6 +11,7 @@ import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareCha
 import { navigateChannel, navigateToChannelNumber } from '../channelNav.js';
 import { ChanBindPicker } from './chanBindPicker.js';
 import { SettingsStore } from '../storage/settingsStore.js';
+import { setMarqueeText } from './marquee.js';
 import {
     resolveViewTransition
 } from './viewTransitions.js';
@@ -114,7 +115,7 @@ function previewDigitEntry() {
     const flagEl = el('remote-channel-flag');
     if (!digitBuffer) return;
     if (bar) bar.classList.remove('is-hidden');
-    if (nameEl) nameEl.textContent = digitBuffer;
+    if (nameEl) setMarqueeText(nameEl, digitBuffer);
     if (flagEl) flagEl.textContent = '';
 }
 
@@ -182,9 +183,12 @@ export function syncRemoteChannelBar(_tabName) {
 
     if (bar) bar.classList.toggle('is-hidden', !show && !tuning);
     if (nameEl) {
-        nameEl.textContent = tuning
-            ? `TV ${tvLabel} · Tuning…`
-            : (show ? `TV ${tvLabel} · ${name}` : '');
+        setMarqueeText(
+            nameEl,
+            tuning
+                ? `TV ${tvLabel} · Tuning…`
+                : (show ? `TV ${tvLabel} · ${name}` : '')
+        );
     }
     if (flagEl) flagEl.textContent = show && country ? countryFlagEmoji(country) : '';
 }

@@ -1,6 +1,6 @@
 import { forEachAppDocument } from '../appDocuments.js';
 import { TvPlayer } from '../tvPlayer.js';
-import { countryFlagEmoji, escapeHtml, el } from '../tvUtils.js';
+import { countryFlagEmoji, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { clearWatchStats, formatWatchDuration, flushAllWatchAccruals, getTopWatched } from '../storage/watchStats.js';
 import { ACTION_ICONS } from './icons.js';
@@ -9,6 +9,7 @@ import { showAppToast } from './toast.js';
 import { RemoteModule } from './remoteModule.js';
 import { REMOTE_TEXTURES } from './remoteTextures.js';
 import { REMOTE_BUTTON_SHAPES } from './remoteButtonShapes.js';
+import { applyMarquee, setMarqueeText, marqueeInnerHtml } from './marquee.js';
 import {
     THEME_COLOR_KEYS,
     applyFontToRoot,
@@ -89,37 +90,6 @@ function buildFontPickerMenu() {
         return `<button type="button" class="settings-font-picker__option" role="option" data-font-id="${entry.id}" style="font-family: ${safeStack}" aria-selected="false">${entry.label}</button>`;
     }).join('');
     menu.dataset.ready = '1';
-}
-
-// Detect each tile's name overflow and toggle the "narrow" class.
-// Clone a second .marquee-text only when the single copy overflows so fitting
-// names never show doubled.
-function measureTileMarquee(tile) {
-    if (!tile || typeof tile.classList?.toggle !== 'function') return;
-    const name = tile.querySelector?.('.channel-tile__name, .country-tile__name');
-    if (!name) return;
-
-    const track = name.querySelector('.marquee-track');
-    const firstText = track?.querySelector('.marquee-text');
-    if (!track || !firstText) return;
-
-    track.querySelectorAll('.marquee-text[aria-hidden="true"]').forEach((node) => node.remove());
-    tile.classList.remove('narrow');
-
-    if (typeof firstText.scrollWidth !== 'number' || typeof name.clientWidth !== 'number') {
-        return;
-    }
-
-    const reducedMotion = typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const overflows = firstText.scrollWidth > name.clientWidth + 2;
-
-    if (overflows && !reducedMotion) {
-        const clone = firstText.cloneNode(true);
-        clone.setAttribute('aria-hidden', 'true');
-        track.appendChild(clone);
-        tile.classList.add('narrow');
-    }
 }
 
 function syncColorInputs(colors) {
@@ -484,11 +454,9 @@ export const Appearance = {
 
         this.updatePreviewTile();
 
-        document.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
+        applyMarquee(document);
         if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => {
-                document.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
-            });
+            requestAnimationFrame(() => applyMarquee(document));
         }
 
         forEachAppDocument((doc) => copyThemeAttributes(document, doc));
@@ -497,11 +465,9 @@ export const Appearance = {
     applyToTiles(container) {
         if (!container || !document.documentElement) return;
 
-        container.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
+        applyMarquee(container);
         if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => {
-                container.querySelectorAll('.channel-tile, .country-tile').forEach(measureTileMarquee);
-            });
+            requestAnimationFrame(() => applyMarquee(container));
         }
     },
 
@@ -515,7 +481,6 @@ export const Appearance = {
         const nameText = channel?.name || 'Now Playing';
         const countryCode = channel?.countrycode || '';
         const initial = (nameText[0] || 'P').toUpperCase();
-        const safeName = escapeHtml(nameText);
 
         if (previewTile) {
             previewTile.classList.toggle('is-playing', shouldPlay);
@@ -535,7 +500,7 @@ export const Appearance = {
         const name = el('preview-name');
         const flag = el('preview-flag');
         const avatar = el('preview-avatar');
-        if (name) name.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span></span>`;
+        if (name) setMarqueeText(name, nameText);
         if (flag) flag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
         if (avatar) avatar.textContent = initial;
 
@@ -543,7 +508,7 @@ export const Appearance = {
         const listName = el('preview-list-name');
         const listFlag = el('preview-list-flag');
         const listAvatar = el('preview-list-avatar');
-        if (listName) listName.innerHTML = `<span class="marquee-track"><span class="marquee-text">${safeName}</span></span>`;
+        if (listName) setMarqueeText(listName, nameText);
         if (listFlag) listFlag.textContent = countryCode ? countryFlagEmoji(countryCode) : '';
         if (listAvatar) listAvatar.textContent = initial;
     },
@@ -695,11 +660,12 @@ export const Appearance = {
         }
 
         list.innerHTML = top.map((entry, i) => {
-            const name = escapeHtml(entry.name || entry.key || 'Unknown');
+            const nameHtml = marqueeInnerHtml(entry.name || entry.key || 'Unknown');
             const time = formatWatchDuration(entry.seconds);
-            return `<div class="watch-stats-row"><span class="watch-stats-row__rank">${i + 1}.</span> <span class="watch-stats-row__name">${name}</span><span class="watch-stats-row__time">${time}</span></div>`;
+            return `<div class="watch-stats-row"><span class="watch-stats-row__rank">${i + 1}.</span> <span class="watch-stats-row__name">${nameHtml}</span><span class="watch-stats-row__time">${time}</span></div>`;
         }).join('');
         list.classList.remove('is-hidden');
         empty.classList.add('is-hidden');
+        applyMarquee(list);
     }
 };
