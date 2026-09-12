@@ -1676,3 +1676,16 @@
     gap: var(--tv-spacing-sm);
 }
 
+/* Letterbox / empty-screen fills become see-through when enabled in Appearance. */
+html[data-tv-empty-space-transparent="true"] .tv-player-tile,
+html[data-tv-empty-space-transparent="true"] .tv-player-tile .tv-playback-surface,
+html[data-tv-empty-space-transparent="true"] .tv-playback-surface,
+html[data-tv-empty-space-transparent="true"] .tv-player-tile .tv-playback-surface video,
+html[data-tv-empty-space-transparent="true"] .tv-playback-surface video,
+html[data-tv-empty-space-transparent="true"] .tv-player-tile__empty,
+html[data-tv-empty-space-transparent="true"] .tv-player-tile__poster,
+html[data-tv-empty-space-transparent="true"] .tv-rotate-clone,
+html[data-tv-empty-space-transparent="true"] .tv-player-video {
+    background: transparent;
+}
+

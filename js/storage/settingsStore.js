@@ -53,6 +53,7 @@ const LIST_WIDTH_STEP = 10;
 const REMOTE_MODULE_OPACITY_MIN = 33;
 const REMOTE_MODULE_OPACITY_MAX = 100;
 const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
+const DEFAULT_TV_EMPTY_SPACE_TRANSPARENT = false;
 const DEFAULT_REMOTE_IDLE_DELAY_SEC = 10;
 const DEFAULT_REMOTE_IDLE_FADE_SEC = 10;
 const REMOTE_IDLE_DELAY_MIN = 0;
@@ -248,6 +249,19 @@ export const SettingsStore = {
         return next;
     },
 
+    getTvEmptySpaceTransparent() {
+        const raw = readPersistedState();
+        return raw.tvEmptySpaceTransparent != null
+            ? raw.tvEmptySpaceTransparent === true
+            : DEFAULT_TV_EMPTY_SPACE_TRANSPARENT;
+    },
+
+    setTvEmptySpaceTransparent(value) {
+        const next = value === true;
+        patchPersistedState({ tvEmptySpaceTransparent: next });
+        return next;
+    },
+
     getRemoteIdleDelaySec() {
         const raw = readPersistedState();
         return raw.remoteIdleDelaySec != null
@@ -368,6 +382,7 @@ export const SettingsStore = {
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
         const remoteModuleOpacity = this.setRemoteModuleOpacity(DEFAULT_REMOTE_MODULE_OPACITY);
         const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
+        const tvEmptySpaceTransparent = this.setTvEmptySpaceTransparent(DEFAULT_TV_EMPTY_SPACE_TRANSPARENT);
         const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
         const remoteIdleFadeSec = this.setRemoteIdleFadeSec(DEFAULT_REMOTE_IDLE_FADE_SEC);
         const remoteTexture = this.setRemoteTexture(DEFAULT_REMOTE_TEXTURE);
@@ -385,6 +400,7 @@ export const SettingsStore = {
             listWidth,
             remoteModuleOpacity,
             remoteIdleFadeEnabled,
+            tvEmptySpaceTransparent,
             remoteIdleDelaySec,
             remoteIdleFadeSec,
             remoteTexture,

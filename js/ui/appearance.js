@@ -303,6 +303,15 @@ export const Appearance = {
             });
         }
 
+        const tvEmptySpaceTransparent = el('tv-empty-space-transparent');
+        if (tvEmptySpaceTransparent && tvEmptySpaceTransparent.dataset.bound !== '1') {
+            tvEmptySpaceTransparent.dataset.bound = '1';
+            tvEmptySpaceTransparent.addEventListener('change', () => {
+                SettingsStore.setTvEmptySpaceTransparent(tvEmptySpaceTransparent.checked);
+                this.applyStyles();
+            });
+        }
+
         const visitedStyleSelect = el('visited-style-select');
         if (visitedStyleSelect && visitedStyleSelect.dataset.bound !== '1') {
             visitedStyleSelect.dataset.bound = '1';
@@ -346,6 +355,7 @@ export const Appearance = {
                     listWidth,
                     remoteModuleOpacity,
                     remoteIdleFadeEnabled,
+                    tvEmptySpaceTransparent,
                     remoteIdleDelaySec,
                     remoteIdleFadeSec,
                     remoteTexture,
@@ -366,6 +376,8 @@ export const Appearance = {
                     delaySec: remoteIdleDelaySec,
                     fadeSec: remoteIdleFadeSec
                 });
+                const tvEmptySpaceTransparentEl = el('tv-empty-space-transparent');
+                if (tvEmptySpaceTransparentEl) tvEmptySpaceTransparentEl.checked = tvEmptySpaceTransparent === true;
                 if (remoteTextureSelect) remoteTextureSelect.value = remoteTexture;
                 if (remoteButtonShapeSelect) remoteButtonShapeSelect.value = remoteButtonShape;
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
@@ -449,6 +461,10 @@ export const Appearance = {
         root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
         root.setAttribute('data-visited-style', SettingsStore.getVisitedStyle());
         root.setAttribute('data-non-visited-style', SettingsStore.getNonVisitedStyle());
+        root.setAttribute(
+            'data-tv-empty-space-transparent',
+            SettingsStore.getTvEmptySpaceTransparent() ? 'true' : 'false'
+        );
         applyThemeColorsToRoot(colors, root);
         applyFontToRoot(fontId, root);
 
@@ -583,6 +599,11 @@ export const Appearance = {
         const activeTileSelect = el('active-tile-select');
         if (activeTileSelect) {
             activeTileSelect.value = activeTileStyle;
+        }
+
+        const tvEmptySpaceTransparent = el('tv-empty-space-transparent');
+        if (tvEmptySpaceTransparent) {
+            tvEmptySpaceTransparent.checked = SettingsStore.getTvEmptySpaceTransparent();
         }
 
         const visitedStyle = SettingsStore.getVisitedStyle();
