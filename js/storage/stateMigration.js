@@ -96,6 +96,8 @@ function buildCanonicalState(base) {
     next.lastChannelName = player.lastChannelName;
     next.wasPlaying = player.wasPlaying;
     next.bufferSize = player.bufferSize;
+    next.reattemptInterval = player.reattemptInterval;
+    next.reattempts = player.reattempts;
     next.mosaicSlots = player.mosaicSlots;
     next.mosaicPlacement = player.mosaicPlacement;
     next.mosaicLayoutMode = player.mosaicLayoutMode;

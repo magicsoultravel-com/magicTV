@@ -300,6 +300,7 @@ export const prepareCommitMethods = {
      */
     startPrepareChannel(channelOrKey, switchGen, opts = {}) {
         this.init();
+        this._clearAutoRetry({ full: true });
         if (switchGen != null && switchGen !== this.switchGeneration) {
             return Promise.resolve(false);
         }

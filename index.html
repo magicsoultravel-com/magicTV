@@ -97,6 +97,7 @@
                                 <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                                 <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
                         </div>
                         <div class="tv-player-tile__hover">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
@@ -149,6 +150,7 @@
                                 <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                                 <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
                         </div>
                         <div class="tv-player-tile__hover">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
@@ -226,6 +228,7 @@
                                 <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                                 <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
                         </div>
                         <div class="tv-player-tile__hover">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
@@ -283,6 +286,7 @@
                                 <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                                 <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
                         </div>
                         <div class="tv-player-tile__hover">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
@@ -340,6 +344,7 @@
                                 <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                                 <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
                         </div>
                         <div class="tv-player-tile__hover">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
@@ -397,6 +402,7 @@
                                 <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
                                 <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
                         </div>
                         <div class="tv-player-tile__hover">
                             <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
@@ -686,6 +692,18 @@
                                                 <label class="settings-section__label" for="recents-cap-input">Max recents (0–100)</label>
                                                 <div class="settings-section__control">
                                                     <input type="number" id="recents-cap-input" min="0" max="100" step="1" value="20" aria-label="Recent channels limit (0 to 100)">
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="reattempt-interval-input">Reattempt interval (1–120s)</label>
+                                                <div class="settings-section__control">
+                                                    <input type="number" id="reattempt-interval-input" min="1" max="120" step="1" value="10" aria-label="Auto-reconnect interval in seconds (1 to 120)">
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="reattempts-input">Reattempts (0–20)</label>
+                                                <div class="settings-section__control">
+                                                    <input type="number" id="reattempts-input" min="0" max="20" step="1" value="5" aria-label="Auto-reconnect attempts (0 disables)">
                                                 </div>
                                             </div>
                                         </div>

@@ -628,6 +628,27 @@
     background: rgba(40, 40, 40, 0.5);
 }
 
+.tv-player-tile__retry-countdown {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Menlo, Consolas, monospace;
+    font-size: clamp(1.75rem, 12%, 3.5rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.tv-player-tile.is-disconnected .tv-player-tile__retry-countdown:not([hidden]) {
+    display: flex;
+}
+
 .tv-player-tile.is-playing .tv-player-tile__playback-state,
 .tv-player-tile.is-empty .tv-player-tile__playback-state {
     display: none;

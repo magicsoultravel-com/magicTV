@@ -19,6 +19,26 @@ export const DEFAULT_BUFFER_SIZE = 15;
 export const MAX_BUFFER_SIZE = 120;
 export const MIN_BUFFER_SIZE = 5;
 
+export const DEFAULT_REATTEMPT_INTERVAL = 10;
+export const MIN_REATTEMPT_INTERVAL = 1;
+export const MAX_REATTEMPT_INTERVAL = 120;
+
+export const DEFAULT_REATTEMPTS = 5;
+export const MIN_REATTEMPTS = 0;
+export const MAX_REATTEMPTS = 20;
+
+export function clampReattemptInterval(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_REATTEMPT_INTERVAL;
+    return Math.min(MAX_REATTEMPT_INTERVAL, Math.max(MIN_REATTEMPT_INTERVAL, Math.round(n)));
+}
+
+export function clampReattempts(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_REATTEMPTS;
+    return Math.min(MAX_REATTEMPTS, Math.max(MIN_REATTEMPTS, Math.round(n)));
+}
+
 export const DEFAULT_SORT_BY = Object.freeze({
     countries: 'stations',
     channels: 'name',
@@ -456,6 +476,8 @@ export function loadPlayerState() {
             bufferSize: Number.isFinite(raw.bufferSize)
                 ? Math.min(MAX_BUFFER_SIZE, Math.max(MIN_BUFFER_SIZE, raw.bufferSize))
                 : DEFAULT_BUFFER_SIZE,
+            reattemptInterval: clampReattemptInterval(raw.reattemptInterval),
+            reattempts: clampReattempts(raw.reattempts),
             mosaicSlots: normalizeMosaicSlots(raw.mosaicSlots),
             mosaicPlacement: normalizeMosaicPlacement(raw.mosaicPlacement),
             mosaicLayoutMode: normalizeMosaicLayoutMode(raw.mosaicLayoutMode),
@@ -484,6 +506,8 @@ export function loadPlayerState() {
             lastChannelName: '',
             wasPlaying: false,
             bufferSize: DEFAULT_BUFFER_SIZE,
+            reattemptInterval: DEFAULT_REATTEMPT_INTERVAL,
+            reattempts: DEFAULT_REATTEMPTS,
             mosaicSlots: {},
             mosaicPlacement: {},
             mosaicLayoutMode: 'grid-h',
@@ -515,6 +539,8 @@ const KNOWN_PLAYER_PATCH_KEYS = new Set([
     'lastChannelName',
     'wasPlaying',
     'bufferSize',
+    'reattemptInterval',
+    'reattempts',
     'mosaicSlots',
     'mosaicPlacement',
     'mosaicLayoutMode',
@@ -622,6 +648,12 @@ export function savePlayerState(patch) {
     if ('lastChannelName' in patch) payload.lastChannelName = merged.lastChannelName;
     if ('wasPlaying' in patch) payload.wasPlaying = merged.wasPlaying;
     if ('bufferSize' in patch) payload.bufferSize = merged.bufferSize;
+    if ('reattemptInterval' in patch) {
+        payload.reattemptInterval = clampReattemptInterval(merged.reattemptInterval);
+    }
+    if ('reattempts' in patch) {
+        payload.reattempts = clampReattempts(merged.reattempts);
+    }
     if ('mosaicSlots' in patch) payload.mosaicSlots = merged.mosaicSlots || {};
     if ('mosaicPlacement' in patch) payload.mosaicPlacement = merged.mosaicPlacement || {};
     if ('mosaicLayoutMode' in patch) {

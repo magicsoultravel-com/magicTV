@@ -7,7 +7,11 @@ import {
     savePlayerState,
     DEFAULT_BUFFER_SIZE,
     MAX_BUFFER_SIZE,
-    MIN_BUFFER_SIZE
+    MIN_BUFFER_SIZE,
+    DEFAULT_REATTEMPT_INTERVAL,
+    DEFAULT_REATTEMPTS,
+    clampReattemptInterval,
+    clampReattempts
 } from '../storage/playerState.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import {
@@ -126,6 +130,8 @@ export function createPlayerInstance(options) {
         posterDataUrl: null,
 
         bufferSize: loadPlayerState().bufferSize || DEFAULT_BUFFER_SIZE,
+        reattemptInterval: loadPlayerState().reattemptInterval ?? DEFAULT_REATTEMPT_INTERVAL,
+        reattempts: loadPlayerState().reattempts ?? DEFAULT_REATTEMPTS,
 
         connection: 'idle',
         /** 'auto' or locked level index */
@@ -134,8 +140,12 @@ export function createPlayerInstance(options) {
         qualityLabel: '—',
         bandwidthEstimateBps: null,
         errorCount: 0,
-        retryCount: 0,
-        maxRetries: 3,
+        /** Auto-reconnect attempts already used in the current disconnect cycle. */
+        _autoRetryAttemptsUsed: 0,
+        _autoRetryTimer: null,
+        _autoRetryTickTimer: null,
+        _autoRetryDeadlineAt: 0,
+        _autoRetryGen: 0,
         /** Last user play/pause intent — media events must not fight this. */
         wantPlaying: false,
         /** Bumped on every transport action; stale play() results ignore older gens. */
@@ -431,6 +441,11 @@ export function createPlayerInstance(options) {
 
         emitState() {
             syncWatchAccrual();
+            if (this.playing && !this.error) {
+                this._clearAutoRetry({ full: true });
+            } else {
+                this._maybeScheduleAutoRetry();
+            }
             onState?.(this);
             if (!shouldBroadcast()) return;
             window.dispatchEvent(new CustomEvent('tv:state_changed', {
@@ -450,9 +465,95 @@ export function createPlayerInstance(options) {
                     recents: FavoritesRecents.getRecents(),
                     recentsMeta: FavoritesRecents.getRecentsMeta(),
                     seekInfo: this.getSeekInfo(),
-                    slotId: this.id
+                    slotId: this.id,
+                    autoRetryDeadlineAt: this._autoRetryDeadlineAt || 0,
+                    autoRetryAttemptsUsed: this._autoRetryAttemptsUsed || 0
                 }
             }));
+        },
+
+        /**
+         * Wipe auto-retry timers; with `full` also reset the attempt budget.
+         * User overrides always pass `{ full: true }`.
+         */
+        _clearAutoRetry({ full = false } = {}) {
+            if (this._autoRetryTimer) {
+                clearTimeout(this._autoRetryTimer);
+                this._autoRetryTimer = null;
+            }
+            if (this._autoRetryTickTimer) {
+                clearInterval(this._autoRetryTickTimer);
+                this._autoRetryTickTimer = null;
+            }
+            if (this._autoRetryDeadlineAt) {
+                this._autoRetryGen += 1;
+                this._autoRetryDeadlineAt = 0;
+            }
+            if (full) this._autoRetryAttemptsUsed = 0;
+        },
+
+        _maybeScheduleAutoRetry() {
+            if (this._autoRetryDeadlineAt) return;
+            if (this.playing) return;
+            if (!this.error || this.error === 'Playback blocked') return;
+            if (this.resumeBlocked) return;
+            if (!this.channel) return;
+            if (this.stopped) return;
+            if (this.wantPlaying !== true) return;
+            const max = this.getReattempts();
+            if (max <= 0) return;
+            if ((this._autoRetryAttemptsUsed || 0) >= max) return;
+            this._scheduleAutoRetry();
+        },
+
+        _scheduleAutoRetry() {
+            const intervalSec = this.getReattemptInterval();
+            const gen = ++this._autoRetryGen;
+            this._autoRetryDeadlineAt = Date.now() + (intervalSec * 1000);
+
+            this._autoRetryTickTimer = setInterval(() => {
+                if (gen !== this._autoRetryGen) return;
+                this.emitState();
+            }, 1000);
+
+            this._autoRetryTimer = setTimeout(() => {
+                if (gen !== this._autoRetryGen) return;
+                this._fireAutoRetry();
+            }, intervalSec * 1000);
+        },
+
+        _fireAutoRetry() {
+            // Clear timers/deadline only — keep attemptsUsed until success or user reset.
+            this._clearAutoRetry();
+            const max = this.getReattempts();
+            if (max <= 0) return;
+            if ((this._autoRetryAttemptsUsed || 0) >= max) return;
+            if (!this.channel || this.stopped || this.wantPlaying !== true) return;
+
+            this._autoRetryAttemptsUsed = (this._autoRetryAttemptsUsed || 0) + 1;
+            void this.playChannel(this.channel, { fromAutoRetry: true });
+        },
+
+        setReattemptInterval(seconds) {
+            this.reattemptInterval = clampReattemptInterval(seconds);
+            return this.reattemptInterval;
+        },
+
+        getReattemptInterval() {
+            return this.reattemptInterval
+                ?? loadPlayerState().reattemptInterval
+                ?? DEFAULT_REATTEMPT_INTERVAL;
+        },
+
+        setReattempts(count) {
+            this.reattempts = clampReattempts(count);
+            return this.reattempts;
+        },
+
+        getReattempts() {
+            return this.reattempts
+                ?? loadPlayerState().reattempts
+                ?? DEFAULT_REATTEMPTS;
         },
 
         mute() {
@@ -846,6 +947,7 @@ export function createPlayerInstance(options) {
          * do not block a fresher pause freeze into IDB.
          */
         pause() {
+            this._clearAutoRetry({ full: true });
             this._clearStuckLoadWatchdog();
             const gen = this.beginTransport(false);
             this._enterPauseAt = Date.now();
@@ -922,8 +1024,13 @@ export function createPlayerInstance(options) {
             }
         },
 
-        async playChannel(channelOrKey) {
+        async playChannel(channelOrKey, { fromAutoRetry = false } = {}) {
             this.init();
+            if (fromAutoRetry) {
+                this._clearAutoRetry();
+            } else {
+                this._clearAutoRetry({ full: true });
+            }
             this.switchGeneration += 1;
             this.prepareGeneration += 1;
             this._preloader?.cancel();
@@ -1006,7 +1113,7 @@ export function createPlayerInstance(options) {
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.playing = false;
-                if (shouldClearWantPlayingOnPlayFail()) {
+                if (shouldClearWantPlayingOnPlayFail() && !fromAutoRetry) {
                     this.wantPlaying = false;
                 }
                 const blocked = isAutoplayNotAllowedError(e);
@@ -1029,6 +1136,7 @@ export function createPlayerInstance(options) {
         },
 
         async stop({ clearChannel = false } = {}) {
+            this._clearAutoRetry({ full: true });
             this._clearStuckLoadWatchdog();
             this.playGeneration += 1;
             this.switchGeneration += 1;

@@ -4,7 +4,11 @@ import {
     savePlayerState,
     DEFAULT_BUFFER_SIZE,
     MAX_BUFFER_SIZE,
-    MIN_BUFFER_SIZE
+    MIN_BUFFER_SIZE,
+    DEFAULT_REATTEMPT_INTERVAL,
+    DEFAULT_REATTEMPTS,
+    clampReattemptInterval,
+    clampReattempts
 } from './storage/playerState.js';
 import { SettingsStore } from './storage/settingsStore.js';
 import { showAppToast } from './ui/toast.js';
@@ -533,6 +537,34 @@ export const MultiView = {
 
     getBufferSize() {
         return loadPlayerState().bufferSize || DEFAULT_BUFFER_SIZE;
+    },
+
+    setReattemptInterval(seconds) {
+        const clamped = clampReattemptInterval(seconds);
+        savePlayerState({ reattemptInterval: clamped });
+        SLOT_IDS.forEach((id) => {
+            const player = this.slots[id].player;
+            if (player) player.setReattemptInterval(clamped);
+        });
+        return clamped;
+    },
+
+    getReattemptInterval() {
+        return loadPlayerState().reattemptInterval ?? DEFAULT_REATTEMPT_INTERVAL;
+    },
+
+    setReattempts(count) {
+        const clamped = clampReattempts(count);
+        savePlayerState({ reattempts: clamped });
+        SLOT_IDS.forEach((id) => {
+            const player = this.slots[id].player;
+            if (player) player.setReattempts(clamped);
+        });
+        return clamped;
+    },
+
+    getReattempts() {
+        return loadPlayerState().reattempts ?? DEFAULT_REATTEMPTS;
     },
 
     syncSettingsToggles() {

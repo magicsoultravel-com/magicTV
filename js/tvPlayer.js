@@ -224,6 +224,22 @@ export const TvPlayer = {
         return MultiView.getBufferSize();
     },
 
+    setReattemptInterval(seconds) {
+        return MultiView.setReattemptInterval(seconds);
+    },
+
+    getReattemptInterval() {
+        return MultiView.getReattemptInterval();
+    },
+
+    setReattempts(count) {
+        return MultiView.setReattempts(count);
+    },
+
+    getReattempts() {
+        return MultiView.getReattempts();
+    },
+
     getBufferInfo() {
         return MultiView.getPrimary()?.getBufferInfo() || { buffered: 0, duration: 0 };
     },

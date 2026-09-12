@@ -59,6 +59,30 @@ export const PlayerChrome = {
                 showAppToast(`Buffer size: ${clamped}s`);
             });
         }
+        const reattemptInterval = el('reattempt-interval-input');
+        if (reattemptInterval && reattemptInterval.dataset.bound !== '1') {
+            reattemptInterval.dataset.bound = '1';
+            const applyInterval = () => {
+                const clamped = TvPlayer.setReattemptInterval(Number(reattemptInterval.value));
+                reattemptInterval.value = String(clamped);
+                showAppToast(`Reattempt interval: ${clamped}s`);
+            };
+            reattemptInterval.addEventListener('change', applyInterval);
+            reattemptInterval.addEventListener('blur', applyInterval);
+        }
+        const reattempts = el('reattempts-input');
+        if (reattempts && reattempts.dataset.bound !== '1') {
+            reattempts.dataset.bound = '1';
+            const applyReattempts = () => {
+                const clamped = TvPlayer.setReattempts(Number(reattempts.value));
+                reattempts.value = String(clamped);
+                showAppToast(clamped === 0
+                    ? 'Reattempts: off'
+                    : `Reattempts: ${clamped}`);
+            };
+            reattempts.addEventListener('change', applyReattempts);
+            reattempts.addEventListener('blur', applyReattempts);
+        }
         Appearance.bind();
         MultiView.bindSettings();
     },
@@ -66,6 +90,12 @@ export const PlayerChrome = {
     syncSettingsFromState() {
         const buffer = el('buffer-size-select');
         if (buffer) buffer.value = String(TvPlayer.getBufferSize());
+        const reattemptInterval = el('reattempt-interval-input');
+        if (reattemptInterval) {
+            reattemptInterval.value = String(TvPlayer.getReattemptInterval());
+        }
+        const reattempts = el('reattempts-input');
+        if (reattempts) reattempts.value = String(TvPlayer.getReattempts());
         syncVolumeDial();
         Appearance.syncFromState();
         MultiView.syncSettingsToggles();

@@ -304,15 +304,38 @@ export const tileChromeMethods = {
             tile.classList.toggle('is-stopped', uiStopped);
             tile.classList.toggle('is-disconnected', uiDisconnected);
             const stateEl = tile.querySelector('.tv-player-tile__playback-state');
+            const countdownEl = tile.querySelector('.tv-player-tile__retry-countdown');
             if (stateEl) {
                 if (uiDisconnected) {
                     stateEl.setAttribute('aria-hidden', 'false');
                     stateEl.setAttribute('role', 'img');
-                    stateEl.setAttribute('aria-label', 'Unable to connect');
+                    const deadlineAt = Number(player?._autoRetryDeadlineAt) || 0;
+                    const remainingSec = deadlineAt > 0
+                        ? Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000))
+                        : 0;
+                    if (countdownEl) {
+                        if (deadlineAt > 0) {
+                            countdownEl.hidden = false;
+                            countdownEl.textContent = String(remainingSec);
+                        } else {
+                            countdownEl.hidden = true;
+                            countdownEl.textContent = '';
+                        }
+                    }
+                    stateEl.setAttribute(
+                        'aria-label',
+                        deadlineAt > 0
+                            ? `Unable to connect. Reconnecting in ${remainingSec}s`
+                            : 'Unable to connect'
+                    );
                 } else {
                     stateEl.setAttribute('aria-hidden', 'true');
                     stateEl.removeAttribute('role');
                     stateEl.removeAttribute('aria-label');
+                    if (countdownEl) {
+                        countdownEl.hidden = true;
+                        countdownEl.textContent = '';
+                    }
                 }
             }
             // Never show “Pick a channel” for a remembered/saved assignment.
