@@ -5,7 +5,7 @@ import { MultiView } from '../multiView.js';
 import { TileFrames } from '../tileFrames.js';
 import { showAppToast } from './toast.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
-import { SettingsStore } from '../storage/settingsStore.js';
+import { SettingsStore, isCatalogBarTab } from '../storage/settingsStore.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { RemotePanel, syncRemoteNav } from './remotePanel.js';
 import { GuidePanel } from './guidePanel.js';
@@ -35,6 +35,8 @@ const MIN_H = 560;
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
+/** Short bottom catalog bar ≈ 3/8 of default docked remote height. */
+const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * (3 / 8);
 const SHEET_TRANSITION_MS = 280;
 
 function minDialogWidth() {
@@ -728,6 +730,105 @@ function applySheetHeight(ratio) {
     sheet.style.height = `${px}px`;
 }
 
+function clearBarSheetInline() {
+    const sheet = dockSheetEl();
+    const tab = dockTabEl();
+    const dialog = dialogEl();
+    if (sheet) {
+        sheet.style.removeProperty('width');
+        sheet.style.removeProperty('left');
+        sheet.style.removeProperty('right');
+        sheet.style.removeProperty('max-width');
+    }
+    if (tab) {
+        tab.style.removeProperty('width');
+        tab.style.removeProperty('left');
+        tab.style.removeProperty('right');
+        tab.style.removeProperty('max-width');
+    }
+    if (dialog) {
+        dialog.classList.remove('is-catalog-bar');
+        dialog.style.removeProperty('width');
+        dialog.style.removeProperty('min-width');
+        dialog.style.removeProperty('max-width');
+        dialog.style.removeProperty('height');
+        dialog.style.removeProperty('left');
+        dialog.style.removeProperty('right');
+        dialog.style.removeProperty('bottom');
+        dialog.style.removeProperty('top');
+    }
+}
+
+function applyBarSheetGeometry() {
+    const sheet = dockSheetEl();
+    const tab = dockTabEl();
+    const { w: vw, h: vh } = viewportSize();
+    const px = Math.max(48, Math.round(vh * BAR_SHEET_HEIGHT));
+    if (sheet) {
+        sheet.style.setProperty('--remote-sheet-height', String(BAR_SHEET_HEIGHT));
+        sheet.style.height = `${px}px`;
+        sheet.style.width = `${vw}px`;
+        sheet.style.maxWidth = '100vw';
+        sheet.style.left = '0';
+        sheet.style.right = '0';
+    }
+    if (tab) {
+        tab.style.width = `${vw}px`;
+        tab.style.maxWidth = '100vw';
+        tab.style.left = '0';
+        tab.style.right = '0';
+    }
+    if (mode === 'undocked') {
+        const dialog = dialogEl();
+        if (dialog) {
+            dialog.classList.add('is-catalog-bar');
+            dialog.style.width = `${vw}px`;
+            dialog.style.minWidth = `${vw}px`;
+            dialog.style.maxWidth = '100vw';
+            dialog.style.height = `${px}px`;
+            dialog.style.left = '0';
+            dialog.style.right = '0';
+            dialog.style.bottom = '0';
+            dialog.style.top = 'auto';
+        }
+    }
+}
+
+function resolveActiveCatalogTab() {
+    for (const t of ['browse', 'favorites', 'recents', 'settings', 'remote']) {
+        if (document.getElementById(`${t}-panel`)?.classList.contains('is-active')) return t;
+    }
+    return 'remote';
+}
+
+function syncCatalogChromeGeometry(tab = resolveActiveCatalogTab()) {
+    const bar = SettingsStore.getCatalogChrome() === 'bar' && isCatalogBarTab(tab) && !isSplit();
+    document.body.classList.toggle('catalog-bar-active', bar);
+    WingPanel.syncForTab?.(tab);
+
+    if (mode === 'docked' && sheetExpanded) {
+        if (bar) {
+            applyBarSheetGeometry();
+        } else {
+            clearBarSheetInline();
+            const saved = getSavedState();
+            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+        }
+    } else if (mode === 'undocked') {
+        if (bar) {
+            applyBarSheetGeometry();
+        } else {
+            clearBarSheetInline();
+            const saved = getSavedState();
+            if (saved) applyGeometry(saved, { pinned });
+        }
+    } else {
+        clearBarSheetInline();
+    }
+
+    BrowserModule.syncCatalogChrome?.(tab);
+}
+
 function setSheetExpanded(expanded, { persist = true } = {}) {
     sheetExpanded = expanded === true;
     const sheet = dockSheetEl();
@@ -738,8 +839,7 @@ function setSheetExpanded(expanded, { persist = true } = {}) {
     tab?.classList.toggle('is-active', sheetExpanded && mode === 'docked');
     tab?.setAttribute('aria-expanded', String(sheetExpanded));
     if (sheetExpanded && mode === 'docked') {
-        const saved = getSavedState();
-        applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+        syncCatalogChromeGeometry();
     }
     if (persist) persistState({ sheetExpanded });
 }
@@ -949,10 +1049,8 @@ function bindOnce() {
 
     document.addEventListener('keydown', onKeydown);
     window.addEventListener('resize', () => {
-        if (mode === 'undocked') applyGeometry(readDialogGeometry());
-        if (mode === 'docked' && sheetExpanded) {
-            const saved = getSavedState();
-            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+        if (mode === 'undocked' || (mode === 'docked' && sheetExpanded)) {
+            syncCatalogChromeGeometry();
         }
     });
     window.addEventListener('pagehide', () => {
@@ -1202,8 +1300,7 @@ export const RemoteModule = {
         if (!externalHost) {
             mountToActiveHost();
             setSheetExpanded(true);
-            const saved = getSavedState();
-            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+            syncCatalogChromeGeometry();
         }
         updateBodyClasses();
         persistState({ mode: 'docked', open: true });
@@ -1264,8 +1361,7 @@ export const RemoteModule = {
         } else if (mode === 'docked') {
             showUndockedUI(false);
             setSheetExpanded(true, { persist: false });
-            const saved = getSavedState();
-            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+            syncCatalogChromeGeometry();
             mountToActiveHost();
         } else {
             mountToActiveHost();
@@ -1333,6 +1429,9 @@ export const RemoteModule = {
     syncBrowseButtons,
     reconcileTargetIfDisabled,
     applyOpacity,
+    syncCatalogChrome(tab) {
+        syncCatalogChromeGeometry(tab ?? resolveActiveCatalogTab());
+    },
     resetIdleFade: () => ModuleIdleFade.resetAll()
 };
 

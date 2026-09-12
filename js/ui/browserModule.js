@@ -6,6 +6,7 @@ import { el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { loadPlayerState } from '../storage/playerState.js';
+import { SettingsStore } from '../storage/settingsStore.js';
 import { MultiView } from '../multiView.js';
 import {
     getLayoutState,
@@ -21,6 +22,7 @@ const MIN_W = 260;
 const MIN_H = 480;
 const VIEW_PAD = 8;
 const DEFAULT_SHEET_HEIGHT_FALLBACK = 0.62;
+const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT_FALLBACK * (3 / 8);
 
 let bound = false;
 let pinned = false;
@@ -165,8 +167,33 @@ function applyDockGeometry(heightOverride = null) {
     const sheet = dockSheetEl();
     const tab = dockTabEl();
     if (!sheet) return;
+    const { w: vw, h: vh } = viewportSize();
+    const useBar = SettingsStore.getCatalogChrome() === 'bar';
+
+    if (useBar) {
+        const height = Math.max(48, Math.round(vh * BAR_SHEET_HEIGHT));
+        sheet.style.width = `${vw}px`;
+        sheet.style.maxWidth = '100vw';
+        sheet.style.height = `${height}px`;
+        sheet.style.top = 'auto';
+        sheet.style.left = '0';
+        sheet.style.right = '0';
+        sheet.style.bottom = '0';
+        sheet.style.maxHeight = '30vh';
+        sheet.style.setProperty('--browser-sheet-height', String(BAR_SHEET_HEIGHT));
+        sheet.classList.add('is-catalog-bar');
+        if (tab) {
+            tab.style.width = `${vw}px`;
+            tab.style.maxWidth = '100vw';
+            tab.style.left = '0';
+            tab.style.right = '0';
+        }
+        document.body.classList.toggle('catalog-bar-active', true);
+        return;
+    }
+
+    sheet.classList.remove('is-catalog-bar');
     const base = measureRemoteDockGeometry();
-    const { h: vh } = viewportSize();
     const height = heightOverride != null
         ? Math.round(Math.min(vh * 0.85, Math.max(MIN_H, heightOverride)))
         : base.height;
@@ -174,11 +201,19 @@ function applyDockGeometry(heightOverride = null) {
     sheet.style.width = `${width}px`;
     sheet.style.height = `${height}px`;
     sheet.style.top = 'auto';
+    sheet.style.left = '';
     sheet.style.right = '';
     sheet.style.bottom = '0';
     sheet.style.maxHeight = '85vh';
+    sheet.style.maxWidth = '';
     sheet.style.setProperty('--browser-sheet-height', String(height / Math.max(1, vh)));
-    if (tab) tab.style.width = `${width}px`;
+    if (tab) {
+        tab.style.width = `${width}px`;
+        tab.style.removeProperty('left');
+        tab.style.removeProperty('right');
+        tab.style.removeProperty('max-width');
+    }
+    document.body.classList.toggle('catalog-bar-active', false);
 }
 
 function setDockExpanded(expanded) {
@@ -613,6 +648,16 @@ export const BrowserModule = {
     /** Tear down float/dock UI and leave shell placement to reconcile (join path). */
     close() {
         tearDownHosts();
+    },
+
+    syncCatalogChrome() {
+        if (!isSplit()) {
+            dockSheetEl()?.classList.remove('is-catalog-bar');
+            return;
+        }
+        if (uiMode === 'docked') {
+            applyDockGeometry();
+        }
     },
 
     mountTo(host) {

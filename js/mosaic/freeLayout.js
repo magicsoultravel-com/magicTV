@@ -4,6 +4,7 @@
  */
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { el } from '../tvUtils.js';
+import { bringOverlayToFront } from '../ui/moduleLayout.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -149,13 +150,15 @@ export const freeLayoutMethods = {
     },
 
     raiseTileInStack(slotId) {
-        if (!this.hasCustomPlacement() || !slotId || !this.mosaicPlacement[slotId]) return;
+        if (!slotId) return;
+        // Compete with remote/browser chrome (last click wins).
+        bringOverlayToFront({ tile: slotId });
+        if (!this.hasCustomPlacement() || !this.mosaicPlacement[slotId]) return;
 
         this.placementZTop += 1;
         const top = this.placementZTop;
         this.mosaicPlacement[slotId].z = top;
-        const tile = el(`player-tile-${slotId}`);
-        if (tile) tile.style.zIndex = String(top);
+        // Shared overlay stack already set inline z; keep placement z for persist/relative order.
     },
 
     placementZForSlot(slotId) {
@@ -191,6 +194,8 @@ export const freeLayoutMethods = {
         const slotId = tile.getAttribute('data-slot');
         if (!slotId || !SLOT_IDS.includes(slotId)) return;
         if (!this.slots[slotId]?.enabled) return;
+
+        this.raiseTileInStack(slotId);
 
         // During mosaic swap/rotate, still allow click-to-focus without starting a drag.
         if (this.swapBusy) {
@@ -272,7 +277,7 @@ export const freeLayoutMethods = {
 
         session.tile.classList.add('is-dragging');
         session.tile.classList.add('is-placed');
-        session.tile.style.zIndex = String(this.placementZForSlot(session.slotId));
+        this.raiseTileInStack(session.slotId);
     },
 
     moveTileDrag(session, clientX, clientY) {
@@ -343,7 +348,7 @@ export const freeLayoutMethods = {
 
         session.tile.classList.add('is-resizing');
         session.tile.classList.add('is-placed');
-        session.tile.style.zIndex = String(this.placementZForSlot(session.slotId));
+        this.raiseTileInStack(session.slotId);
     },
 
     moveTileResize(session, clientX, clientY) {

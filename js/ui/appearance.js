@@ -374,6 +374,18 @@ export const Appearance = {
             });
         }
 
+        const catalogChromeSelect = el('catalog-chrome-select');
+        if (catalogChromeSelect && catalogChromeSelect.dataset.bound !== '1') {
+            catalogChromeSelect.dataset.bound = '1';
+            catalogChromeSelect.addEventListener('change', () => {
+                SettingsStore.setCatalogChrome(catalogChromeSelect.value);
+                this.applyStyles();
+                RemoteModule.syncCatalogChrome?.();
+                const label = catalogChromeSelect.options[catalogChromeSelect.selectedIndex]?.text || catalogChromeSelect.value;
+                showAppToast(`Catalog chrome: ${label}`);
+            });
+        }
+
         const resetBtn = el('reset-appearance-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
@@ -390,6 +402,7 @@ export const Appearance = {
                     remoteIdleFadeSec,
                     remoteTexture,
                     remoteButtonShape,
+                    catalogChrome,
                     activeTileStyle,
                     visitedStyle,
                     nonVisitedStyle,
@@ -412,6 +425,7 @@ export const Appearance = {
                 });
                 if (remoteTextureSelect) remoteTextureSelect.value = remoteTexture;
                 if (remoteButtonShapeSelect) remoteButtonShapeSelect.value = remoteButtonShape;
+                if (catalogChromeSelect) catalogChromeSelect.value = catalogChrome;
                 if (activeTileSelect) activeTileSelect.value = activeTileStyle;
                 if (visitedStyleSelect) visitedStyleSelect.value = visitedStyle;
                 if (nonVisitedStyleSelect) nonVisitedStyleSelect.value = nonVisitedStyle;
@@ -420,6 +434,7 @@ export const Appearance = {
                 document.documentElement.setAttribute('data-theme', themeId);
                 this.applyStyles();
                 syncCatalogLayoutBtnChrome();
+                RemoteModule.syncCatalogChrome?.();
                 RemoteModule.resetIdleFade();
                 showAppToast('Appearance reset to defaults');
             });
@@ -478,6 +493,7 @@ export const Appearance = {
         const listWidth = SettingsStore.getListWidth();
         const remoteModuleOpacity = SettingsStore.getRemoteModuleOpacity();
         const catalogLayout = SettingsStore.getCatalogLayout();
+        const catalogChrome = SettingsStore.getCatalogChrome();
         const themeId = SettingsStore.getThemeId();
         const colors = SettingsStore.getThemeColors();
         const fontId = SettingsStore.getFontId();
@@ -490,6 +506,7 @@ export const Appearance = {
         root.setAttribute('data-remote-button-shape', SettingsStore.getRemoteButtonShape());
         root.setAttribute('data-theme', themeId);
         root.setAttribute('data-channel-layout', catalogLayout);
+        root.setAttribute('data-catalog-chrome', catalogChrome);
         root.setAttribute('data-active-tile-style', SettingsStore.getActiveTileStyle());
         root.setAttribute('data-visited-style', SettingsStore.getVisitedStyle());
         root.setAttribute('data-non-visited-style', SettingsStore.getNonVisitedStyle());
@@ -652,6 +669,11 @@ export const Appearance = {
         const nonVisitedStyleSelect = el('non-visited-style-select');
         if (nonVisitedStyleSelect) {
             nonVisitedStyleSelect.value = nonVisitedStyle;
+        }
+
+        const catalogChromeSelect = el('catalog-chrome-select');
+        if (catalogChromeSelect) {
+            catalogChromeSelect.value = SettingsStore.getCatalogChrome();
         }
 
         const recentsCap = SettingsStore.getRecentsCap();

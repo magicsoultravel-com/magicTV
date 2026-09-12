@@ -673,3 +673,77 @@ body.browser-shell-split #remote-shell {
     min-height: var(--remote-btn-size, 40px);
 }
 
+
+/* ===== Catalog bottom bar (data-catalog-chrome=bar) ===== */
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet,
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-tab {
+    left: 0;
+    right: 0;
+    width: 100vw;
+    max-width: 100vw;
+    transform-origin: bottom center;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active.remote-dock-side-right .remote-dock-sheet,
+html[data-catalog-chrome="bar"] body.catalog-bar-active.remote-dock-side-right .remote-dock-tab {
+    left: 0;
+    right: 0;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet {
+    max-height: 30vh;
+    transition:
+        transform 0.25s ease,
+        height 0.28s ease,
+        width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__inner {
+    border-radius: 12px 12px 0 0;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-module__dialog.is-catalog-bar {
+    border-radius: 12px 12px 0 0;
+    cursor: default;
+}
+
+/* Suppress 2× wing width when bar chrome is active */
+html[data-catalog-chrome="bar"] body.catalog-bar-active.remote-dock-expanded .remote-dock-sheet,
+html[data-catalog-chrome="bar"] body.catalog-bar-active.remote-dock-expanded .remote-dock-tab,
+html[data-catalog-chrome="bar"] body.catalog-bar-active.remote-wing-mode-browser .remote-module__host > #tv-catalog-body,
+html[data-catalog-chrome="bar"] body.catalog-bar-active.remote-wing-mode-browser .remote-dock-sheet__inner > #tv-catalog-body {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active .catalog-root.module-layout--joined:not(.is-remote-view) #browser-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .module-shell__chrome {
+    padding: 0.15rem 0.5rem;
+    flex-shrink: 0;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .module-shell__scroll,
+html[data-catalog-chrome="bar"] body.catalog-bar-active #browse-panel,
+html[data-catalog-chrome="bar"] body.catalog-bar-active #favorites-panel,
+html[data-catalog-chrome="bar"] body.catalog-bar-active #recents-panel {
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-module__footer,
+html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .remote-module__footer {
+    padding: 0.15rem 0.35rem;
+}
+
+html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__resize {
+    display: none;
+}

@@ -174,13 +174,43 @@ export function toggleSplitBrowser({ hostKind = 'undocked' } = {}) {
     return splitBrowser({ hostKind });
 }
 
-/** Raise a module shell above its sibling (last focused wins). */
-export function bringModuleToFront(shellId) {
-    if (typeof document === 'undefined') return;
+/** @typedef {'remote'|'browser'|{ tile: string }} OverlayTarget */
+
+/**
+ * Raise remote float + dock hosts, browser float + dock hosts, or a TV tile
+ * so last interaction wins across chrome and mosaic.
+ * @param {OverlayTarget | typeof SHELL_REMOTE | typeof SHELL_BROWSER} target
+ * @returns {number} assigned z-index
+ */
+export function bringOverlayToFront(target) {
+    if (typeof document === 'undefined') return stackZ;
     stackZ += 1;
-    const id = shellId === SHELL_BROWSER ? 'browser-module' : 'remote-module';
-    const node = document.getElementById(id);
-    if (node) node.style.zIndex = String(stackZ);
+    const z = String(stackZ);
+
+    if (target && typeof target === 'object' && target.tile) {
+        const tile = document.getElementById(`player-tile-${target.tile}`);
+        if (tile) tile.style.zIndex = z;
+        return stackZ;
+    }
+
+    const shell = target === SHELL_BROWSER || target === 'browser' ? 'browser' : 'remote';
+    const ids = shell === 'browser'
+        ? ['browser-module', 'browser-dock-sheet', 'browser-dock-tab']
+        : ['remote-module', 'remote-dock-sheet', 'remote-dock-tab'];
+    for (const id of ids) {
+        const node = document.getElementById(id);
+        if (node) node.style.zIndex = z;
+    }
+    return stackZ;
+}
+
+/** @deprecated Prefer bringOverlayToFront — kept for existing call sites. */
+export function bringModuleToFront(shellId) {
+    return bringOverlayToFront(shellId === SHELL_BROWSER ? 'browser' : 'remote');
+}
+
+export function getOverlayStackZ() {
+    return stackZ;
 }
 
 export function remoteShellEl() {

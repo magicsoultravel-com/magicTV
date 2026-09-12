@@ -789,3 +789,70 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     height: 22px;
 }
 
+
+/* Compact horizontal catalog inside bottom bar chrome */
+html[data-catalog-chrome="bar"] body.catalog-bar-active .channel-grid,
+html[data-catalog-chrome="bar"] body.catalog-bar-active .country-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0;
+    padding: 0.25rem 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 100%;
+    max-height: 100%;
+}
+
+/* Tiles layout — square-ish cards in the strip */
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .channel-tile,
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .country-tile,
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .favorite-folder-tile,
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .favorite-folder-parent-tile {
+    flex: 0 0 auto;
+    width: min(var(--tv-tile-width, 120px), 28vw);
+    min-width: min(var(--tv-tile-width, 120px), 28vw);
+    max-width: min(var(--tv-tile-width, 120px), 28vw);
+    min-height: 0;
+    height: calc(100% - 0.25rem);
+    max-height: 100%;
+    padding: 0.2rem 0.35rem;
+    content-visibility: visible;
+}
+
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .channel-tile__name,
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .country-tile__name {
+    font-size: 0.75em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .channel-tile__icon,
+html[data-catalog-chrome="bar"]:not([data-channel-layout="list"]) body.catalog-bar-active .country-tile__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+}
+
+/* List layout — keep list-row width/height; scroll horizontally in the bar */
+html[data-catalog-chrome="bar"][data-channel-layout="list"] body.catalog-bar-active .channel-grid,
+html[data-catalog-chrome="bar"][data-channel-layout="list"] body.catalog-bar-active .country-grid {
+    align-items: center;
+}
+
+html[data-catalog-chrome="bar"][data-channel-layout="list"] body.catalog-bar-active .channel-tile,
+html[data-catalog-chrome="bar"][data-channel-layout="list"] body.catalog-bar-active .country-tile,
+html[data-catalog-chrome="bar"][data-channel-layout="list"] body.catalog-bar-active .favorite-folder-tile,
+html[data-catalog-chrome="bar"][data-channel-layout="list"] body.catalog-bar-active .favorite-folder-parent-tile {
+    flex: 0 0 auto;
+    width: var(--tv-list-width, 300px);
+    min-width: var(--tv-list-width, 300px);
+    max-width: var(--tv-list-width, 300px);
+    height: auto;
+    min-height: 32px;
+    max-height: none;
+    content-visibility: visible;
+}

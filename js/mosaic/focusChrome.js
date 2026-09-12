@@ -83,8 +83,8 @@ export const focusChromeMethods = {
     focusScreen(slotId) {
         if (!SLOT_IDS.includes(slotId)) return;
         this.setStatusSlot(slotId);
+        this.raiseTileInStack(slotId);
         if (this.hasCustomPlacement()) {
-            this.raiseTileInStack(slotId);
             this.persistPlacement();
         }
         this.maybeRetargetChannelPicker(slotId);

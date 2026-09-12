@@ -68,6 +68,30 @@ describe('moduleLayout SSOT', () => {
         const z2 = Number(browser.style.zIndex);
         assert.equal(z2 > z1, true);
     });
+
+    it('bringOverlayToFront raises remote dock hosts and tiles', async () => {
+        const remote = { style: { zIndex: '' }, id: 'remote-module' };
+        const remoteSheet = { style: { zIndex: '' }, id: 'remote-dock-sheet' };
+        const remoteTab = { style: { zIndex: '' }, id: 'remote-dock-tab' };
+        const tile = { style: { zIndex: '' }, id: 'player-tile-center' };
+        const nodes = {
+            'remote-module': remote,
+            'remote-dock-sheet': remoteSheet,
+            'remote-dock-tab': remoteTab,
+            'player-tile-center': tile
+        };
+        globalThis.document = {
+            getElementById: (id) => nodes[id] || null
+        };
+        const { bringOverlayToFront } = await import('../js/ui/moduleLayout.js?layout=overlay');
+        bringOverlayToFront('remote');
+        const zRemote = Number(remote.style.zIndex);
+        assert.equal(Number(remoteSheet.style.zIndex), zRemote);
+        assert.equal(Number(remoteTab.style.zIndex), zRemote);
+        bringOverlayToFront({ tile: 'center' });
+        const zTile = Number(tile.style.zIndex);
+        assert.equal(zTile > zRemote, true);
+    });
 });
 
 describe('joined/split panel activation preserves activeTab concept', () => {

@@ -81,6 +81,18 @@ test('catalogLayout list survives unrelated savePlayerState volume write', () =>
     assert.equal(raw.volume, 0.55);
 });
 
+test('catalogChrome bar survives unrelated savePlayerState volume write', () => {
+    SettingsStore.setCatalogChrome('bar');
+    assert.equal(SettingsStore.getCatalogChrome(), 'bar');
+
+    savePlayerState({ volume: 0.4 });
+
+    assert.equal(SettingsStore.getCatalogChrome(), 'bar');
+    const raw = JSON.parse(store.get(STATE_KEY));
+    assert.equal(raw.catalogChrome, 'bar');
+    assert.equal(SettingsStore.setCatalogChrome('nope'), 'wing');
+});
+
 test('corrupt matrix_tv_state refuses patch write and keeps raw string', () => {
     const corrupt = '{not-valid-json';
     store.set(STATE_KEY, corrupt);

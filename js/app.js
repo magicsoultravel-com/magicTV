@@ -543,6 +543,7 @@ function syncRemoteTabChrome() {
     syncRemoteNav(tab);
     syncRemoteChannelBar(tab);
     WingPanel.syncForTab(tab);
+    RemoteModule.syncCatalogChrome?.(tab);
 }
 
 const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];

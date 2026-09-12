@@ -65,6 +65,10 @@ const REMOTE_IDLE_FADE_MIN = 1;
 const REMOTE_IDLE_FADE_MAX = 120;
 const DEFAULT_REMOTE_TEXTURE = 'none';
 const CATALOG_LAYOUTS = ['tiles', 'list'];
+export const CATALOG_CHROMES = ['wing', 'bar'];
+export const DEFAULT_CATALOG_CHROME = 'wing';
+/** Tabs that use the short full-width bottom bar when catalogChrome is `bar`. */
+export const CATALOG_BAR_TABS = ['browse', 'favorites', 'recents'];
 const DEFAULT_ACTIVE_TILE_STYLE = 'wave';
 const ACTIVE_TILE_STYLES = ['none', 'wave', 'pulse', 'visualizer'];
 export const CHAN_SWITCH_MODES = ['classic', 'safeLoading'];
@@ -158,6 +162,14 @@ function clampRemoteIdleFadeSec(value) {
 
 function normalizeCatalogLayout(value) {
     return CATALOG_LAYOUTS.includes(value) ? value : DEFAULT_CATALOG_LAYOUT;
+}
+
+export function normalizeCatalogChrome(value) {
+    return CATALOG_CHROMES.includes(value) ? value : DEFAULT_CATALOG_CHROME;
+}
+
+export function isCatalogBarTab(tab) {
+    return CATALOG_BAR_TABS.includes(tab);
 }
 
 function normalizeActiveTileStyle(value) {
@@ -346,6 +358,17 @@ export const SettingsStore = {
         return next;
     },
 
+    getCatalogChrome() {
+        const raw = readPersistedState();
+        return normalizeCatalogChrome(raw.catalogChrome);
+    },
+
+    setCatalogChrome(value) {
+        const next = normalizeCatalogChrome(value);
+        patchPersistedState({ catalogChrome: next });
+        return next;
+    },
+
     getThemeId() {
         const raw = readPersistedState();
         return normalizeThemeId(raw.themeId);
@@ -414,6 +437,7 @@ export const SettingsStore = {
         const remoteTexture = this.setRemoteTexture(DEFAULT_REMOTE_TEXTURE);
         const remoteButtonShape = this.setRemoteButtonShape(DEFAULT_REMOTE_BUTTON_SHAPE);
         const catalogLayout = this.setCatalogLayout(DEFAULT_CATALOG_LAYOUT);
+        const catalogChrome = this.setCatalogChrome(DEFAULT_CATALOG_CHROME);
         const activeTileStyle = this.setActiveTileStyle(DEFAULT_ACTIVE_TILE_STYLE);
         const visitedStyle = this.setVisitedStyle(DEFAULT_VISITED_STYLE);
         const nonVisitedStyle = this.setNonVisitedStyle(DEFAULT_NON_VISITED_STYLE);
@@ -433,6 +457,7 @@ export const SettingsStore = {
             remoteTexture,
             remoteButtonShape,
             catalogLayout,
+            catalogChrome,
             activeTileStyle,
             visitedStyle,
             nonVisitedStyle,

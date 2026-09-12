@@ -303,8 +303,8 @@ export const MultiView = {
             e.preventDefault();
             const slotId = tile.getAttribute('data-slot');
             if (!slotId || !this.slots[slotId]?.enabled) return;
+            this.raiseTileInStack(slotId);
             if (this.hasCustomPlacement()) {
-                this.raiseTileInStack(slotId);
                 this.persistPlacement();
             }
             this.maybeRetargetChannelPicker(slotId);

@@ -3,6 +3,7 @@
  * Modes: closed | guide | browser
  */
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
+import { SettingsStore, isCatalogBarTab } from '../storage/settingsStore.js';
 import { isSplit } from './moduleLayout.js';
 
 /** @typedef {'closed'|'guide'|'browser'} WingMode */
@@ -17,12 +18,17 @@ function syncBodyClasses() {
     const body = document.body;
     if (!body) return;
 
-    const dockExpanded = wingMode !== 'closed';
+    const barCatalog = SettingsStore.getCatalogChrome() === 'bar'
+        && isCatalogBarTab(activeTab)
+        && !isSplit();
+    // Bottom-bar chrome replaces the 2× wing expansion for catalog tabs.
+    const dockExpanded = wingMode !== 'closed' && !(barCatalog && wingMode === 'browser');
     body.classList.toggle('remote-dock-expanded', dockExpanded);
     body.classList.toggle('remote-wing-open', wingMode === 'guide');
     body.classList.toggle('remote-wing-mode-guide', wingMode === 'guide');
     body.classList.toggle('remote-wing-mode-browser', wingMode === 'browser');
     body.classList.toggle('remote-guide-open', wingMode === 'guide');
+    body.classList.toggle('catalog-bar-active', barCatalog && wingMode === 'browser');
 }
 
 function persistGuideOpen() {
