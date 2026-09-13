@@ -49,11 +49,21 @@ import {
     shouldBumpPlayGenerationOnPause,
     isAutoplayNotAllowedError,
     shouldFreshResume,
-    shouldRecoverStuckLoad
+    shouldRecoverStuckLoad,
+    isClockStalled,
+    isVideoFrameStalled,
+    shouldRunFreezeTick,
+    FREEZE_CONFIRM_MS,
+    FREEZE_TICK_MS,
+    FREEZE_VIDEO_CONFIRM_WINDOWS,
+    FREEZE_HEAL_COOLDOWN_MS,
+    FREEZE_HEAL_MAX_FAILS
 } from './pauseBuffer.js';
 import {
     takePausedFillTurn,
-    releasePausedFill
+    releasePausedFill,
+    shouldAllowPrefetch,
+    shouldRestartHlsOnError
 } from './loadBudget.js';
 import { tvDebug } from './tvDebug.js';
 import { createWatchAccrualControllers } from './watchAccrual.js';
@@ -140,6 +150,8 @@ export function createPlayerInstance(options) {
         qualityLabel: '—',
         bandwidthEstimateBps: null,
         errorCount: 0,
+        /** Non-fatal hls restarts since last healthy paint; escalates to D/C. */
+        _hlsNonFatalRestarts: 0,
         /** Auto-reconnect attempts already used in the current disconnect cycle. */
         _autoRetryAttemptsUsed: 0,
         _autoRetryTimer: null,
@@ -170,6 +182,19 @@ export function createPlayerInstance(options) {
         _stuckLoadRetried: false,
         /** Synchronous watchdog tick — also the test seam. */
         _stuckLoadTick: null,
+        /** Freeze-heal tracker: healing keeps front picture/audio, warms backstage. */
+        healing: false,
+        _freezeTimer: null,
+        _freezeGen: 0,
+        _freezeLastTime: NaN,
+        _freezeLastFrames: -1,
+        _freezeLastTickAt: 0,
+        _freezeStalledWindows: 0,
+        _freezeQuickKickDone: false,
+        _freezeFails: 0,
+        _freezeCooldownUntil: 0,
+        /** Test seam: synchronous freeze tick. */
+        _freezeTick: null,
 
         _bindVideoEvents(videoEl) {
             bindPlayerVideoEvents(this, videoEl, { shouldRecordRecents, syncWatchAccrual });
@@ -411,6 +436,217 @@ export function createPlayerInstance(options) {
             }
         },
 
+        /** Decoded video frames advanced? -1 when the API is unavailable. */
+        _readDecodedFrames(video) {
+            if (!video) return -1;
+            try {
+                if (typeof video.getVideoPlaybackQuality === 'function') {
+                    const q = video.getVideoPlaybackQuality();
+                    if (q && Number.isFinite(Number(q.totalVideoFrames))) {
+                        return Number(q.totalVideoFrames);
+                    }
+                }
+            } catch { /* ignore */ }
+            const legacy = Number(video.webkitDecodedFrameCount ?? video.mozPaintedFrames ?? NaN);
+            return Number.isFinite(legacy) ? legacy : -1;
+        },
+
+        /** Reset freeze observation without touching cooldown/fail/kick state. */
+        _resetFreezeObservation(now = Date.now(), { resetKick = false } = {}) {
+            this._freezeLastTime = Number(this.video?.currentTime ?? NaN);
+            this._freezeLastFrames = this._readDecodedFrames(this.video);
+            this._freezeLastTickAt = now;
+            this._freezeStalledWindows = 0;
+            if (resetKick) this._freezeQuickKickDone = false;
+        },
+
+        _clearFreezeTicker() {
+            if (this._freezeTimer) {
+                clearInterval(this._freezeTimer);
+                this._freezeTimer = null;
+            }
+            this._freezeTick = null;
+        },
+
+        /** Playing-state freeze ticker; cheap kicks + background warm keep A/V. */
+        _armFreezeTicker() {
+            this._clearFreezeTicker();
+            const freezeGen = ++this._freezeGen;
+            const playGen = this.playGeneration;
+            const transportGen = this.transportGen;
+            const chanKey = channelKey(this.channel);
+            this._resetFreezeObservation(Date.now(), { resetKick: true });
+
+            this._freezeTick = () => {
+                if (freezeGen !== this._freezeGen) return;
+                if (playGen !== this.playGeneration) return;
+                if (transportGen !== this.transportGen) return;
+                if (chanKey && chanKey !== channelKey(this.channel)) return;
+                if (this.wantPlaying !== true || this.playing !== true) return;
+                if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+                this._runFreezeCheck();
+            };
+
+            // setInterval keeps node:test alive and jsdom-free unit tests
+            // hanging (their document mock has no real timers/video).
+            // Browser check: real DOM has document.hidden as a boolean.
+            const canArmLiveTimer = typeof setInterval === 'function'
+                && typeof document !== 'undefined'
+                && typeof document.hidden === 'boolean';
+            if (canArmLiveTimer) {
+                this._freezeTimer = setInterval(() => {
+                    this._freezeTick?.();
+                }, FREEZE_TICK_MS);
+                if (typeof this._freezeTimer?.unref === 'function') {
+                    try { this._freezeTimer.unref(); } catch { /* ignore */ }
+                }
+            }
+        },
+
+        _runFreezeCheck(now = Date.now()) {
+            const v = this.video;
+            if (!shouldRunFreezeTick({
+                wantPlaying: this.wantPlaying,
+                playing: this.playing,
+                loading: this.loading,
+                loadPhase: this.loadPhase,
+                paused: v?.paused === true,
+                stopped: this.stopped,
+                seeking: v?.seeking === true,
+                hidden: typeof document !== 'undefined' && document.visibilityState === 'hidden',
+                hasChannel: Boolean(this.channel),
+                healing: this.healing,
+                prepareBusy: this.preparing === true || this._preparePromise != null
+            })) {
+                return;
+            }
+            const nowTime = Number(v?.currentTime ?? NaN);
+            const nowFrames = this._readDecodedFrames(v);
+            const lastTick = this._freezeLastTickAt || now;
+            const elapsed = Math.max(0, now - lastTick);
+            const fullStall = isClockStalled({
+                lastTime: this._freezeLastTime,
+                nowTime,
+                elapsedMs: elapsed,
+                thresholdMs: FREEZE_CONFIRM_MS
+            });
+            const clockAdvanced = Number.isFinite(this._freezeLastTime)
+                && Number.isFinite(nowTime)
+                && Math.abs(nowTime - this._freezeLastTime) >= 0.05;
+            const videoStall = isVideoFrameStalled({
+                lastFrames: this._freezeLastFrames,
+                nowFrames,
+                clockAdvanced,
+                stalledWindows: this._freezeStalledWindows,
+                requiredWindows: FREEZE_VIDEO_CONFIRM_WINDOWS
+            });
+            if (!fullStall && !videoStall) {
+                if (clockAdvanced && nowFrames >= 0 && nowFrames === this._freezeLastFrames) {
+                    this._freezeStalledWindows += 1;
+                } else {
+                    this._freezeStalledWindows = 0;
+                    this._freezeLastTime = nowTime;
+                    this._freezeLastFrames = nowFrames;
+                }
+                this._freezeLastTickAt = now;
+                return;
+            }
+            const kind = fullStall ? 'full' : 'video-only';
+            tvDebug('player', `freeze suspected (${kind})`, { slot: this.id });
+            this._freezeStalledWindows = 0;
+            this._freezeLastTime = nowTime;
+            this._freezeLastFrames = nowFrames;
+            this._freezeLastTickAt = now;
+            void this._healFrozenStream(kind);
+        },
+
+        /** Cheap in-place kick: startLoad (full) / recoverMediaError (video-only). */
+        _quickKickFrozenStream(kind) {
+            if (this._freezeQuickKickDone) return false;
+            this._freezeQuickKickDone = true;
+            try {
+                if (kind === 'video-only' && this.hls && typeof this.hls.recoverMediaError === 'function') {
+                    this.hls.recoverMediaError();
+                    tvDebug('player', 'freeze quick kick recoverMediaError', { slot: this.id });
+                    return true;
+                }
+                if (this.hls && typeof this.hls.startLoad === 'function') {
+                    if (!shouldRestartHlsOnError({ lastRestartedAt: this._lastHlsNetworkRestartAt || 0 })) {
+                        return false;
+                    }
+                    this._lastHlsNetworkRestartAt = Date.now();
+                    this.hls.startLoad();
+                    tvDebug('player', 'freeze quick kick startLoad', { slot: this.id });
+                    return true;
+                }
+                if (this.video && !this.hls) {
+                    try { this.video.load(); } catch { /* ignore */ }
+                    return true;
+                }
+            } catch { /* ignore */ }
+            return false;
+        },
+
+        /** Heal frozen stream via background warm; front <video> untouched. */
+        async _healFrozenStream(kind = 'full') {
+            if (this.healing) return;
+            if (!this.channel || this.stopped || this.wantPlaying !== true || this.playing !== true) return;
+            if (this.preparing || this._preparePromise) return;
+            const now = Date.now();
+            if (now < (this._freezeCooldownUntil || 0)) return;
+            if ((this._freezeFails || 0) >= FREEZE_HEAL_MAX_FAILS) {
+                this._declareFreezeDead();
+                return;
+            }
+            if (!this._freezeQuickKickDone) {
+                this._quickKickFrozenStream(kind);
+                this._resetFreezeObservation();
+                return;
+            }
+            this.healing = true;
+            this._freezeCooldownUntil = now + FREEZE_HEAL_COOLDOWN_MS;
+            const healGen = this._freezeGen;
+            tvDebug('player', 'freeze background heal start', { slot: this.id, kind });
+            try {
+                const switchGen = this.switchGeneration;
+                const ok = await this._runPrepare(this.channel, switchGen, { suppressUi: true });
+                if (healGen !== this._freezeGen) return;
+                if (!ok || !this._preloader?.isReady()) throw new Error('heal warm not ready');
+                const staging = this.videoBack;
+                if (!(staging && staging.readyState >= 2)) throw new Error('heal warm no frame');
+                const committed = await this.commitPreparedChannel(this.channel, switchGen, {
+                    allowFallback: false,
+                    fromHeal: true
+                });
+                if (committed !== true) throw new Error('heal swap rejected');
+                this._freezeFails = 0;
+                this._resetFreezeObservation(Date.now(), { resetKick: true });
+            } catch {
+                this.cancelPrepare();
+                this._freezeFails = (this._freezeFails || 0) + 1;
+                this._resetFreezeObservation();
+                if ((this._freezeFails || 0) >= FREEZE_HEAL_MAX_FAILS) {
+                    this._declareFreezeDead();
+                    return;
+                }
+            } finally {
+                if (healGen === this._freezeGen) this.healing = false;
+                try { this.emitState(); } catch { /* ignore */ }
+            }
+        },
+
+        /** Give up: enter the existing disconnect/retry flow. */
+        _declareFreezeDead() {
+            this.healing = false;
+            this._clearFreezeTicker();
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.playing = false;
+            this.error = 'Stream unavailable';
+            tvDebug('player', 'freeze heal exhausted - disconnect', { slot: this.id });
+            this.emitState();
+        },
+
         /** Clear offscreen prefetch/staging styling so swapped-in video is visible in the tile. */
         _promoteFrontVideo() {
             const v = this.video;
@@ -509,7 +745,11 @@ export function createPlayerInstance(options) {
         _scheduleAutoRetry() {
             const intervalSec = this.getReattemptInterval();
             const gen = ++this._autoRetryGen;
-            this._autoRetryDeadlineAt = Date.now() + (intervalSec * 1000);
+            this._autoRetrySwitchGen = this.switchGeneration;
+            // Stagger herd: base interval + up to 2s jitter so N dead tiles don't slam at once.
+            const jitterMs = Math.floor(Math.random() * 2000);
+            const delayMs = (intervalSec * 1000) + jitterMs;
+            this._autoRetryDeadlineAt = Date.now() + delayMs;
 
             this._autoRetryTickTimer = setInterval(() => {
                 if (gen !== this._autoRetryGen) return;
@@ -519,7 +759,7 @@ export function createPlayerInstance(options) {
             this._autoRetryTimer = setTimeout(() => {
                 if (gen !== this._autoRetryGen) return;
                 this._fireAutoRetry();
-            }, intervalSec * 1000);
+            }, delayMs);
         },
 
         _fireAutoRetry() {
@@ -529,8 +769,24 @@ export function createPlayerInstance(options) {
             if (max <= 0) return;
             if ((this._autoRetryAttemptsUsed || 0) >= max) return;
             if (!this.channel || this.stopped || this.wantPlaying !== true) return;
+            // Never clobber a newer user channel pick racing the countdown.
+            if (this._autoRetrySwitchGen != null && this._autoRetrySwitchGen !== this.switchGeneration) return;
 
             this._autoRetryAttemptsUsed = (this._autoRetryAttemptsUsed || 0) + 1;
+            if (this.playing === true && (this.video?.videoWidth > 0 || this.posterDataUrl)) {
+                // Have something worth keeping: heal in background, front untouched.
+                this._freezeFails = 0;
+                this._freezeQuickKickDone = true;
+                void this._healFrozenStream('full');
+                return;
+            }
+            // Snapshot a fresh poster so the retry gap covers black, not D/C badge alone.
+            try {
+                if (!this.posterDataUrl && this.video?.videoWidth > 0) {
+                    const poster = snapshotVideoPoster(this.video, { rejectBlack: false });
+                    if (poster) this.posterDataUrl = poster;
+                }
+            } catch { /* ignore */ }
             void this.playChannel(this.channel, { fromAutoRetry: true });
         },
 
@@ -949,6 +1205,8 @@ export function createPlayerInstance(options) {
         pause() {
             this._clearAutoRetry({ full: true });
             this._clearStuckLoadWatchdog();
+            this._clearFreezeTicker();
+            this.healing = false;
             const gen = this.beginTransport(false);
             this._enterPauseAt = Date.now();
             this._pausedFillArmed = false;
@@ -1138,6 +1396,8 @@ export function createPlayerInstance(options) {
         async stop({ clearChannel = false } = {}) {
             this._clearAutoRetry({ full: true });
             this._clearStuckLoadWatchdog();
+            this._clearFreezeTicker();
+            this.healing = false;
             this.playGeneration += 1;
             this.switchGeneration += 1;
             this.prepareGeneration += 1;
@@ -1191,6 +1451,8 @@ export function createPlayerInstance(options) {
             unregisterWatchAccrualFlusher(snapshotWatchAccrual);
             unregisterWatchAccrualAborter(abortWatchAccrual);
             this._clearStuckLoadWatchdog();
+            this._clearFreezeTicker();
+            this.healing = false;
             this._preloader?.cancel();
             cancelSlotPrefetch(this.id);
             await this.stop({ clearChannel: true });

@@ -153,6 +153,8 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
     hls.on(events.FRAG_LOADED, (_, data) => {
         if (generation !== ctx.playGeneration) return;
         ctx._noteLoadProgress?.('hls_frag_loaded');
+        ctx._hlsNonFatalRestarts = 0;
+        ctx._resetFreezeObservation?.();
         const prevBw = ctx.bandwidthEstimateBps;
         const prevLabel = ctx.qualityLabel;
         const bw = data?.stats?.bwEstimate ?? data?.frag?.stats?.bwEstimate;
@@ -189,10 +191,28 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
             if (shouldRestartHlsOnError({ lastRestartedAt: ctx._lastHlsNetworkRestartAt })) {
                 ctx._lastHlsNetworkRestartAt = Date.now();
                 ctx.hls.startLoad();
+                ctx._hlsNonFatalRestarts = (ctx._hlsNonFatalRestarts || 0) + 1;
+                // Wedged-but-non-fatal must escalate: endless startLoad never
+                // reaches the D/C badge/retry. 8 restarts ≈ 20s+ of failure.
+                if ((ctx._hlsNonFatalRestarts || 0) >= 8 && ctx.playing !== true) {
+                    ctx.loading = false;
+                    ctx.loadPhase = 'idle';
+                    ctx.playing = false;
+                    ctx.error = 'Stream unavailable';
+                    try { ctx.emitState(); } catch { /* ignore */ }
+                }
             }
         } else if (data.type === hls.constructor?.ErrorTypes?.MEDIA_ERROR
             || data.type === 'mediaError') {
             ctx.hls.recoverMediaError();
+            ctx._hlsNonFatalRestarts = (ctx._hlsNonFatalRestarts || 0) + 1;
+            if ((ctx._hlsNonFatalRestarts || 0) >= 12 && ctx.playing !== true) {
+                ctx.loading = false;
+                ctx.loadPhase = 'idle';
+                ctx.playing = false;
+                ctx.error = 'Stream unavailable';
+                try { ctx.emitState(); } catch { /* ignore */ }
+            }
         }
     });
 

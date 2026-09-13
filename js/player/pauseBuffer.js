@@ -14,6 +14,20 @@ export const STALLED_PAUSE_BEHIND_MS = 30000;
 export const STUCK_LOAD_RECOVERY_MS = 5000;
 
 /**
+ * Freeze-heal: clock/frame stall must persist this long before acting.
+ * Above PRELOAD_STALL (8s) so normal rebuffer settles first. One-size-fits-all.
+ */
+export const FREEZE_CONFIRM_MS = 12000;
+/** Poll cadence for the playing-state freeze ticker. */
+export const FREEZE_TICK_MS = 2000;
+/** Consecutive stalled windows required before a video-only heal (slideshow guard). */
+export const FREEZE_VIDEO_CONFIRM_WINDOWS = 2;
+/** Cooldown between heal attempts on the same slot (anti-spree). */
+export const FREEZE_HEAL_COOLDOWN_MS = 45000;
+/** Failed background heals before falling through to disconnect/retry flow. */
+export const FREEZE_HEAL_MAX_FAILS = 3;
+
+/**
  * Target currentTime so headroom ≈ bufferSize (park behind bufferedEnd).
  * @returns {number|null} seek target, or null if already parked / no range
  */
@@ -208,6 +222,65 @@ export function shouldRecoverStuckLoad({
  */
 export function shouldClearWasPlayingOnAutoplayBlock() {
     return false;
+}
+
+/**
+ * Full freeze: media clock stopped advancing while playback claims to run.
+ * Pure helper for the freeze ticker — no DOM.
+ */
+export function isClockStalled({
+    lastTime = 0,
+    nowTime = 0,
+    elapsedMs = 0,
+    thresholdMs = FREEZE_CONFIRM_MS
+} = {}) {
+    if (!Number.isFinite(lastTime) || !Number.isFinite(nowTime)) return false;
+    if (!Number.isFinite(elapsedMs) || elapsedMs < thresholdMs) return false;
+    return Math.abs(nowTime - lastTime) < 0.05;
+}
+
+/**
+ * Video-only freeze: audio clock advances but no new decoded video frames.
+ * Requires consecutive stalled windows so slideshows/low-fps don't flap.
+ */
+export function isVideoFrameStalled({
+    lastFrames = -1,
+    nowFrames = -1,
+    clockAdvanced = false,
+    stalledWindows = 0,
+    requiredWindows = FREEZE_VIDEO_CONFIRM_WINDOWS
+} = {}) {
+    if (clockAdvanced !== true) return false;
+    if (!Number.isFinite(nowFrames) || nowFrames < 0) return false;
+    if (!Number.isFinite(lastFrames) || lastFrames < 0) return false;
+    if (nowFrames !== lastFrames) return false;
+    return stalledWindows + 1 >= requiredWindows;
+}
+
+/**
+ * Whether the freeze ticker may run at all — mirrors the guards the
+ * player tick uses so tests lock the same contract.
+ */
+export function shouldRunFreezeTick({
+    wantPlaying = false,
+    playing = false,
+    loading = false,
+    loadPhase = 'idle',
+    paused = false,
+    stopped = false,
+    seeking = false,
+    hidden = false,
+    hasChannel = false,
+    healing = false,
+    prepareBusy = false
+} = {}) {
+    if (wantPlaying !== true || playing !== true) return false;
+    if (hasChannel !== true) return false;
+    if (paused === true || stopped === true || seeking === true) return false;
+    if (hidden === true || healing === true || prepareBusy === true) return false;
+    if (loading === true) return false;
+    if (loadPhase === 'connecting' || loadPhase === 'buffering') return false;
+    return true;
 }
 
 /**

@@ -60,6 +60,8 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
         player.error = null;
         player.resumeBlocked = false;
         player.posterDataUrl = null;
+        player.healing = false;
+        player._freezeFails = 0;
         if (shouldRecordRecents()) savePlayerState({ wasPlaying: true });
         const key = channelKey(player.channel);
         if (shouldRecordRecents() && key && player.recentRecordedForKey !== key) {
@@ -68,6 +70,7 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
             FavoritesRecents.markVisited(key, player.channel);
         }
         player.emitState();
+        try { player._armFreezeTicker?.(); } catch { /* ignore */ }
         scheduleSlotPrefetch(player.id, player);
     });
     videoEl.addEventListener('timeupdate', () => {
@@ -105,6 +108,7 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
             return;
         }
         player.playing = false;
+        try { player._clearFreezeTicker?.(); } catch { /* ignore */ }
         if (player.pausePhase !== 'idle') {
             player.updatePauseBuffer();
         }
@@ -136,6 +140,8 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
     videoEl.addEventListener('error', () => {
         if (!isActive()) return;
         player._clearStuckLoadWatchdog();
+        try { player._clearFreezeTicker?.(); } catch { /* ignore */ }
+        player.healing = false;
         player.loading = false;
         player.loadPhase = 'idle';
         player.playing = false;
@@ -145,6 +151,8 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
     videoEl.addEventListener('ended', () => {
         if (!isActive()) return;
         player._clearStuckLoadWatchdog();
+        try { player._clearFreezeTicker?.(); } catch { /* ignore */ }
+        player.healing = false;
         player.playing = false;
         player.loadPhase = 'idle';
         player.emitState();

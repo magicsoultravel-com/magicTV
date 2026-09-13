@@ -23,9 +23,14 @@ import {
     shouldClearStaleBufferOnTimeupdate,
     shouldFreshResume,
     shouldRecoverStuckLoad,
+    isClockStalled,
+    isVideoFrameStalled,
+    shouldRunFreezeTick,
     STALLED_PAUSE_RESTART_MS,
     STALLED_PAUSE_BEHIND_MS,
     STUCK_LOAD_RECOVERY_MS,
+    FREEZE_CONFIRM_MS,
+    FREEZE_VIDEO_CONFIRM_WINDOWS,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -608,4 +613,40 @@ test('shouldRecoverStuckLoad only fires on a stalled in-flight load', () => {
         now,
         lastProgressAt: now - STUCK_LOAD_RECOVERY_MS + 1000
     }), false);
+});
+
+test('isClockStalled needs a sustained frozen clock', () => {
+    assert.equal(isClockStalled({ lastTime: 10, nowTime: 10, elapsedMs: FREEZE_CONFIRM_MS + 1 }), true);
+    assert.equal(isClockStalled({ lastTime: 10, nowTime: 10, elapsedMs: FREEZE_CONFIRM_MS - 1 }), false);
+    assert.equal(isClockStalled({ lastTime: 10, nowTime: 10.2, elapsedMs: FREEZE_CONFIRM_MS + 1 }), false);
+    assert.equal(isClockStalled({ lastTime: NaN, nowTime: 10, elapsedMs: FREEZE_CONFIRM_MS + 1 }), false);
+});
+
+test('isVideoFrameStalled needs clock motion + consecutive windows', () => {
+    assert.equal(isVideoFrameStalled({
+        lastFrames: 100, nowFrames: 100, clockAdvanced: true, stalledWindows: FREEZE_VIDEO_CONFIRM_WINDOWS - 1
+    }), true);
+    assert.equal(isVideoFrameStalled({
+        lastFrames: 100, nowFrames: 100, clockAdvanced: true, stalledWindows: 0
+    }), FREEZE_VIDEO_CONFIRM_WINDOWS <= 1);
+    assert.equal(isVideoFrameStalled({
+        lastFrames: 100, nowFrames: 101, clockAdvanced: true, stalledWindows: 5
+    }), false);
+    assert.equal(isVideoFrameStalled({
+        lastFrames: 100, nowFrames: 100, clockAdvanced: false, stalledWindows: 5
+    }), false);
+    assert.equal(isVideoFrameStalled({
+        lastFrames: -1, nowFrames: -1, clockAdvanced: true, stalledWindows: 5
+    }), false);
+});
+
+test('shouldRunFreezeTick only while healthy playing', () => {
+    const base = { wantPlaying: true, playing: true, hasChannel: true };
+    assert.equal(shouldRunFreezeTick(base), true);
+    assert.equal(shouldRunFreezeTick({ ...base, loading: true }), false);
+    assert.equal(shouldRunFreezeTick({ ...base, loadPhase: 'buffering' }), false);
+    assert.equal(shouldRunFreezeTick({ ...base, paused: true }), false);
+    assert.equal(shouldRunFreezeTick({ ...base, healing: true }), false);
+    assert.equal(shouldRunFreezeTick({ ...base, prepareBusy: true }), false);
+    assert.equal(shouldRunFreezeTick({ ...base, playing: false }), false);
 });

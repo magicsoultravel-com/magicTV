@@ -323,11 +323,12 @@ export const prepareCommitMethods = {
      * Falls back to playChannel when warm-up did not complete.
      * @param {object|string} [channelOrKey]
      * @param {number} [switchGen]
-     * @param {{ allowFallback?: boolean }} [opts]
+     * @param {{ allowFallback?: boolean, fromHeal?: boolean }} [opts]
      * @returns {Promise<boolean|void>}
      */
     async commitPreparedChannel(channelOrKey, switchGen, opts = {}) {
         const allowFallback = opts.allowFallback !== false;
+        const fromHeal = opts.fromHeal === true;
         this.init();
         if (switchGen != null && switchGen !== this.switchGeneration) return false;
         this._clearStuckLoadWatchdog();
@@ -419,7 +420,9 @@ export const prepareCommitMethods = {
         this.preparedTarget = null;
         swapCompleted = true;
 
-        this._recordLastChannel?.(key, channel);
+        if (!fromHeal) {
+            this._recordLastChannel?.(key, channel);
+        }
 
         const v = this.video;
         if (!(v && v.readyState >= 2)) {
@@ -428,7 +431,9 @@ export const prepareCommitMethods = {
 
         this.loading = false;
         this.loadPhase = 'idle';
-        this.posterDataUrl = null;
+        if (!fromHeal) {
+            this.posterDataUrl = null;
+        }
 
         try {
             const played = await playAfterAttach(this, {

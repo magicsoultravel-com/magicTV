@@ -771,3 +771,87 @@ test('_abortSwitchIntent restores playing when front video is still live', async
     assert.equal(player.wantPlaying, true);
     assert.equal(player.loading, false);
 });
+
+test('freeze heal quick-kicks first, then background-warms without touching front', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const { FREEZE_CONFIRM_MS } = await import('../js/player/pauseBuffer.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    const channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.channel = channel;
+    player.wantPlaying = true;
+    player.playing = true;
+    player.loading = false;
+    player.loadPhase = 'idle';
+    player.video.currentTime = 10;
+    player.video.paused = false;
+    player.video.seeking = false;
+    player.video.getVideoPlaybackQuality = () => ({ totalVideoFrames: 100 });
+
+    let startLoadCalls = 0;
+    player.hls = { startLoad() { startLoadCalls += 1; }, recoverMediaError() {} };
+    player._lastHlsNetworkRestartAt = 0;
+
+    // Simulate a sustained full freeze: clock never moves.
+    player._resetFreezeObservation(Date.now() - FREEZE_CONFIRM_MS - 1000, { resetKick: true });
+    player._freezeLastTickAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
+    player._runFreezeCheck();
+    assert.equal(startLoadCalls, 1);
+    assert.equal(player.playing, true);
+    assert.equal(player.error, null);
+
+    // Second confirmed window with kick already done → background warm.
+    let warmed = false;
+    let committed = false;
+    player._runPrepare = async () => { warmed = true; return true; };
+    player._preloader = { isReady: () => true, cancel: () => {} };
+    player.videoBack.readyState = 2;
+    player.commitPreparedChannel = async () => { committed = true; return true; };
+    player._freezeQuickKickDone = true;
+    player._freezeCooldownUntil = 0;
+    player._resetFreezeObservation(Date.now() - FREEZE_CONFIRM_MS - 1000);
+    player._freezeLastTickAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
+    player.video.currentTime = 10;
+    await player._healFrozenStream('full');
+    assert.equal(warmed, true);
+    assert.equal(committed, true);
+    assert.equal(player.playing, true);
+    assert.equal(player.error, null);
+    player._clearFreezeTicker();
+    player._clearStuckLoadWatchdog();
+});
+
+test('freeze heal exhausts to disconnect after repeated warm failures', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const { FREEZE_HEAL_MAX_FAILS } = await import('../js/player/pauseBuffer.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player._runPrepare = async () => false;
+    player._preloader = { isReady: () => false, cancel: () => {} };
+    player._freezeQuickKickDone = true;
+    player._freezeCooldownUntil = 0;
+
+    for (let i = 0; i < FREEZE_HEAL_MAX_FAILS; i++) {
+        player._freezeCooldownUntil = 0;
+        await player._healFrozenStream('full');
+    }
+    assert.equal(player.playing, false);
+    assert.equal(player.error, 'Stream unavailable');
+    player._clearFreezeTicker();
+    player._clearStuckLoadWatchdog();
+});
