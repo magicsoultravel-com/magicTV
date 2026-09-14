@@ -216,33 +216,77 @@ export const playbackMethods = {
     },
 
     async stopAll() {
-        await Promise.all(SLOT_IDS.map(async (id) => {
-            const slot = this.slots[id];
-            if (!slot?.enabled || !slot?.player?.channel) return;
-            await slot.player.stop().catch(() => {});
-        }));
+        // Batch stop with the same per-tile switch animation as a single-tile
+        // stop (tileChrome 'stop' case): out→stop→in on slots showing content.
+        // Staggered starts cascade the wipe instead of racing 6 of them
+        // (concurrent grain/matrix wipes stomp each other's paint loops).
+        const targets = SLOT_IDS
+            .map((id) => ({ id, slot: this.slots[id] }))
+            .filter(({ slot }) => slot?.enabled && slot?.player?.channel);
+        TileFrames.setPlaybackBusy(true);
+        try {
+            for (let i = 0; i < targets.length; i++) {
+                const { id, slot } = targets[i];
+                if (i > 0) await waitMs(computeMosaicLaunchDelay(1));
+                const player = slot?.player;
+                if (!player?.channel) continue;
+                const shouldAnimate = player.playing || player.loading || player.pausePhase !== 'idle';
+                if (shouldAnimate) {
+                    await this.withChannelSwitchTransition(
+                        id,
+                        () => player.stop().catch(() => {})
+                    );
+                } else {
+                    await player.stop().catch(() => {});
+                }
+            }
+        } finally {
+            if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
+        }
         this.persistSlots();
-        TileFrames.setPlaybackBusy(false);
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
     },
 
     async playAll() {
-        await Promise.all(SLOT_IDS.map(async (id) => {
-            const slot = this.slots[id];
-            const player = slot?.player;
-            if (!slot?.enabled || !player?.channel) return;
-            if (player.wantPlaying === true || player.playing === true) return;
-            try {
-                if (player.channel.url_resolved && !player.stopped) {
-                    await player.resume();
-                } else {
-                    await player.playChannel(player.channel);
+        // Batch start: fresh plays (no visible content) get the tile "in"
+        // animation (skipOut, like playOnSlot); plain resumes stay instant.
+        // Staggered starts keep up to MAX_MOSAIC_SLOTS manifests from slamming
+        // the connection pool at once (see playChannelsOnMosaic).
+        const targets = SLOT_IDS
+            .map((id) => ({ id, slot: this.slots[id] }))
+            .filter(({ slot }) => {
+                const player = slot?.player;
+                if (!slot?.enabled || !player?.channel) return false;
+                return !(player.wantPlaying === true || player.playing === true);
+            });
+        TileFrames.setPlaybackBusy(true);
+        try {
+            for (let i = 0; i < targets.length; i++) {
+                const { id, slot } = targets[i];
+                if (i > 0) await waitMs(computeMosaicLaunchDelay(1));
+                const player = slot?.player;
+                if (!player?.channel) continue;
+                // The stagger leaves a window where a slot may have started
+                // playing on its own — never double-start it.
+                if (player.wantPlaying === true || player.playing === true) continue;
+                try {
+                    if (player.channel.url_resolved && !player.stopped) {
+                        await player.resume();
+                    } else {
+                        await this.withChannelSwitchTransition(
+                            id,
+                            () => player.playChannel(player.channel),
+                            { skipOut: true }
+                        );
+                    }
+                } catch {
+                    /* ignore per-slot failures */
                 }
-            } catch {
-                /* ignore per-slot failures */
             }
-        }));
+        } finally {
+            if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
+        }
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();

@@ -3,6 +3,7 @@
  */
 import { test, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { TileFrames } from '../js/tileFrames.js';
 
 const store = new Map();
 
@@ -674,3 +675,169 @@ test('playChannelSafe cold start plays channel directly and returns playing stat
         MultiView.withChannelSwitchTransition = origTransition;
     }
 });
+
+function stubBatchDeps({ slots, transitions = [], busy = [] }) {
+    stubPlayOnSlotDeps({});
+    MultiView.slots = slots;
+    MultiView.syncMosaicChrome = () => {};
+    const origTransition = MultiView.withChannelSwitchTransition;
+    MultiView.withChannelSwitchTransition = async (id, handler, opts = {}) => {
+        transitions.push({ id, skipOut: opts?.skipOut === true, skipIn: opts?.skipIn === true });
+        if (typeof handler === 'function') {
+            await handler();
+        } else {
+            await handler?.onCommit?.();
+            await handler?.onMidpoint?.();
+        }
+    };
+    return { origTransition, busy };
+}
+
+function captureBusyCalls(busy) {
+    // playback.js calls TileFrames.setPlaybackBusy() via property lookup on
+    // the shared export object, so swapping the property is a safe seam.
+    const orig = TileFrames.setPlaybackBusy;
+    TileFrames.setPlaybackBusy = (next) => { busy.push(!!next); };
+    try {
+        orig(false);
+    } catch { /* ignore */ }
+    return () => { TileFrames.setPlaybackBusy = orig; };
+}
+
+function makeSlotPlayer(overrides = {}) {
+    const player = {
+        channel: makeChannel('Slot'),
+        stopped: true,
+        playing: false,
+        loading: false,
+        wantPlaying: false,
+        pausePhase: 'idle',
+        resume: async () => {},
+        playChannel: async () => {},
+        stop: async () => {},
+        ...overrides
+    };
+    if (overrides.channel === undefined) player.channel = makeChannel('Slot');
+    return player;
+}
+
+test('stopAll animates visible slots through the tile switch transition', async () => {
+    const transitions = [];
+    const busy = [];
+    const { origTransition } = stubBatchDeps({ transitions, busy, slots: {} });
+    const playingPlayer = makeSlotPlayer({
+        stopped: false,
+        playing: true,
+        stop: async () => { playingPlayer.playing = false; }
+    });
+    MultiView.slots = {
+        topLeft: { enabled: true, player: playingPlayer },
+        center: { enabled: false, player: makeSlotPlayer() }
+    };
+    const origBusy = captureBusyCalls(busy);
+    try {
+        await MultiView.stopAll();
+        assert.deepEqual(transitions.map((t) => t.id), ['topLeft']);
+        assert.equal(playingPlayer.playing, false);
+        assert.deepEqual(busy, [true, false]);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+        origBusy();
+    }
+});
+
+test('stopAll skips the transition for already-stopped slots', async () => {
+    const transitions = [];
+    const busy = [];
+    const { origTransition } = stubBatchDeps({ transitions, busy, slots: {} });
+    let stopped = false;
+    MultiView.slots = {
+        topLeft: {
+            enabled: true,
+            player: makeSlotPlayer({
+                stopped: true,
+                playing: false,
+                loading: false,
+                pausePhase: 'idle',
+                stop: async () => { stopped = true; }
+            })
+        }
+    };
+    const origBusy = captureBusyCalls(busy);
+    try {
+        await MultiView.stopAll();
+        assert.deepEqual(transitions, []);
+        assert.equal(stopped, true);
+        assert.deepEqual(busy, [true, false]);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+        origBusy();
+    }
+});
+
+test('playAll animates fresh plays with skipOut and resumes instantly', async () => {
+    const transitions = [];
+    const busy = [];
+    const { origTransition } = stubBatchDeps({ transitions, busy, slots: {} });
+    let freshPlayed = false;
+    let resumed = false;
+    const freshPlayer = makeSlotPlayer({
+        channel: { name: 'Fresh' },
+        stopped: true,
+        playing: false,
+        playChannel: async () => {
+            freshPlayed = true;
+            freshPlayer.stopped = false;
+            freshPlayer.playing = true;
+        }
+    });
+    const resumePlayer = makeSlotPlayer({
+        stopped: false,
+        pausePhase: 'paused',
+        resume: async () => {
+            resumed = true;
+            resumePlayer.playing = true;
+        }
+    });
+    const alreadyPlaying = makeSlotPlayer({ stopped: false, playing: true, wantPlaying: true });
+    MultiView.slots = {
+        topLeft: { enabled: true, player: freshPlayer },
+        topRight: { enabled: true, player: resumePlayer },
+        bottomLeft: { enabled: true, player: alreadyPlaying }
+    };
+    const origBusy = captureBusyCalls(busy);
+    try {
+        await MultiView.playAll();
+        assert.deepEqual(transitions.map((t) => t.id), ['topLeft']);
+        assert.equal(transitions[0].skipOut, true);
+        assert.equal(freshPlayed, true);
+        assert.equal(resumed, true);
+        // Successful batch leaves slots playing, so the busy flag stays
+        // latched (same as playChannelsOnMosaic) until a stop clears it.
+        assert.deepEqual(busy, [true]);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+        origBusy();
+    }
+});
+
+test('stopAll clears the busy flag once nothing is playing', async () => {
+    const transitions = [];
+    const busy = [];
+    const { origTransition } = stubBatchDeps({ transitions, busy, slots: {} });
+    const player = makeSlotPlayer({
+        stopped: false,
+        playing: true,
+        stop: async () => { player.playing = false; }
+    });
+    MultiView.slots = { center: { enabled: true, player } };
+    const origBusy = captureBusyCalls(busy);
+    try {
+        await MultiView.stopAll();
+        assert.equal(busy[busy.length - 1], false);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+        origBusy();
+    }
+});
+
