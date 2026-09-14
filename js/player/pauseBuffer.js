@@ -20,12 +20,14 @@ export const STUCK_LOAD_RECOVERY_MS = 5000;
 export const FREEZE_CONFIRM_MS = 12000;
 /** Poll cadence for the playing-state freeze ticker. */
 export const FREEZE_TICK_MS = 2000;
-/** Consecutive stalled windows required before a video-only heal (slideshow guard). */
-export const FREEZE_VIDEO_CONFIRM_WINDOWS = 2;
+/** Minimum observed frame rate (fps) that arms the video-only stall detector. */
+export const FREEZE_VIDEO_MIN_FPS = 2;
 /** Cooldown between heal attempts on the same slot (anti-spree). */
 export const FREEZE_HEAL_COOLDOWN_MS = 45000;
 /** Failed background heals before falling through to disconnect/retry flow. */
 export const FREEZE_HEAL_MAX_FAILS = 3;
+/** Continuous healthy motion that forgives past heal failures. */
+export const FREEZE_HEALTHY_RESET_MS = 30000;
 
 /**
  * Target currentTime so headroom ≈ bufferSize (park behind bufferedEnd).
@@ -274,7 +276,9 @@ export function shouldClearWasPlayingOnAutoplayBlock() {
 }
 
 /**
- * Full freeze: media clock stopped advancing while playback claims to run.
+ * Full freeze: media clock stopped advancing for the full confirm window.
+ * elapsedMs is time since the clock last moved (NOT the tick gap) — the tick
+ * fires every FREEZE_TICK_MS but a stall only counts after FREEZE_CONFIRM_MS.
  * Pure helper for the freeze ticker — no DOM.
  */
 export function isClockStalled({
@@ -289,21 +293,39 @@ export function isClockStalled({
 }
 
 /**
- * Video-only freeze: audio clock advances but no new decoded video frames.
- * Requires consecutive stalled windows so slideshows/low-fps don't flap.
+ * Frames advanced since the previous sample (fps leg of the heal contract).
  */
-export function isVideoFrameStalled({
-    lastFrames = -1,
-    nowFrames = -1,
-    clockAdvanced = false,
-    stalledWindows = 0,
-    requiredWindows = FREEZE_VIDEO_CONFIRM_WINDOWS
-} = {}) {
-    if (clockAdvanced !== true) return false;
+export function didFramesAdvance({ lastFrames = -1, nowFrames = -1 } = {}) {
     if (!Number.isFinite(nowFrames) || nowFrames < 0) return false;
     if (!Number.isFinite(lastFrames) || lastFrames < 0) return false;
-    if (nowFrames !== lastFrames) return false;
-    return stalledWindows + 1 >= requiredWindows;
+    return nowFrames > lastFrames;
+}
+
+/**
+ * Media clock advanced since the previous sample (≥50ms of timeline motion).
+ */
+export function didClockAdvance({ lastTime = 0, nowTime = 0 } = {}) {
+    if (!Number.isFinite(lastTime) || !Number.isFinite(nowTime)) return false;
+    return Math.abs(nowTime - lastTime) >= 0.05;
+}
+
+/**
+ * Video-only freeze: audio clock advances but no new decoded video frames for
+ * the full confirm window AND the stream previously proved it can decode
+ * real motion (minObservedFps). Still-image tracks (cover art) and slideshows
+ * never reach FREEZE_VIDEO_MIN_FPS, so they are never mistaken for a freeze.
+ */
+export function isVideoFrameStalled({
+    framesElapsedMs = 0,
+    thresholdMs = FREEZE_CONFIRM_MS,
+    clockAdvanced = false,
+    minObservedFps = 0,
+    requiredFps = FREEZE_VIDEO_MIN_FPS
+} = {}) {
+    if (clockAdvanced !== true) return false;
+    if (!Number.isFinite(framesElapsedMs) || framesElapsedMs < thresholdMs) return false;
+    if (!Number.isFinite(minObservedFps) || minObservedFps < requiredFps) return false;
+    return true;
 }
 
 /**

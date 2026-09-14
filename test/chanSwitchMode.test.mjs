@@ -798,9 +798,10 @@ test('freeze heal quick-kicks first, then background-warms without touching fron
     player.hls = { startLoad() { startLoadCalls += 1; }, recoverMediaError() {} };
     player._lastHlsNetworkRestartAt = 0;
 
-    // Simulate a sustained full freeze: clock never moves.
+    // Simulate a sustained full freeze: no motion for the whole window.
     player._resetFreezeObservation(Date.now() - FREEZE_CONFIRM_MS - 1000, { resetKick: true });
-    player._freezeLastTickAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
+    player._freezeLastClockMotionAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
+    player._freezeLastFrameMotionAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
     player._runFreezeCheck();
     assert.equal(startLoadCalls, 1);
     assert.equal(player.playing, true);
@@ -812,11 +813,13 @@ test('freeze heal quick-kicks first, then background-warms without touching fron
     player._runPrepare = async () => { warmed = true; return true; };
     player._preloader = { isReady: () => true, cancel: () => {} };
     player.videoBack.readyState = 2;
+    player._confirmStagingAlive = async () => true;
     player.commitPreparedChannel = async () => { committed = true; return true; };
     player._freezeQuickKickDone = true;
     player._freezeCooldownUntil = 0;
     player._resetFreezeObservation(Date.now() - FREEZE_CONFIRM_MS - 1000);
-    player._freezeLastTickAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
+    player._freezeLastClockMotionAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
+    player._freezeLastFrameMotionAt = Date.now() - FREEZE_CONFIRM_MS - 1000;
     player.video.currentTime = 10;
     await player._healFrozenStream('full');
     assert.equal(warmed, true);
@@ -852,6 +855,135 @@ test('freeze heal exhausts to disconnect after repeated warm failures', async ()
     }
     assert.equal(player.playing, false);
     assert.equal(player.error, 'Stream unavailable');
+    player._clearFreezeTicker();
+    player._clearStuckLoadWatchdog();
+});
+
+test('freeze detector needs elapsed-since-motion, not the tick gap', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player.loading = false;
+    player.loadPhase = 'idle';
+    player.video.paused = false;
+    player.video.seeking = false;
+
+    let healCalls = 0;
+    player._healFrozenStream = async () => { healCalls += 1; };
+
+    // Normal 2s ticks with motion — must never heal.
+    player._resetFreezeObservation(Date.now() - 2000);
+    player.video.currentTime = 10;
+    player.video.getVideoPlaybackQuality = () => ({ totalVideoFrames: 100 });
+    player._runFreezeCheck();
+    player.video.currentTime = 12;
+    player.video.getVideoPlaybackQuality = () => ({ totalVideoFrames: 148 });
+    player._runFreezeCheck(Date.now());
+    assert.equal(healCalls, 0);
+
+    // Frozen long enough → heals.
+    player.video.currentTime = 12;
+    player.video.getVideoPlaybackQuality = () => ({ totalVideoFrames: 148 });
+    player._freezeLastTime = 12;
+    player._freezeLastFrames = 148;
+    player._freezeLastClockMotionAt = Date.now() - 13000;
+    player._freezeLastFrameMotionAt = Date.now() - 13000;
+    player._runFreezeCheck(Date.now() + 14000);
+    assert.equal(healCalls, 1);
+    player._clearFreezeTicker();
+    player._clearStuckLoadWatchdog();
+});
+
+test('video-only heal ignores still-image tracks', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Radio', url_resolved: 'https://example.com/radio.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player.loading = false;
+    player.loadPhase = 'idle';
+    player.video.paused = false;
+    player.video.seeking = false;
+
+    let healCalls = 0;
+    player._healFrozenStream = async () => { healCalls += 1; };
+
+    // Cover-art video: clock runs, frames never move, never proved motion.
+    player._resetFreezeObservation();
+    player.video.getVideoPlaybackQuality = () => ({ totalVideoFrames: 7 });
+    for (let t = 0; t <= 20000; t += 2000) {
+        player.video.currentTime = 100 + t / 1000;
+        player._runFreezeCheck(Date.now() + t);
+    }
+    assert.equal(healCalls, 0);
+    player._clearFreezeTicker();
+    player._clearStuckLoadWatchdog();
+});
+
+test('throttled kick does not consume the kick stage', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    let startLoadCalls = 0;
+    player.hls = { startLoad() { startLoadCalls += 1; }, recoverMediaError() {} };
+    player._lastHlsNetworkRestartAt = Date.now();
+
+    assert.equal(player._quickKickFrozenStream('full'), false);
+    assert.equal(startLoadCalls, 0);
+    assert.equal(player._freezeQuickKickDone, false);
+    player._clearFreezeTicker();
+    player._clearStuckLoadWatchdog();
+});
+
+test('heal refuses to swap onto a dead staging buffer', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player._runPrepare = async () => true;
+    player._preloader = { isReady: () => true, cancel: () => {} };
+    player.videoBack.readyState = 2;
+    player.videoBack.currentTime = 50;
+    player.videoBack.getVideoPlaybackQuality = () => ({ totalVideoFrames: 42 });
+    let committed = false;
+    player.commitPreparedChannel = async () => { committed = true; return true; };
+    player._freezeQuickKickDone = true;
+    player._freezeCooldownUntil = 0;
+
+    await player._healFrozenStream('full');
+    assert.equal(committed, false);
+    assert.equal(player._freezeFails, 1);
+    assert.equal(player.playing, true);
     player._clearFreezeTicker();
     player._clearStuckLoadWatchdog();
 });

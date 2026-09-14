@@ -26,13 +26,15 @@ import {
     shouldFreshResume,
     shouldRecoverStuckLoad,
     isClockStalled,
+    didClockAdvance,
+    didFramesAdvance,
     isVideoFrameStalled,
     shouldRunFreezeTick,
     STALLED_PAUSE_RESTART_MS,
     STALLED_PAUSE_BEHIND_MS,
     STUCK_LOAD_RECOVERY_MS,
     FREEZE_CONFIRM_MS,
-    FREEZE_VIDEO_CONFIRM_WINDOWS,
+    FREEZE_VIDEO_MIN_FPS,
     PARK_HEADROOM_RATIO
 } from '../js/player/pauseBuffer.js';
 
@@ -649,29 +651,35 @@ test('shouldRecoverStuckLoad only fires on a stalled in-flight load', () => {
     }), false);
 });
 
-test('isClockStalled needs a sustained frozen clock', () => {
+test('isClockStalled needs a sustained frozen clock (elapsed = since last motion)', () => {
     assert.equal(isClockStalled({ lastTime: 10, nowTime: 10, elapsedMs: FREEZE_CONFIRM_MS + 1 }), true);
-    assert.equal(isClockStalled({ lastTime: 10, nowTime: 10, elapsedMs: FREEZE_CONFIRM_MS - 1 }), false);
+    // Tick-gap elapsed (2s) must NOT count — regression guard for the dead detector.
+    assert.equal(isClockStalled({ lastTime: 10, nowTime: 10, elapsedMs: 2000 }), false);
     assert.equal(isClockStalled({ lastTime: 10, nowTime: 10.2, elapsedMs: FREEZE_CONFIRM_MS + 1 }), false);
     assert.equal(isClockStalled({ lastTime: NaN, nowTime: 10, elapsedMs: FREEZE_CONFIRM_MS + 1 }), false);
 });
 
-test('isVideoFrameStalled needs clock motion + consecutive windows', () => {
-    assert.equal(isVideoFrameStalled({
-        lastFrames: 100, nowFrames: 100, clockAdvanced: true, stalledWindows: FREEZE_VIDEO_CONFIRM_WINDOWS - 1
-    }), true);
-    assert.equal(isVideoFrameStalled({
-        lastFrames: 100, nowFrames: 100, clockAdvanced: true, stalledWindows: 0
-    }), FREEZE_VIDEO_CONFIRM_WINDOWS <= 1);
-    assert.equal(isVideoFrameStalled({
-        lastFrames: 100, nowFrames: 101, clockAdvanced: true, stalledWindows: 5
-    }), false);
-    assert.equal(isVideoFrameStalled({
-        lastFrames: 100, nowFrames: 100, clockAdvanced: false, stalledWindows: 5
-    }), false);
-    assert.equal(isVideoFrameStalled({
-        lastFrames: -1, nowFrames: -1, clockAdvanced: true, stalledWindows: 5
-    }), false);
+test('didClockAdvance / didFramesAdvance motion legs', () => {
+    assert.equal(didClockAdvance({ lastTime: 10, nowTime: 10.2 }), true);
+    assert.equal(didClockAdvance({ lastTime: 10, nowTime: 10.01 }), false);
+    assert.equal(didClockAdvance({ lastTime: NaN, nowTime: 10 }), false);
+    assert.equal(didFramesAdvance({ lastFrames: 100, nowFrames: 101 }), true);
+    assert.equal(didFramesAdvance({ lastFrames: 100, nowFrames: 100 }), false);
+    assert.equal(didFramesAdvance({ lastFrames: -1, nowFrames: -1 }), false);
+    assert.equal(didFramesAdvance({ lastFrames: 100, nowFrames: 99 }), false);
+});
+
+test('isVideoFrameStalled needs full window + proven motion history', () => {
+    const live = { framesElapsedMs: FREEZE_CONFIRM_MS + 1, clockAdvanced: true, minObservedFps: 25 };
+    assert.equal(isVideoFrameStalled(live), true);
+    // Only 4s flat (old eager window) must NOT fire.
+    assert.equal(isVideoFrameStalled({ ...live, framesElapsedMs: 4000 }), false);
+    // Still-image track (never decoded motion) must NOT fire.
+    assert.equal(isVideoFrameStalled({ ...live, minObservedFps: 0 }), false);
+    // Slideshow-ish trickle below the bar must NOT fire.
+    assert.equal(isVideoFrameStalled({ ...live, minObservedFps: FREEZE_VIDEO_MIN_FPS - 0.5 }), false);
+    // Frozen audio clock is a full freeze, not a video-only freeze.
+    assert.equal(isVideoFrameStalled({ ...live, clockAdvanced: false }), false);
 });
 
 test('shouldRunFreezeTick only while healthy playing', () => {

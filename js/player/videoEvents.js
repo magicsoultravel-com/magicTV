@@ -61,7 +61,9 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
         player.resumeBlocked = false;
         player.posterDataUrl = null;
         player.healing = false;
-        player._freezeFails = 0;
+        // NOTE: _freezeFails is intentionally NOT reset here. A `playing`
+        // blip must not forgive strikes — the tick resets them only after
+        // 30s of sustained healthy motion (FREEZE_HEALTHY_RESET_MS).
         // Pause buffering disables the hls.js live-edge yank (Infinity); healthy
         // playback must re-arm it, otherwise latency drifts unbounded after resume.
         try { player._restoreLiveSyncOnPlaying?.(); } catch { /* ignore */ }

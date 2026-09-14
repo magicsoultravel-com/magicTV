@@ -53,13 +53,16 @@ import {
     shouldFreshResume,
     shouldRecoverStuckLoad,
     isClockStalled,
+    didClockAdvance,
+    didFramesAdvance,
     isVideoFrameStalled,
     shouldRunFreezeTick,
     FREEZE_CONFIRM_MS,
     FREEZE_TICK_MS,
-    FREEZE_VIDEO_CONFIRM_WINDOWS,
+    FREEZE_VIDEO_MIN_FPS,
     FREEZE_HEAL_COOLDOWN_MS,
-    FREEZE_HEAL_MAX_FAILS
+    FREEZE_HEAL_MAX_FAILS,
+    FREEZE_HEALTHY_RESET_MS
 } from './pauseBuffer.js';
 import {
     takePausedFillTurn,
@@ -190,8 +193,10 @@ export function createPlayerInstance(options) {
         _freezeGen: 0,
         _freezeLastTime: NaN,
         _freezeLastFrames: -1,
-        _freezeLastTickAt: 0,
-        _freezeStalledWindows: 0,
+        _freezeLastClockMotionAt: 0,
+        _freezeLastFrameMotionAt: 0,
+        _freezeMinObservedFps: 0,
+        _freezeHealthyMotionSince: 0,
         _freezeQuickKickDone: false,
         _freezeFails: 0,
         _freezeCooldownUntil: 0,
@@ -457,8 +462,10 @@ export function createPlayerInstance(options) {
         _resetFreezeObservation(now = Date.now(), { resetKick = false } = {}) {
             this._freezeLastTime = Number(this.video?.currentTime ?? NaN);
             this._freezeLastFrames = this._readDecodedFrames(this.video);
-            this._freezeLastTickAt = now;
-            this._freezeStalledWindows = 0;
+            this._freezeLastClockMotionAt = now;
+            this._freezeLastFrameMotionAt = now;
+            this._freezeMinObservedFps = 0;
+            this._freezeHealthyMotionSince = now;
             if (resetKick) this._freezeQuickKickDone = false;
         },
 
@@ -524,65 +531,104 @@ export function createPlayerInstance(options) {
             }
             const nowTime = Number(v?.currentTime ?? NaN);
             const nowFrames = this._readDecodedFrames(v);
-            const lastTick = this._freezeLastTickAt || now;
-            const elapsed = Math.max(0, now - lastTick);
+            const moved = didClockAdvance({ lastTime: this._freezeLastTime, nowTime });
+            const framesMoved = didFramesAdvance({ lastFrames: this._freezeLastFrames, nowFrames });
+
+            // fps gate BEFORE re-anchoring (uses previous-sample deltas):
+            // only streams that provably decode real motion qualify for the
+            // video-only detector (kills still-image/slideshow false alarms).
+            if (moved && framesMoved) {
+                const prevTime = this._freezeLastTime;
+                const clockDelta = Number.isFinite(prevTime) && Number.isFinite(nowTime)
+                    ? Math.abs(nowTime - prevTime) : NaN;
+                const frameDelta = nowFrames - this._freezeLastFrames;
+                if (Number.isFinite(clockDelta) && clockDelta >= 0.5 && frameDelta > 0) {
+                    const fps = frameDelta / clockDelta;
+                    if (Number.isFinite(fps)) {
+                        this._freezeMinObservedFps = Math.max(this._freezeMinObservedFps || 0, fps);
+                    }
+                }
+            }
+            if (moved) {
+                this._freezeLastClockMotionAt = now;
+                this._freezeLastTime = nowTime;
+                this._freezeHealthyMotionSince = this._freezeHealthyMotionSince || now;
+            }
+            if (framesMoved) {
+                this._freezeLastFrameMotionAt = now;
+                this._freezeLastFrames = nowFrames;
+                this._freezeHealthyMotionSince = this._freezeHealthyMotionSince || now;
+            }
+            if (!framesMoved) {
+                // Frames flat: full freeze when the clock is flat too,
+                // video-only freeze when the clock keeps moving. Elapsed is
+                // measured from last OBSERVED motion, not the tick gap.
+                return this._checkFreezeStall({ nowTime, now, moved });
+            }
+            // Healthy frame motion forgives past heal failures only after a
+            // sustained run — a single `playing` blip must NOT reset strikes.
+            if ((this._freezeFails || 0) > 0
+                && (now - (this._freezeHealthyMotionSince || now)) >= FREEZE_HEALTHY_RESET_MS) {
+                this._freezeFails = 0;
+            }
+            return;
+        },
+
+        _checkFreezeStall({ nowTime, now, moved }) {
+            const clockStillFor = Math.max(0, now - (this._freezeLastClockMotionAt || now));
+            const framesStillFor = Math.max(0, now - (this._freezeLastFrameMotionAt || now));
             const fullStall = isClockStalled({
                 lastTime: this._freezeLastTime,
                 nowTime,
-                elapsedMs: elapsed,
+                elapsedMs: clockStillFor,
                 thresholdMs: FREEZE_CONFIRM_MS
             });
-            const clockAdvanced = Number.isFinite(this._freezeLastTime)
-                && Number.isFinite(nowTime)
-                && Math.abs(nowTime - this._freezeLastTime) >= 0.05;
             const videoStall = isVideoFrameStalled({
-                lastFrames: this._freezeLastFrames,
-                nowFrames,
-                clockAdvanced,
-                stalledWindows: this._freezeStalledWindows,
-                requiredWindows: FREEZE_VIDEO_CONFIRM_WINDOWS
+                framesElapsedMs: framesStillFor,
+                thresholdMs: FREEZE_CONFIRM_MS,
+                clockAdvanced: moved,
+                minObservedFps: this._freezeMinObservedFps || 0,
+                requiredFps: FREEZE_VIDEO_MIN_FPS
             });
-            if (!fullStall && !videoStall) {
-                if (clockAdvanced && nowFrames >= 0 && nowFrames === this._freezeLastFrames) {
-                    this._freezeStalledWindows += 1;
-                } else {
-                    this._freezeStalledWindows = 0;
-                    this._freezeLastTime = nowTime;
-                    this._freezeLastFrames = nowFrames;
-                }
-                this._freezeLastTickAt = now;
-                return;
-            }
+            if (!fullStall && !videoStall) return;
             const kind = fullStall ? 'full' : 'video-only';
             tvDebug('player', `freeze suspected (${kind})`, { slot: this.id });
-            this._freezeStalledWindows = 0;
-            this._freezeLastTime = nowTime;
-            this._freezeLastFrames = nowFrames;
-            this._freezeLastTickAt = now;
+            // Re-anchor the stall windows so the next tick measures a fresh
+            // confirm window after the kick/heal below.
+            this._freezeLastClockMotionAt = fullStall ? now : this._freezeLastClockMotionAt;
+            this._freezeLastFrameMotionAt = now;
             void this._healFrozenStream(kind);
         },
 
         /** Cheap in-place kick: startLoad (full) / recoverMediaError (video-only). */
         _quickKickFrozenStream(kind) {
             if (this._freezeQuickKickDone) return false;
-            this._freezeQuickKickDone = true;
             try {
                 if (kind === 'video-only' && this.hls && typeof this.hls.recoverMediaError === 'function') {
                     this.hls.recoverMediaError();
+                    this._freezeQuickKickDone = true;
                     tvDebug('player', 'freeze quick kick recoverMediaError', { slot: this.id });
                     return true;
                 }
                 if (this.hls && typeof this.hls.startLoad === 'function') {
+                    // Throttled (no-op) kick must NOT consume the kick stage —
+                    // leave it armed so the next window retries the cheap kick.
                     if (!shouldRestartHlsOnError({ lastRestartedAt: this._lastHlsNetworkRestartAt || 0 })) {
                         return false;
                     }
                     this._lastHlsNetworkRestartAt = Date.now();
                     this.hls.startLoad();
+                    this._freezeQuickKickDone = true;
                     tvDebug('player', 'freeze quick kick startLoad', { slot: this.id });
                     return true;
                 }
                 if (this.video && !this.hls) {
+                    // Native/progressive: refetch is destructive, so only kick
+                    // when the network is provably dead (no progress either).
+                    const quietFor = Date.now() - (this._loadLastProgressAt || 0);
+                    if (this._loadLastProgressAt > 0 && quietFor < FREEZE_CONFIRM_MS) return false;
                     try { this.video.load(); } catch { /* ignore */ }
+                    this._freezeQuickKickDone = true;
                     return true;
                 }
             } catch { /* ignore */ }
@@ -616,12 +662,18 @@ export function createPlayerInstance(options) {
                 if (!ok || !this._preloader?.isReady()) throw new Error('heal warm not ready');
                 const staging = this.videoBack;
                 if (!(staging && staging.readyState >= 2)) throw new Error('heal warm no frame');
+                // Don't swap good-for-dead: prove the staging buffer is alive
+                // (clock or frames move) before committing the front over.
+                if (!(await this._confirmStagingAlive(staging))) {
+                    throw new Error('heal warm stalled');
+                }
                 const committed = await this.commitPreparedChannel(this.channel, switchGen, {
                     allowFallback: false,
                     fromHeal: true
                 });
                 if (committed !== true) throw new Error('heal swap rejected');
-                this._freezeFails = 0;
+                // Strikes reset only after the new stream proves healthy in the
+                // tick (30s sustained motion) — never on the swap itself.
                 this._resetFreezeObservation(Date.now(), { resetKick: true });
             } catch {
                 this.cancelPrepare();
@@ -635,6 +687,26 @@ export function createPlayerInstance(options) {
                 if (healGen === this._freezeGen) this.healing = false;
                 try { this.emitState(); } catch { /* ignore */ }
             }
+        },
+
+        /**
+         * Prove a warmed staging buffer is actually playing (not a frozen
+         * frame) before swapping the front over to it.
+         */
+        async _confirmStagingAlive(staging) {
+            if (!staging) return false;
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            const snap = () => ({
+                t: Number(staging.currentTime ?? NaN),
+                f: this._readDecodedFrames(staging)
+            });
+            const a = snap();
+            await sleep(2000);
+            const b = snap();
+            const clockMoved = Number.isFinite(a.t) && Number.isFinite(b.t)
+                && Math.abs(b.t - a.t) >= 0.05;
+            const framesMoved = Number.isFinite(a.f) && Number.isFinite(b.f) && b.f > a.f;
+            return clockMoved || framesMoved;
         },
 
         /** Give up: enter the existing disconnect/retry flow. */
