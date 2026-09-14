@@ -41,6 +41,8 @@ import {
 import {
     computeParkBehindTime,
     computeResumeSeekTime,
+    findBufferedRange,
+    nextBufferedStart,
     shouldClearWasPlayingOnAutoplayBlock,
     shouldPauseOnToggle,
     shouldClearWantPlayingOnPlayFail,
@@ -854,11 +856,24 @@ export function createPlayerInstance(options) {
             if (!video || !video.buffered || video.buffered.length === 0) {
                 return { buffered: 0, duration: 0 };
             }
-            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            const current = video.currentTime || 0;
+            // Hole-aware: headroom is measured inside the range holding the
+            // playhead. Spanning start(0)..end(last) across a gap would count
+            // unbuffered seconds as playable and park the head into the hole.
+            const active = findBufferedRange(video.buffered, current);
+            if (active) {
+                return {
+                    buffered: Math.max(0, active.end - current),
+                    duration: video.duration || 0
+                };
+            }
+            // Playhead sits in a gap: nothing playable ahead of us.
+            const upcoming = nextBufferedStart(video.buffered, current);
             const duration = video.duration || 0;
             return {
-                buffered: Math.max(0, bufferedEnd - (video.currentTime || 0)),
-                duration
+                buffered: 0,
+                duration,
+                gapToNext: upcoming == null ? null : Math.max(0, upcoming - current)
             };
         },
 
@@ -904,8 +919,14 @@ export function createPlayerInstance(options) {
             const duration = video.duration;
             const isLive = !Number.isFinite(duration);
             const current = video.currentTime || 0;
-            const bufferedStart = video.buffered.start(0);
-            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            // Report the active (playhead) range, not the outer span: the outer
+            // span misplaces seek-bar progress when a live playlist holds a gap.
+            // Fall back to the outer span only when the playhead is in a hole.
+            const active = findBufferedRange(video.buffered, current);
+            const bufferedStart = active ? active.start : video.buffered.start(0);
+            const bufferedEnd = active
+                ? active.end
+                : video.buffered.end(video.buffered.length - 1);
             const seekableDuration = Math.max(0, bufferedEnd - bufferedStart);
             const progress = seekableDuration > 0
                 ? ((current - bufferedStart) / seekableDuration) * 100
@@ -963,16 +984,32 @@ export function createPlayerInstance(options) {
                 : LIVE_MAX_LATENCY_DURATION_COUNT;
         },
 
+        /**
+         * Re-arm normal live-edge latency once media actually flows again.
+         * Called from the playing event: safe because playback already has
+         * headroom, so the guard cannot yank a fresh resume to live.
+         */
+        _restoreLiveSyncOnPlaying() {
+            this.setPauseLiveSync(false);
+        },
+
         /** Park currentTime so headroom ≈ bufferSize (behind bufferedEnd). */
         parkBehindBuffer() {
             const video = this.video;
             if (!video?.buffered?.length) return;
-            const bufferedStart = video.buffered.start(0);
-            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            const current = video.currentTime || 0;
+            // In a gap there is no contiguous headroom to park inside: jump to
+            // the next buffered range start instead of computing inside a hole.
+            const active = findBufferedRange(video.buffered, current);
+            if (!active) {
+                const upcoming = nextBufferedStart(video.buffered, current);
+                if (upcoming != null) video.currentTime = upcoming;
+                return;
+            }
             const desired = computeParkBehindTime(
-                video.currentTime || 0,
-                bufferedStart,
-                bufferedEnd,
+                current,
+                active.start,
+                active.end,
                 this.bufferSize || DEFAULT_BUFFER_SIZE
             );
             if (desired != null) video.currentTime = desired;
@@ -986,12 +1023,20 @@ export function createPlayerInstance(options) {
         prepareResumePosition() {
             const video = this.video;
             if (!video?.buffered?.length) return false;
-            const bufferedStart = video.buffered.start(0);
-            const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            const current = video.currentTime || 0;
+            // Resume from a gap would spin at an unbuffered timestamp: recover
+            // forward into the next buffered range (+0.05s so we are inside it).
+            const active = findBufferedRange(video.buffered, current);
+            if (!active) {
+                const upcoming = nextBufferedStart(video.buffered, current);
+                if (upcoming == null) return false;
+                video.currentTime = upcoming + 0.05;
+                return true;
+            }
             const desired = computeResumeSeekTime(
-                video.currentTime || 0,
-                bufferedStart,
-                bufferedEnd
+                current,
+                active.start,
+                active.end
             );
             if (desired == null) return false;
             video.currentTime = desired;
@@ -1153,8 +1198,12 @@ export function createPlayerInstance(options) {
 
             const gen = this.beginTransport(true);
             const didSeek = this.prepareResumePosition();
-            // Keep liveMaxLatency Infinity from pause-buffer — do not yank to live.
+            // Live-edge guard was disabled (Infinity) while pause-buffered.
+            // Resume keeps the parked playhead, then playing re-arms normal
+            // latency via _restoreLiveSyncOnPlaying — never yank to live here.
             this.pausePhase = 'idle';
+            this._pausedFillArmed = false;
+            releasePausedFill(this.id);
             this.playing = false;
             this.loading = true;
             this.loadPhase = 'buffering';
@@ -1260,7 +1309,10 @@ export function createPlayerInstance(options) {
             this.bufferSize = size;
             applyHlsBufferConfig(this.hls, size);
             if (this.video) {
-                this.video.preload = size > 60 ? 'auto' : 'metadata';
+                // Live HLS appends ahead of currentTime; a restrictive preload
+                // like metadata lets Safari throttle native-HLS buffering and
+                // starves the pause backfill. Keep auto on all sizes.
+                this.video.preload = 'auto';
             }
             this.emitState();
         },

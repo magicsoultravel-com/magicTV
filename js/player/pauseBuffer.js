@@ -59,6 +59,55 @@ export function computeResumeSeekTime(current, bufferedStart, bufferedEnd) {
 }
 
 /**
+ * Locate the buffered range containing currentTime (hole-aware).
+ * TimeRanges can hold several disjoint ranges; callers must not assume
+ * start(0)..end(last) is continuous. A small epsilon tolerates fragment
+ * boundary jitter so the playhead at a range edge still counts as inside.
+ * @param {TimeRanges|{length:number,start:(i:number)=>number,end:(i:number)=>number}|null} buffered
+ * @param {number} currentTime
+ * @param {number} [epsilon]
+ * @returns {{start:number,end:number,index:number}|null}
+ */
+export function findBufferedRange(buffered, currentTime, epsilon = 0.3) {
+    try {
+        const count = buffered?.length || 0;
+        if (!count || typeof buffered.start !== 'function' || typeof buffered.end !== 'function') return null;
+        const now = Number(currentTime);
+        const tol = Number.isFinite(epsilon) && epsilon >= 0 ? epsilon : 0.3;
+        for (let i = 0; i < count; i += 1) {
+            const start = buffered.start(i);
+            const end = buffered.end(i);
+            if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+            if (Number.isFinite(now) && now + tol >= start && now - tol <= end) {
+                return { start, end, index: i };
+            }
+        }
+    } catch { /* ignore malformed TimeRanges */ }
+    return null;
+}
+
+/**
+ * Start of the first buffered range ahead of currentTime (hole recovery).
+ * @returns {number|null}
+ */
+export function nextBufferedStart(buffered, currentTime) {
+    try {
+        const count = buffered?.length || 0;
+        if (!count || typeof buffered.start !== 'function' || typeof buffered.end !== 'function') return null;
+        const now = Number.isFinite(currentTime) ? currentTime : -Infinity;
+        let best = null;
+        for (let i = 0; i < count; i += 1) {
+            const start = buffered.start(i);
+            const end = buffered.end(i);
+            if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+            if (start > now && (best == null || start < best)) best = start;
+        }
+        return best;
+    } catch { /* ignore */ }
+    return null;
+}
+
+/**
  * Whether a native `playing` event should update player/UI state.
  * Rejects stale events after the user already paused (mash-safe).
  */

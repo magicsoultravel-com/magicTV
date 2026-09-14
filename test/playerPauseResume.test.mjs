@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import {
     computeParkBehindTime,
     computeResumeSeekTime,
+    findBufferedRange,
+    nextBufferedStart,
     classifyTilePlayback,
     shouldAcceptPlayingEvent,
     shouldAcceptPauseEvent,
@@ -56,6 +58,38 @@ test('park clamps to bufferedStart when range is shorter than bufferSize', () =>
 test('park returns null for empty/invalid ranges', () => {
     assert.equal(computeParkBehindTime(10, 10, 10, 15), null);
     assert.equal(computeParkBehindTime(10, NaN, 20, 15), null);
+});
+
+// ----- Hole-aware buffered ranges -----
+
+function fakeBuffered(ranges) {
+    return {
+        length: ranges.length,
+        start: (i) => ranges[i][0],
+        end: (i) => ranges[i][1]
+    };
+}
+
+test('findBufferedRange resolves the range holding the playhead', () => {
+    const buffered = fakeBuffered([[0, 10], [20, 40]]);
+    assert.deepEqual(findBufferedRange(buffered, 25), { start: 20, end: 40, index: 1 });
+    assert.deepEqual(findBufferedRange(buffered, 5), { start: 0, end: 10, index: 0 });
+});
+
+test('findBufferedRange returns null inside a gap and tolerates edge jitter', () => {
+    const buffered = fakeBuffered([[0, 10], [20, 40]]);
+    assert.equal(findBufferedRange(buffered, 15), null);
+    // 0.3s epsilon: just past the edge still counts as inside
+    assert.deepEqual(findBufferedRange(buffered, 10.2), { start: 0, end: 10, index: 0 });
+    assert.equal(findBufferedRange(null, 5), null);
+    assert.equal(findBufferedRange(fakeBuffered([]), 5), null);
+});
+
+test('nextBufferedStart skips the hole to the upcoming range', () => {
+    const buffered = fakeBuffered([[0, 10], [20, 40], [50, 60]]);
+    assert.equal(nextBufferedStart(buffered, 12), 20);
+    assert.equal(nextBufferedStart(buffered, 45), 50);
+    assert.equal(nextBufferedStart(buffered, 70), null);
 });
 
 // ----- Resume position -----

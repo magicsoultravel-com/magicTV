@@ -62,6 +62,9 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
         player.posterDataUrl = null;
         player.healing = false;
         player._freezeFails = 0;
+        // Pause buffering disables the hls.js live-edge yank (Infinity); healthy
+        // playback must re-arm it, otherwise latency drifts unbounded after resume.
+        try { player._restoreLiveSyncOnPlaying?.(); } catch { /* ignore */ }
         if (shouldRecordRecents()) savePlayerState({ wasPlaying: true });
         const key = channelKey(player.channel);
         if (shouldRecordRecents() && key && player.recentRecordedForKey !== key) {
