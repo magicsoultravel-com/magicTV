@@ -722,13 +722,9 @@ function bindViewTransitionSelect() {
 async function init() {
     let revealed = false;
     let sessionRepaired = false;
-    let sessionLibraryRestored = false;
-    let sessionLibraryWiped = false;
     try {
         const migration = migratePersistedState();
         sessionRepaired = migration.repaired === true;
-        sessionLibraryRestored = migration.libraryRestored === true;
-        sessionLibraryWiped = migration.libraryWiped === true;
     } catch (err) {
         console.warn('[magicTV] State migration failed:', err);
         sessionRepaired = true;
@@ -838,11 +834,7 @@ async function init() {
         // must never be held hostage by the network.
         await reveal();
 
-        if (sessionLibraryRestored) {
-            showAppToast('Favorites folders recovered from backup');
-        } else if (sessionLibraryWiped) {
-            showAppToast('Session data was cleared — use Settings → Export/Import if you have a backup');
-        } else if (sessionRepaired) {
+        if (sessionRepaired) {
             showAppToast('Session data repaired — some layout was reset');
         }
 

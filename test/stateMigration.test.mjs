@@ -32,7 +32,6 @@ before(() => {
 let STATE_KEY;
 let CORRUPT_BACKUP_KEY;
 let STATE_SCHEMA_VERSION;
-let LIBRARY_MIRROR_KEY;
 let parsePersistedStateRaw;
 let patchPersistedState;
 let writePersistedState;
@@ -54,7 +53,6 @@ before(async () => {
         CORRUPT_BACKUP_KEY
     } = await import('../js/storage/stateMigration.js'));
     ({ loadPlayerState } = await import('../js/storage/playerState.js'));
-    ({ LIBRARY_MIRROR_KEY } = await import('../js/storage/libraryMirror.js'));
 });
 
 beforeEach(() => {
@@ -148,63 +146,11 @@ test('corrupt JSON backs up and force-resets to versioned empty blob', () => {
     const result = migratePersistedState();
     assert.equal(result.migrated, true);
     assert.equal(result.repaired, true);
-    assert.equal(result.libraryRestored, false);
-    assert.equal(result.libraryWiped, true);
     assert.equal(store.get(CORRUPT_BACKUP_KEY), corrupt);
 
     const parsed = parsePersistedStateRaw();
     assert.equal(parsed.ok, true);
     assert.equal(parsed.value.stateSchemaVersion, STATE_SCHEMA_VERSION);
-});
-
-test('corrupt JSON restores favoriteFolders from library mirror', () => {
-    store.set(LIBRARY_MIRROR_KEY, JSON.stringify({
-        favorites: ['iptv-org:A.us'],
-        favoritesMeta: [{ key: 'iptv-org:A.us', name: 'A', logo: '', countrycode: 'US' }],
-        favoriteFolders: [{ id: 'f_keep', name: 'News', items: ['iptv-org:A.us'] }],
-        favoritesRootOrder: [],
-        savedAt: 1
-    }));
-    store.set(STATE_KEY, '{not-valid-json');
-
-    const result = migratePersistedState();
-    assert.equal(result.repaired, true);
-    assert.equal(result.libraryRestored, true);
-    assert.equal(result.libraryWiped, false);
-
-    const state = loadPlayerState();
-    assert.equal(state.favoriteFolders.length, 1);
-    assert.equal(state.favoriteFolders[0].id, 'f_keep');
-    assert.equal(state.favoriteFolders[0].name, 'News');
-    assert.deepEqual(state.favorites, ['iptv-org:A.us']);
-});
-
-test('versioned blob with empty folders reconciles from mirror', () => {
-    store.set(STATE_KEY, JSON.stringify({
-        stateSchemaVersion: STATE_SCHEMA_VERSION,
-        favorites: ['iptv-org:A.us'],
-        favoritesMeta: [{ key: 'iptv-org:A.us', name: 'A', logo: '', countrycode: 'US' }],
-        favoriteFolders: [],
-        remoteButtonShape: 'ninja',
-        volume: 0.5
-    }));
-    store.set(LIBRARY_MIRROR_KEY, JSON.stringify({
-        favorites: ['iptv-org:A.us'],
-        favoritesMeta: [{ key: 'iptv-org:A.us', name: 'A', logo: '', countrycode: 'US' }],
-        favoriteFolders: [{ id: 'f2', name: 'Sports', items: [] }],
-        favoritesRootOrder: ['iptv-org:A.us'],
-        savedAt: 2
-    }));
-
-    const result = migratePersistedState();
-    assert.equal(result.migrated, false);
-    assert.equal(result.repaired, true);
-    assert.equal(result.libraryRestored, true);
-
-    const raw = JSON.parse(store.get(STATE_KEY));
-    assert.equal(raw.favoriteFolders.length, 1);
-    assert.equal(raw.favoriteFolders[0].name, 'Sports');
-    assert.equal(raw.remoteButtonShape, 'ninja');
 });
 
 test('migrate preserves remoteButtonShape', () => {

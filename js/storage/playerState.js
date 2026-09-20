@@ -3,10 +3,12 @@
  * Merges via shared persistedState so SettingsStore / registry patches survive.
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';
-import { writeLibraryMirror, hasFavoriteFolders } from './libraryMirror.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
 
+function hasFavoriteFolders(folders) {
+    return Array.isArray(folders) && folders.length > 0;
+}
 export const DEFAULT_RECENTS_CAP = 20;
 export const RECENTS_CAP_MIN = 0;
 export const RECENTS_CAP_MAX = 100;
@@ -713,17 +715,5 @@ export function savePlayerState(patch) {
         if (!KNOWN_PLAYER_PATCH_KEYS.has(key)) payload[key] = value;
     }
 
-    const written = patchPersistedState(payload);
-
-    if (patchFavorites || patchFolders || patchRootOrder) {
-        const after = loadPlayerState();
-        writeLibraryMirror({
-            favorites: after.favorites,
-            favoritesMeta: after.favoritesMeta,
-            favoriteFolders: after.favoriteFolders,
-            favoritesRootOrder: after.favoritesRootOrder
-        });
-    }
-
-    return written;
+    return patchPersistedState(payload);
 }

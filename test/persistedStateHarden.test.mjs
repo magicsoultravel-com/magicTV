@@ -27,9 +27,6 @@ let SettingsStore;
 let parsePersistedStateRaw;
 let patchPersistedState;
 let STATE_KEY;
-let LIBRARY_MIRROR_KEY;
-let migratePersistedState;
-let readLibraryMirror;
 
 before(async () => {
     ({
@@ -43,8 +40,6 @@ before(async () => {
         patchPersistedState,
         STATE_KEY
     } = await import('../js/storage/persistedState.js'));
-    ({ LIBRARY_MIRROR_KEY, readLibraryMirror } = await import('../js/storage/libraryMirror.js'));
-    ({ migratePersistedState } = await import('../js/storage/stateMigration.js'));
 });
 
 beforeEach(() => {
@@ -129,21 +124,6 @@ test('savePlayerState volume against corrupt blob does not wipe folders string',
     assert.equal(store.get(STATE_KEY), corrupt);
 });
 
-test('folder create writes library mirror', () => {
-    savePlayerState({
-        favorites: ['iptv-org:A.us'],
-        favoritesMeta: [{ key: 'iptv-org:A.us', name: 'A', logo: '', countrycode: 'US' }]
-    });
-    const folder = FavoritesRecents.createFavoriteFolder('Mirrored');
-    assert.ok(folder?.id);
-
-    const mirror = readLibraryMirror();
-    assert.ok(mirror);
-    assert.equal(mirror.favoriteFolders.length, 1);
-    assert.equal(mirror.favoriteFolders[0].name, 'Mirrored');
-    assert.ok(store.get(LIBRARY_MIRROR_KEY));
-});
-
 test('favorites-only save does not clobber stored folders', () => {
     savePlayerState({
         favorites: ['iptv-org:A.us'],
@@ -200,27 +180,6 @@ test('favorites-only save re-reads raw folders when load saw empty', () => {
     assert.equal(state.favoriteFolders.length, 1);
     assert.equal(state.favoriteFolders[0].id, 'f_raw');
     assert.equal(state.favoriteFolders[0].name, 'FromRaw');
-});
-
-test('mirror survives main-blob wipe and boot reconcile', () => {
-    savePlayerState({
-        favorites: ['iptv-org:A.us'],
-        favoritesMeta: [{ key: 'iptv-org:A.us', name: 'A', logo: '', countrycode: 'US' }],
-        favoriteFolders: [{ id: 'f_boot', name: 'Keep', items: [] }]
-    });
-    assert.ok(readLibraryMirror()?.favoriteFolders?.length === 1);
-
-    // Simulate clobber of main blob folders while mirror remains.
-    store.set(STATE_KEY, JSON.stringify({
-        stateSchemaVersion: 1,
-        favorites: ['iptv-org:A.us'],
-        favoriteFolders: [],
-        volume: 0.2
-    }));
-
-    const result = migratePersistedState();
-    assert.equal(result.libraryRestored, true);
-    assert.equal(loadPlayerState().favoriteFolders[0].id, 'f_boot');
 });
 
 test('explicit empty favoriteFolders patch still clears folders', () => {
