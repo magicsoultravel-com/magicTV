@@ -841,3 +841,84 @@ test('stopAll clears the busy flag once nothing is playing', async () => {
     }
 });
 
+test('stopAll kicks later slots without awaiting earlier transition completion', async () => {
+    const transitions = [];
+    const busy = [];
+    const { origTransition } = stubBatchDeps({ transitions, busy, slots: {} });
+    let releaseFirst;
+    const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+    let secondStopped = false;
+
+    MultiView.withChannelSwitchTransition = async (id, handler) => {
+        transitions.push({ id });
+        if (id === 'topLeft') {
+            await firstGate;
+            await handler();
+            return;
+        }
+        await handler();
+    };
+
+    const firstPlayer = makeSlotPlayer({
+        stopped: false,
+        playing: true,
+        stop: async () => { firstPlayer.playing = false; }
+    });
+    const secondPlayer = makeSlotPlayer({
+        stopped: false,
+        playing: true,
+        stop: async () => {
+            secondStopped = true;
+            secondPlayer.playing = false;
+        }
+    });
+    MultiView.slots = {
+        topLeft: { enabled: true, player: firstPlayer },
+        center: { enabled: true, player: secondPlayer }
+    };
+    const origBusy = captureBusyCalls(busy);
+    try {
+        const done = MultiView.stopAll();
+        // Past the 500ms kick stagger — second slot must stop even while first hangs.
+        await new Promise((r) => setTimeout(r, 650));
+        assert.equal(secondStopped, true);
+        assert.ok(transitions.some((t) => t.id === 'center'));
+        releaseFirst();
+        await done;
+        assert.equal(firstPlayer.playing, false);
+    } finally {
+        MultiView.withChannelSwitchTransition = origTransition;
+        origBusy();
+    }
+});
+
+test('stopAll skips transitions when document is hidden', async () => {
+    const transitions = [];
+    const busy = [];
+    const { origTransition } = stubBatchDeps({ transitions, busy, slots: {} });
+    document.visibilityState = 'hidden';
+    let stopped = false;
+    const playingPlayer = makeSlotPlayer({
+        stopped: false,
+        playing: true,
+        stop: async () => {
+            stopped = true;
+            playingPlayer.playing = false;
+        }
+    });
+    MultiView.slots = {
+        topLeft: { enabled: true, player: playingPlayer }
+    };
+    const origBusy = captureBusyCalls(busy);
+    try {
+        await MultiView.stopAll();
+        assert.deepEqual(transitions, []);
+        assert.equal(stopped, true);
+        assert.deepEqual(busy, [true, false]);
+    } finally {
+        document.visibilityState = 'visible';
+        MultiView.withChannelSwitchTransition = origTransition;
+        origBusy();
+    }
+});
+

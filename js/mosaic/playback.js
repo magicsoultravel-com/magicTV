@@ -216,30 +216,34 @@ export const playbackMethods = {
     },
 
     async stopAll() {
-        // Batch stop with the same per-tile switch animation as a single-tile
-        // stop (tileChrome 'stop' case): out→stop→in on slots showing content.
-        // Staggered starts cascade the wipe instead of racing 6 of them
-        // (concurrent grain/matrix wipes stomp each other's paint loops).
+        // Fire-stagger: kick each slot ~500ms apart without awaiting completion
+        // (same shape as playChannelsOnMosaic). Awaiting each transition used to
+        // stall the whole batch when alt-tab paused WAAPI/rAF mid-wipe.
         const targets = SLOT_IDS
             .map((id) => ({ id, slot: this.slots[id] }))
             .filter(({ slot }) => slot?.enabled && slot?.player?.channel);
+        const stepMs = computeMosaicLaunchDelay(1, 500);
+        const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
         TileFrames.setPlaybackBusy(true);
+        const jobs = [];
         try {
             for (let i = 0; i < targets.length; i++) {
+                if (i > 0) await waitMs(stepMs);
                 const { id, slot } = targets[i];
-                if (i > 0) await waitMs(computeMosaicLaunchDelay(1));
                 const player = slot?.player;
                 if (!player?.channel) continue;
-                const shouldAnimate = player.playing || player.loading || player.pausePhase !== 'idle';
-                if (shouldAnimate) {
-                    await this.withChannelSwitchTransition(
-                        id,
-                        () => player.stop().catch(() => {})
-                    );
-                } else {
-                    await player.stop().catch(() => {});
-                }
+                const shouldAnimate = !hidden
+                    && (player.playing || player.loading || player.pausePhase !== 'idle');
+                jobs.push(
+                    shouldAnimate
+                        ? this.withChannelSwitchTransition(
+                            id,
+                            () => player.stop().catch(() => {})
+                        )
+                        : player.stop().catch(() => {})
+                );
             }
+            await Promise.allSettled(jobs);
         } finally {
             if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
         }
@@ -249,10 +253,8 @@ export const playbackMethods = {
     },
 
     async playAll() {
-        // Batch start: fresh plays (no visible content) get the tile "in"
-        // animation (skipOut, like playOnSlot); plain resumes stay instant.
-        // Staggered starts keep up to MAX_MOSAIC_SLOTS manifests from slamming
-        // the connection pool at once (see playChannelsOnMosaic).
+        // Fire-stagger fresh plays / resumes: kick starts ~500ms apart, join at
+        // the end. Hidden tab skips transitions (no WAAPI hang on alt-tab).
         const targets = SLOT_IDS
             .map((id) => ({ id, slot: this.slots[id] }))
             .filter(({ slot }) => {
@@ -260,30 +262,40 @@ export const playbackMethods = {
                 if (!slot?.enabled || !player?.channel) return false;
                 return !(player.wantPlaying === true || player.playing === true);
             });
+        const stepMs = computeMosaicLaunchDelay(1, 500);
+        const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
         TileFrames.setPlaybackBusy(true);
+        const jobs = [];
         try {
             for (let i = 0; i < targets.length; i++) {
+                if (i > 0) await waitMs(stepMs);
                 const { id, slot } = targets[i];
-                if (i > 0) await waitMs(computeMosaicLaunchDelay(1));
                 const player = slot?.player;
                 if (!player?.channel) continue;
                 // The stagger leaves a window where a slot may have started
                 // playing on its own — never double-start it.
                 if (player.wantPlaying === true || player.playing === true) continue;
-                try {
-                    if (player.channel.url_resolved && !player.stopped) {
-                        await player.resume();
-                    } else {
+                jobs.push((async () => {
+                    try {
+                        if (player.channel.url_resolved && !player.stopped) {
+                            await player.resume();
+                            return;
+                        }
+                        if (hidden) {
+                            await player.playChannel(player.channel);
+                            return;
+                        }
                         await this.withChannelSwitchTransition(
                             id,
                             () => player.playChannel(player.channel),
                             { skipOut: true }
                         );
+                    } catch {
+                        /* ignore per-slot failures */
                     }
-                } catch {
-                    /* ignore per-slot failures */
-                }
+                })());
             }
+            await Promise.allSettled(jobs);
         } finally {
             if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
         }
