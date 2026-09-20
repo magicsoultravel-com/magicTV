@@ -429,6 +429,180 @@
                         <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
                         <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
                     </div>
+<div id="player-tile-topCenter" class="tv-player-tile is-hidden" data-slot="topCenter" role="button" tabindex="0" aria-label="Top center screen" aria-hidden="true">
+                        <div id="tv-playback-surface-topCenter" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__chan-num" aria-hidden="true"></span><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
+                        <span class="tv-player-tile__tv-id is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__echo" aria-hidden="true">
+                            <span class="tv-player-tile__quality-echo">Quality: —</span>
+                        </div>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--loading" viewBox="0 0 48 48" focusable="false">
+                                <circle cx="24" cy="24" r="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="72 40"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--disconnect" viewBox="0 0 48 48" focusable="false" aria-hidden="true">
+                                <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
+                        </div>
+                        <div class="tv-player-tile__hover">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="swap" title="Swap with main" aria-label="Swap with main">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M1.5 4h7M6.2 2.2 9.5 4 6.2 5.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 8h-7M5.8 6.2 2.5 8 5.8 9.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+<div id="player-tile-midLeft" class="tv-player-tile is-hidden" data-slot="midLeft" role="button" tabindex="0" aria-label="Middle left screen" aria-hidden="true">
+                        <div id="tv-playback-surface-midLeft" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__chan-num" aria-hidden="true"></span><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
+                        <span class="tv-player-tile__tv-id is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__echo" aria-hidden="true">
+                            <span class="tv-player-tile__quality-echo">Quality: —</span>
+                        </div>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--loading" viewBox="0 0 48 48" focusable="false">
+                                <circle cx="24" cy="24" r="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="72 40"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--disconnect" viewBox="0 0 48 48" focusable="false" aria-hidden="true">
+                                <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
+                        </div>
+                        <div class="tv-player-tile__hover">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="swap" title="Swap with main" aria-label="Swap with main">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M1.5 4h7M6.2 2.2 9.5 4 6.2 5.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 8h-7M5.8 6.2 2.5 8 5.8 9.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
+<div id="player-tile-midRight" class="tv-player-tile is-hidden" data-slot="midRight" role="button" tabindex="0" aria-label="Middle right screen" aria-hidden="true">
+                        <div id="tv-playback-surface-midRight" class="tv-playback-surface"></div>
+                        <img class="tv-player-tile__poster is-hidden" alt="" decoding="async">
+                        <span class="tv-player-tile__name is-hidden" aria-hidden="true"><span class="tv-player-tile__chan-num" aria-hidden="true"></span><span class="tv-player-tile__name-text"></span><span class="tv-player-tile__flag" aria-hidden="true"></span></span>
+                        <span class="tv-player-tile__tv-id is-hidden" aria-hidden="true"></span>
+                        <div class="tv-player-tile__echo" aria-hidden="true">
+                            <span class="tv-player-tile__quality-echo">Quality: —</span>
+                        </div>
+                        <div class="tv-player-tile__corner">
+                            <button type="button" class="tv-player-tile__dismiss" data-tile-action="dismiss" title="Dismiss screen" aria-label="Dismiss screen">
+                                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+                        <div class="tv-player-tile__empty">
+                            <span class="tv-player-tile__empty-label">Pick a channel</span>
+                        </div>
+                        <div class="tv-player-tile__playback-state" aria-hidden="true">
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--pause" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <rect x="28" y="10" width="8" height="28" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--stop" viewBox="0 0 48 48" focusable="false">
+                                <rect x="12" y="12" width="24" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--loading" viewBox="0 0 48 48" focusable="false">
+                                <circle cx="24" cy="24" r="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="72 40"/>
+                            </svg>
+                            <svg class="tv-player-tile__state-icon tv-player-tile__state-icon--disconnect" viewBox="0 0 48 48" focusable="false" aria-hidden="true">
+                                <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <line x1="14" y1="34" x2="34" y2="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <div class="tv-player-tile__retry-countdown" aria-live="polite" hidden></div>
+                        </div>
+                        <div class="tv-player-tile__hover">
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3" data-tile-action="browse" title="Pick channel" aria-label="Pick channel" aria-pressed="false">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="play" title="Play" aria-label="Play">▶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop" title="Stop" aria-label="Stop">⏹</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="pip" title="Pop out" aria-label="Pop out">⬆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__action-btn" data-tile-action="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__fav-btn" data-tile-action="fav" title="Favorite" aria-label="Toggle favorite">☆</button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__volume-btn is-muted" data-tile-action="mute" title="Unmute" aria-label="Unmute" aria-pressed="true">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            </button>
+                            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="swap" title="Swap with main" aria-label="Swap with main">
+                                <svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M1.5 4h7M6.2 2.2 9.5 4 6.2 5.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 8h-7M5.8 6.2 2.5 8 5.8 9.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        </div>
+                        <span class="tv-player-tile__resize" data-resize="n" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="s" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="e" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize" data-resize="w" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="nw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="ne" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="sw" aria-hidden="true"></span>
+                        <span class="tv-player-tile__resize tv-player-tile__resize--corner" data-resize="se" aria-hidden="true"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -629,6 +803,24 @@
                                 <span class="tv-controls__screen-name" hidden></span>
                                 <span class="tv-controls__screen-remove" aria-label="Remove TV 6" title="Remove TV 6">×</span>
                             </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="topCenter" aria-label="TV 7 top center" title="TV 7 top center" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">7</span>
+                                <span class="tv-controls__screen-name" hidden></span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 7" title="Remove TV 7">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="midLeft" aria-label="TV 8 middle left" title="TV 8 middle left" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">8</span>
+                                <span class="tv-controls__screen-name" hidden></span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 8" title="Remove TV 8">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="midRight" aria-label="TV 9 middle right" title="TV 9 middle right" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">9</span>
+                                <span class="tv-controls__screen-name" hidden></span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 9" title="Remove TV 9">×</span>
+                            </button>
                             <button type="button" class="tv-controls__add-screen-btn" aria-label="Add screen" title="Add screen">+</button>
                         </div>
                     </div>
@@ -695,7 +887,13 @@
                                                     <input type="number" id="recents-cap-input" min="0" max="100" step="1" value="20" aria-label="Recent channels limit (0 to 100)">
                                                 </div>
                                             </div>
-                                            <div class="settings-section__item">
+                                                                                        <div class="settings-section__item">
+                                                <label class="settings-section__label" for="max-tvs-input">Max TVs (1–9)</label>
+                                                <div class="settings-section__control">
+                                                    <input type="number" id="max-tvs-input" min="1" max="9" step="1" value="6" aria-label="Maximum mosaic TVs (1 to 9)">
+                                                </div>
+                                            </div>
+<div class="settings-section__item">
                                                 <label class="settings-section__label" for="reattempt-interval-input">Reattempt interval (1–120s)</label>
                                                 <div class="settings-section__control">
                                                     <input type="number" id="reattempt-interval-input" min="1" max="120" step="1" value="10" aria-label="Auto-reconnect interval in seconds (1 to 120)">
@@ -1083,6 +1281,24 @@
                                 <span class="tv-controls__screen-label" aria-hidden="true">6</span>
                                 <span class="tv-controls__screen-name" hidden></span>
                                 <span class="tv-controls__screen-remove" aria-label="Remove TV 6" title="Remove TV 6">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="topCenter" aria-label="TV 7 top center" title="TV 7 top center" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">7</span>
+                                <span class="tv-controls__screen-name" hidden></span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 7" title="Remove TV 7">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="midLeft" aria-label="TV 8 middle left" title="TV 8 middle left" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">8</span>
+                                <span class="tv-controls__screen-name" hidden></span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 8" title="Remove TV 8">×</span>
+                            </button>
+                            <button type="button" class="tv-controls__screen-btn" data-screen-slot="midRight" aria-label="TV 9 middle right" title="TV 9 middle right" hidden>
+                                <span class="tv-controls__screen-frame" aria-hidden="true"></span>
+                                <span class="tv-controls__screen-label" aria-hidden="true">9</span>
+                                <span class="tv-controls__screen-name" hidden></span>
+                                <span class="tv-controls__screen-remove" aria-label="Remove TV 9" title="Remove TV 9">×</span>
                             </button>
                             <button type="button" class="tv-controls__add-screen-btn" id="add-screen-btn" aria-label="Add screen" title="Add screen">+</button>
                         </div>

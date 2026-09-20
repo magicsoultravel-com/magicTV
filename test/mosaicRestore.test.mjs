@@ -77,7 +77,10 @@ beforeEach(async () => {
         topRight: { id: 'topRight', enabled: false, player: null },
         bottomLeft: { id: 'bottomLeft', enabled: false, player: null },
         bottomRight: { id: 'bottomRight', enabled: false, player: null },
-        bottomCenter: { id: 'bottomCenter', enabled: false, player: null }
+        bottomCenter: { id: 'bottomCenter', enabled: false, player: null },
+        topCenter: { id: 'topCenter', enabled: false, player: null },
+        midLeft: { id: 'midLeft', enabled: false, player: null },
+        midRight: { id: 'midRight', enabled: false, player: null }
     };
     savePlayerState = (await import('../js/storage/playerState.js')).savePlayerState;
     ChanBindPicker = (await import('../js/ui/chanBindPicker.js')).ChanBindPicker;
@@ -188,7 +191,10 @@ test('restoreSlots restores saved slots as STOPPED (no stream attach)', async ()
             topRight: { id: 'topRight', enabled: false, player: null },
             bottomLeft: { id: 'bottomLeft', enabled: false, player: null },
             bottomRight: { id: 'bottomRight', enabled: false, player: null },
-            bottomCenter: { id: 'bottomCenter', enabled: false, player: null }
+            bottomCenter: { id: 'bottomCenter', enabled: false, player: null },
+            topCenter: { id: 'topCenter', enabled: false, player: null },
+            midLeft: { id: 'midLeft', enabled: false, player: null },
+            midRight: { id: 'midRight', enabled: false, player: null }
         },
         slotsHydrated: false,
         rememberedSlotKeys: {},

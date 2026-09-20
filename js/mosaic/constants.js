@@ -4,11 +4,45 @@
 
 import { TILE_SWAP_DURATIONS } from '../ui/viewTransitions.js';
 
-export const CORNER_IDS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
-export const SLOT_IDS = ['topLeft', 'center', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
-/** Fill order for batch play: primary first, then corners. */
-export const MAX_MOSAIC_SLOTS = 6;
-export const PLAY_FILL_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
+/** Absolute hard cap for mosaic screens (settings may lower this). */
+export const HARD_MAX_MOSAIC_SLOTS = 9;
+/** Default user-facing max until they change Settings → Max TVs. */
+export const DEFAULT_MAX_MOSAIC_SLOTS = 6;
+
+export const CORNER_IDS = [
+    'topLeft',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'bottomCenter',
+    'topCenter',
+    'midLeft',
+    'midRight'
+];
+export const SLOT_IDS = [
+    'topLeft',
+    'center',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'bottomCenter',
+    'topCenter',
+    'midLeft',
+    'midRight'
+];
+/** Fill order for batch play: primary first, then satellites. */
+export const MAX_MOSAIC_SLOTS = HARD_MAX_MOSAIC_SLOTS;
+export const PLAY_FILL_ORDER = [
+    'center',
+    'topLeft',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'bottomCenter',
+    'topCenter',
+    'midLeft',
+    'midRight'
+];
 
 /** 1-based TV labels matching remote/guide screen numbering. */
 export const SLOT_SCREEN_LABELS = Object.freeze({
@@ -17,8 +51,22 @@ export const SLOT_SCREEN_LABELS = Object.freeze({
     topRight: '3',
     bottomLeft: '4',
     bottomRight: '5',
-    bottomCenter: '6'
+    bottomCenter: '6',
+    topCenter: '7',
+    midLeft: '8',
+    midRight: '9'
 });
+
+/**
+ * Outline / accent index 1–3 cycling by screen label (TV1→1, TV2→2, TV3→3, TV4→1, …).
+ * @param {string} slotId
+ * @returns {1|2|3}
+ */
+export function slotOutlineAccent(slotId) {
+    const label = Number(SLOT_SCREEN_LABELS[slotId] || '1');
+    const n = Number.isFinite(label) && label > 0 ? label : 1;
+    return /** @type {1|2|3} */ (((n - 1) % 3) + 1);
+}
 
 export const DRAG_THRESHOLD_PX = 6;
 export const RESIZE_MIN_W = 72;

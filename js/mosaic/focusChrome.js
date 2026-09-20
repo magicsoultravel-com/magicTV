@@ -3,10 +3,19 @@
  * Methods mix into MultiView (this === MultiView).
  */
 import { el } from '../tvUtils.js';
-import { CORNER_IDS, SLOT_IDS } from './constants.js';
+import { CORNER_IDS, SLOT_IDS, PLAY_FILL_ORDER, DRAG_THRESHOLD_PX } from './constants.js';
 import { syncScreenBtnActions } from '../ui/screenStripControls.js';
 
-const SCREEN_ADD_ORDER = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
+const SCREEN_ADD_ORDER = [
+    'topLeft',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'bottomCenter',
+    'topCenter',
+    'midLeft',
+    'midRight'
+];
 
 /** Cached chrome modules so focus switches do not re-await dynamic imports. */
 let _statusChromeMods = null;
@@ -15,9 +24,48 @@ let _statusChromePromise = null;
 let _remoteModuleRef = null;
 let _remoteModulePromise = null;
 
+/** @type {null | {
+ *   pointerId: number,
+ *   sourceSlot: string,
+ *   sourceBtn: HTMLElement,
+ *   ghost: HTMLElement,
+ *   startX: number,
+ *   startY: number,
+ *   offsetX: number,
+ *   offsetY: number,
+ *   dragging: boolean,
+ *   targetSlot: string | null
+ * }} */
+let _stripDrag = null;
+
 function getScreenControlStrips() {
     if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return [];
     return Array.from(document.querySelectorAll('.tv-controls__screens'));
+}
+
+function clearStripDragTargetHighlights() {
+    if (typeof document === 'undefined') return;
+    document.querySelectorAll('.tv-controls__screen-btn.is-strip-drop-target')
+        .forEach((btn) => btn.classList.remove('is-strip-drop-target'));
+}
+
+function endStripDrag({ commit = false } = {}) {
+    const session = _stripDrag;
+    _stripDrag = null;
+    if (!session) return;
+    const { sourceBtn, ghost, sourceSlot, targetSlot, dragging } = session;
+    sourceBtn?.classList.remove('is-strip-dragging');
+    clearStripDragTargetHighlights();
+    ghost?.remove?.();
+    try {
+        sourceBtn?.releasePointerCapture?.(session.pointerId);
+    } catch { /* ignore */ }
+
+    if (commit && dragging && targetSlot && targetSlot !== sourceSlot) {
+        // MultiView method mixed onto `this` by the caller via bind.
+        return { sourceSlot, targetSlot };
+    }
+    return null;
 }
 
 export const focusChromeMethods = {
@@ -91,10 +139,12 @@ export const focusChromeMethods = {
     },
 
     /**
-     * Add the next screen in the fixed order, or remove the last added one
-     * when all corners are already enabled.
+     * Add the next screen in the fixed order (honors Max TVs setting).
      */
     addNextScreen() {
+        const max = this.getMaxMosaicSlots?.() ?? PLAY_FILL_ORDER.length;
+        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+        if (enabledCount >= max) return;
         const next = SCREEN_ADD_ORDER.find((id) => !this.slots[id].enabled);
         if (!next) return;
         this.setSideEnabled(next, true);
@@ -119,7 +169,8 @@ export const focusChromeMethods = {
         const strips = getScreenControlStrips();
         if (!strips.length) return;
         const expanded = this.screensStripExpanded === true;
-        const enabledCount = 1 + SCREEN_ADD_ORDER.filter((id) => this.slots[id]?.enabled).length;
+        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+        const max = this.getMaxMosaicSlots?.() ?? PLAY_FILL_ORDER.length;
         strips.forEach((strip) => {
             const section = strip.closest('.remote-panel__footer-screens');
             if (section) {
@@ -151,7 +202,8 @@ export const focusChromeMethods = {
                 }
             });
             if (addBtn) {
-                const atMax = SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
+                const atMax = enabledCount >= max
+                    || SCREEN_ADD_ORDER.every((id) => this.slots[id].enabled);
                 addBtn.hidden = atMax;
                 addBtn.classList.toggle('is-limit', atMax);
                 addBtn.title = 'Add screen';
@@ -269,12 +321,122 @@ export const focusChromeMethods = {
         _remoteModulePromise.then(apply).catch(() => {});
     },
 
+    /**
+     * Begin / update / finish screen-strip drag-to-swap.
+     * @param {PointerEvent} e
+     */
+    onScreenStripPointerDown(e) {
+        if (e.button != null && e.button !== 0) return;
+        const btn = e.target.closest?.('.tv-controls__screen-btn');
+        if (!btn || btn.hidden || !btn.closest('.tv-controls__screens')) return;
+        if (e.target.closest?.('.tv-controls__screen-remove, [data-screen-action]')) return;
+        const slotId = btn.dataset.screenSlot;
+        if (!slotId || !SLOT_IDS.includes(slotId)) return;
+        if (slotId !== 'center' && !this.slots[slotId]?.enabled) return;
+
+        const rect = btn.getBoundingClientRect();
+        _stripDrag = {
+            pointerId: e.pointerId,
+            sourceSlot: slotId,
+            sourceBtn: btn,
+            ghost: null,
+            startX: e.clientX,
+            startY: e.clientY,
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
+            dragging: false,
+            targetSlot: null
+        };
+        try {
+            btn.setPointerCapture(e.pointerId);
+        } catch { /* ignore */ }
+    },
+
+    onScreenStripPointerMove(e) {
+        const session = _stripDrag;
+        if (!session || e.pointerId !== session.pointerId) return;
+        const dx = e.clientX - session.startX;
+        const dy = e.clientY - session.startY;
+        if (!session.dragging) {
+            if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+            session.dragging = true;
+            session.sourceBtn.classList.add('is-strip-dragging');
+            const ghost = session.sourceBtn.cloneNode(true);
+            ghost.classList.add('tv-controls__screen-btn--ghost');
+            ghost.removeAttribute('data-screen-slot');
+            ghost.setAttribute('aria-hidden', 'true');
+            ghost.style.width = `${session.sourceBtn.offsetWidth}px`;
+            ghost.style.height = `${session.sourceBtn.offsetHeight}px`;
+            document.body.appendChild(ghost);
+            session.ghost = ghost;
+            this.clearScreenStripHover();
+        }
+        if (session.ghost) {
+            session.ghost.style.transform =
+                `translate(${e.clientX - session.offsetX}px, ${e.clientY - session.offsetY}px)`;
+        }
+
+        clearStripDragTargetHighlights();
+        session.targetSlot = null;
+        const elUnder = document.elementFromPoint(e.clientX, e.clientY);
+        const targetBtn = elUnder?.closest?.('.tv-controls__screen-btn');
+        if (targetBtn && !targetBtn.hidden && targetBtn !== session.sourceBtn
+            && targetBtn.closest('.tv-controls__screens')) {
+            const targetSlot = targetBtn.dataset.screenSlot;
+            if (targetSlot && SLOT_IDS.includes(targetSlot)
+                && (targetSlot === 'center' || this.slots[targetSlot]?.enabled)
+                && targetSlot !== session.sourceSlot) {
+                targetBtn.classList.add('is-strip-drop-target');
+                session.targetSlot = targetSlot;
+                this.setScreenStripHover(targetSlot);
+            }
+        }
+    },
+
+    async onScreenStripPointerUp(e) {
+        const session = _stripDrag;
+        if (!session || e.pointerId !== session.pointerId) return;
+        const wasDragging = session.dragging;
+        const sourceSlot = session.sourceSlot;
+        const swap = endStripDrag({ commit: true });
+        this.clearScreenStripHover();
+        if (swap) {
+            await this.swapSlotChannels?.(swap.sourceSlot, swap.targetSlot);
+            return;
+        }
+        if (!wasDragging && sourceSlot) {
+            this.focusScreen(sourceSlot);
+        }
+    },
+
+    onScreenStripPointerCancel(e) {
+        const session = _stripDrag;
+        if (!session || (e.pointerId != null && e.pointerId !== session.pointerId)) return;
+        endStripDrag({ commit: false });
+        this.clearScreenStripHover();
+    },
+
     bindScreenControls() {
         if (typeof document === 'undefined') return;
         if (document.body?.dataset?.screenControlsBound === '1') return;
         document.body.dataset.screenControlsBound = '1';
 
         document.body.addEventListener('click', (e) => {
+            // Strip focus is handled on pointerup when the gesture was a click (not a drag).
+            if (e.target.closest?.('.tv-controls__screen-btn')
+                && !e.target.closest?.('.tv-controls__screen-remove, [data-screen-action], .tv-controls__add-screen-btn, .tv-controls__screens-expand')) {
+                // Prevent duplicate focus from click after pointerup already focused.
+                if (e.target.closest?.('.tv-controls__screens')) {
+                    const removeOrAction = e.target.closest?.('.tv-controls__screen-remove, [data-screen-action]');
+                    if (!removeOrAction) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        // focus already done on pointerup for non-drag
+                        return;
+                    }
+                }
+            }
+
             const expandBtn = e.target.closest?.('.tv-controls__screens-expand');
             if (expandBtn) {
                 e.stopPropagation();
@@ -315,18 +477,26 @@ export const focusChromeMethods = {
                             .catch(() => {});
                     }).catch(() => {});
                 }
-                return;
-            }
-            const screenBtn = e.target.closest('.tv-controls__screen-btn');
-            if (screenBtn && strip.contains(screenBtn)) {
-                e.stopPropagation();
-                e.preventDefault();
-                const slotId = screenBtn.dataset.screenSlot;
-                if (slotId) this.focusScreen(slotId);
             }
         });
 
+        document.body.addEventListener('pointerdown', (e) => {
+            if (!e.target.closest?.('.tv-controls__screens')) return;
+            this.onScreenStripPointerDown(e);
+        });
+        document.body.addEventListener('pointermove', (e) => this.onScreenStripPointerMove(e));
+        document.body.addEventListener('pointerup', (e) => {
+            this.onScreenStripPointerUp(e).catch(() => {});
+        });
+        document.body.addEventListener('pointercancel', (e) => this.onScreenStripPointerCancel(e));
+        document.body.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || !_stripDrag) return;
+            endStripDrag({ commit: false });
+            this.clearScreenStripHover();
+        });
+
         document.body.addEventListener('mouseover', (e) => {
+            if (_stripDrag?.dragging) return;
             const btn = e.target.closest?.('.tv-controls__screen-btn');
             if (!btn || btn.hidden || !btn.closest('.tv-controls__screens')) return;
             if (btn.contains(e.relatedTarget)) return;
@@ -335,6 +505,7 @@ export const focusChromeMethods = {
         });
 
         document.body.addEventListener('mouseout', (e) => {
+            if (_stripDrag?.dragging) return;
             const btn = e.target.closest?.('.tv-controls__screen-btn');
             if (!btn || btn.hidden) return;
             if (btn.contains(e.relatedTarget)) return;

@@ -1,12 +1,17 @@
 /**
  * Pure CSS grid template for the mosaic shell (no DOM).
+ * Butterfly / asymmetric templates cover the classic ≤6 slots only.
+ * Extra slots (7–9) force the free-layout single-cell shell.
  * @param {{
  *   freeLayout?: boolean,
  *   topLeft?: boolean,
  *   topRight?: boolean,
  *   bottomLeft?: boolean,
  *   bottomRight?: boolean,
- *   bottomCenter?: boolean
+ *   bottomCenter?: boolean,
+ *   topCenter?: boolean,
+ *   midLeft?: boolean,
+ *   midRight?: boolean
  * }} flags
  * @returns {{ areas: string, columns: string, rows: string, hasLeft: boolean, hasRight: boolean, hasTop: boolean, hasBottom: boolean, hasAnyCorner: boolean }}
  */
@@ -16,25 +21,32 @@ export function resolveMosaicGridTemplate({
     topRight = false,
     bottomLeft = false,
     bottomRight = false,
-    bottomCenter = false
+    bottomCenter = false,
+    topCenter = false,
+    midLeft = false,
+    midRight = false
 } = {}) {
     const hasTopLeft = topLeft === true;
     const hasTopRight = topRight === true;
     const hasBottomLeft = bottomLeft === true;
     const hasBottomRight = bottomRight === true;
     const hasBottomCenter = bottomCenter === true;
-    const hasLeft = hasTopLeft || hasBottomLeft;
-    const hasRight = hasTopRight || hasBottomRight;
-    const hasTop = hasTopLeft || hasTopRight;
+    const hasTopCenter = topCenter === true;
+    const hasMidLeft = midLeft === true;
+    const hasMidRight = midRight === true;
+    const hasExtraSlots = hasTopCenter || hasMidLeft || hasMidRight;
+    const hasLeft = hasTopLeft || hasBottomLeft || hasMidLeft;
+    const hasRight = hasTopRight || hasBottomRight || hasMidRight;
+    const hasTop = hasTopLeft || hasTopRight || hasTopCenter;
     const hasBottom = hasBottomLeft || hasBottomRight || hasBottomCenter;
-    const hasAnyCorner = hasLeft || hasRight || hasBottomCenter;
+    const hasAnyCorner = hasLeft || hasRight || hasBottomCenter || hasExtraSlots;
 
     let areas = '"center"';
     let columns = '1fr';
     let rows = '1fr';
 
-    // Free-layout: single-cell grid shell; tiles overlay via absolute placement.
-    if (freeLayout || !hasAnyCorner) {
+    // Free-layout or 7–9 TVs: single-cell grid shell; tiles overlay via absolute placement.
+    if (freeLayout || !hasAnyCorner || hasExtraSlots) {
         return {
             areas,
             columns,

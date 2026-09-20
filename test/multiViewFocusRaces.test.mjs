@@ -102,7 +102,19 @@ beforeEach(() => {
     MultiView.statusSlotId = 'center';
     MultiView.swapBusy = false;
     MultiView._channelSwitchBusy = new Set();
-    for (const id of ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter']) {
+    for (const id of [
+        'topLeft',
+        'topRight',
+        'bottomLeft',
+        'bottomRight',
+        'bottomCenter',
+        'topCenter',
+        'midLeft',
+        'midRight'
+    ]) {
+        if (!MultiView.slots[id]) {
+            MultiView.slots[id] = { id, enabled: false, player: null };
+        }
         MultiView.slots[id].enabled = false;
         MultiView.slots[id].player = null;
     }

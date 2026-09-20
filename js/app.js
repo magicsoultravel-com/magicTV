@@ -149,7 +149,7 @@ async function playSharedDeepLink() {
         MultiView.rememberedSlotKeys?.[id]
     ));
     const target = chooseSharedPlayTarget(occupied, {
-        max: MAX_MOSAIC_SLOTS,
+        max: MultiView.getMaxMosaicSlots?.() ?? MAX_MOSAIC_SLOTS,
         fallback: MultiView.statusSlotId || 'center'
     });
     TileFrames.setPlaybackBusy(true);

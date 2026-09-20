@@ -4,6 +4,7 @@ import { TvPlayer } from '../tvPlayer.js';
 import { MultiView } from '../multiView.js';
 import { ChannelGrid } from './channelGrid.js';
 import { CHAN_BIND_SVG } from './tileHoverControls.js';
+import { SLOT_SCREEN_LABELS } from '../mosaic/constants.js';
 
 const BIND_ICON = CHAN_BIND_SVG;
 
@@ -52,8 +53,7 @@ function syncBindButton(btn, slotId) {
 }
 
 function slotLabel(slotId) {
-    const labels = { center: '1', topLeft: '2', topRight: '3', bottomLeft: '4', bottomRight: '5', bottomCenter: '6' };
-    return labels[slotId] || '1';
+    return SLOT_SCREEN_LABELS[slotId] || '1';
 }
 
 function renderMenu(menuEl, slotId) {

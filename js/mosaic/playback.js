@@ -555,7 +555,7 @@ export const playbackMethods = {
     async playChannelsOnMosaic(channels) {
         const list = (Array.isArray(channels) ? channels : [])
             .filter(Boolean)
-            .slice(0, Math.min(MAX_MOSAIC_SLOTS, PLAY_FILL_ORDER.length));
+            .slice(0, Math.min(this.getMaxMosaicSlots?.() ?? MAX_MOSAIC_SLOTS, PLAY_FILL_ORDER.length));
         if (!list.length) return;
 
         this.init();

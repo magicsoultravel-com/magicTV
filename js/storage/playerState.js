@@ -275,7 +275,17 @@ export function normalizeWatchStatsMeta(raw) {
         .filter((e) => e && e.seconds > 0 && !seen.has(e.key) && (seen.add(e.key), true));
 }
 
-const MOSAIC_SLOT_IDS = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
+const MOSAIC_SLOT_IDS = [
+    'center',
+    'topLeft',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'bottomCenter',
+    'topCenter',
+    'midLeft',
+    'midRight'
+];
 
 function normalizeMosaicSlots(raw) {
     if (!raw || typeof raw !== 'object') return {};

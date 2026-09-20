@@ -92,6 +92,13 @@
     --strip-tile-h: 3.4rem;
 }
 
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="7"],
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="8"],
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="9"] {
+    --strip-tile-w: 5.25rem;
+    --strip-tile-h: 3rem;
+}
+
 .remote-module__host > .tv-module__actions--remote-end,
 .remote-dock-sheet__inner > .tv-module__actions--remote-end,
 .remote-module__host > .tv-module__actions--browser-end,

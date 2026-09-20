@@ -28,6 +28,10 @@ import {
     loadPlayerState,
     savePlayerState
 } from './playerState.js';
+import {
+    HARD_MAX_MOSAIC_SLOTS,
+    DEFAULT_MAX_MOSAIC_SLOTS
+} from '../mosaic/constants.js';
 
 export {
     VIEW_TRANSITIONS,
@@ -513,6 +517,60 @@ export const SettingsStore = {
     setScreenBottomCenter(enabled) {
         const next = Boolean(enabled);
         patchPersistedState({ screenBottomCenter: next });
+        return next;
+    },
+
+    getScreenTopCenter() {
+        return readScreenFlag('screenTopCenter', null);
+    },
+
+    setScreenTopCenter(enabled) {
+        const next = Boolean(enabled);
+        patchPersistedState({ screenTopCenter: next });
+        return next;
+    },
+
+    getScreenMidLeft() {
+        return readScreenFlag('screenMidLeft', null);
+    },
+
+    setScreenMidLeft(enabled) {
+        const next = Boolean(enabled);
+        patchPersistedState({ screenMidLeft: next });
+        return next;
+    },
+
+    getScreenMidRight() {
+        return readScreenFlag('screenMidRight', null);
+    },
+
+    setScreenMidRight(enabled) {
+        const next = Boolean(enabled);
+        patchPersistedState({ screenMidRight: next });
+        return next;
+    },
+
+    /**
+     * User-facing mosaic screen cap (1..HARD_MAX). Defaults to 6 until changed.
+     * @returns {number}
+     */
+    getMaxMosaicSlots() {
+        const raw = Number(readPersistedState().maxMosaicSlots);
+        if (!Number.isFinite(raw)) return DEFAULT_MAX_MOSAIC_SLOTS;
+        return Math.min(HARD_MAX_MOSAIC_SLOTS, Math.max(1, Math.round(raw)));
+    },
+
+    /**
+     * Persist Max TVs setting.
+     * @param {number} value
+     * @returns {number}
+     */
+    setMaxMosaicSlots(value) {
+        const next = Math.min(
+            HARD_MAX_MOSAIC_SLOTS,
+            Math.max(1, Math.round(Number(value) || DEFAULT_MAX_MOSAIC_SLOTS))
+        );
+        patchPersistedState({ maxMosaicSlots: next });
         return next;
     },
 

@@ -14,7 +14,17 @@ import { applyMarquee, marqueeInnerHtml, setMarqueeText } from './marquee.js';
 const GUIDE_REFRESH_ICON = ACTION_ICONS.refresh;
 const GUIDE_UNAVAILABLE_ICON = ACTION_ICONS.guideUnavailable;
 
-const GUIDE_SLOT_ORDER = ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'bottomCenter'];
+const GUIDE_SLOT_ORDER = [
+    'center',
+    'topLeft',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'bottomCenter',
+    'topCenter',
+    'midLeft',
+    'midRight'
+];
 
 let refreshTimer = null;
 let lastSnapshot = '';

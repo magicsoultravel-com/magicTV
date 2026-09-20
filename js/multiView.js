@@ -22,8 +22,10 @@ import {
     CORNER_IDS,
     SLOT_IDS,
     MAX_MOSAIC_SLOTS,
+    PLAY_FILL_ORDER,
     clearTilePlacementStyle,
-    SLOT_SCREEN_LABELS
+    SLOT_SCREEN_LABELS,
+    slotOutlineAccent
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
 import { swapMethods } from './mosaic/swap.js';
@@ -45,7 +47,10 @@ const SCREEN_GETTERS = {
     topRight: () => SettingsStore.getScreenTopRight(),
     bottomLeft: () => SettingsStore.getScreenBottomLeft(),
     bottomRight: () => SettingsStore.getScreenBottomRight(),
-    bottomCenter: () => SettingsStore.getScreenBottomCenter()
+    bottomCenter: () => SettingsStore.getScreenBottomCenter(),
+    topCenter: () => SettingsStore.getScreenTopCenter(),
+    midLeft: () => SettingsStore.getScreenMidLeft(),
+    midRight: () => SettingsStore.getScreenMidRight()
 };
 
 const SCREEN_SETTERS = {
@@ -53,7 +58,10 @@ const SCREEN_SETTERS = {
     topRight: (v) => SettingsStore.setScreenTopRight(v),
     bottomLeft: (v) => SettingsStore.setScreenBottomLeft(v),
     bottomRight: (v) => SettingsStore.setScreenBottomRight(v),
-    bottomCenter: (v) => SettingsStore.setScreenBottomCenter(v)
+    bottomCenter: (v) => SettingsStore.setScreenBottomCenter(v),
+    topCenter: (v) => SettingsStore.setScreenTopCenter(v),
+    midLeft: (v) => SettingsStore.setScreenMidLeft(v),
+    midRight: (v) => SettingsStore.setScreenMidRight(v)
 };
 
 function savedVolume() {
@@ -79,7 +87,10 @@ export const MultiView = {
         topRight: { id: 'topRight', enabled: false, player: null },
         bottomLeft: { id: 'bottomLeft', enabled: false, player: null },
         bottomRight: { id: 'bottomRight', enabled: false, player: null },
-        bottomCenter: { id: 'bottomCenter', enabled: false, player: null }
+        bottomCenter: { id: 'bottomCenter', enabled: false, player: null },
+        topCenter: { id: 'topCenter', enabled: false, player: null },
+        midLeft: { id: 'midLeft', enabled: false, player: null },
+        midRight: { id: 'midRight', enabled: false, player: null }
     },
     pipWatchers: new WeakSet(),
 
@@ -146,6 +157,7 @@ export const MultiView = {
         CORNER_IDS.forEach((id) => {
             this.setSideEnabled(id, SCREEN_GETTERS[id](), { silent: true });
         });
+        this.enforceMaxMosaicSlots({ silent: true });
 
         const saved = loadPlayerState().mosaicPlacement || {};
         this.mosaicPlacement = this.sanitizePlacementMap(saved);
@@ -352,6 +364,50 @@ export const MultiView = {
         this.syncMosaicChrome();
     },
 
+    /**
+     * User Max TVs setting (clamped). Hard ceiling is MAX_MOSAIC_SLOTS.
+     * @returns {number}
+     */
+    getMaxMosaicSlots() {
+        return SettingsStore.getMaxMosaicSlots();
+    },
+
+    /**
+     * Persist Max TVs and disable excess satellite screens when lowered.
+     * @param {number} value
+     * @param {{ silent?: boolean }} [opts]
+     * @returns {number}
+     */
+    setMaxMosaicSlots(value, { silent = false } = {}) {
+        const next = SettingsStore.setMaxMosaicSlots(value);
+        this.enforceMaxMosaicSlots({ silent });
+        if (!silent) {
+            this.syncSettingsToggles();
+            this.syncScreenControls?.();
+            import('./ui/remotePanel.js')
+                .then(({ syncLayoutPicker }) => syncLayoutPicker?.())
+                .catch(() => {});
+        }
+        return next;
+    },
+
+    /**
+     * Disable satellite screens beyond the current max (center always kept).
+     * @param {{ silent?: boolean }} [opts]
+     */
+    enforceMaxMosaicSlots({ silent = false } = {}) {
+        const max = this.getMaxMosaicSlots();
+        let enabled = 1; // center
+        for (const id of PLAY_FILL_ORDER) {
+            if (id === 'center') continue;
+            if (!this.slots[id]?.enabled) continue;
+            enabled += 1;
+            if (enabled > max) {
+                this.setSideEnabled(id, false, { silent });
+            }
+        }
+    },
+
     syncLayout() {
         const mosaic = el('player-mosaic');
         if (!mosaic) return;
@@ -362,7 +418,10 @@ export const MultiView = {
             topRight: this.slots.topRight.enabled,
             bottomLeft: this.slots.bottomLeft.enabled,
             bottomRight: this.slots.bottomRight.enabled,
-            bottomCenter: this.slots.bottomCenter.enabled
+            bottomCenter: this.slots.bottomCenter.enabled,
+            topCenter: this.slots.topCenter?.enabled,
+            midLeft: this.slots.midLeft?.enabled,
+            midRight: this.slots.midRight?.enabled
         });
 
         mosaic.classList.toggle('has-left', grid.hasLeft);
@@ -372,6 +431,9 @@ export const MultiView = {
         mosaic.classList.toggle('has-bottom-left', this.slots.bottomLeft.enabled);
         mosaic.classList.toggle('has-bottom-right', this.slots.bottomRight.enabled);
         mosaic.classList.toggle('has-bottom-center', this.slots.bottomCenter.enabled);
+        mosaic.classList.toggle('has-top-center', this.slots.topCenter?.enabled === true);
+        mosaic.classList.toggle('has-mid-left', this.slots.midLeft?.enabled === true);
+        mosaic.classList.toggle('has-mid-right', this.slots.midRight?.enabled === true);
         mosaic.classList.toggle('has-corners', grid.hasAnyCorner);
 
         mosaic.style.gridTemplateAreas = grid.areas;
@@ -381,10 +443,11 @@ export const MultiView = {
         SLOT_IDS.forEach((id) => {
             const tile = el(`player-tile-${id}`);
             if (!tile) return;
-            const enabled = this.slots[id].enabled;
+            const enabled = this.slots[id]?.enabled === true;
             tile.classList.toggle('is-hidden', !enabled);
             tile.classList.toggle('is-primary', id === 'center');
             tile.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+            tile.dataset.outlineAccent = String(slotOutlineAccent(id));
             if (!enabled) {
                 clearTilePlacementStyle(tile);
                 delete this.mosaicPlacement[id];
@@ -420,7 +483,7 @@ export const MultiView = {
     mountAll() {
         SLOT_IDS.forEach((id) => {
             const slot = this.slots[id];
-            if (!slot.enabled || !slot.player) return;
+            if (!slot?.enabled || !slot.player) return;
             const surface = el(`tv-playback-surface-${id}`);
             if (surface) slot.player.mountVideo(surface);
         });
@@ -429,7 +492,13 @@ export const MultiView = {
     setSideEnabled(sideId, enabled, { silent = false } = {}) {
         if (!CORNER_IDS.includes(sideId)) return;
         const slot = this.slots[sideId];
+        if (!slot) return;
         const next = Boolean(enabled);
+        if (next) {
+            const currentEnabled = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+            const wouldBe = slot.enabled ? currentEnabled : currentEnabled + 1;
+            if (wouldBe > this.getMaxMosaicSlots()) return;
+        }
         if (slot.enabled === next && slot.player) {
             this.syncLayout();
             this.mountAll();
@@ -473,7 +542,11 @@ export const MultiView = {
         if (next && this.isGridLayoutMode?.() && !silent) {
             const mosaic = el('player-mosaic');
             if (mosaic?.classList?.add) {
-                this.applyGridLayoutPreset();
+                const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+                if (enabledCount > 6 && this.getSelectedLayoutMode?.() === 'butterfly') {
+                    savePlayerState({ mosaicLayoutMode: 'grid-h' });
+                }
+                this.applyGridLayoutPreset(undefined, { animate: true });
             }
         }
         this.mountAll();
@@ -581,6 +654,11 @@ export const MultiView = {
         if (shutdownSelect) {
             fillViewTransitionSelect(shutdownSelect, SettingsStore.getShutdownTransition());
         }
+        const maxTvsInput = el('max-tvs-input');
+        if (maxTvsInput) {
+            maxTvsInput.value = String(this.getMaxMosaicSlots());
+            maxTvsInput.max = String(MAX_MOSAIC_SLOTS);
+        }
         this.syncScreenControls();
     },
 
@@ -621,6 +699,20 @@ export const MultiView = {
                 shutdownSelect.value = next;
                 const label = VIEW_TRANSITION_LABELS[next] || next;
                 showAppToast(`Shutdown: ${label}`);
+            });
+        }
+        const maxTvsInput = el('max-tvs-input');
+        if (maxTvsInput && maxTvsInput.dataset.bound !== '1') {
+            maxTvsInput.dataset.bound = '1';
+            maxTvsInput.max = String(MAX_MOSAIC_SLOTS);
+            maxTvsInput.value = String(this.getMaxMosaicSlots());
+            maxTvsInput.addEventListener('change', () => {
+                const next = this.setMaxMosaicSlots(Number(maxTvsInput.value));
+                maxTvsInput.value = String(next);
+                showAppToast(`Max TVs: ${next}`);
+            });
+            maxTvsInput.addEventListener('blur', () => {
+                maxTvsInput.value = String(this.getMaxMosaicSlots());
             });
         }
         this.syncSettingsToggles();

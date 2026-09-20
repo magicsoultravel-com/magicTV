@@ -7,35 +7,55 @@ import { el } from '../tvUtils.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
+    PLAY_FILL_ORDER,
     DRAG_THRESHOLD_PX,
     RESIZE_MIN_W,
     RESIZE_MIN_H,
     RESIZE_EDGES,
     clearTilePlacementStyle
 } from './constants.js';
+import {
+    captureTileRects,
+    flipTilesToCurrent,
+    travelAnimationsEnabled
+} from './tileTravel.js';
 
 /** Keep mosaic tile stacking below remote/browser chrome (8500+). */
 const MAX_TILE_STACK_Z = 7500;
 
-/** TV label order mapped to 6 grid cells. */
+/** TV label order mapped to grid cells (0-based). */
 const GRID_CELL_BY_SLOT = Object.freeze({
     center: 0,
     topLeft: 1,
     topRight: 2,
     bottomLeft: 3,
     bottomRight: 4,
-    bottomCenter: 5
+    bottomCenter: 5,
+    topCenter: 6,
+    midLeft: 7,
+    midRight: 8
 });
 
-function gridBoxForCell(cell, orientation) {
+/**
+ * Equal-cell box for a grid cell. ≤6 uses classic 3×2 / 2×3; 7–9 uses 3×3.
+ * @param {number} cell
+ * @param {'grid-h'|'grid-v'} orientation
+ * @param {number} enabledCount
+ */
+function gridBoxForCell(cell, orientation, enabledCount = 6) {
+    const use3x3 = enabledCount > 6;
     if (orientation === 'grid-v') {
-        const col = cell % 2;
-        const row = Math.floor(cell / 2);
-        return { x: col / 2, y: row / 3, w: 1 / 2, h: 1 / 3 };
+        const cols = use3x3 ? 3 : 2;
+        const rows = use3x3 ? 3 : 3;
+        const col = cell % cols;
+        const row = Math.floor(cell / cols);
+        return { x: col / cols, y: row / rows, w: 1 / cols, h: 1 / rows };
     }
-    const col = cell % 3;
-    const row = Math.floor(cell / 3);
-    return { x: col / 3, y: row / 2, w: 1 / 3, h: 1 / 2 };
+    const cols = 3;
+    const rows = use3x3 ? 3 : 2;
+    const col = cell % cols;
+    const row = Math.floor(cell / cols);
+    return { x: col / cols, y: row / rows, w: 1 / cols, h: 1 / rows };
 }
 
 function normalizeSelectedLayoutMode(mode) {
@@ -198,7 +218,7 @@ export const freeLayoutMethods = {
         if (!slotId || !SLOT_IDS.includes(slotId)) return;
         if (!this.slots[slotId]?.enabled) return;
 
-        this.raiseTileInStack(slotId);
+        this.raiseTileInStack?.(slotId);
 
         // During mosaic swap/rotate, still allow click-to-focus without starting a drag.
         if (this.swapBusy) {
@@ -563,7 +583,15 @@ export const freeLayoutMethods = {
         savePlayerState({ mosaicPlacement: { ...cleaned } });
     },
 
-    resetMosaicPlacement() {
+    /**
+     * Clear free-layout placement (butterfly / CSS grid shell).
+     * @param {{ animate?: boolean }} [opts]
+     */
+    async resetMosaicPlacement(opts = {}) {
+        const enabledIds = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled);
+        const animate = opts.animate === true && travelAnimationsEnabled();
+        const firstRects = animate ? captureTileRects(enabledIds) : null;
+
         this.mosaicPlacement = {};
         this.placementZTop = 1;
         this.clearFreeLayoutStyles();
@@ -572,6 +600,10 @@ export const freeLayoutMethods = {
         this.mountAll();
         this.scheduleRefreshTiles();
         this.syncPlacementChrome();
+
+        if (firstRects) {
+            await flipTilesToCurrent(enabledIds, firstRects);
+        }
     },
 
     getSelectedLayoutMode() {
@@ -583,9 +615,14 @@ export const freeLayoutMethods = {
     },
 
     setSelectedLayoutMode(mode) {
-        const next = normalizeSelectedLayoutMode(mode);
+        let next = normalizeSelectedLayoutMode(mode);
+        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+        // Butterfly only covers the classic ≤6 mosaic; fall back to H-grid.
+        if (next === 'butterfly' && enabledCount > 6) {
+            next = 'grid-h';
+        }
         savePlayerState({ mosaicLayoutMode: next });
-        this.resetToSelectedLayout();
+        this.resetToSelectedLayout({ animate: true });
         if (typeof document !== 'undefined') {
             import('../ui/remotePanel.js')
                 .then(({ syncLayoutPicker }) => syncLayoutPicker?.())
@@ -593,19 +630,27 @@ export const freeLayoutMethods = {
         }
     },
 
-    applyGridLayoutPreset(orientation) {
+    /**
+     * @param {'grid-h'|'grid-v'|string} [orientation]
+     * @param {{ animate?: boolean }} [opts]
+     */
+    async applyGridLayoutPreset(orientation, opts = {}) {
         const orient = normalizeSelectedLayoutMode(orientation || this.getSelectedLayoutMode());
         const gridOrient = orient === 'grid-v' ? 'grid-v' : 'grid-h';
+        const enabledIds = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled);
+        const enabledCount = enabledIds.length;
         const next = {};
         let z = 1;
-        SLOT_IDS.forEach((id) => {
-            if (!this.slots[id]?.enabled) return;
+        enabledIds.forEach((id) => {
             const cell = GRID_CELL_BY_SLOT[id];
             if (cell == null) return;
-            const box = gridBoxForCell(cell, gridOrient);
+            const box = gridBoxForCell(cell, gridOrient, enabledCount);
             next[id] = { ...box, z: z++ };
         });
         if (!Object.keys(next).length) return;
+
+        const animate = opts.animate === true && travelAnimationsEnabled();
+        const firstRects = animate ? captureTileRects(enabledIds) : null;
 
         this.mosaicPlacement = next;
         this.placementZTop = Object.values(next).reduce((max, p) => Math.max(max, p.z || 1), 1);
@@ -616,20 +661,38 @@ export const freeLayoutMethods = {
         this.mountAll();
         this.scheduleRefreshTiles();
         this.syncPlacementChrome();
+
+        if (firstRects) {
+            await flipTilesToCurrent(enabledIds, firstRects);
+        }
     },
 
-    resetToSelectedLayout() {
+    /**
+     * @param {{ animate?: boolean }} [opts]
+     */
+    resetToSelectedLayout(opts = {}) {
         const mode = this.getSelectedLayoutMode();
-        if (isGridLayoutMode(mode)) {
-            this.applyGridLayoutPreset(mode);
-            return;
+        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+        if (mode === 'butterfly' && enabledCount > 6) {
+            savePlayerState({ mosaicLayoutMode: 'grid-h' });
+            return this.applyGridLayoutPreset('grid-h', opts);
         }
-        this.resetMosaicPlacement();
+        if (isGridLayoutMode(mode)) {
+            return this.applyGridLayoutPreset(mode, opts);
+        }
+        return this.resetMosaicPlacement(opts);
     },
 
     ensureLayoutModeOnInit() {
         const mode = this.getSelectedLayoutMode();
-        if (!isGridLayoutMode(mode)) return;
+        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
+        if (mode === 'butterfly' && enabledCount > 6) {
+            savePlayerState({ mosaicLayoutMode: 'grid-h' });
+            this.applyGridLayoutPreset('grid-h');
+            return;
+        }
+        if (!isGridLayoutMode(mode) && mode !== 'butterfly') return;
+        if (!isGridLayoutMode(this.getSelectedLayoutMode())) return;
         const missingSlot = SLOT_IDS.some((id) => this.slots[id]?.enabled && !this.mosaicPlacement[id]);
         if (!this.hasCustomPlacement() || missingSlot) {
             this.applyGridLayoutPreset(mode);

@@ -60,8 +60,8 @@
 
 .tv-player-tile:hover,
 .tv-player-tile:focus-within {
-    border-color: color-mix(in srgb, var(--tv-primary) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-primary) calc(15% * var(--ui-idle-opacity-mult, 1)), transparent);
+    border-color: color-mix(in srgb, var(--tv-tile-outline, var(--tv-primary)) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--tv-tile-outline, var(--tv-primary)) calc(15% * var(--ui-idle-opacity-mult, 1)), transparent);
     overflow: visible;
     /* Tile raised just above hover controls (7400), below remote UI (8500+). */
     z-index: 7500;
@@ -70,10 +70,20 @@
 /* Mosaic tile highlight while browsing for a target screen or hovering the screen strip. */
 .tv-player-tile.is-channel-picker-target,
 .tv-player-tile.is-screen-strip-hover {
-    border-color: color-mix(in srgb, var(--tv-primary) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
+    border-color: color-mix(in srgb, var(--tv-tile-outline, var(--tv-primary)) calc(var(--ui-idle-opacity-mult, 1) * 100%), transparent);
     box-shadow:
-        0 0 0 2px color-mix(in srgb, var(--tv-primary) calc(55% * var(--ui-idle-opacity-mult, 1)), transparent),
-        0 6px 22px color-mix(in srgb, var(--tv-primary) calc(28% * var(--ui-idle-opacity-mult, 1)), transparent);
+        0 0 0 2px color-mix(in srgb, var(--tv-tile-outline, var(--tv-primary)) calc(55% * var(--ui-idle-opacity-mult, 1)), transparent),
+        0 6px 22px color-mix(in srgb, var(--tv-tile-outline, var(--tv-primary)) calc(28% * var(--ui-idle-opacity-mult, 1)), transparent);
+}
+
+.tv-player-tile[data-outline-accent="1"] { --tv-tile-outline: var(--tv-main-1); }
+.tv-player-tile[data-outline-accent="2"] { --tv-tile-outline: var(--tv-main-2); }
+.tv-player-tile[data-outline-accent="3"] { --tv-tile-outline: var(--tv-main-3); }
+
+.tv-player-tile.is-tile-traveling {
+    z-index: 7600;
+    pointer-events: none;
+    will-change: transform;
 }
 
 .tv-player-tile.is-hidden {
@@ -1419,6 +1429,26 @@
     color: var(--tv-text-secondary);
 }
 
+.tv-controls__screen-btn.is-strip-dragging {
+    opacity: 0.35;
+}
+
+.tv-controls__screen-btn.is-strip-drop-target {
+    border-color: var(--tv-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tv-primary) 45%, transparent);
+}
+
+.tv-controls__screen-btn--ghost {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 12000;
+    margin: 0;
+    pointer-events: none;
+    opacity: 0.88;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
 .tv-controls__screen-frame {
     position: absolute;
     inset: 0;
@@ -1489,6 +1519,12 @@
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="6"] .tv-controls__screens {
+    max-width: calc(3 * var(--strip-tile-w) + 1rem);
+}
+
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="7"] .tv-controls__screens,
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="8"] .tv-controls__screens,
+.remote-panel__footer-screens.is-screens-expanded[data-screen-count="9"] .tv-controls__screens {
     max-width: calc(3 * var(--strip-tile-w) + 1rem);
 }
 
