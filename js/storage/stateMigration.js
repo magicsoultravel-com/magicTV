@@ -1,6 +1,7 @@
 /**
  * Boot-time rewrite of matrix_tv_state into the current canonical shape.
  * Keeps library + settings; strips legacy keys; can drop session chrome on quota.
+ * Recovers favorite folders from library mirror / corrupt backup when possible.
  */
 import {
     STATE_KEY,
@@ -9,6 +10,13 @@ import {
 } from './persistedState.js';
 import { loadPlayerState } from './playerState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
+import {
+    mergeLibraryMirrorIntoState,
+    writeLibraryMirror,
+    hasFavoriteFolders,
+    tryParseLibraryFromCorruptBackup,
+    readLibraryMirror
+} from './libraryMirror.js';
 
 export const STATE_SCHEMA_VERSION = 1;
 export const CORRUPT_BACKUP_KEY = 'matrix_tv_state_corrupt_backup';
@@ -71,6 +79,36 @@ function applySettingsMigrations(next) {
     return next;
 }
 
+function pickLibraryFields(player, base) {
+    const baseFolders = Array.isArray(base.favoriteFolders) ? base.favoriteFolders : [];
+    const playerFolders = Array.isArray(player.favoriteFolders) ? player.favoriteFolders : [];
+
+    // Never let empty load defaults overwrite non-empty base folders.
+    if (!hasFavoriteFolders(playerFolders) && hasFavoriteFolders(baseFolders)) {
+        const favorites = Array.isArray(player.favorites) && player.favorites.length
+            ? player.favorites
+            : (Array.isArray(base.favorites) ? base.favorites.map(migrateFavoriteRef) : []);
+        return {
+            favorites,
+            favoritesMeta: Array.isArray(player.favoritesMeta) && player.favoritesMeta.length
+                ? player.favoritesMeta
+                : (base.favoritesMeta || []),
+            favoriteFolders: baseFolders,
+            favoritesRootOrder: Array.isArray(player.favoritesRootOrder)
+                && player.favoritesRootOrder.length
+                ? player.favoritesRootOrder
+                : (base.favoritesRootOrder || [])
+        };
+    }
+
+    return {
+        favorites: player.favorites,
+        favoritesMeta: player.favoritesMeta,
+        favoriteFolders: playerFolders,
+        favoritesRootOrder: player.favoritesRootOrder
+    };
+}
+
 /**
  * Build a canonical blob from the current store (or empty after corrupt reset).
  * @param {Record<string, any>} base
@@ -78,11 +116,12 @@ function applySettingsMigrations(next) {
 function buildCanonicalState(base) {
     const player = loadPlayerState();
     const next = { ...base };
+    const library = pickLibraryFields(player, base);
 
-    next.favorites = player.favorites;
-    next.favoritesMeta = player.favoritesMeta;
-    next.favoriteFolders = player.favoriteFolders;
-    next.favoritesRootOrder = player.favoritesRootOrder;
+    next.favorites = library.favorites;
+    next.favoritesMeta = library.favoritesMeta;
+    next.favoriteFolders = library.favoriteFolders;
+    next.favoritesRootOrder = library.favoritesRootOrder;
     next.chanBindScopeBySlot = player.chanBindScopeBySlot;
     next.recents = player.recents;
     next.recentsMeta = player.recentsMeta;
@@ -114,26 +153,134 @@ function buildCanonicalState(base) {
     return next;
 }
 
+function syncMirrorFromState(state) {
+    if (!state || typeof state !== 'object') return;
+    writeLibraryMirror({
+        favorites: state.favorites,
+        favoritesMeta: state.favoritesMeta,
+        favoriteFolders: state.favoriteFolders,
+        favoritesRootOrder: state.favoritesRootOrder
+    });
+}
+
+/**
+ * Recover a base object after corrupt main blob.
+ * Prefer library mirror, then parseable corrupt backup library fields.
+ * @returns {{ base: Record<string, any>, libraryRestored: boolean }}
+ */
+function recoverAfterCorrupt() {
+    const fromMirror = mergeLibraryMirrorIntoState({});
+    if (fromMirror.restored) {
+        return { base: fromMirror.state, libraryRestored: true };
+    }
+
+    let corruptRaw = null;
+    try {
+        corruptRaw = localStorage.getItem(CORRUPT_BACKUP_KEY);
+    } catch {
+        corruptRaw = null;
+    }
+    const fromBackup = tryParseLibraryFromCorruptBackup(corruptRaw);
+    if (fromBackup) {
+        return { base: { ...fromBackup }, libraryRestored: true };
+    }
+
+    // Mirror may have favorites without folders — still better than empty.
+    const mirror = readLibraryMirror();
+    if (mirror && Array.isArray(mirror.favorites) && mirror.favorites.length) {
+        return {
+            base: {
+                favorites: mirror.favorites,
+                favoritesMeta: mirror.favoritesMeta || [],
+                favoriteFolders: mirror.favoriteFolders || [],
+                favoritesRootOrder: mirror.favoritesRootOrder || []
+            },
+            libraryRestored: hasFavoriteFolders(mirror.favoriteFolders)
+        };
+    }
+
+    return { base: {}, libraryRestored: false };
+}
+
+/**
+ * @param {Record<string, any>} state
+ * @returns {{ state: Record<string, any>, restored: boolean } | null}
+ *   null when no write needed
+ */
+function maybeReconcileFolders(state) {
+    const { state: next, restored } = mergeLibraryMirrorIntoState(state);
+    if (!restored) return null;
+    return { state: next, restored: true };
+}
+
 /**
  * Migrate legacy / unversioned matrix_tv_state once at boot.
- * @returns {{ migrated: boolean, repaired: boolean }}
+ * Also reconciles empty favoriteFolders from the library mirror.
+ * @returns {{
+ *   migrated: boolean,
+ *   repaired: boolean,
+ *   libraryRestored?: boolean,
+ *   libraryWiped?: boolean
+ * }}
  */
 export function migratePersistedState() {
     let repaired = false;
+    let libraryRestored = false;
+    let libraryWiped = false;
     const parsed = parsePersistedStateRaw();
 
     if (!parsed.ok) {
         backupCorruptRaw();
-        writePersistedState({}, { force: true });
+        const recovered = recoverAfterCorrupt();
+        writePersistedState(recovered.base, { force: true });
         repaired = true;
+        libraryRestored = recovered.libraryRestored;
+        libraryWiped = !recovered.libraryRestored;
     } else if (Number(parsed.value.stateSchemaVersion) >= STATE_SCHEMA_VERSION) {
-        return { migrated: false, repaired: false };
+        const reconciled = maybeReconcileFolders(parsed.value);
+        if (reconciled) {
+            const next = { ...reconciled.state, stateSchemaVersion: STATE_SCHEMA_VERSION };
+            writePersistedState(next, { force: true });
+            syncMirrorFromState(next);
+            return {
+                migrated: false,
+                repaired: true,
+                libraryRestored: true,
+                libraryWiped: false
+            };
+        }
+        return { migrated: false, repaired: false, libraryRestored: false, libraryWiped: false };
     }
 
-    const base = parsePersistedStateRaw().value;
+    let base = parsePersistedStateRaw().value;
+    const reconciled = maybeReconcileFolders(base);
+    if (reconciled) {
+        base = reconciled.state;
+        libraryRestored = true;
+        repaired = true;
+        libraryWiped = false;
+    }
+
+    // Ensure storage matches base before loadPlayerState inside buildCanonicalState.
+    if (reconciled || repaired) {
+        writePersistedState(base, { force: true });
+    }
+
     const next = buildCanonicalState(base);
     const written = writePersistedState(next, { force: true });
     if (written !== next) repaired = true;
 
-    return { migrated: true, repaired };
+    syncMirrorFromState(written);
+
+    if (repaired && !libraryRestored && !hasFavoriteFolders(written.favoriteFolders)) {
+        // Corrupt path with no recoverable library.
+        libraryWiped = libraryWiped || !hasFavoriteFolders(written.favoriteFolders);
+    }
+
+    return {
+        migrated: true,
+        repaired,
+        libraryRestored,
+        libraryWiped: libraryWiped && !libraryRestored
+    };
 }

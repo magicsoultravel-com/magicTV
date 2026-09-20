@@ -9,6 +9,7 @@ import {
     normalizeWatchStatsMeta,
     normalizeChanBindScopeBySlot
 } from './playerState.js';
+import { writeLibraryMirror } from './libraryMirror.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
 export const EXPORT_FORMAT = 'magictv-user-data';
@@ -283,6 +284,7 @@ export function summarizeUserData(payload) {
         : (Array.isArray(state.recents) ? state.recents.length : 0);
     return {
         favorites: Array.isArray(state.favorites) ? state.favorites.length : 0,
+        folders: Array.isArray(state.favoriteFolders) ? state.favoriteFolders.length : 0,
         recents: recentsLen,
         hidden: Array.isArray(state.hiddenChannels) ? state.hiddenChannels.length : 0,
         visited: Array.isArray(state.visitedChannels) ? state.visitedChannels.length : 0,
@@ -295,6 +297,12 @@ export function summarizeUserData(payload) {
 export function applyUserDataReplace(payload) {
     const state = payload.state;
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    writeLibraryMirror({
+        favorites: state.favorites,
+        favoritesMeta: state.favoritesMeta,
+        favoriteFolders: state.favoriteFolders,
+        favoritesRootOrder: state.favoritesRootOrder
+    });
     const extras = payload.extras || {};
     if (extras.clockStyle != null) writeExtra(CLOCK_STYLE_KEY, extras.clockStyle);
     if (extras.clockHidden != null) writeBoolExtra(CLOCK_HIDDEN_KEY, extras.clockHidden);

@@ -11,6 +11,7 @@ import {
 function formatSummary(summary) {
     const lines = [
         `Favorites: ${summary.favorites}`,
+        `Folders: ${summary.folders ?? 0}`,
         `Recents: ${summary.recents}`,
         `Hidden: ${summary.hidden}`,
         `Visited: ${summary.visited}`,

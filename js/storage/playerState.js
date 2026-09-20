@@ -3,6 +3,7 @@
  * Merges via shared persistedState so SettingsStore / registry patches survive.
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';
+import { writeLibraryMirror, hasFavoriteFolders } from './libraryMirror.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
 
@@ -427,10 +428,57 @@ function normalizeVisitedChannels(raw) {
     return out;
 }
 
+function emptyPlayerState() {
+    return {
+        favorites: [],
+        favoritesMeta: [],
+        favoriteFolders: [],
+        favoritesRootOrder: [],
+        chanBindScopeBySlot: normalizeChanBindScopeBySlot(null, [], null),
+        recents: [],
+        recentsMeta: [],
+        visitedChannels: [],
+        visitedChannelsMeta: [],
+        hiddenChannels: [],
+        hiddenChannelsMeta: [],
+        watchStatsMeta: [],
+        volume: 0.85,
+        lastChannelKey: null,
+        lastChannelName: '',
+        wasPlaying: false,
+        bufferSize: DEFAULT_BUFFER_SIZE,
+        reattemptInterval: DEFAULT_REATTEMPT_INTERVAL,
+        reattempts: DEFAULT_REATTEMPTS,
+        mosaicSlots: {},
+        mosaicPlacement: {},
+        mosaicLayoutMode: 'grid-h',
+        remoteModule: null,
+        channelPicker: null,
+        sortBy: { ...DEFAULT_SORT_BY },
+        sortDir: { ...DEFAULT_SORT_DIR },
+        categoryFilter: { ...DEFAULT_CATEGORY_FILTER }
+    };
+}
+
+/** Best-effort library fields when full load throws — never invent empty over raw folders. */
+function loadLibraryFieldsBestEffort(raw) {
+    const favorites = Array.isArray(raw?.favorites)
+        ? raw.favorites.map(migrateFavoriteRef)
+        : [];
+    const favoritesMeta = normalizeFavoritesMeta(favorites, raw?.favoritesMeta);
+    const favoriteFolders = normalizeFavoriteFolders(favorites, raw?.favoriteFolders);
+    const favoritesRootOrder = normalizeFavoritesRootOrder(
+        favorites,
+        favoriteFolders,
+        raw?.favoritesRootOrder
+    );
+    return { favorites, favoritesMeta, favoriteFolders, favoritesRootOrder };
+}
+
 /** Parsed player fields from the shared blob (does not strip sibling keys). */
 export function loadPlayerState() {
+    const raw = readPersistedState();
     try {
-        const raw = readPersistedState();
         const favorites = Array.isArray(raw.favorites)
             ? raw.favorites.map(migrateFavoriteRef)
             : [];
@@ -488,35 +536,11 @@ export function loadPlayerState() {
             categoryFilter: normalizeCategoryFilter(raw.categoryFilter)
         };
     } catch {
-        return {
-            favorites: [],
-            favoritesMeta: [],
-            favoriteFolders: [],
-            favoritesRootOrder: [],
-            chanBindScopeBySlot: normalizeChanBindScopeBySlot(null, [], null),
-            recents: [],
-            recentsMeta: [],
-            visitedChannels: [],
-            visitedChannelsMeta: [],
-            hiddenChannels: [],
-            hiddenChannelsMeta: [],
-            watchStatsMeta: [],
-            volume: 0.85,
-            lastChannelKey: null,
-            lastChannelName: '',
-            wasPlaying: false,
-            bufferSize: DEFAULT_BUFFER_SIZE,
-            reattemptInterval: DEFAULT_REATTEMPT_INTERVAL,
-            reattempts: DEFAULT_REATTEMPTS,
-            mosaicSlots: {},
-            mosaicPlacement: {},
-            mosaicLayoutMode: 'grid-h',
-            remoteModule: null,
-            channelPicker: null,
-            sortBy: { ...DEFAULT_SORT_BY },
-            sortDir: { ...DEFAULT_SORT_DIR },
-            categoryFilter: { ...DEFAULT_CATEGORY_FILTER }
-        };
+        try {
+            return { ...emptyPlayerState(), ...loadLibraryFieldsBestEffort(raw) };
+        } catch {
+            return emptyPlayerState();
+        }
     }
 }
 
@@ -588,6 +612,20 @@ export function savePlayerState(patch) {
                 merged.favorites,
                 merged.favoriteFolders
             );
+            // Guard: favorites-only re-derive must not persist [] over non-empty stored folders
+            // (e.g. load catch returned empty defaults while raw blob still had folders).
+            if (
+                !patchFolders
+                && !hasFavoriteFolders(merged.favoriteFolders)
+            ) {
+                const rawStored = readPersistedState();
+                if (hasFavoriteFolders(rawStored.favoriteFolders)) {
+                    merged.favoriteFolders = normalizeFavoriteFolders(
+                        merged.favorites,
+                        rawStored.favoriteFolders
+                    );
+                }
+            }
             payload.favoriteFolders = merged.favoriteFolders;
         }
         if (patchFavorites || patchFolders || patchRootOrder) {
@@ -675,5 +713,17 @@ export function savePlayerState(patch) {
         if (!KNOWN_PLAYER_PATCH_KEYS.has(key)) payload[key] = value;
     }
 
-    return patchPersistedState(payload);
+    const written = patchPersistedState(payload);
+
+    if (patchFavorites || patchFolders || patchRootOrder) {
+        const after = loadPlayerState();
+        writeLibraryMirror({
+            favorites: after.favorites,
+            favoritesMeta: after.favoritesMeta,
+            favoriteFolders: after.favoriteFolders,
+            favoritesRootOrder: after.favoritesRootOrder
+        });
+    }
+
+    return written;
 }
