@@ -5,10 +5,12 @@
 import { el } from '../tvUtils.js';
 import { loadPlayerState } from '../storage/playerState.js';
 import { resolveSavedMosaicMap } from '../mosaic/persist.js';
-import { PLAY_FILL_ORDER } from '../mosaic/constants.js';
+import { PLAY_FILL_ORDER, slotOutlineAccent, slotOutlineIntensity } from '../mosaic/constants.js';
 import { fetchStoredFramesForMosaic, resolveStoredFrameDataUrl, collectFrameLookupKeys } from '../mosaic/frameLookup.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { applyMarquee, marqueeInnerHtml } from './marquee.js';
+import { tvLabelAccentChars, chanNumberAccentHtml, buildChannelIndex } from '../channelNav.js';
+import { FavoritesRecents } from '../storage/favoritesRecents.js';
 
 let open = false;
 /** @type {(() => void) | null} */
@@ -86,8 +88,29 @@ function renderList(tiles, posterMap = new Map()) {
     const listEl = el('resume-session-list');
     if (!listEl) return;
 
+    /** @type {Map<string, Map<string, number>>} */
+    const numbersByScope = new Map();
+    const numbersForScope = (scope) => {
+        const scopeKey = scope?.mode === 'folder' ? `folder:${scope.folderId}` : 'favorites';
+        let map = numbersByScope.get(scopeKey);
+        if (!map) {
+            map = buildChannelIndex(scope || { mode: 'favorites' }).numberByKey;
+            numbersByScope.set(scopeKey, map);
+        }
+        return map;
+    };
+    const resolveChanNum = (slotId, key) => {
+        if (!key) return null;
+        const scoped = numbersForScope(FavoritesRecents.getChanBindScope(slotId)).get(key);
+        if (Number.isFinite(scoped)) return scoped;
+        const allFavs = numbersForScope({ mode: 'favorites' }).get(key);
+        return Number.isFinite(allFavs) ? allFavs : null;
+    };
+
     listEl.innerHTML = tiles.map(({ slotId, channelName, channelKey, isLastActive }) => {
         const screenNum = SLOT_SCREEN_LABELS[slotId] || slotId;
+        const accent = slotOutlineAccent(slotId);
+        const intensity = slotOutlineIntensity(slotId);
         const activeClass = isLastActive ? ' is-last-active' : '';
         const playerPoster = MultiView.slots[slotId]?.player?.posterDataUrl || '';
         const cachedPoster = posterMap.get(channelKey) || '';
@@ -97,13 +120,20 @@ function renderList(tiles, posterMap = new Map()) {
             ? `<img class="resume-session__tile-poster" src="${escapeHtml(poster)}" alt="" decoding="async">`
             : `<img class="resume-session__tile-poster is-hidden" alt="" decoding="async">`;
         const fallbackClass = poster ? ' is-hidden' : '';
+        const tvLabelHtml = tvLabelAccentChars(screenNum)
+            .map(({ char, accent: a }) => `<span data-accent="${a}">${escapeHtml(char)}</span>`)
+            .join('');
+        const chanNum = resolveChanNum(slotId, channelKey);
+        const chanNumHtml = Number.isFinite(chanNum)
+            ? `<span class="resume-session__tile-chan-num" aria-hidden="true">${chanNumberAccentHtml(chanNum)}</span>`
+            : '';
         return `<li class="resume-session__item${activeClass}">
-            <button type="button" class="resume-session__tile" data-slot-id="${escapeHtml(slotId)}" aria-label="Play TV ${escapeHtml(screenNum)}: ${escapeHtml(channelName)}">
+            <button type="button" class="resume-session__tile" data-slot-id="${escapeHtml(slotId)}" data-outline-accent="${accent}" data-outline-intensity="${intensity}" aria-label="Play TV ${escapeHtml(screenNum)}: ${escapeHtml(channelName)}">
                 <span class="resume-session__tile-frame">
                     ${posterHtml}
                     <span class="resume-session__tile-fallback${fallbackClass}" aria-hidden="true">${escapeHtml(initial)}</span>
-                    <span class="resume-session__tile-screen">TV ${escapeHtml(screenNum)}</span>
-                    <span class="resume-session__tile-name">${marqueeInnerHtml(channelName)}</span>
+                    <span class="resume-session__tile-screen" aria-hidden="true">${tvLabelHtml}</span>
+                    <span class="resume-session__tile-name">${chanNumHtml}<span class="resume-session__tile-name-text">${marqueeInnerHtml(channelName)}</span></span>
                 </span>
             </button>
         </li>`;

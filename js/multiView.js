@@ -25,7 +25,7 @@ import {
     PLAY_FILL_ORDER,
     clearTilePlacementStyle,
     SLOT_SCREEN_LABELS,
-    slotOutlineAccent
+    applySlotOutlineAttrs
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
 import { swapMethods } from './mosaic/swap.js';
@@ -447,7 +447,7 @@ export const MultiView = {
             tile.classList.toggle('is-hidden', !enabled);
             tile.classList.toggle('is-primary', id === 'center');
             tile.setAttribute('aria-hidden', enabled ? 'false' : 'true');
-            tile.dataset.outlineAccent = String(slotOutlineAccent(id));
+            applySlotOutlineAttrs(tile, id);
             if (!enabled) {
                 clearTilePlacementStyle(tile);
                 delete this.mosaicPlacement[id];

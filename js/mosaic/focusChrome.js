@@ -3,7 +3,7 @@
  * Methods mix into MultiView (this === MultiView).
  */
 import { el } from '../tvUtils.js';
-import { CORNER_IDS, SLOT_IDS, PLAY_FILL_ORDER, DRAG_THRESHOLD_PX } from './constants.js';
+import { CORNER_IDS, SLOT_IDS, PLAY_FILL_ORDER, DRAG_THRESHOLD_PX, applySlotOutlineAttrs } from './constants.js';
 import { syncScreenBtnActions } from '../ui/screenStripControls.js';
 
 const SCREEN_ADD_ORDER = [
@@ -192,6 +192,7 @@ export const focusChromeMethods = {
                 btn.hidden = !enabled;
                 btn.classList.toggle('is-active', enabled && this.statusSlotId === slotId);
                 if (enabled && slotId) {
+                    applySlotOutlineAttrs(btn, slotId);
                     const player = this.slots[slotId]?.player;
                     const intentPlaying = player?.wantPlaying === true || player?.playing === true;
                     const isMuted = player ? !this.isSlotAudible(player) : true;

@@ -68,6 +68,30 @@ export function slotOutlineAccent(slotId) {
     return /** @type {1|2|3} */ (((n - 1) % 3) + 1);
 }
 
+/**
+ * Outline intensity band by screen label: 1–3 full, 4–6 soft, 7–9 softer.
+ * @param {string} slotId
+ * @returns {'full'|'soft'|'softer'}
+ */
+export function slotOutlineIntensity(slotId) {
+    const label = Number(SLOT_SCREEN_LABELS[slotId] || '1');
+    const n = Number.isFinite(label) && label > 0 ? label : 1;
+    if (n <= 3) return 'full';
+    if (n <= 6) return 'soft';
+    return 'softer';
+}
+
+/**
+ * Stamp mosaic / strip outline attrs from slot id.
+ * @param {HTMLElement | null | undefined} el
+ * @param {string} slotId
+ */
+export function applySlotOutlineAttrs(el, slotId) {
+    if (!el) return;
+    el.dataset.outlineAccent = String(slotOutlineAccent(slotId));
+    el.dataset.outlineIntensity = slotOutlineIntensity(slotId);
+}
+
 export const DRAG_THRESHOLD_PX = 6;
 export const RESIZE_MIN_W = 72;
 export const RESIZE_MIN_H = 64;

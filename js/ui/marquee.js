@@ -12,7 +12,7 @@ const HOSTS = [
     '.tv-header-channel-name',
     '#remote-channel-name',
     '.guide-screen__channel',
-    '.resume-session__tile-name',
+    '.resume-session__tile-name-text',
     '.watch-stats-row__name'
 ].join(', ');
 
