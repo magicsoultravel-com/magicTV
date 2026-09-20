@@ -615,12 +615,7 @@ export const freeLayoutMethods = {
     },
 
     setSelectedLayoutMode(mode) {
-        let next = normalizeSelectedLayoutMode(mode);
-        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
-        // Butterfly only covers the classic ≤6 mosaic; fall back to H-grid.
-        if (next === 'butterfly' && enabledCount > 6) {
-            next = 'grid-h';
-        }
+        const next = normalizeSelectedLayoutMode(mode);
         savePlayerState({ mosaicLayoutMode: next });
         this.resetToSelectedLayout({ animate: true });
         if (typeof document !== 'undefined') {
@@ -672,11 +667,6 @@ export const freeLayoutMethods = {
      */
     resetToSelectedLayout(opts = {}) {
         const mode = this.getSelectedLayoutMode();
-        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
-        if (mode === 'butterfly' && enabledCount > 6) {
-            savePlayerState({ mosaicLayoutMode: 'grid-h' });
-            return this.applyGridLayoutPreset('grid-h', opts);
-        }
         if (isGridLayoutMode(mode)) {
             return this.applyGridLayoutPreset(mode, opts);
         }
@@ -685,14 +675,7 @@ export const freeLayoutMethods = {
 
     ensureLayoutModeOnInit() {
         const mode = this.getSelectedLayoutMode();
-        const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
-        if (mode === 'butterfly' && enabledCount > 6) {
-            savePlayerState({ mosaicLayoutMode: 'grid-h' });
-            this.applyGridLayoutPreset('grid-h');
-            return;
-        }
-        if (!isGridLayoutMode(mode) && mode !== 'butterfly') return;
-        if (!isGridLayoutMode(this.getSelectedLayoutMode())) return;
+        if (!isGridLayoutMode(mode)) return;
         const missingSlot = SLOT_IDS.some((id) => this.slots[id]?.enabled && !this.mosaicPlacement[id]);
         if (!this.hasCustomPlacement() || missingSlot) {
             this.applyGridLayoutPreset(mode);

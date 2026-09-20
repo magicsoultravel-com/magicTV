@@ -542,10 +542,6 @@ export const MultiView = {
         if (next && this.isGridLayoutMode?.() && !silent) {
             const mosaic = el('player-mosaic');
             if (mosaic?.classList?.add) {
-                const enabledCount = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled).length;
-                if (enabledCount > 6 && this.getSelectedLayoutMode?.() === 'butterfly') {
-                    savePlayerState({ mosaicLayoutMode: 'grid-h' });
-                }
                 this.applyGridLayoutPreset(undefined, { animate: true });
             }
         }

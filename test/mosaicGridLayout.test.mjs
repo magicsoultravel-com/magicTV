@@ -59,3 +59,40 @@ test('six-TV butterfly uses two large middle columns', () => {
     assert.equal(g.columns, 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)');
     assert.equal(g.rows, '1fr 1fr');
 });
+
+test('nine-TV butterfly uses 3x3 hub column', () => {
+    const g = resolveMosaicGridTemplate({
+        topLeft: true,
+        topRight: true,
+        bottomLeft: true,
+        bottomRight: true,
+        bottomCenter: true,
+        topCenter: true,
+        midLeft: true,
+        midRight: true
+    });
+    assert.equal(
+        g.areas,
+        '"topLeft topCenter topRight" "midLeft center midRight" "bottomLeft bottomCenter bottomRight"'
+    );
+    assert.equal(g.columns, 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)');
+    assert.equal(g.rows, '1fr 1fr 1fr');
+    assert.equal(g.hasAnyCorner, true);
+});
+
+test('seven-TV butterfly (no mids) spans corners into mid row', () => {
+    const g = resolveMosaicGridTemplate({
+        topLeft: true,
+        topRight: true,
+        bottomLeft: true,
+        bottomRight: true,
+        bottomCenter: true,
+        topCenter: true
+    });
+    assert.equal(
+        g.areas,
+        '"topLeft topCenter topRight" "topLeft center topRight" "bottomLeft bottomCenter bottomRight"'
+    );
+    assert.equal(g.columns, 'minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr)');
+    assert.equal(g.rows, '1fr 1fr 1fr');
+});

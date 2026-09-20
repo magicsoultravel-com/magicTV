@@ -1,7 +1,6 @@
 /** Remote control panel — default view inside the remote module. */
 import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
-import { PLAY_FILL_ORDER } from '../mosaic/constants.js';
 import { ACTION_ICONS, CARD_ICONS, LAYOUT_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
@@ -242,16 +241,8 @@ function clampLayoutPopout(wrap, popout) {
 
 export function syncLayoutPicker() {
     const mode = MultiView.getSelectedLayoutMode?.() || 'grid-h';
-    const enabledCount = PLAY_FILL_ORDER.filter(
-        (id) => id === 'center' || MultiView.slots?.[id]?.enabled
-    ).length;
-    const butterflyOk = enabledCount <= 6;
     queryAllInApp('[data-layout-mode]').forEach((btn) => {
         const layoutMode = btn.getAttribute('data-layout-mode');
-        if (layoutMode === 'butterfly') {
-            btn.hidden = !butterflyOk;
-            btn.disabled = !butterflyOk;
-        }
         const active = layoutMode === mode;
         btn.classList.toggle('is-active', active);
         btn.setAttribute('aria-pressed', String(active));

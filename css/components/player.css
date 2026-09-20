@@ -42,6 +42,9 @@
 #player-tile-bottomLeft { grid-area: bottomLeft; }
 #player-tile-bottomRight { grid-area: bottomRight; }
 #player-tile-bottomCenter { grid-area: bottomCenter; }
+#player-tile-topCenter { grid-area: topCenter; }
+#player-tile-midLeft { grid-area: midLeft; }
+#player-tile-midRight { grid-area: midRight; }
 #player-tile-center { grid-area: center; }
 
 .tv-player-tile {
