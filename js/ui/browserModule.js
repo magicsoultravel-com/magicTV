@@ -17,10 +17,12 @@ import {
     SHELL_BROWSER
 } from './moduleLayout.js';
 import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
+import { RemoteModule } from './remoteModule.js';
 
 const MIN_W = 260;
 const MIN_H = 480;
 const VIEW_PAD = 8;
+const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT_FALLBACK = 0.62;
 const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT_FALLBACK * (3 / 8);
 
@@ -421,6 +423,19 @@ function beginGesture(e, mode, edge = '') {
     e.preventDefault();
 }
 
+function edgeInsetLeft(side, width) {
+    const { w: vw } = viewportSize();
+    const w = Math.max(MIN_W, Number(width) || MIN_W);
+    if (side === 'right') {
+        return Math.round(Math.max(VIEW_PAD, vw - w - EDGE_INSET));
+    }
+    return EDGE_INSET;
+}
+
+function syncDockSideBtn() {
+    RemoteModule.syncDockSideButtons?.();
+}
+
 function syncDockToggleBtn() {
     const dockBtn = el('browser-dock-toggle');
     if (!dockBtn) return;
@@ -435,11 +450,11 @@ function syncDockToggleBtn() {
 function syncCollapseHeaderBtn() {
     const collapseBtn = el('browser-collapse-header-btn');
     if (!collapseBtn) return;
-    const split = isSplit();
-    collapseBtn.classList.toggle('is-hidden', !split);
+    collapseBtn.classList.remove('is-hidden');
     collapseBtn.innerHTML = ACTION_ICONS.expand;
-    collapseBtn.title = 'Collapse browser';
-    collapseBtn.setAttribute('aria-label', 'Collapse browser');
+    const label = isSplit() ? 'Collapse browser' : 'Collapse remote';
+    collapseBtn.title = label;
+    collapseBtn.setAttribute('aria-label', label);
 }
 
 function syncActionButtons() {
@@ -452,6 +467,7 @@ function syncActionButtons() {
         popBtn.setAttribute('aria-label', 'Pop out browser');
     }
     syncDockToggleBtn();
+    syncDockSideBtn();
     syncCollapseHeaderBtn();
     syncRemoteScreenFooter();
 }
@@ -522,7 +538,12 @@ function bindOnce() {
         else BrowserModule.undock();
     });
 
-    el('browser-collapse-header-btn')?.addEventListener('click', () => BrowserModule.hide());
+    el('browser-collapse-header-btn')?.addEventListener('click', () => {
+        if (isSplit()) BrowserModule.hide();
+        else RemoteModule.hide();
+    });
+
+    el('browser-dock-side-btn')?.addEventListener('click', () => RemoteModule.toggleDockSide());
 
     document.addEventListener('click', (e) => {
         const brand = e.target?.closest?.('#browser-shell > .module-shell__chrome > .remote-module__brand');
@@ -532,7 +553,7 @@ function bindOnce() {
         if (isSplit() && uiMode !== 'hidden') {
             BrowserModule.hide();
         } else if (!isSplit()) {
-            switchTab('remote');
+            RemoteModule.hide();
         }
     });
 
@@ -637,6 +658,22 @@ export const BrowserModule = {
         document.body.classList.toggle('browser-docked', false);
         syncActionButtons();
         patchLayout({ browserHostKind: 'hidden' }, { reconcile: false });
+    },
+
+    /**
+     * Nudge undocked browser float to the edge opposite remote's dock side.
+     * @param {'left'|'right'} remoteDockSide
+     */
+    syncDockSideGeometry(remoteDockSide) {
+        if (!isSplit() || uiMode !== 'undocked') return;
+        const browserSide = remoteDockSide === 'right' ? 'left' : 'right';
+        const geom = readDialogGeometry();
+        const next = {
+            ...geom,
+            left: edgeInsetLeft(browserSide, geom.width)
+        };
+        applyGeometry(next);
+        patchLayout({ browser: { ...next, pinned } }, { reconcile: false });
     },
 
     show() {

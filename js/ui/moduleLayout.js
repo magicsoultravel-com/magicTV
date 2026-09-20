@@ -174,24 +174,22 @@ export function toggleSplitBrowser({ hostKind = 'undocked' } = {}) {
     return splitBrowser({ hostKind });
 }
 
-/** @typedef {'remote'|'browser'|{ tile: string }} OverlayTarget */
+/** @typedef {'remote'|'browser'} OverlayTarget */
 
 /**
- * Raise remote float + dock hosts, browser float + dock hosts, or a TV tile
- * so last interaction wins across chrome and mosaic.
- * @param {OverlayTarget | typeof SHELL_REMOTE | typeof SHELL_BROWSER} target
+ * Raise remote or browser float + dock hosts so last interaction wins between modules.
+ * Mosaic tiles use free-layout placement z only (below this band) — do not pass `{ tile }`.
+ * @param {typeof SHELL_REMOTE | typeof SHELL_BROWSER | string} target
  * @returns {number} assigned z-index
  */
 export function bringOverlayToFront(target) {
     if (typeof document === 'undefined') return stackZ;
-    stackZ += 1;
-    const z = String(stackZ);
-
     if (target && typeof target === 'object' && target.tile) {
-        const tile = document.getElementById(`player-tile-${target.tile}`);
-        if (tile) tile.style.zIndex = z;
         return stackZ;
     }
+
+    stackZ += 1;
+    const z = String(stackZ);
 
     const shell = target === SHELL_BROWSER || target === 'browser' ? 'browser' : 'remote';
     const ids = shell === 'browser'

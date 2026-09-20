@@ -69,7 +69,7 @@ describe('moduleLayout SSOT', () => {
         assert.equal(z2 > z1, true);
     });
 
-    it('bringOverlayToFront raises remote dock hosts and tiles', async () => {
+    it('bringOverlayToFront raises remote dock hosts; tiles stay below module band', async () => {
         const remote = { style: { zIndex: '' }, id: 'remote-module' };
         const remoteSheet = { style: { zIndex: '' }, id: 'remote-dock-sheet' };
         const remoteTab = { style: { zIndex: '' }, id: 'remote-dock-tab' };
@@ -88,9 +88,10 @@ describe('moduleLayout SSOT', () => {
         const zRemote = Number(remote.style.zIndex);
         assert.equal(Number(remoteSheet.style.zIndex), zRemote);
         assert.equal(Number(remoteTab.style.zIndex), zRemote);
+        assert.equal(zRemote >= 8510, true);
         bringOverlayToFront({ tile: 'center' });
-        const zTile = Number(tile.style.zIndex);
-        assert.equal(zTile > zRemote, true);
+        assert.equal(tile.style.zIndex, '');
+        assert.equal(Number(remote.style.zIndex), zRemote);
     });
 });
 

@@ -4,7 +4,6 @@
  */
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { el } from '../tvUtils.js';
-import { bringOverlayToFront } from '../ui/moduleLayout.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -14,6 +13,9 @@ import {
     RESIZE_EDGES,
     clearTilePlacementStyle
 } from './constants.js';
+
+/** Keep mosaic tile stacking below remote/browser chrome (8500+). */
+const MAX_TILE_STACK_Z = 7500;
 
 /** TV label order mapped to 6 grid cells. */
 const GRID_CELL_BY_SLOT = Object.freeze({
@@ -151,14 +153,15 @@ export const freeLayoutMethods = {
 
     raiseTileInStack(slotId) {
         if (!slotId) return;
-        // Compete with remote/browser chrome (last click wins).
-        bringOverlayToFront({ tile: slotId });
-        if (!this.hasCustomPlacement() || !this.mosaicPlacement[slotId]) return;
-
+        // Raise among mosaic tiles only — remote/browser chrome stays above at 8500+.
         this.placementZTop += 1;
-        const top = this.placementZTop;
-        this.mosaicPlacement[slotId].z = top;
-        // Shared overlay stack already set inline z; keep placement z for persist/relative order.
+        const top = Math.min(this.placementZTop, MAX_TILE_STACK_Z);
+        if (this.hasCustomPlacement() && this.mosaicPlacement[slotId]) {
+            this.mosaicPlacement[slotId].z = top;
+        }
+        if (typeof document === 'undefined') return;
+        const tile = document.getElementById(`player-tile-${slotId}`);
+        if (tile) tile.style.zIndex = String(top);
     },
 
     placementZForSlot(slotId) {

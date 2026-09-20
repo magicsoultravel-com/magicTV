@@ -258,6 +258,7 @@ body.remote-dock-side-right .remote-module__dialog {
 #remote-split-browser-btn,
 #browser-split-browser-btn,
 #browser-dock-toggle,
+#browser-dock-side-btn,
 #browser-collapse-header-btn {
     display: none;
 }
@@ -279,6 +280,12 @@ body.remote-dock-side-right .remote-module__dialog {
 .browser-module .remote-module__host #browser-split-browser-btn,
 .browser-module .remote-module__host #browser-dock-toggle,
 .browser-dock-sheet__inner #browser-dock-toggle,
+.remote-module__host #browser-dock-side-btn,
+.remote-dock-sheet__inner #browser-dock-side-btn,
+.browser-module .remote-module__host #browser-dock-side-btn,
+.browser-dock-sheet__inner #browser-dock-side-btn,
+.remote-module__host #browser-collapse-header-btn,
+.remote-dock-sheet__inner #browser-collapse-header-btn,
 .browser-module .remote-module__host #browser-collapse-header-btn,
 .browser-dock-sheet__inner #browser-collapse-header-btn,
 .browser-module .remote-module__host #catalog-layout-btn,

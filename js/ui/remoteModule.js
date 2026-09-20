@@ -224,18 +224,29 @@ function syncDockToggleBtn() {
 }
 
 function syncDockSideBtn() {
-    const btn = el('remote-dock-side-btn');
-    if (!btn) return;
-    btn.innerHTML = ACTION_ICONS.dockSide;
-    const toRight = dockSide !== 'right';
-    const label = toRight ? 'Move to right' : 'Move to left';
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
+    const remoteBtn = el('remote-dock-side-btn');
+    const browserBtn = el('browser-dock-side-btn');
+    const remoteToRight = dockSide !== 'right';
+    const remoteLabel = remoteToRight ? 'Move to right' : 'Move to left';
+    if (remoteBtn) {
+        remoteBtn.innerHTML = ACTION_ICONS.dockSide;
+        remoteBtn.title = remoteLabel;
+        remoteBtn.setAttribute('aria-label', remoteLabel);
+    }
+    if (browserBtn) {
+        // Browser is always opposite of remote.
+        const browserOnRight = dockSide !== 'right';
+        const browserLabel = browserOnRight ? 'Move to left' : 'Move to right';
+        browserBtn.innerHTML = ACTION_ICONS.dockSide;
+        browserBtn.title = browserLabel;
+        browserBtn.setAttribute('aria-label', browserLabel);
+    }
 }
 
 function applyDockSide(side, { persist = true, moveGeometry = true } = {}) {
     dockSide = normalizeDockSide(side);
     document.body.classList.toggle('remote-dock-side-right', dockSide === 'right');
+    document.body.classList.toggle('browser-dock-side-left', dockSide === 'right');
     syncDockSideBtn();
     if (moveGeometry && mode === 'undocked') {
         const geom = readDialogGeometry();
@@ -243,6 +254,9 @@ function applyDockSide(side, { persist = true, moveGeometry = true } = {}) {
             ...geom,
             left: edgeInsetLeft(dockSide, geom.width)
         });
+    }
+    if (moveGeometry) {
+        BrowserModule.syncDockSideGeometry?.(dockSide);
     }
     if (persist) {
         const prev = getSavedState() || {};
@@ -860,6 +874,7 @@ function updateBodyClasses() {
     document.body.classList.toggle('remote-hidden-tab', mode === 'hidden');
     document.body.classList.toggle('remote-undocked-open', mode === 'undocked');
     document.body.classList.toggle('remote-dock-side-right', dockSide === 'right');
+    document.body.classList.toggle('browser-dock-side-left', dockSide === 'right');
 }
 
 function onKeydown(e) {
@@ -1199,6 +1214,18 @@ export const RemoteModule = {
 
     getMode() {
         return mode;
+    },
+
+    getDockSide() {
+        return dockSide;
+    },
+
+    toggleDockSide() {
+        toggleDockSide();
+    },
+
+    syncDockSideButtons() {
+        syncDockSideBtn();
     },
 
     isOpen() {
