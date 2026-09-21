@@ -28,6 +28,20 @@ body.has-resume-session #app-container.is-header-collapsed .tv-brand {
     z-index: 8530;
 }
 
+/* Collapsed magic-remote dock tab peeks above the welcome backdrop.
+   (Normally the tab is display:none whenever the remote is not fully hidden.) */
+body.has-resume-session .remote-dock-tab {
+    display: flex !important;
+    z-index: 8535;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+/* Keep an expanded dock sheet under the welcome dialog if it somehow opens. */
+body.has-resume-session .remote-dock-sheet {
+    z-index: 8510;
+}
+
 .resume-session__dialog {
     position: relative;
     z-index: 1;

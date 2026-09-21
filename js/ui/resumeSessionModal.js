@@ -11,6 +11,7 @@ import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { applyMarquee, marqueeInnerHtml } from './marquee.js';
 import { tvLabelAccentChars, chanNumberAccentHtml, buildChannelIndex } from '../channelNav.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
+import { RemoteModule } from './remoteModule.js';
 
 let open = false;
 /** @type {(() => void) | null} */
@@ -56,6 +57,9 @@ function showModal() {
     modal.classList.remove('is-hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('has-resume-session');
+    try {
+        RemoteModule.ensureCollapsedDockTab?.();
+    } catch { /* remote may not be ready in tests */ }
 }
 
 function hideModal() {

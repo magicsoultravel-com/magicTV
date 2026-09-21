@@ -1038,6 +1038,29 @@ function bindOnce() {
     });
 
     dockTabEl()?.addEventListener('click', () => {
+        const welcomeOpen = typeof document !== 'undefined'
+            && document.body?.classList?.contains('has-resume-session');
+        if (welcomeOpen) {
+            import('./resumeSessionModal.js')
+                .then(({ ResumeSessionModal }) => {
+                    ResumeSessionModal.close?.();
+                    RemoteModule.open({
+                        mode: 'docked',
+                        slotId: targetSlotId || 'center',
+                        tab: isSplit() ? null : 'remote',
+                        focusClose: false
+                    });
+                })
+                .catch(() => {
+                    RemoteModule.open({
+                        mode: 'docked',
+                        slotId: targetSlotId || 'center',
+                        tab: isSplit() ? null : 'remote',
+                        focusClose: false
+                    });
+                });
+            return;
+        }
         if (mode === 'hidden') {
             RemoteModule.open({
                 mode: 'docked',
@@ -1045,6 +1068,8 @@ function bindOnce() {
                 tab: isSplit() ? null : 'remote',
                 focusClose: false
             });
+        } else if (mode === 'docked' && !sheetExpanded) {
+            RemoteModule.toggleDockedSheet();
         }
     });
 
@@ -1394,6 +1419,33 @@ export const RemoteModule = {
             mountToActiveHost();
         }
         RemotePanel.syncRemotePanel();
+    },
+
+    /**
+     * Welcome screen: show the bottom peek tab.
+     * Prefer staying `hidden` (that is the normal peek-tab state). If the
+     * remote is already open, collapse any expanded sheet without persisting.
+     */
+    ensureCollapsedDockTab() {
+        bindOnce();
+        if (mode === 'hidden') {
+            updateBodyClasses();
+            return;
+        }
+        if (mode === 'undocked') {
+            showUndockedUI(false);
+            mode = 'docked';
+            setSheetExpanded(false, { persist: false });
+            mountToActiveHost();
+            updateBodyClasses();
+            syncDockToggleBtn();
+            RemotePanel.syncRemotePanel();
+            return;
+        }
+        if (mode === 'docked' && sheetExpanded) {
+            setSheetExpanded(false, { persist: false });
+            updateBodyClasses();
+        }
     },
 
     toggleDockedSheet() {
