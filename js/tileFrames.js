@@ -9,6 +9,7 @@
 import { FrameCache } from './storage/frameCache.js';
 import { PosterCache } from './storage/posterCache.js';
 import { loadHlsLibrary } from './tvHls.js';
+import { isAnySlotConstrained } from './player/loadBudget.js';
 import {
     setFrameState,
     settleFrameCapture as settleFrameCaptureUi
@@ -228,6 +229,9 @@ function heavyLimit() {
 function canStartTier(tier) {
     if (state.running >= MAX_TOTAL) return false;
     if (tier === 'heavy') {
+        // Soft-yield: don't start offscreen HLS grabs while any mosaic slot
+        // is loading/buffering/healing — not only when playbackBusy is set.
+        if (isAnySlotConstrained()) return false;
         if (state.playbackBusy && state.heavyRunning >= MAX_HEAVY_BUSY) return false;
         return state.heavyRunning < heavyLimit();
     }

@@ -17,7 +17,17 @@ import {
     fillViewTransitionSelect,
     VIEW_TRANSITION_LABELS
 } from './ui/viewTransitions.js';
-import { reportSlotLoading } from './player/loadBudget.js';
+import {
+    reportSlotPressure,
+    getSlotPressureReason,
+    shouldYieldHealthy,
+    resolveYieldState,
+    computeYieldLevelCap,
+    setHealBudgetContext,
+    YIELD_HOLD_MS,
+    YIELD_MIN_HEIGHT,
+    YIELD_BUFFER_LENGTH
+} from './player/loadBudget.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -113,6 +123,14 @@ export const MultiView = {
     screenStripHoverSlotId: null,
     /** Bottom multi-TV strip enlarged to show channel title + frame. */
     screensStripExpanded: false,
+
+    /**
+     * Sibling soft-yield latch (MultiView is the sole applicator — not per-slot).
+     * Enter immediately when shouldYieldHealthy; exit only after YIELD_HOLD_MS.
+     */
+    _siblingYieldActive: false,
+    _lastYieldWorthyAt: 0,
+    _yieldHoldTimer: 0,
 
     getPrimary() {
         return this.slots.center.player;
@@ -243,12 +261,8 @@ export const MultiView = {
                 return player === this.getStatusPlayer() || player === this.slots.center.player;
             },
             onState: (player) => {
-                reportSlotLoading(
-                    player?.id,
-                    player?.loading === true
-                    || player?.loadPhase === 'connecting'
-                    || player?.loadPhase === 'buffering'
-                );
+                reportSlotPressure(player?.id, this.deriveSlotPressureReason(player));
+                this.syncSiblingYield();
                 this.scheduleRefreshTiles();
                 this.noteSlotPlayingForTiles(player);
             },
@@ -258,6 +272,147 @@ export const MultiView = {
         slot.player = player;
         this.watchPip(player.video);
         return player;
+    },
+
+    /**
+     * Pressure reason for loadBudget / sibling yield. Null clears constraint.
+     * @param {ReturnType<typeof createPlayerInstance> | null | undefined} player
+     * @returns {string|null}
+     */
+    deriveSlotPressureReason(player) {
+        if (!player) return null;
+        if (player.healing === true) return 'healing';
+        if (player.preparing === true || player._preparePromise != null) return 'preparing';
+        if (player.loading === true
+            || player.loadPhase === 'connecting'
+            || player.loadPhase === 'buffering') {
+            return 'loading';
+        }
+        if (player._freezePressure === true) return 'freeze';
+        return null;
+    },
+
+    /** Playing mosaic slot ids (wantPlaying or playing with a channel). */
+    collectPlayingSlotIds() {
+        const ids = [];
+        for (const id of SLOT_IDS) {
+            const player = this.slots[id]?.player;
+            if (!player?.channel) continue;
+            if (player.wantPlaying === true || player.playing === true) ids.push(id);
+        }
+        return ids;
+    },
+
+    /**
+     * Sole coordinator for sibling soft-yield. Re-run on every slot onState and
+     * when the hysteresis hold timer fires.
+     * @param {number} [now]
+     */
+    syncSiblingYield(now = Date.now()) {
+        const playingIds = this.collectPlayingSlotIds();
+        let constrainedPlaying = 0;
+        let healthyPlaying = 0;
+        for (const id of playingIds) {
+            if (getSlotPressureReason(id)) constrainedPlaying += 1;
+            else healthyPlaying += 1;
+        }
+
+        const shouldYieldNow = shouldYieldHealthy({
+            constrainedCount: constrainedPlaying,
+            healthyPlayingCount: healthyPlaying
+        });
+        const next = resolveYieldState({
+            prevActive: this._siblingYieldActive === true,
+            shouldYieldNow,
+            lastYieldWorthyAt: this._lastYieldWorthyAt || 0,
+            now,
+            holdMs: YIELD_HOLD_MS
+        });
+        this._lastYieldWorthyAt = next.lastYieldWorthyAt;
+
+        const wasActive = this._siblingYieldActive === true;
+        this._siblingYieldActive = next.active === true;
+
+        setHealBudgetContext({
+            yieldActive: this._siblingYieldActive,
+            playingIds
+        });
+
+        if (this._siblingYieldActive) {
+            this.applySiblingYieldToHealthy();
+        } else if (wasActive) {
+            this.clearSiblingYieldAll();
+        }
+
+        this.armSiblingYieldHoldTimer(now, shouldYieldNow);
+    },
+
+    /** Cancel pending hysteresis wakeup (tests / teardown). */
+    clearSiblingYieldHoldTimer() {
+        if (!this._yieldHoldTimer) return;
+        try { clearTimeout(this._yieldHoldTimer); } catch { /* ignore */ }
+        this._yieldHoldTimer = 0;
+    },
+
+    /**
+     * While in the post-clear hold window, schedule one wakeup to unyield.
+     * @param {number} now
+     * @param {boolean} shouldYieldNow
+     */
+    armSiblingYieldHoldTimer(now, shouldYieldNow) {
+        if (typeof setTimeout !== 'function') return;
+        this.clearSiblingYieldHoldTimer();
+        if (!this._siblingYieldActive || shouldYieldNow) return;
+        const elapsed = Math.max(0, now - (this._lastYieldWorthyAt || now));
+        const remain = Math.max(0, YIELD_HOLD_MS - elapsed);
+        this._yieldHoldTimer = setTimeout(() => {
+            this._yieldHoldTimer = 0;
+            try {
+                this.syncSiblingYield();
+            } catch { /* document may be torn down in tests */ }
+        }, remain + 1);
+        if (typeof this._yieldHoldTimer?.unref === 'function') {
+            try { this._yieldHoldTimer.unref(); } catch { /* ignore */ }
+        }
+    },
+
+    /** Apply ABR/buffer yield to healthy playing auto-quality slots. */
+    applySiblingYieldToHealthy() {
+        for (const id of SLOT_IDS) {
+            const player = this.slots[id]?.player;
+            if (!player?.hls) continue;
+            if (!(player.wantPlaying === true || player.playing === true)) continue;
+            if (getSlotPressureReason(id)) {
+                player.clearSiblingYieldProfile?.();
+                continue;
+            }
+            if (player.qualityMode !== 'auto') continue;
+
+            const levels = player.hls.levels || [];
+            const priorCap = player._yieldRestore?.autoLevelCapping;
+            const liveCap = Number.isFinite(player.hls.autoLevelCapping)
+                ? player.hls.autoLevelCapping
+                : -1;
+            const sizeBasedCap = Number.isInteger(priorCap) && priorCap >= 0
+                ? priorCap
+                : (liveCap >= 0 && !player._siblingYielded ? liveCap : -1);
+
+            const levelCap = computeYieldLevelCap({
+                levels,
+                minHeight: YIELD_MIN_HEIGHT,
+                sizeBasedCap
+            });
+            player.applySiblingYieldProfile?.({
+                levelCap,
+                bufferLength: YIELD_BUFFER_LENGTH
+            });
+        }
+    },
+
+    clearSiblingYieldAll() {
+        for (const id of SLOT_IDS) {
+            this.slots[id]?.player?.clearSiblingYieldProfile?.();
+        }
     },
 
     watchPip(video) {

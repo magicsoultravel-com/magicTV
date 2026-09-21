@@ -68,7 +68,9 @@ import {
     takePausedFillTurn,
     releasePausedFill,
     shouldAllowPrefetch,
-    shouldRestartHlsOnError
+    shouldRestartHlsOnError,
+    shouldDeferHealWarmForSlot,
+    YIELD_BUFFER_LENGTH
 } from './loadBudget.js';
 import { tvDebug } from './tvDebug.js';
 import { createWatchAccrualControllers } from './watchAccrual.js';
@@ -200,6 +202,11 @@ export function createPlayerInstance(options) {
         _freezeQuickKickDone: false,
         _freezeFails: 0,
         _freezeCooldownUntil: 0,
+        /** True once freeze stall is confirmed until observation resets. */
+        _freezePressure: false,
+        /** Sibling soft-yield restore token (owned values before MultiView capped us). */
+        _yieldRestore: null,
+        _siblingYielded: false,
         /** Test seam: synchronous freeze tick. */
         _freezeTick: null,
 
@@ -459,13 +466,17 @@ export function createPlayerInstance(options) {
         },
 
         /** Reset freeze observation without touching cooldown/fail/kick state. */
-        _resetFreezeObservation(now = Date.now(), { resetKick = false } = {}) {
+        _resetFreezeObservation(now = Date.now(), {
+            resetKick = false,
+            clearPressure = true
+        } = {}) {
             this._freezeLastTime = Number(this.video?.currentTime ?? NaN);
             this._freezeLastFrames = this._readDecodedFrames(this.video);
             this._freezeLastClockMotionAt = now;
             this._freezeLastFrameMotionAt = now;
             this._freezeMinObservedFps = 0;
             this._freezeHealthyMotionSince = now;
+            if (clearPressure) this._freezePressure = false;
             if (resetKick) this._freezeQuickKickDone = false;
         },
 
@@ -593,6 +604,8 @@ export function createPlayerInstance(options) {
             if (!fullStall && !videoStall) return;
             const kind = fullStall ? 'full' : 'video-only';
             tvDebug('player', `freeze suspected (${kind})`, { slot: this.id });
+            this._freezePressure = true;
+            try { this.emitState(); } catch { /* ignore */ }
             // Re-anchor the stall windows so the next tick measures a fresh
             // confirm window after the kick/heal below.
             this._freezeLastClockMotionAt = fullStall ? now : this._freezeLastClockMotionAt;
@@ -648,13 +661,29 @@ export function createPlayerInstance(options) {
             }
             if (!this._freezeQuickKickDone) {
                 this._quickKickFrozenStream(kind);
-                this._resetFreezeObservation();
+                // Keep freeze pressure so siblings stay yielded through the kick.
+                this._resetFreezeObservation(Date.now(), { clearPressure: false });
+                return;
+            }
+            const deferReason = shouldDeferHealWarmForSlot(this.id);
+            if (deferReason) {
+                // Keep the cheap kick path; defer only the second HLS warm.
+                // Cooldown still advances so we retry by reason on the next cycle
+                // instead of silently giving up forever.
+                this._freezeCooldownUntil = now + FREEZE_HEAL_COOLDOWN_MS;
+                tvDebug('player', 'freeze background heal deferred', {
+                    slot: this.id,
+                    kind,
+                    reason: deferReason
+                });
+                this._resetFreezeObservation(Date.now(), { clearPressure: false });
                 return;
             }
             this.healing = true;
             this._freezeCooldownUntil = now + FREEZE_HEAL_COOLDOWN_MS;
             const healGen = this._freezeGen;
             tvDebug('player', 'freeze background heal start', { slot: this.id, kind });
+            try { this.emitState(); } catch { /* ignore */ }
             try {
                 const switchGen = this.switchGeneration;
                 const ok = await this._runPrepare(this.channel, switchGen, { suppressUi: true });
@@ -915,8 +944,58 @@ export function createPlayerInstance(options) {
         setBufferSize(size) {
             const clamped = Math.min(MAX_BUFFER_SIZE, Math.max(MIN_BUFFER_SIZE, size));
             this.bufferSize = clamped;
-            applyHlsBufferConfig(this.hls, clamped);
+            if (this._siblingYielded && this._yieldRestore) {
+                this._yieldRestore.bufferSize = clamped;
+                // Keep the yielded HLS buffer until MultiView clears yield.
+            } else {
+                applyHlsBufferConfig(this.hls, clamped);
+            }
             return clamped;
+        },
+
+        /**
+         * MultiView-only: temporarily cap ABR / shrink buffer while a sibling
+         * struggles. Stores pre-yield autoLevelCapping + buffer for exact restore.
+         * Skipped when the user locked a manual quality mode.
+         * @param {{ levelCap?: number, bufferLength?: number }} [opts]
+         */
+        applySiblingYieldProfile({
+            levelCap = -1,
+            bufferLength = YIELD_BUFFER_LENGTH
+        } = {}) {
+            if (this.qualityMode !== 'auto') return;
+            if (!this.hls) return;
+            if (!this._yieldRestore) {
+                this._yieldRestore = {
+                    autoLevelCapping: Number.isFinite(this.hls.autoLevelCapping)
+                        ? this.hls.autoLevelCapping
+                        : -1,
+                    bufferSize: this.bufferSize || this.getBufferSize()
+                };
+            }
+            if (Number.isInteger(levelCap) && levelCap >= 0) {
+                this.hls.autoLevelCapping = levelCap;
+            }
+            const buf = Number(bufferLength);
+            if (Number.isFinite(buf) && buf > 0) {
+                applyHlsBufferConfig(this.hls, buf);
+            }
+            this._siblingYielded = true;
+        },
+
+        /** Restore exact pre-yield ABR cap and user buffer size. */
+        clearSiblingYieldProfile() {
+            if (!this._siblingYielded && !this._yieldRestore) return;
+            const restore = this._yieldRestore;
+            if (this.hls && restore) {
+                this.hls.autoLevelCapping = restore.autoLevelCapping;
+                const buf = restore.bufferSize;
+                if (Number.isFinite(buf) && buf > 0) {
+                    applyHlsBufferConfig(this.hls, buf);
+                }
+            }
+            this._yieldRestore = null;
+            this._siblingYielded = false;
         },
 
         getBufferSize() {
@@ -1038,6 +1117,10 @@ export function createPlayerInstance(options) {
                     }
                 } else {
                     this._pausedFillArmed = false;
+                    // Turn loser must release the pipe — otherwise an already
+                    // started backfill keeps fetching while another slot holds
+                    // the turn token.
+                    try { this.hls?.stopLoad?.(); } catch { /* ignore */ }
                 }
             }
             if (this.pausePhase !== prevPhase) {
@@ -1562,6 +1645,8 @@ export function createPlayerInstance(options) {
             this._enterPauseAt = 0;
             this._pausedFillArmed = false;
             releasePausedFill(this.id);
+            this.clearSiblingYieldProfile();
+            this._freezePressure = false;
             this.qualityMode = 'auto';
             this.qualityLevel = -1;
             this.qualityLabel = '—';
