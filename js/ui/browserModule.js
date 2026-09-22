@@ -16,7 +16,7 @@ import {
     bringModuleToFront,
     SHELL_BROWSER
 } from './moduleLayout.js';
-import { browserEndActionsEl, startActionsEl } from './moduleActions.js';
+import { assembleEndCluster, browserEndActionsEl, startActionsEl } from './moduleActions.js';
 import { RemoteModule } from './remoteModule.js';
 
 const MIN_W = 260;
@@ -283,6 +283,7 @@ function restoreActions() {
             browserEndDockParent.appendChild(browserEnd);
         }
     }
+    assembleEndCluster();
     startDockParent = null;
     startNextSibling = null;
     browserEndDockParent = null;
@@ -294,8 +295,8 @@ function mountShellToHost(host) {
     if (!shell || !host) return;
     rememberShellHome(shell);
     rememberActions();
-    const start = startActionsEl() || stagingEl()?.querySelector('.tv-module__actions--start');
-    const browserEnd = browserEndActionsEl() || stagingEl()?.querySelector('.tv-module__actions--browser-end');
+    const start = startActionsEl();
+    const browserEnd = browserEndActionsEl();
     if (start) host.appendChild(start);
     if (browserEnd) host.appendChild(browserEnd);
     host.appendChild(shell);
@@ -481,6 +482,15 @@ function syncRemoteScreenFooter() {
     if (split) MultiView.syncScreenControls?.();
 }
 
+/** Brand / chevron — collapse browser host when split, else the joined remote. */
+function collapseBrowserChrome() {
+    if (isSplit()) {
+        if (uiMode !== 'hidden') BrowserModule.hide();
+        return;
+    }
+    RemoteModule.hide();
+}
+
 function bindOnce() {
     if (bound) return;
     bound = true;
@@ -539,8 +549,7 @@ function bindOnce() {
     });
 
     el('browser-collapse-header-btn')?.addEventListener('click', () => {
-        if (isSplit()) BrowserModule.hide();
-        else RemoteModule.hide();
+        collapseBrowserChrome();
     });
 
     el('browser-dock-side-btn')?.addEventListener('click', () => RemoteModule.toggleDockSide());
@@ -550,11 +559,7 @@ function bindOnce() {
         if (!brand) return;
         if (dialogEl()?.classList.contains('is-dragging')) return;
         e.preventDefault();
-        if (isSplit() && uiMode !== 'hidden') {
-            BrowserModule.hide();
-        } else if (!isSplit()) {
-            RemoteModule.hide();
-        }
+        collapseBrowserChrome();
     });
 
     window.addEventListener('resize', () => {

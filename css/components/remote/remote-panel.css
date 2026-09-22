@@ -99,14 +99,14 @@
     --strip-tile-h: 3rem;
 }
 
-.remote-module__host > .tv-module__actions--remote-end,
-.remote-dock-sheet__inner > .tv-module__actions--remote-end,
-.remote-module__host > .tv-module__actions--browser-end,
-.remote-dock-sheet__inner > .tv-module__actions--browser-end,
+.remote-module__host > :is(.tv-module__actions-cluster--end, .tv-module__actions--remote-end, .tv-module__actions--browser-end),
+.remote-dock-sheet__inner > :is(.tv-module__actions-cluster--end, .tv-module__actions--remote-end, .tv-module__actions--browser-end),
 .browser-module .remote-module__host > .tv-module__actions--browser-end,
 .browser-dock-sheet__inner > .tv-module__actions--browser-end {
     position: absolute;
     top: 0.35rem;
+    left: auto;
+    right: var(--tv-spacing-sm, 0.5rem);
     z-index: 6;
     pointer-events: auto;
     display: flex;
@@ -116,28 +116,27 @@
     gap: 0.25rem;
 }
 
-.remote-module__host > .tv-module__actions--remote-end,
-.remote-dock-sheet__inner > .tv-module__actions--remote-end {
-    left: auto;
-    right: var(--tv-spacing-sm, 0.5rem);
+/* Joined: strips flow as one right-aligned row (remote chrome, then extras). */
+.tv-module__actions-cluster--end > :is(.tv-module__actions--remote-end, .tv-module__actions--browser-end) {
+    position: static;
+    display: contents;
 }
 
-.remote-module__host > .tv-module__actions--browser-end,
-.remote-dock-sheet__inner > .tv-module__actions--browser-end {
-    left: auto;
-    right: var(--tv-spacing-sm, 0.5rem);
+/* Joined cluster already has remote window chrome — hide browser duplicates. */
+.tv-module__actions-cluster--end:has(> .tv-module__actions--remote-end) :is(
+    #browser-external-popout-btn,
+    #browser-split-browser-btn,
+    #browser-dock-toggle,
+    #browser-dock-side-btn,
+    #browser-collapse-header-btn
+) {
+    display: none !important;
 }
 
-/* Merged browser tabs: Remote chrome moves left so it doesn't sit on top of browser actions. */
-.catalog-root.module-layout--joined:not(.is-remote-view) .remote-module__host > .tv-module__actions--remote-end,
-.catalog-root.module-layout--joined:not(.is-remote-view) .remote-dock-sheet__inner > .tv-module__actions--remote-end {
-    left: var(--tv-spacing-sm, 0.5rem);
-    right: auto;
-}
-
-.remote-module__host > .tv-module__actions--remote-end:only-of-type,
-.remote-dock-sheet__inner > .tv-module__actions--remote-end:only-of-type {
-    left: var(--tv-spacing-sm, 0.5rem);
+/* Remote tab: hide browser-only extras so the row matches remote chrome alone. */
+.remote-module__host:has(> .catalog-root.is-remote-view) .tv-module__actions-cluster--end :is(#catalog-layout-btn, #browser-refresh-btn),
+.remote-dock-sheet__inner:has(> .catalog-root.is-remote-view) .tv-module__actions-cluster--end :is(#catalog-layout-btn, #browser-refresh-btn) {
+    display: none !important;
 }
 
 .remote-module__host > .tv-module__actions--start,
@@ -254,8 +253,8 @@
    while the user is hovering (or keyboard-focusing) that particular module.
    Hidden (non-interactive) by default on pointer devices; always visible on touch. */
 @media (hover: hover) {
-    .remote-module__host > .tv-module__actions,
-    .remote-dock-sheet__inner > .tv-module__actions,
+    .remote-module__host > :is(.tv-module__actions, .tv-module__actions-cluster),
+    .remote-dock-sheet__inner > :is(.tv-module__actions, .tv-module__actions-cluster),
     .browser-module .remote-module__host > .tv-module__actions,
     .browser-dock-sheet__inner > .tv-module__actions {
         opacity: 0;
@@ -263,14 +262,10 @@
         transition: opacity 0.15s ease;
     }
 
-    .remote-module__host:hover > .tv-module__actions,
-    .remote-module__host:focus-within > .tv-module__actions,
-    .remote-dock-sheet__inner:hover > .tv-module__actions,
-    .remote-dock-sheet__inner:focus-within > .tv-module__actions,
-    .browser-module .remote-module__host:hover > .tv-module__actions,
-    .browser-module .remote-module__host:focus-within > .tv-module__actions,
-    .browser-dock-sheet__inner:hover > .tv-module__actions,
-    .browser-dock-sheet__inner:focus-within > .tv-module__actions {
+    .remote-module__host:is(:hover, :focus-within) > :is(.tv-module__actions, .tv-module__actions-cluster),
+    .remote-dock-sheet__inner:is(:hover, :focus-within) > :is(.tv-module__actions, .tv-module__actions-cluster),
+    .browser-module .remote-module__host:is(:hover, :focus-within) > .tv-module__actions,
+    .browser-dock-sheet__inner:is(:hover, :focus-within) > .tv-module__actions {
         opacity: 1;
         pointer-events: auto;
     }

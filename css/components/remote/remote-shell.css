@@ -289,7 +289,9 @@ body.remote-dock-side-right .remote-module__dialog {
 .browser-module .remote-module__host #browser-collapse-header-btn,
 .browser-dock-sheet__inner #browser-collapse-header-btn,
 .browser-module .remote-module__host #catalog-layout-btn,
-.browser-dock-sheet__inner #catalog-layout-btn {
+.browser-dock-sheet__inner #catalog-layout-btn,
+.browser-module .remote-module__host #browser-refresh-btn,
+.browser-dock-sheet__inner #browser-refresh-btn {
     display: inline-flex;
 }
 

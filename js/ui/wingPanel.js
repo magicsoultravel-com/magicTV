@@ -106,6 +106,14 @@ export const WingPanel = {
         return guideOpenPref;
     },
 
+    /**
+     * Drop browser wing so the dock tab returns to remote tile width on collapse.
+     */
+    closeBrowserWing({ silent = true } = {}) {
+        if (wingMode !== 'browser') return wingMode;
+        return applyMode('closed', { silent });
+    },
+
     setGuideOpen(open, { silent = false } = {}) {
         guideOpenPref = open === true;
         persistGuideOpen();

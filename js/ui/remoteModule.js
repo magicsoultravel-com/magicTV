@@ -11,7 +11,12 @@ import { RemotePanel, syncRemoteNav } from './remotePanel.js';
 import { GuidePanel } from './guidePanel.js';
 import { WingPanel } from './wingPanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
-import { browserEndActionsEl, remoteEndActionsEl, startActionsEl } from './moduleActions.js';
+import {
+    assembleEndCluster,
+    endClusterEl,
+    remoteEndActionsEl,
+    startActionsEl
+} from './moduleActions.js';
 import { BrowserModule } from './browserModule.js';
 import { ModuleIdleFade } from './moduleIdleFade.js';
 import {
@@ -55,10 +60,8 @@ let mode = 'hidden';
 let targetSlotId = null;
 let dockParent = null;
 let nextSibling = null;
-let remoteEndActionsDockParent = null;
-let remoteEndActionsNextSibling = null;
-let browserEndActionsDockParent = null;
-let browserEndActionsNextSibling = null;
+let endClusterDockParent = null;
+let endClusterNextSibling = null;
 let guideDockParent = null;
 let guideNextSibling = null;
 let bound = false;
@@ -101,21 +104,6 @@ function catalogBody() {
 
 function guidePanelEl() {
     return el('guide-panel');
-}
-
-function moduleStartActions() {
-    return startActionsEl()
-        || stagingEl()?.querySelector('.tv-module__actions--start');
-}
-
-function moduleRemoteEndActions() {
-    return remoteEndActionsEl()
-        || stagingEl()?.querySelector('.tv-module__actions--remote-end');
-}
-
-function moduleBrowserEndActions() {
-    return browserEndActionsEl()
-        || stagingEl()?.querySelector('.tv-module__actions--browser-end');
 }
 
 let startActionsDockParent = null;
@@ -199,8 +187,15 @@ function waitForSheetCollapseAnimation() {
     });
 }
 
+/** Close browser wing + clear bar inline widths so dock peeks at remote tile size. */
+function prepareCollapseToRemoteTileWidth() {
+    WingPanel.closeBrowserWing({ silent: true });
+    clearBarSheetInline();
+}
+
 async function animateDockedCollapseThen(run) {
     if (sheetCollapseAnimating) return;
+    prepareCollapseToRemoteTileWidth();
     if (mode !== 'docked' || !sheetExpanded) {
         run();
         return;
@@ -227,19 +222,18 @@ function syncDockSideBtn() {
     const remoteBtn = el('remote-dock-side-btn');
     const browserBtn = el('browser-dock-side-btn');
     const remoteToRight = dockSide !== 'right';
-    const remoteLabel = remoteToRight ? 'Move to right' : 'Move to left';
     if (remoteBtn) {
+        const label = remoteToRight ? 'Move to right' : 'Move to left';
         remoteBtn.innerHTML = ACTION_ICONS.dockSide;
-        remoteBtn.title = remoteLabel;
-        remoteBtn.setAttribute('aria-label', remoteLabel);
+        remoteBtn.title = label;
+        remoteBtn.setAttribute('aria-label', label);
     }
     if (browserBtn) {
         // Browser is always opposite of remote.
-        const browserOnRight = dockSide !== 'right';
-        const browserLabel = browserOnRight ? 'Move to left' : 'Move to right';
+        const label = remoteToRight ? 'Move to left' : 'Move to right';
         browserBtn.innerHTML = ACTION_ICONS.dockSide;
-        browserBtn.title = browserLabel;
-        browserBtn.setAttribute('aria-label', browserLabel);
+        browserBtn.title = label;
+        browserBtn.setAttribute('aria-label', label);
     }
 }
 
@@ -487,59 +481,33 @@ function getActiveHost() {
     return getInPageHost();
 }
 
+function restoreNode(node, parent, next) {
+    if (!node || !parent) return;
+    if (next && next.parentElement === parent) parent.insertBefore(node, next);
+    else if (node.parentElement !== parent) parent.appendChild(node);
+}
+
 function restoreBodyToStaging() {
     const body = catalogBody();
     const guide = guidePanelEl();
     const staging = stagingEl();
-    const remoteEndActions = moduleRemoteEndActions();
-    const browserEndActions = moduleBrowserEndActions();
-    const startActions = moduleStartActions();
+    const startActions = startActionsEl();
+    const cluster = endClusterEl();
     if (!body || !staging) return;
 
-    if (startActions && startActionsDockParent) {
-        if (startActionsNextSibling && startActionsNextSibling.parentElement === startActionsDockParent) {
-            startActionsDockParent.insertBefore(startActions, startActionsNextSibling);
-        } else {
-            startActionsDockParent.appendChild(startActions);
-        }
+    restoreNode(startActions, startActionsDockParent, startActionsNextSibling);
+
+    if (cluster) {
+        assembleEndCluster();
+        restoreNode(cluster, endClusterDockParent || staging, endClusterNextSibling);
     }
 
-    if (remoteEndActions && remoteEndActionsDockParent) {
-        if (remoteEndActionsNextSibling && remoteEndActionsNextSibling.parentElement === remoteEndActionsDockParent) {
-            remoteEndActionsDockParent.insertBefore(remoteEndActions, remoteEndActionsNextSibling);
-        } else {
-            remoteEndActionsDockParent.appendChild(remoteEndActions);
-        }
-    }
-
-    if (browserEndActions && browserEndActionsDockParent) {
-        if (browserEndActionsNextSibling && browserEndActionsNextSibling.parentElement === browserEndActionsDockParent) {
-            browserEndActionsDockParent.insertBefore(browserEndActions, browserEndActionsNextSibling);
-        } else {
-            browserEndActionsDockParent.appendChild(browserEndActions);
-        }
-    }
-
-    if (dockParent) {
-        if (nextSibling && nextSibling.parentElement === dockParent) {
-            dockParent.insertBefore(body, nextSibling);
-        } else {
-            dockParent.appendChild(body);
-        }
-    } else {
-        staging.appendChild(body);
-    }
+    if (dockParent) restoreNode(body, dockParent, nextSibling);
+    else staging.appendChild(body);
 
     if (guide) {
-        if (guideDockParent) {
-            if (guideNextSibling && guideNextSibling.parentElement === guideDockParent) {
-                guideDockParent.insertBefore(guide, guideNextSibling);
-            } else {
-                guideDockParent.appendChild(guide);
-            }
-        } else {
-            staging.appendChild(guide);
-        }
+        if (guideDockParent) restoreNode(guide, guideDockParent, guideNextSibling);
+        else staging.appendChild(guide);
     }
 
     dockParent = null;
@@ -548,10 +516,8 @@ function restoreBodyToStaging() {
     guideNextSibling = null;
     startActionsDockParent = null;
     startActionsNextSibling = null;
-    remoteEndActionsDockParent = null;
-    remoteEndActionsNextSibling = null;
-    browserEndActionsDockParent = null;
-    browserEndActionsNextSibling = null;
+    endClusterDockParent = null;
+    endClusterNextSibling = null;
 }
 
 function ensureShellsJoinedInRoot() {
@@ -693,9 +659,8 @@ function teleportBodyTo(host) {
     const guide = guidePanelEl();
     if (!body || !host) return;
 
-    const remoteEndActions = moduleRemoteEndActions();
-    const browserEndActions = moduleBrowserEndActions();
-    const startActions = moduleStartActions();
+    const startActions = startActionsEl();
+    const cluster = endClusterEl();
     const split = isSplit();
 
     if (!dockParent) {
@@ -706,24 +671,27 @@ function teleportBodyTo(host) {
         guideDockParent = guide.parentElement;
         guideNextSibling = guide.nextSibling;
     }
-    if (remoteEndActions && !remoteEndActionsDockParent) {
-        remoteEndActionsDockParent = remoteEndActions.parentElement;
-        remoteEndActionsNextSibling = remoteEndActions.nextSibling;
+    if (cluster && !endClusterDockParent) {
+        endClusterDockParent = cluster.parentElement;
+        endClusterNextSibling = cluster.nextSibling;
     }
-    if (!split) {
-        if (browserEndActions && !browserEndActionsDockParent) {
-            browserEndActionsDockParent = browserEndActions.parentElement;
-            browserEndActionsNextSibling = browserEndActions.nextSibling;
-        }
-        if (startActions && !startActionsDockParent) {
-            startActionsDockParent = startActions.parentElement;
-            startActionsNextSibling = startActions.nextSibling;
-        }
+    if (!split && startActions && !startActionsDockParent) {
+        startActionsDockParent = startActions.parentElement;
+        startActionsNextSibling = startActions.nextSibling;
     }
 
     if (!split && startActions) host.appendChild(startActions);
-    if (remoteEndActions) host.appendChild(remoteEndActions);
-    if (!split && browserEndActions) host.appendChild(browserEndActions);
+
+    if (!split) {
+        const assembled = assembleEndCluster();
+        if (assembled) host.appendChild(assembled);
+    } else if (cluster) {
+        // Split: remote-end stays in the cluster; browser-end leaves via BrowserModule.
+        const remoteEnd = remoteEndActionsEl();
+        if (remoteEnd) cluster.appendChild(remoteEnd);
+        host.appendChild(cluster);
+    }
+
     host.appendChild(body);
     if (guide) host.appendChild(guide);
     syncCatalogRootClasses(body);
@@ -1155,10 +1123,8 @@ function finishClose() {
 
     mode = 'hidden';
     targetSlotId = null;
-    remoteEndActionsDockParent = null;
-    remoteEndActionsNextSibling = null;
-    browserEndActionsDockParent = null;
-    browserEndActionsNextSibling = null;
+    endClusterDockParent = null;
+    endClusterNextSibling = null;
 
     MultiView.syncTileStatusHighlight?.();
     updateBodyClasses();
@@ -1181,9 +1147,12 @@ function finishHideSplit() {
     const body = catalogBody();
     const guide = guidePanelEl();
     const staging = stagingEl();
-    const remoteEnd = moduleRemoteEndActions();
+    const cluster = endClusterEl();
     if (body && staging) {
-        if (remoteEnd) staging.appendChild(remoteEnd);
+        if (cluster) {
+            assembleEndCluster();
+            staging.appendChild(cluster);
+        }
         staging.appendChild(body);
         if (guide) staging.appendChild(guide);
     }
@@ -1191,8 +1160,8 @@ function finishHideSplit() {
     nextSibling = null;
     guideDockParent = null;
     guideNextSibling = null;
-    remoteEndActionsDockParent = null;
-    remoteEndActionsNextSibling = null;
+    endClusterDockParent = null;
+    endClusterNextSibling = null;
 
     mode = 'hidden';
     persistState({ open: false, mode: 'hidden' });
