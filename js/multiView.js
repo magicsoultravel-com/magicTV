@@ -763,9 +763,7 @@ export const MultiView = {
         if (clamped > 0) this.lastVolume = clamped;
         savePlayerState({ volume: clamped });
         const primary = this.getPrimary();
-        if (primary && clamped > 0) {
-            primary.muted = false;
-        } else if (primary && clamped === 0) {
+        if (primary && clamped === 0) {
             primary.muted = true;
         }
         this.applyVolumeToAll();
