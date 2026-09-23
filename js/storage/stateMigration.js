@@ -7,16 +7,30 @@ import {
     parsePersistedStateRaw,
     writePersistedState
 } from './persistedState.js';
-import { loadPlayerState } from './playerState.js';
+import { loadPlayerStateFrom } from './playerState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
-export const STATE_SCHEMA_VERSION = 1;
+export const STATE_SCHEMA_VERSION = 2;
 export const CORRUPT_BACKUP_KEY = 'matrix_tv_state_corrupt_backup';
 
 const HEADER_MODES = new Set(['full', 'colorMark', 'greyMark', 'greyMarkBehind']);
 const HEADER_MARK_MODES = new Set(['colorMark', 'greyMark', 'greyMarkBehind']);
 const REMOTE_MODULE_OPACITY_MIN = 33;
 const REMOTE_MODULE_OPACITY_MAX = 100;
+
+/** Dead top-level keys no longer read by the app. */
+const ORPHAN_STATE_KEYS = [
+    'browserW',
+    'browserH',
+    'browserX',
+    'browserY',
+    'browserFloating',
+    'browseSort',
+    'browseSortDir',
+    'countrySort',
+    'liveOffset',
+    'hideOfflineChannels'
+];
 
 function hasFavoriteFolders(folders) {
     return Array.isArray(folders) && folders.length > 0;
@@ -75,6 +89,15 @@ function applySettingsMigrations(next) {
     return next;
 }
 
+function stripOrphanAndLegacyKeys(next) {
+    delete next.channelPicker;
+    delete next.chanBindScope;
+    for (const key of ORPHAN_STATE_KEYS) {
+        delete next[key];
+    }
+    return next;
+}
+
 /** Prefer non-empty base folders when load returned empty defaults. */
 function pickLibraryFields(player, base) {
     const baseFolders = Array.isArray(base.favoriteFolders) ? base.favoriteFolders : [];
@@ -106,13 +129,16 @@ function pickLibraryFields(player, base) {
 }
 
 /**
- * Build a canonical blob from the current store (or empty after corrupt reset).
- * @param {Record<string, any>} base
+ * Pure rewrite of a persisted-state object into the current canonical shape.
+ * Does not read or write localStorage.
+ * @param {Record<string, any>|null|undefined} base
+ * @returns {Record<string, any>}
  */
-function buildCanonicalState(base) {
-    const player = loadPlayerState();
-    const next = { ...base };
-    const library = pickLibraryFields(player, base);
+export function canonicalizePersistedState(base) {
+    const src = base && typeof base === 'object' && !Array.isArray(base) ? base : {};
+    const player = loadPlayerStateFrom(src);
+    const next = { ...src };
+    const library = pickLibraryFields(player, src);
 
     next.favorites = library.favorites;
     next.favoritesMeta = library.favoritesMeta;
@@ -141,9 +167,7 @@ function buildCanonicalState(base) {
     next.sortDir = player.sortDir;
     next.categoryFilter = player.categoryFilter;
 
-    delete next.channelPicker;
-    delete next.chanBindScope;
-
+    stripOrphanAndLegacyKeys(next);
     applySettingsMigrations(next);
     next.stateSchemaVersion = STATE_SCHEMA_VERSION;
     return next;
@@ -166,7 +190,7 @@ export function migratePersistedState() {
     }
 
     const base = parsePersistedStateRaw().value;
-    const next = buildCanonicalState(base);
+    const next = canonicalizePersistedState(base);
     const written = writePersistedState(next, { force: true });
     if (written !== next) repaired = true;
 

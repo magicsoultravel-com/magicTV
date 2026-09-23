@@ -37,7 +37,9 @@ let patchPersistedState;
 let writePersistedState;
 let compactNonEssentialPersistedState;
 let migratePersistedState;
+let canonicalizePersistedState;
 let loadPlayerState;
+let loadPlayerStateFrom;
 
 before(async () => {
     ({
@@ -49,12 +51,12 @@ before(async () => {
     } = await import('../js/storage/persistedState.js'));
     ({
         migratePersistedState,
+        canonicalizePersistedState,
         STATE_SCHEMA_VERSION,
         CORRUPT_BACKUP_KEY
     } = await import('../js/storage/stateMigration.js'));
-    ({ loadPlayerState } = await import('../js/storage/playerState.js'));
+    ({ loadPlayerState, loadPlayerStateFrom } = await import('../js/storage/playerState.js'));
 });
-
 beforeEach(() => {
     store.clear();
     throwOnSetItem = false;
@@ -258,4 +260,75 @@ test('compactNonEssentialPersistedState keeps library keys', () => {
     assert.equal(compacted.mosaicSlots.center.url, '');
     assert.equal(compacted.remoteModule.open, false);
     assert.equal(compacted.channelPicker, undefined);
+});
+
+test('canonicalizePersistedState is pure and strips orphan keys', () => {
+    store.set(STATE_KEY, JSON.stringify({ favorites: ['iptv-org:KEEP.us'], volume: 0.2 }));
+    const before = store.get(STATE_KEY);
+
+    const sparse = {
+        favorites: ['iptv-org:A.us', 'iptv-org:B.us'],
+        volume: 0.4,
+        browserW: 908,
+        browserH: 711,
+        browserX: 10,
+        browserY: 20,
+        browserFloating: true,
+        browseSort: 'name',
+        browseSortDir: 'asc',
+        countrySort: 'name',
+        liveOffset: 3,
+        hideOfflineChannels: true,
+        stateSchemaVersion: 1
+    };
+    const next = canonicalizePersistedState(sparse);
+
+    assert.equal(store.get(STATE_KEY), before);
+    assert.equal(next.stateSchemaVersion, STATE_SCHEMA_VERSION);
+    assert.equal(STATE_SCHEMA_VERSION, 2);
+    assert.deepEqual(next.favorites, ['iptv-org:A.us', 'iptv-org:B.us']);
+    assert.equal(next.browserW, undefined);
+    assert.equal(next.browserH, undefined);
+    assert.equal(next.browserFloating, undefined);
+    assert.equal(next.browseSort, undefined);
+    assert.equal(next.liveOffset, undefined);
+    assert.equal(next.hideOfflineChannels, undefined);
+    assert.ok(Array.isArray(next.favoriteFolders));
+    assert.ok(next.chanBindScopeBySlot);
+});
+
+test('schema v1 to v2 boot strips orphans', () => {
+    store.set(STATE_KEY, JSON.stringify({
+        favorites: ['iptv-org:A.us'],
+        volume: 0.5,
+        stateSchemaVersion: 1,
+        browserW: 908,
+        liveOffset: 3,
+        hideOfflineChannels: true
+    }));
+
+    const result = migratePersistedState();
+    assert.equal(result.migrated, true);
+
+    const raw = JSON.parse(store.get(STATE_KEY));
+    assert.equal(raw.stateSchemaVersion, 2);
+    assert.equal(raw.browserW, undefined);
+    assert.equal(raw.liveOffset, undefined);
+    assert.equal(raw.hideOfflineChannels, undefined);
+    assert.deepEqual(raw.favorites, ['iptv-org:A.us']);
+});
+
+test('loadPlayerStateFrom matches loadPlayerState for stored raw', () => {
+    const blob = {
+        favorites: ['iptv-org:A.us'],
+        favoritesMeta: [{ key: 'iptv-org:A.us', name: 'A', logo: '', countrycode: 'US' }],
+        volume: 0.55,
+        bufferSize: 30
+    };
+    store.set(STATE_KEY, JSON.stringify(blob));
+    const fromStore = loadPlayerState();
+    const fromRaw = loadPlayerStateFrom(blob);
+    assert.deepEqual(fromRaw.favorites, fromStore.favorites);
+    assert.equal(fromRaw.volume, fromStore.volume);
+    assert.equal(fromRaw.bufferSize, fromStore.bufferSize);
 });

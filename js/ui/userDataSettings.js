@@ -23,6 +23,10 @@ function formatSummary(summary) {
             lines.push(`Exported: ${date.toLocaleString()}`);
         }
     }
+    if (Array.isArray(summary.warnings) && summary.warnings.length) {
+        lines.push('', 'Warnings:');
+        for (const w of summary.warnings) lines.push(`- ${w}`);
+    }
     return lines.join('\n');
 }
 
@@ -46,7 +50,10 @@ async function handleImportFile(file) {
     const mergeLibrary = window.confirm(
         'Merge library data only?\n\n'
         + 'OK = Merge favorites, recents, visited, hidden, and watch stats into your current data.\n'
-        + 'Cancel = Replace all user data with this backup.'
+        + 'Cancel = Replace all user data with this backup'
+        + (summary.sparse
+            ? ' (missing folders/settings in this file will reset to defaults).'
+            : '.')
     );
 
     try {

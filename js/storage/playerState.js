@@ -487,34 +487,37 @@ function loadLibraryFieldsBestEffort(raw) {
     return { favorites, favoritesMeta, favoriteFolders, favoritesRootOrder };
 }
 
-/** Parsed player fields from the shared blob (does not strip sibling keys). */
-export function loadPlayerState() {
-    const raw = readPersistedState();
+/**
+ * Parsed player fields from a raw blob object (does not touch storage).
+ * @param {Record<string, any>|null|undefined} raw
+ */
+export function loadPlayerStateFrom(raw) {
+    const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
     try {
-        const favorites = Array.isArray(raw.favorites)
-            ? raw.favorites.map(migrateFavoriteRef)
+        const favorites = Array.isArray(src.favorites)
+            ? src.favorites.map(migrateFavoriteRef)
             : [];
-        const favoritesMeta = normalizeFavoritesMeta(favorites, raw.favoritesMeta);
-        const recentsMeta = migrateRecentsMeta(raw);
+        const favoritesMeta = normalizeFavoritesMeta(favorites, src.favoritesMeta);
+        const recentsMeta = migrateRecentsMeta(src);
         const recents = recentsMeta.map((e) => e.key);
-        const visitedChannels = normalizeVisitedChannels(raw);
-        const visitedChannelsMeta = normalizeVisitedMeta(visitedChannels, raw.visitedChannelsMeta);
-        const hiddenChannels = Array.isArray(raw.hiddenChannels)
-            ? raw.hiddenChannels.map(migrateFavoriteRef)
+        const visitedChannels = normalizeVisitedChannels(src);
+        const visitedChannelsMeta = normalizeVisitedMeta(visitedChannels, src.visitedChannelsMeta);
+        const hiddenChannels = Array.isArray(src.hiddenChannels)
+            ? src.hiddenChannels.map(migrateFavoriteRef)
             : [];
-        const hiddenChannelsMeta = normalizeHiddenMeta(hiddenChannels, raw.hiddenChannelsMeta);
-        const favoriteFolders = normalizeFavoriteFolders(favorites, raw.favoriteFolders);
+        const hiddenChannelsMeta = normalizeHiddenMeta(hiddenChannels, src.hiddenChannelsMeta);
+        const favoriteFolders = normalizeFavoriteFolders(favorites, src.favoriteFolders);
         const favoritesRootOrder = normalizeFavoritesRootOrder(
             favorites,
             favoriteFolders,
-            raw.favoritesRootOrder
+            src.favoritesRootOrder
         );
         const chanBindScopeBySlot = normalizeChanBindScopeBySlot(
-            raw.chanBindScopeBySlot,
+            src.chanBindScopeBySlot,
             favoriteFolders,
-            raw.chanBindScope
+            src.chanBindScope
         );
-        const watchStatsMeta = normalizeWatchStatsMeta(raw.watchStatsMeta);
+        const watchStatsMeta = normalizeWatchStatsMeta(src.watchStatsMeta);
 
         return {
             favorites,
@@ -529,31 +532,36 @@ export function loadPlayerState() {
             hiddenChannels,
             hiddenChannelsMeta,
             watchStatsMeta,
-            volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
-            lastChannelKey: raw.lastChannelKey ? migrateFavoriteRef(raw.lastChannelKey) : null,
-            lastChannelName: raw.lastChannelName || '',
-            wasPlaying: raw.wasPlaying === true,
-            bufferSize: Number.isFinite(raw.bufferSize)
-                ? Math.min(MAX_BUFFER_SIZE, Math.max(MIN_BUFFER_SIZE, raw.bufferSize))
+            volume: Number.isFinite(src.volume) ? Math.min(1, Math.max(0, src.volume)) : 0.85,
+            lastChannelKey: src.lastChannelKey ? migrateFavoriteRef(src.lastChannelKey) : null,
+            lastChannelName: src.lastChannelName || '',
+            wasPlaying: src.wasPlaying === true,
+            bufferSize: Number.isFinite(src.bufferSize)
+                ? Math.min(MAX_BUFFER_SIZE, Math.max(MIN_BUFFER_SIZE, src.bufferSize))
                 : DEFAULT_BUFFER_SIZE,
-            reattemptInterval: clampReattemptInterval(raw.reattemptInterval),
-            reattempts: clampReattempts(raw.reattempts),
-            mosaicSlots: normalizeMosaicSlots(raw.mosaicSlots),
-            mosaicPlacement: normalizeMosaicPlacement(raw.mosaicPlacement),
-            mosaicLayoutMode: normalizeMosaicLayoutMode(raw.mosaicLayoutMode),
-            remoteModule: normalizeRemoteModule(raw.remoteModule, raw.channelPicker),
-            channelPicker: normalizeChannelPicker(raw.channelPicker),
-            sortBy: normalizeSortBy(raw.sortBy),
-            sortDir: normalizeSortDir(raw.sortDir),
-            categoryFilter: normalizeCategoryFilter(raw.categoryFilter)
+            reattemptInterval: clampReattemptInterval(src.reattemptInterval),
+            reattempts: clampReattempts(src.reattempts),
+            mosaicSlots: normalizeMosaicSlots(src.mosaicSlots),
+            mosaicPlacement: normalizeMosaicPlacement(src.mosaicPlacement),
+            mosaicLayoutMode: normalizeMosaicLayoutMode(src.mosaicLayoutMode),
+            remoteModule: normalizeRemoteModule(src.remoteModule, src.channelPicker),
+            channelPicker: normalizeChannelPicker(src.channelPicker),
+            sortBy: normalizeSortBy(src.sortBy),
+            sortDir: normalizeSortDir(src.sortDir),
+            categoryFilter: normalizeCategoryFilter(src.categoryFilter)
         };
     } catch {
         try {
-            return { ...emptyPlayerState(), ...loadLibraryFieldsBestEffort(raw) };
+            return { ...emptyPlayerState(), ...loadLibraryFieldsBestEffort(src) };
         } catch {
             return emptyPlayerState();
         }
     }
+}
+
+/** Parsed player fields from the shared blob (does not strip sibling keys). */
+export function loadPlayerState() {
+    return loadPlayerStateFrom(readPersistedState());
 }
 
 const KNOWN_PLAYER_PATCH_KEYS = new Set([

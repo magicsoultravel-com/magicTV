@@ -117,8 +117,101 @@ test('applyUserDataReplace overwrites local state and extras', () => {
     assert.deepEqual(player.favorites, ['iptv-org:B.us']);
     const raw = JSON.parse(store.get('matrix_tv_state'));
     assert.equal(raw.textSize, 16);
+    assert.equal(raw.stateSchemaVersion, 2);
     assert.equal(store.get('magic_tv_clock_style'), 'analog');
+    assert.equal(store.get('magic_tv_clock_hidden'), '1');
     assert.equal(store.get('magicTV:castHostAudio'), 'false');
+});
+
+test('applyUserDataReplace canonicalizes sparse backup and strips orphans', async () => {
+    seedLocalState();
+    const localBefore = store.get('matrix_tv_state');
+    const payload = {
+        format: UserDataExport.EXPORT_FORMAT,
+        version: UserDataExport.EXPORT_VERSION,
+        exportedAt: '2026-09-23T00:00:00.000Z',
+        appVersion: '1.0.0',
+        state: {
+            favorites: ['iptv-org:Sparse.us'],
+            volume: 0.1,
+            browserW: 908,
+            browserH: 711,
+            liveOffset: 3,
+            hideOfflineChannels: true,
+            browseSort: 'name'
+        },
+        extras: {
+            clockStyle: 'segment',
+            clockHidden: false,
+            castHostAudio: false,
+            castHostVideo: false
+        }
+    };
+    const { canonicalizePersistedState } = await import('../js/storage/stateMigration.js');
+    const preview = canonicalizePersistedState(payload.state);
+    assert.equal(store.get('matrix_tv_state'), localBefore);
+    assert.equal(preview.browserW, undefined);
+    assert.equal(preview.stateSchemaVersion, 2);
+
+    UserDataExport.applyUserDataReplace(payload);
+    const raw = JSON.parse(store.get('matrix_tv_state'));
+    assert.deepEqual(raw.favorites, ['iptv-org:Sparse.us']);
+    assert.equal(raw.stateSchemaVersion, 2);
+    assert.equal(raw.browserW, undefined);
+    assert.equal(raw.liveOffset, undefined);
+    assert.equal(raw.hideOfflineChannels, undefined);
+    assert.equal(raw.themeId, undefined);
+    assert.deepEqual(raw.favoriteFolders, []);
+});
+
+test('buildUserDataExport emits canonical state without mutating storage', () => {
+    store.set('matrix_tv_state', JSON.stringify({
+        favorites: ['iptv-org:A.us'],
+        volume: 0.4,
+        browserW: 908,
+        liveOffset: 3,
+        hideOfflineChannels: true
+    }));
+    store.set('magic_tv_clock_hidden', '1');
+    const before = store.get('matrix_tv_state');
+    const payload = UserDataExport.buildUserDataExport();
+    assert.equal(store.get('matrix_tv_state'), before);
+    assert.equal(payload.state.stateSchemaVersion, 2);
+    assert.equal(payload.state.browserW, undefined);
+    assert.equal(payload.state.liveOffset, undefined);
+    assert.equal(payload.extras.clockHidden, true);
+});
+
+test('clockHidden round-trips with tvClock 1/0 storage', () => {
+    seedLocalState();
+    store.set('magic_tv_clock_hidden', '1');
+    const exported = UserDataExport.buildUserDataExport();
+    assert.equal(exported.extras.clockHidden, true);
+
+    store.clear();
+    seedLocalState();
+    store.set('magic_tv_clock_hidden', '0');
+    UserDataExport.applyUserDataReplace({
+        ...exported,
+        extras: { ...exported.extras, clockHidden: true }
+    });
+    assert.equal(store.get('magic_tv_clock_hidden'), '1');
+});
+
+test('summarizeUserData flags sparse backups', () => {
+    const summary = UserDataExport.summarizeUserData({
+        format: UserDataExport.EXPORT_FORMAT,
+        version: 1,
+        state: {
+            favorites: ['iptv-org:A.us', 'iptv-org:B.us'],
+            recentsMeta: []
+        }
+    });
+    assert.equal(summary.favorites, 2);
+    assert.equal(summary.folders, 0);
+    assert.equal(summary.sparse, true);
+    assert.ok(summary.warnings.some((w) => /folders/i.test(w)));
+    assert.ok(summary.warnings.some((w) => /stateSchemaVersion/i.test(w)));
 });
 
 test('applyUserDataMergeLibrary unions library data and keeps local settings', () => {

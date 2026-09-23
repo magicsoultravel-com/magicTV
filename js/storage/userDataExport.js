@@ -1,7 +1,7 @@
 /**
  * Export / import user data (localStorage only — excludes IndexedDB tile/catalog caches).
  */
-import { readPersistedState, STATE_KEY } from './persistedState.js';
+import { readPersistedState, writePersistedState } from './persistedState.js';
 import {
     loadPlayerState,
     savePlayerState,
@@ -9,6 +9,7 @@ import {
     normalizeWatchStatsMeta,
     normalizeChanBindScopeBySlot
 } from './playerState.js';
+import { canonicalizePersistedState } from './stateMigration.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
 export const EXPORT_FORMAT = 'magictv-user-data';
@@ -35,14 +36,24 @@ function writeExtra(key, value) {
     } catch { /* ignore */ }
 }
 
+/** Accept tvClock '1'/'0' and legacy 'true'/'false'. */
 function readBoolExtra(key) {
     const v = readExtra(key);
-    if (v === 'true') return true;
-    if (v === 'false') return false;
+    if (v === 'true' || v === '1') return true;
+    if (v === 'false' || v === '0') return false;
     return null;
 }
 
 function writeBoolExtra(key, value) {
+    if (value == null) {
+        writeExtra(key, null);
+        return;
+    }
+    // Match tvClock persistence ('1' / '0').
+    writeExtra(key, value ? '1' : '0');
+}
+
+function writeCastBoolExtra(key, value) {
     writeExtra(key, value == null ? null : String(Boolean(value)));
 }
 
@@ -244,7 +255,7 @@ export function buildUserDataExport() {
         version: EXPORT_VERSION,
         exportedAt: new Date().toISOString(),
         appVersion: APP_VERSION,
-        state: readPersistedState(),
+        state: canonicalizePersistedState(readPersistedState()),
         extras: {
             clockStyle: extras.clockStyle,
             clockHidden: extras.clockHidden === true,
@@ -278,29 +289,44 @@ export function parseUserDataImport(text) {
 
 export function summarizeUserData(payload) {
     const state = payload?.state || {};
+    const favorites = Array.isArray(state.favorites) ? state.favorites.length : 0;
+    const folders = Array.isArray(state.favoriteFolders) ? state.favoriteFolders.length : 0;
+    const rootOrder = Array.isArray(state.favoritesRootOrder) ? state.favoritesRootOrder.length : 0;
     const recentsLen = Array.isArray(state.recentsMeta)
         ? state.recentsMeta.length
         : (Array.isArray(state.recents) ? state.recents.length : 0);
+    const warnings = [];
+    if (favorites > 0 && folders === 0) {
+        warnings.push('Favorites present but no folders — replace will leave a flat library.');
+    }
+    if (favorites > 0 && rootOrder === 0 && folders === 0) {
+        warnings.push('No favorites root order in this backup.');
+    }
+    if (state.stateSchemaVersion == null) {
+        warnings.push('Backup has no stateSchemaVersion (older or sparse export).');
+    }
     return {
-        favorites: Array.isArray(state.favorites) ? state.favorites.length : 0,
-        folders: Array.isArray(state.favoriteFolders) ? state.favoriteFolders.length : 0,
+        favorites,
+        folders,
         recents: recentsLen,
         hidden: Array.isArray(state.hiddenChannels) ? state.hiddenChannels.length : 0,
         visited: Array.isArray(state.visitedChannels) ? state.visitedChannels.length : 0,
         watchStats: Array.isArray(state.watchStatsMeta) ? state.watchStatsMeta.length : 0,
         exportedAt: payload?.exportedAt || null,
-        appVersion: payload?.appVersion || null
+        appVersion: payload?.appVersion || null,
+        sparse: warnings.length > 0,
+        warnings
     };
 }
 
 export function applyUserDataReplace(payload) {
-    const state = payload.state;
-    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    const next = canonicalizePersistedState(payload.state);
+    writePersistedState(next, { force: true });
     const extras = payload.extras || {};
     if (extras.clockStyle != null) writeExtra(CLOCK_STYLE_KEY, extras.clockStyle);
     if (extras.clockHidden != null) writeBoolExtra(CLOCK_HIDDEN_KEY, extras.clockHidden);
-    if (extras.castHostAudio != null) writeBoolExtra(CAST_HOST_AUDIO_KEY, extras.castHostAudio);
-    if (extras.castHostVideo != null) writeBoolExtra(CAST_HOST_VIDEO_KEY, extras.castHostVideo);
+    if (extras.castHostAudio != null) writeCastBoolExtra(CAST_HOST_AUDIO_KEY, extras.castHostAudio);
+    if (extras.castHostVideo != null) writeCastBoolExtra(CAST_HOST_VIDEO_KEY, extras.castHostVideo);
 }
 
 export function applyUserDataMergeLibrary(payload) {
