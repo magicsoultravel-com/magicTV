@@ -14,6 +14,8 @@ import { ChromecastManager } from '../cast/chromecastManager.js';
 import { buildChannelIndex, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
 import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
 import { setMarqueeText } from '../ui/marquee.js';
+import { SettingsStore } from '../storage/settingsStore.js';
+import { formatWatchDuration, getLiveWatchSeconds } from '../storage/watchStats.js';
 
 function pipSupported() {
     return typeof document !== 'undefined'
@@ -410,9 +412,86 @@ export const tileChromeMethods = {
             }
 
             this.syncTileCastUi(tile, id, player);
+            this.syncTileWatchEcho(tile, player);
         });
         this.syncMosaicChrome();
         if (this.screensStripExpanded) this.syncScreenControls();
+        this.ensureWatchChromeTick();
+    },
+
+    /**
+     * Update session / total play-time chrome on one mosaic tile.
+     * @param {HTMLElement} tile
+     * @param {object|null|undefined} player
+     */
+    syncTileWatchEcho(tile, player) {
+        const watchEl = tile?.querySelector('.tv-player-tile__watch-echo');
+        if (!watchEl) return;
+        const showSession = SettingsStore.getShowMosaicWatchSession();
+        const showTotal = SettingsStore.getShowMosaicWatchTotal();
+        const hasChannel = Boolean(player?.channel);
+        if (!hasChannel || (!showSession && !showTotal)) {
+            watchEl.classList.add('is-hidden');
+            watchEl.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        const { session, total } = getLiveWatchSeconds(player);
+        const sessionEl = watchEl.querySelector('.tv-player-tile__watch-session');
+        const totalEl = watchEl.querySelector('.tv-player-tile__watch-total');
+        const sepEl = watchEl.querySelector('.tv-player-tile__watch-sep');
+        if (sessionEl) {
+            sessionEl.textContent = showSession ? formatWatchDuration(session) : '';
+            sessionEl.classList.toggle('is-hidden', !showSession);
+        }
+        if (totalEl) {
+            totalEl.textContent = showTotal ? formatWatchDuration(total) : '';
+            totalEl.classList.toggle('is-hidden', !showTotal);
+        }
+        if (sepEl) sepEl.classList.toggle('is-hidden', !(showSession && showTotal));
+        watchEl.classList.remove('is-hidden');
+        watchEl.setAttribute('aria-hidden', 'false');
+    },
+
+    /** Lightweight 1s tick for watch-echo text (and cast accrual sync). */
+    ensureWatchChromeTick() {
+        const need = SettingsStore.getShowMosaicWatchSession()
+            || SettingsStore.getShowMosaicWatchTotal()
+            || ChromecastManager.isCasting();
+        if (!need) {
+            this.stopWatchChromeTick();
+            return;
+        }
+        if (this._watchChromeTick) return;
+        this._watchChromeTick = setInterval(() => {
+            this.updateWatchChromeOnly();
+        }, 1000);
+        if (typeof this._watchChromeTick?.unref === 'function') this._watchChromeTick.unref();
+    },
+
+    stopWatchChromeTick() {
+        if (!this._watchChromeTick) return;
+        clearInterval(this._watchChromeTick);
+        this._watchChromeTick = 0;
+    },
+
+    updateWatchChromeOnly() {
+        const showSession = SettingsStore.getShowMosaicWatchSession();
+        const showTotal = SettingsStore.getShowMosaicWatchTotal();
+        const casting = ChromecastManager.isCasting();
+        if (!showSession && !showTotal && !casting) {
+            this.stopWatchChromeTick();
+            return;
+        }
+        for (const id of SLOT_IDS) {
+            const slot = this.slots?.[id];
+            const player = slot?.player;
+            if (player?.syncWatchAccrual) {
+                try { player.syncWatchAccrual(); } catch { /* ignore */ }
+            }
+            if (!showSession && !showTotal) continue;
+            const tile = el(`player-tile-${id}`);
+            if (tile) this.syncTileWatchEcho(tile, player);
+        }
     },
 
     syncTileCastUi(tile, slotId, player) {

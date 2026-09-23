@@ -192,6 +192,11 @@ export const MultiView = {
         ChromecastManager.init(this).catch(() => {});
         window.addEventListener('tv:cast_state_changed', () => this.scheduleRefreshTiles());
         window.addEventListener('tv:cast_host_toggled', () => this.scheduleRefreshTiles());
+        window.addEventListener('tv:mosaic_watch_chrome_changed', () => {
+            this.ensureWatchChromeTick();
+            this.updateWatchChromeOnly();
+        });
+        this.ensureWatchChromeTick();
         this.bindPlacementChrome();
         // Stubs only — full stream restore is hydrateMosaicFromSaved() from app.js.
         if (!this._deferFullRestore) {

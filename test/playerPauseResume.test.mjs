@@ -504,7 +504,7 @@ test('isHealthyWatchPlayback credits active play only', () => {
     assert.equal(isHealthyWatchPlayback({ ...base, playing: false, wantPlaying: true }), false);
 });
 
-test('isHealthyWatchPlayback is false while document is hidden', () => {
+test('isHealthyWatchPlayback is false while document is hidden and video paused', () => {
     const base = {
         hasChannel: true,
         playing: true,
@@ -514,18 +514,36 @@ test('isHealthyWatchPlayback is false while document is hidden', () => {
         pausePhase: 'idle',
         stopped: false,
         error: null,
-        posterDataUrl: null
+        posterDataUrl: null,
+        videoPaused: true
     };
     const prev = globalThis.document;
     globalThis.document = { visibilityState: 'hidden' };
     try {
         assert.equal(isHealthyWatchPlayback(base), false);
+        assert.equal(isHealthyWatchPlayback({ ...base, videoPaused: false }), true);
         globalThis.document.visibilityState = 'visible';
-        assert.equal(isHealthyWatchPlayback(base), true);
+        assert.equal(isHealthyWatchPlayback({ ...base, videoPaused: true }), true);
     } finally {
         if (prev === undefined) delete globalThis.document;
         else globalThis.document = prev;
     }
+});
+
+test('isHealthyWatchPlayback rejects freeze pressure', () => {
+    const base = {
+        hasChannel: true,
+        playing: true,
+        wantPlaying: true,
+        loading: false,
+        loadPhase: 'idle',
+        pausePhase: 'idle',
+        stopped: false,
+        error: null,
+        posterDataUrl: null,
+        videoPaused: false
+    };
+    assert.equal(isHealthyWatchPlayback({ ...base, freezePressure: true }), false);
 });
 
 test('shouldClearStaleBufferOnTimeupdate recovers sticky hitch flags', () => {

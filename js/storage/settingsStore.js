@@ -57,6 +57,8 @@ const LIST_WIDTH_STEP = 10;
 const REMOTE_MODULE_OPACITY_MIN = 33;
 const REMOTE_MODULE_OPACITY_MAX = 100;
 const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
+const DEFAULT_SHOW_MOSAIC_WATCH_SESSION = true;
+const DEFAULT_SHOW_MOSAIC_WATCH_TOTAL = true;
 const DEFAULT_TV_EMPTY_SPACE_TRANSPARENT = false;
 const DEFAULT_TV_EMPTY_SPACE_TRANSPARENCY = 100;
 const TV_EMPTY_SPACE_TRANSPARENCY_MIN = 0;
@@ -277,6 +279,32 @@ export const SettingsStore = {
         return next;
     },
 
+    getShowMosaicWatchSession() {
+        const raw = readPersistedState();
+        return raw.showMosaicWatchSession != null
+            ? raw.showMosaicWatchSession === true
+            : DEFAULT_SHOW_MOSAIC_WATCH_SESSION;
+    },
+
+    setShowMosaicWatchSession(value) {
+        const next = value === true;
+        patchPersistedState({ showMosaicWatchSession: next });
+        return next;
+    },
+
+    getShowMosaicWatchTotal() {
+        const raw = readPersistedState();
+        return raw.showMosaicWatchTotal != null
+            ? raw.showMosaicWatchTotal === true
+            : DEFAULT_SHOW_MOSAIC_WATCH_TOTAL;
+    },
+
+    setShowMosaicWatchTotal(value) {
+        const next = value === true;
+        patchPersistedState({ showMosaicWatchTotal: next });
+        return next;
+    },
+
     getTvEmptySpaceTransparent() {
         const raw = readPersistedState();
         return raw.tvEmptySpaceTransparent != null
@@ -434,6 +462,8 @@ export const SettingsStore = {
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
         const remoteModuleOpacity = this.setRemoteModuleOpacity(DEFAULT_REMOTE_MODULE_OPACITY);
         const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
+        const showMosaicWatchSession = this.setShowMosaicWatchSession(DEFAULT_SHOW_MOSAIC_WATCH_SESSION);
+        const showMosaicWatchTotal = this.setShowMosaicWatchTotal(DEFAULT_SHOW_MOSAIC_WATCH_TOTAL);
         const tvEmptySpaceTransparent = this.setTvEmptySpaceTransparent(DEFAULT_TV_EMPTY_SPACE_TRANSPARENT);
         const tvEmptySpaceTransparency = this.setTvEmptySpaceTransparency(DEFAULT_TV_EMPTY_SPACE_TRANSPARENCY);
         const remoteIdleDelaySec = this.setRemoteIdleDelaySec(DEFAULT_REMOTE_IDLE_DELAY_SEC);
@@ -454,6 +484,8 @@ export const SettingsStore = {
             listWidth,
             remoteModuleOpacity,
             remoteIdleFadeEnabled,
+            showMosaicWatchSession,
+            showMosaicWatchTotal,
             tvEmptySpaceTransparent,
             tvEmptySpaceTransparency,
             remoteIdleDelaySec,

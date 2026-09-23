@@ -20,6 +20,7 @@ import {
     registerWatchAccrualAborter,
     unregisterWatchAccrualAborter
 } from '../storage/watchStats.js';
+import { ChromecastManager } from '../cast/chromecastManager.js';
 import {
     attachStream,
     destroyHls,
@@ -181,6 +182,12 @@ export function createPlayerInstance(options) {
         playGeneration: 0,
         watchAccrueKey: null,
         watchAccrueStartedAt: null,
+        /** Media currentTime when the open accrual window started (NaN if unknown). */
+        watchAccrueMediaAt: NaN,
+        /** Healthy seconds banked for the current channel tune (resets on channel change). */
+        watchSessionSeconds: 0,
+        /** Channel key the session counter belongs to. */
+        watchSessionKey: null,
         /** Timer id + gen for the stuck-load watchdog (null when idle). */
         _stuckLoadTimer: null,
         _stuckLoadGen: 0,
@@ -1633,7 +1640,11 @@ export function createPlayerInstance(options) {
                     this.videoBack.load();
                 } catch { /* ignore */ }
             }
-            if (clearChannel) this.channel = null;
+            if (clearChannel) {
+                this.channel = null;
+                this.watchSessionSeconds = 0;
+                this.watchSessionKey = null;
+            }
             this.playing = false;
             this.loading = false;
             this.loadPhase = 'idle';
@@ -1657,6 +1668,7 @@ export function createPlayerInstance(options) {
 
         async dispose() {
             flushWatchAccrual();
+            try { watchCtrl?.clearCastTick?.(); } catch { /* ignore */ }
             unregisterWatchAccrualFlusher(snapshotWatchAccrual);
             unregisterWatchAccrualAborter(abortWatchAccrual);
             this._clearStuckLoadWatchdog();
@@ -1685,8 +1697,20 @@ export function createPlayerInstance(options) {
     attachPrepareCommitMethods(player, { shouldRecordRecents });
     watchCtrl = createWatchAccrualControllers({
         getPlayer: () => player,
-        shouldRecordRecents
+        shouldRecordRecents,
+        isCastWatching: () => {
+            try {
+                return ChromecastManager.isCasting()
+                    && ChromecastManager.getActiveSlot() === id
+                    && ChromecastManager.isCastPlaying() === true;
+            } catch {
+                return false;
+            }
+        }
     });
+    /** Test / mosaic tick seam. */
+    player.syncWatchAccrual = () => watchCtrl.syncWatchAccrual();
+    player.flushWatchAccrual = () => watchCtrl.flushWatchAccrual();
 
     return player;
 }

@@ -870,6 +870,28 @@
     text-overflow: ellipsis;
 }
 
+.tv-player-tile__watch-echo {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.2em;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--tv-text-secondary, #B3B3B3);
+}
+
+.tv-player-tile__watch-echo.is-hidden,
+.tv-player-tile__watch-session.is-hidden,
+.tv-player-tile__watch-total.is-hidden,
+.tv-player-tile__watch-sep.is-hidden {
+    display: none;
+}
+
+.tv-player-tile__watch-sep {
+    opacity: 0.65;
+}
+
 .tv-player-tile__corner {
     position: absolute;
     top: 0.3rem;

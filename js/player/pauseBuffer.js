@@ -182,14 +182,23 @@ export function classifyTilePlayback({
     return { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected };
 }
 
-/** True when playback is actively delivering media (not buffering, pause, stop, or error). */
+/**
+ * True when local playback is actively delivering media (not buffering, pause, stop, or error).
+ * Hidden tabs still count when the media element is playing (background / PiP).
+ * Pass freezePressure / videoPaused when available.
+ */
 export function isHealthyWatchPlayback(state = {}) {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
+    if (state.freezePressure === true) return false;
     const { uiPlaying, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback(state);
     if (!state.hasChannel || !uiPlaying || uiPaused || uiStopped || uiDisconnected) return false;
     if (state.wantPlaying !== true) return false;
     if (state.loadPhase === 'connecting' || state.loadPhase === 'buffering') return false;
     if (state.loading === true) return false;
+    // Background / PiP: page may be hidden but video still playing — keep accruing.
+    // If the element is paused while hidden, do not bank wall-clock.
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        if (state.videoPaused === true) return false;
+    }
     return true;
 }
 

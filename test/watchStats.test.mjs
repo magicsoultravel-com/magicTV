@@ -84,8 +84,25 @@ test('formatWatchDuration renders compact labels', () => {
     assert.equal(WatchStats.formatWatchDuration(0.4), '0.4s');
     assert.equal(WatchStats.formatWatchDuration(5.5), '5.5s');
     assert.equal(WatchStats.formatWatchDuration(45), '45s');
-    assert.equal(WatchStats.formatWatchDuration(125), '2m');
+    assert.equal(WatchStats.formatWatchDuration(60), '1m');
+    assert.equal(WatchStats.formatWatchDuration(125), '2m 5s');
     assert.equal(WatchStats.formatWatchDuration(3725), '1h 2m');
+});
+
+test('getWatchSeconds and getLiveWatchSeconds include banked + open window', () => {
+    WatchStats.addWatchSeconds('iptv-org:CNN.us', 100, CHANNEL);
+    assert.equal(WatchStats.getWatchSeconds('iptv-org:CNN.us'), 100);
+    const player = {
+        channel: { providerId: 'iptv-org', channelId: 'CNN.us', name: 'CNN' },
+        watchAccrueKey: 'iptv-org:CNN.us',
+        watchAccrueStartedAt: Date.now() - 5000,
+        watchAccrueMediaAt: NaN,
+        watchSessionSeconds: 12,
+        video: null
+    };
+    const live = WatchStats.getLiveWatchSeconds(player);
+    assert.ok(live.session >= 16.5 && live.session <= 18);
+    assert.ok(live.total >= 104.5 && live.total <= 106);
 });
 
 test('savePlayerState without watchStatsMeta patch preserves persisted watch stats', async () => {

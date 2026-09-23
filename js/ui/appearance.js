@@ -250,6 +250,26 @@ export const Appearance = {
             });
         }
 
+        const showMosaicWatchSessionEl = el('show-mosaic-watch-session');
+        if (showMosaicWatchSessionEl && showMosaicWatchSessionEl.dataset.bound !== '1') {
+            showMosaicWatchSessionEl.dataset.bound = '1';
+            showMosaicWatchSessionEl.checked = SettingsStore.getShowMosaicWatchSession();
+            showMosaicWatchSessionEl.addEventListener('change', () => {
+                SettingsStore.setShowMosaicWatchSession(showMosaicWatchSessionEl.checked);
+                window.dispatchEvent(new CustomEvent('tv:mosaic_watch_chrome_changed'));
+            });
+        }
+
+        const showMosaicWatchTotalEl = el('show-mosaic-watch-total');
+        if (showMosaicWatchTotalEl && showMosaicWatchTotalEl.dataset.bound !== '1') {
+            showMosaicWatchTotalEl.dataset.bound = '1';
+            showMosaicWatchTotalEl.checked = SettingsStore.getShowMosaicWatchTotal();
+            showMosaicWatchTotalEl.addEventListener('change', () => {
+                SettingsStore.setShowMosaicWatchTotal(showMosaicWatchTotalEl.checked);
+                window.dispatchEvent(new CustomEvent('tv:mosaic_watch_chrome_changed'));
+            });
+        }
+
         if (idleDelaySlider) {
             idleDelaySlider.addEventListener('input', () => {
                 const delaySec = SettingsStore.setRemoteIdleDelaySec(Number(idleDelaySlider.value));
@@ -396,6 +416,8 @@ export const Appearance = {
                     listWidth,
                     remoteModuleOpacity,
                     remoteIdleFadeEnabled,
+                    showMosaicWatchSession,
+                    showMosaicWatchTotal,
                     tvEmptySpaceTransparent,
                     tvEmptySpaceTransparency,
                     remoteIdleDelaySec,
@@ -419,6 +441,11 @@ export const Appearance = {
                     delaySec: remoteIdleDelaySec,
                     fadeSec: remoteIdleFadeSec
                 });
+                const sessionEl = el('show-mosaic-watch-session');
+                if (sessionEl) sessionEl.checked = showMosaicWatchSession === true;
+                const totalEl = el('show-mosaic-watch-total');
+                if (totalEl) totalEl.checked = showMosaicWatchTotal === true;
+                window.dispatchEvent(new CustomEvent('tv:mosaic_watch_chrome_changed'));
                 syncTvEmptySpaceTransparencyUi({
                     enabled: tvEmptySpaceTransparent,
                     pct: tvEmptySpaceTransparency
@@ -475,7 +502,39 @@ export const Appearance = {
             watchStatsSection.dataset.bound = '1';
             watchStatsSection.addEventListener('toggle', () => {
                 if (watchStatsSection.open) this.refreshWatchStats();
+                this._syncWatchStatsLiveRefresh();
             });
+        }
+
+        if (typeof window !== 'undefined' && !Appearance._watchPersistBound) {
+            Appearance._watchPersistBound = true;
+            window.addEventListener('tv:watch_stats_persist_failed', () => {
+                showAppToast('Watch stats could not be saved (storage full or corrupt)');
+            });
+        }
+        this._syncWatchStatsLiveRefresh();
+    },
+
+    _watchStatsLiveTimer: 0,
+
+    _syncWatchStatsLiveRefresh() {
+        const section = el('watch-stats-section');
+        const open = Boolean(section?.open);
+        if (open && !this._watchStatsLiveTimer) {
+            this._watchStatsLiveTimer = setInterval(() => {
+                const stillOpen = el('watch-stats-section')?.open;
+                if (!stillOpen) {
+                    this._syncWatchStatsLiveRefresh();
+                    return;
+                }
+                flushAllWatchAccruals();
+                this.updateWatchStats();
+            }, 5000);
+            return;
+        }
+        if (!open && this._watchStatsLiveTimer) {
+            clearInterval(this._watchStatsLiveTimer);
+            this._watchStatsLiveTimer = 0;
         }
     },
 
@@ -616,6 +675,15 @@ export const Appearance = {
             delaySec: SettingsStore.getRemoteIdleDelaySec(),
             fadeSec: SettingsStore.getRemoteIdleFadeSec()
         });
+
+        const showMosaicWatchSession = el('show-mosaic-watch-session');
+        if (showMosaicWatchSession) {
+            showMosaicWatchSession.checked = SettingsStore.getShowMosaicWatchSession();
+        }
+        const showMosaicWatchTotal = el('show-mosaic-watch-total');
+        if (showMosaicWatchTotal) {
+            showMosaicWatchTotal.checked = SettingsStore.getShowMosaicWatchTotal();
+        }
 
         const remoteTextureSelect = el('remote-texture-select');
         if (remoteTextureSelect) {

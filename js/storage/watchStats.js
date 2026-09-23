@@ -3,7 +3,7 @@
  * Credits seconds only when callers flush open accrual windows.
  */
 import { loadPlayerState, savePlayerState, normalizeWatchStatsMeta } from './playerState.js';
-import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
+import { channelKey, migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
 export const WATCH_STATS_CAP = 100;
 const PERSIST_DEBOUNCE_MS = 45000;
@@ -43,7 +43,20 @@ function persistNow() {
         clearTimeout(persistTimer);
         persistTimer = 0;
     }
-    savePlayerState({ watchStatsMeta: toSortedMeta() });
+    const meta = toSortedMeta();
+    savePlayerState({ watchStatsMeta: meta });
+    // Detect refuse-write / quota leaving disk behind in-memory totals.
+    try {
+        const disk = loadPlayerState().watchStatsMeta || [];
+        const diskByKey = new Map(disk.map((e) => [e.key, e.seconds]));
+        const drifted = meta.some((e) => {
+            const d = diskByKey.get(e.key);
+            return !Number.isFinite(d) || Math.abs(d - e.seconds) > 0.5;
+        });
+        if (drifted && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('tv:watch_stats_persist_failed'));
+        }
+    } catch { /* ignore */ }
 }
 
 export function scheduleWatchStatsPersist(force = false) {
@@ -56,6 +69,7 @@ export function scheduleWatchStatsPersist(force = false) {
         persistTimer = 0;
         persistNow();
     }, PERSIST_DEBOUNCE_MS);
+    if (typeof persistTimer?.unref === 'function') persistTimer.unref();
 }
 
 export function registerWatchAccrualFlusher(fn) {
@@ -90,7 +104,7 @@ export function abortAllWatchAccruals() {
 
 export function addWatchSeconds(key, seconds, channel = null) {
     const migrated = migrateFavoriteRef(key);
-    if (!migrated || !Number.isFinite(seconds) || seconds <= 0) return;
+    if (!migrated || migrated.endsWith(':') || !Number.isFinite(seconds) || seconds <= 0) return;
     const map = ensureCache();
     const existing = map.get(migrated) || {
         key: migrated,
@@ -116,6 +130,47 @@ export function reloadWatchStatsCache() {
     );
 }
 
+export function getWatchSeconds(key) {
+    const migrated = migrateFavoriteRef(key);
+    if (!migrated) return 0;
+    const entry = ensureCache().get(migrated);
+    return entry ? Number(entry.seconds) || 0 : 0;
+}
+
+/**
+ * Live session + lifetime totals for a player, including the open accrual window.
+ * @param {object|null|undefined} player
+ * @returns {{ session: number, total: number, key: string }}
+ */
+export function getLiveWatchSeconds(player) {
+    const key = player?.channel ? channelKey(player.channel) : '';
+    const migrated = key ? migrateFavoriteRef(key) : '';
+    if (!migrated || migrated.endsWith(':')) {
+        return { session: 0, total: 0, key: '' };
+    }
+
+    let open = 0;
+    if (player.watchAccrueKey === migrated && player.watchAccrueStartedAt) {
+        const wall = Math.max(0, (Date.now() - player.watchAccrueStartedAt) / 1000);
+        const mediaAt = Number(player.watchAccrueMediaAt);
+        const nowMedia = Number(player.video?.currentTime);
+        if (Number.isFinite(mediaAt) && Number.isFinite(nowMedia) && nowMedia >= mediaAt) {
+            const mediaDelta = nowMedia - mediaAt;
+            open = mediaDelta > 0.05 ? Math.min(wall, mediaDelta) : wall;
+        } else {
+            open = wall;
+        }
+    }
+
+    const banked = getWatchSeconds(migrated);
+    const sessionBanked = Number(player.watchSessionSeconds) || 0;
+    return {
+        key: migrated,
+        session: sessionBanked + open,
+        total: banked + open
+    };
+}
+
 export function getTopWatched(limit = 20) {
     const n = Number.isFinite(limit) ? Math.max(0, Math.round(limit)) : 20;
     return toSortedMeta().slice(0, n);
@@ -131,16 +186,23 @@ export function clearWatchStats() {
     savePlayerState({ watchStatsMeta: [] });
 }
 
+/**
+ * Compact human labels for Most watched and mosaic chrome.
+ * Under 1h keeps seconds so mid-length totals stay honest.
+ */
 export function formatWatchDuration(totalSeconds) {
     const raw = Math.max(0, Number(totalSeconds) || 0);
     if (raw < 60) {
         if (raw < 10) return `${raw.toFixed(1)}s`;
         return `${Math.floor(raw)}s`;
     }
-    const m = Math.floor(raw / 60);
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    const rm = m % 60;
+    const totalM = Math.floor(raw / 60);
+    if (totalM < 60) {
+        const s = Math.floor(raw % 60);
+        return s ? `${totalM}m ${s}s` : `${totalM}m`;
+    }
+    const h = Math.floor(totalM / 60);
+    const rm = totalM % 60;
     return rm ? `${h}h ${rm}m` : `${h}h`;
 }
 
