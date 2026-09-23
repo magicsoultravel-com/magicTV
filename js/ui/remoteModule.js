@@ -19,6 +19,7 @@ import {
 } from './moduleActions.js';
 import { BrowserModule } from './browserModule.js';
 import { ModuleIdleFade } from './moduleIdleFade.js';
+import { DockOpenGate } from './dockOpenGate.js';
 import {
     hydrateLayoutFromPlayerState,
     getLayoutState,
@@ -651,7 +652,9 @@ function reconcileShells() {
     document.body.classList.add('browser-shell-split');
     syncSplitChromeButtons();
     ModuleIdleFade.syncForLayout();
-    deps.ensureBrowserCatalog?.();
+    DockOpenGate.afterOpen(() => {
+        deps.ensureBrowserCatalog?.();
+    });
 }
 
 function teleportBodyTo(host) {
@@ -662,6 +665,16 @@ function teleportBodyTo(host) {
     const startActions = startActionsEl();
     const cluster = endClusterEl();
     const split = isSplit();
+
+    // Already mounted in this host — skip reparent (avoids layout invalidation on pull-out).
+    const bodyHere = body.parentElement === host;
+    const guideHere = !guide || guide.parentElement === host;
+    const clusterHere = !cluster || cluster.parentElement === host;
+    const startHere = split || !startActions || startActions.parentElement === host;
+    if (bodyHere && guideHere && clusterHere && startHere) {
+        syncCatalogRootClasses(body);
+        return;
+    }
 
     if (!dockParent) {
         dockParent = body.parentElement;
@@ -811,10 +824,14 @@ function syncCatalogChromeGeometry(tab = resolveActiveCatalogTab()) {
     BrowserModule.syncCatalogChrome?.(tab);
 }
 
-function setSheetExpanded(expanded, { persist = true } = {}) {
+function setSheetExpanded(expanded, { persist = true, animateOpen = false } = {}) {
+    const wasExpanded = sheetExpanded;
     sheetExpanded = expanded === true;
     const sheet = dockSheetEl();
     const tab = dockTabEl();
+    if (sheetExpanded && !wasExpanded && animateOpen && mode === 'docked') {
+        DockOpenGate.begin(sheet);
+    }
     sheet?.classList.toggle('is-expanded', sheetExpanded);
     sheet?.classList.toggle('is-collapsed', !sheetExpanded);
     sheet?.setAttribute('aria-hidden', String(!sheetExpanded));
@@ -822,6 +839,9 @@ function setSheetExpanded(expanded, { persist = true } = {}) {
     tab?.setAttribute('aria-expanded', String(sheetExpanded));
     if (sheetExpanded && mode === 'docked') {
         syncCatalogChromeGeometry();
+    }
+    if (!sheetExpanded) {
+        sheet?.classList.remove('is-opening');
     }
     if (persist) persistState({ sheetExpanded });
 }
@@ -1113,6 +1133,7 @@ function finishClose() {
         RemoteExternalPopout.popIn();
     }
 
+    DockOpenGate.cancel();
     persistState({ open: false, mode: 'hidden' });
 
     externalHost = null;
@@ -1140,6 +1161,7 @@ function finishHideSplit() {
         RemoteExternalPopout.popIn();
     }
 
+    DockOpenGate.cancel();
     externalHost = null;
     showUndockedUI(false);
     setSheetExpanded(false, { persist: false });
@@ -1248,7 +1270,10 @@ export const RemoteModule = {
         targetSlotId = slotId || 'center';
         MultiView.setStatusSlot(targetSlotId);
 
-        if (tab != null && tab !== undefined) deps.switchTab(tab);
+        const wasHidden = mode === 'hidden';
+        const deferTab = wasHidden && openMode !== 'undocked' && tab != null;
+
+        if (!deferTab && tab != null && tab !== undefined) deps.switchTab(tab);
 
         if (mode === 'hidden') {
             mode = openMode === 'undocked' ? 'undocked' : 'docked';
@@ -1266,13 +1291,16 @@ export const RemoteModule = {
                 showUndockedUI(false);
                 mountToActiveHost();
                 const saved = getSavedState();
-                setSheetExpanded(true, { persist: false });
+                setSheetExpanded(true, { persist: false, animateOpen: true });
                 applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
             }
         } else if (mode === 'docked' && openMode === 'undocked') {
             this.undock();
         } else {
             mountToActiveHost();
+            if (mode === 'docked' && !sheetExpanded && openMode === 'docked') {
+                setSheetExpanded(true, { persist: false, animateOpen: true });
+            }
         }
 
         updateBodyClasses();
@@ -1283,7 +1311,16 @@ export const RemoteModule = {
         syncSplitChromeButtons();
         RemoteExternalPopout.syncBtn();
         syncDockToggleBtn();
-        RemotePanel.syncRemotePanel();
+
+        const finishChrome = () => {
+            if (deferTab) deps.switchTab(tab);
+            RemotePanel.syncRemotePanel();
+        };
+        if (DockOpenGate.isOpening()) {
+            DockOpenGate.afterOpen(finishChrome);
+        } else {
+            finishChrome();
+        }
     },
 
     close() {
@@ -1320,14 +1357,18 @@ export const RemoteModule = {
         // While external, only update the return host; remount happens on pop-in.
         if (!externalHost) {
             mountToActiveHost();
-            setSheetExpanded(true);
+            setSheetExpanded(true, { animateOpen: true });
             syncCatalogChromeGeometry();
         }
         updateBodyClasses();
         persistState({ mode: 'docked', open: true });
         syncBrowseButtons();
         syncDockToggleBtn();
-        RemotePanel.syncRemotePanel();
+        if (DockOpenGate.isOpening()) {
+            DockOpenGate.afterOpen(() => RemotePanel.syncRemotePanel());
+        } else {
+            RemotePanel.syncRemotePanel();
+        }
     },
 
     undock() {
@@ -1420,10 +1461,11 @@ export const RemoteModule = {
     toggleDockedSheet() {
         if (mode !== 'docked') return;
         if (!sheetExpanded) {
-            setSheetExpanded(true);
+            setSheetExpanded(true, { animateOpen: true });
             mountToActiveHost();
         } else {
             setSheetExpanded(false);
+            DockOpenGate.cancel();
         }
         persistState({ sheetExpanded });
     },

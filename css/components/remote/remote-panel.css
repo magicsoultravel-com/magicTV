@@ -444,6 +444,15 @@ body.browser-dock-side-left .browser-dock-sheet {
     pointer-events: auto;
 }
 
+.browser-dock-sheet.is-opening {
+    will-change: transform;
+    contain: layout paint;
+}
+
+body.dock-ui-opening .browser-dock-sheet {
+    transition: transform 0.25s ease;
+}
+
 .browser-dock-sheet.is-expanded .browser-dock-sheet__inner {
     border: 1px solid var(--tv-border, #2A2E3A);
     border-bottom: none;

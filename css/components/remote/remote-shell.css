@@ -125,6 +125,33 @@ body.remote-dock-side-right .remote-dock-sheet {
     pointer-events: auto;
 }
 
+/* Pull-out: transform-only slide; snap width/wing to final size (no competing layout anim). */
+.remote-dock-sheet.is-opening {
+    will-change: transform;
+    contain: layout paint;
+}
+
+body.dock-ui-opening .remote-dock-sheet,
+body.dock-ui-opening .remote-dock-tab {
+    transition:
+        transform 0.25s ease,
+        opacity 0.15s ease,
+        border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.dock-ui-opening .remote-module__host > #tv-catalog-body,
+body.dock-ui-opening .remote-dock-sheet__inner > #tv-catalog-body,
+body.dock-ui-opening.remote-wing-mode-browser .remote-module__host > #tv-catalog-body,
+body.dock-ui-opening.remote-wing-mode-browser .remote-dock-sheet__inner > #tv-catalog-body,
+body.dock-ui-opening .remote-module__dialog {
+    transition: none !important;
+}
+
+body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
+    animation: none !important;
+}
+
 .remote-dock-sheet.is-expanded .remote-dock-sheet__inner {
     border: 1px solid var(--tv-border, #2A2E3A);
     border-bottom: none;
@@ -397,20 +424,7 @@ body.remote-wing-mode-browser .remote-dock-sheet__inner > #tv-catalog-body {
         max-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-body.remote-wing-mode-browser #browser-shell {
-    animation: browser-wing-reveal 0.5s var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
-}
-
-@keyframes browser-wing-reveal {
-    from {
-        opacity: 0;
-        transform: translateX(-12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
+/* Browser wing reveal dropped — opacity/transform anim competed with dock pull-out paint. */
 
 /* Dock expanded to 2× when guide wing or browser tab is open */
 body.remote-dock-expanded .remote-dock-sheet,

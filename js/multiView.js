@@ -489,12 +489,48 @@ export const MultiView = {
 
             const observeTarget = typeof document !== 'undefined' ? document.body : null;
             if (observeTarget && typeof MutationObserver === 'function') {
-                const obs = new MutationObserver(() => {
-                    if (this.hasCustomPlacement()) {
-                        requestAnimationFrame(() => this.applyFreeLayout());
+                const UI_CLASS_RE = /^(remote-|browser-|catalog-|ui-idle-|has-resume|has-remote|has-channel)/;
+                const obs = new MutationObserver((mutations) => {
+                    if (!this.hasCustomPlacement()) return;
+                    let mosaicRelevant = false;
+                    for (const m of mutations) {
+                        if (m.type !== 'attributes' || m.attributeName !== 'class') continue;
+                        const prev = (m.oldValue || '').split(/\s+/).filter(Boolean);
+                        const next = [...observeTarget.classList];
+                        const prevSet = new Set(prev);
+                        const nextSet = new Set(next);
+                        for (const c of next) {
+                            if (!prevSet.has(c) && !UI_CLASS_RE.test(c)) {
+                                mosaicRelevant = true;
+                                break;
+                            }
+                        }
+                        if (!mosaicRelevant) {
+                            for (const c of prev) {
+                                if (!nextSet.has(c) && !UI_CLASS_RE.test(c)) {
+                                    mosaicRelevant = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (mosaicRelevant) break;
                     }
+                    if (!mosaicRelevant) return;
+                    const mosaic = document.getElementById('player-mosaic');
+                    const w = mosaic?.clientWidth || 0;
+                    const h = mosaic?.clientHeight || 0;
+                    if (w === this._lastFreeLayoutW && h === this._lastFreeLayoutH) return;
+                    requestAnimationFrame(() => {
+                        this._lastFreeLayoutW = mosaic?.clientWidth || 0;
+                        this._lastFreeLayoutH = mosaic?.clientHeight || 0;
+                        this.applyFreeLayout();
+                    });
                 });
-                obs.observe(observeTarget, { attributes: true, attributeFilter: ['class'] });
+                obs.observe(observeTarget, {
+                    attributes: true,
+                    attributeFilter: ['class'],
+                    attributeOldValue: true
+                });
             }
         }
     },

@@ -18,6 +18,7 @@ import {
 } from './moduleLayout.js';
 import { assembleEndCluster, browserEndActionsEl, startActionsEl } from './moduleActions.js';
 import { RemoteModule } from './remoteModule.js';
+import { DockOpenGate } from './dockOpenGate.js';
 
 const MIN_W = 260;
 const MIN_H = 480;
@@ -218,9 +219,17 @@ function applyDockGeometry(heightOverride = null) {
     document.body.classList.toggle('catalog-bar-active', false);
 }
 
-function setDockExpanded(expanded) {
+function setDockExpanded(expanded, { animateOpen = false } = {}) {
     const sheet = dockSheetEl();
     const tab = dockTabEl();
+    const wasExpanded = sheet?.classList.contains('is-expanded');
+    if (expanded && !wasExpanded && animateOpen) {
+        DockOpenGate.begin(sheet);
+    }
+    if (!expanded) {
+        sheet?.classList.remove('is-opening');
+        if (wasExpanded) DockOpenGate.cancel();
+    }
     sheet?.classList.toggle('is-expanded', expanded);
     sheet?.classList.toggle('is-collapsed', !expanded);
     sheet?.setAttribute('aria-hidden', String(!expanded));
@@ -618,7 +627,9 @@ export const BrowserModule = {
         document.body.classList.remove('browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible', 'browser-hidden-tab');
         syncActionButtons();
         patchLayout({ browserHostKind: 'undocked' }, { reconcile: false });
-        ensureBrowserCatalog();
+        DockOpenGate.afterOpen(() => {
+            ensureBrowserCatalog();
+        });
     },
 
     dock() {
@@ -629,7 +640,7 @@ export const BrowserModule = {
         if (!host) return;
         uiMode = 'docked';
         applyDockGeometry();
-        setDockExpanded(true);
+        setDockExpanded(true, { animateOpen: true });
         dockTabEl()?.classList.remove('is-hidden');
         mountShellToHost(host);
         bringModuleToFront(SHELL_BROWSER);
@@ -637,7 +648,9 @@ export const BrowserModule = {
         document.body.classList.remove('browser-dock-tab-visible', 'browser-hidden-tab');
         syncActionButtons();
         patchLayout({ browserHostKind: 'docked' }, { reconcile: false });
-        ensureBrowserCatalog();
+        DockOpenGate.afterOpen(() => {
+            ensureBrowserCatalog();
+        });
     },
 
     undock() {
@@ -684,7 +697,6 @@ export const BrowserModule = {
     show() {
         if (!isSplit()) return;
         this.dock();
-        ensureBrowserCatalog();
     },
 
     /** Tear down float/dock UI and leave shell placement to reconcile (join path). */

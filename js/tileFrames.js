@@ -26,6 +26,7 @@ import {
     MEDIA_READY_TIMEOUT,
     MEDIA_READY_BUSY_MS
 } from './tiles/streamCapture.js';
+import { DockOpenGate } from './ui/dockOpenGate.js';
 
 const MAX_TOTAL = 8;
 const MAX_CHEAP = 6;
@@ -540,6 +541,20 @@ async function primeFromCache(container, { skipCache = false } = {}) {
 
 function observe(container, opts = {}) {
     if (!container) return;
+    if (DockOpenGate.isOpening()) {
+        // Coalesce: keep latest container; one flush after settle.
+        observe._deferred = { container, opts };
+        if (!observe._deferScheduled) {
+            observe._deferScheduled = true;
+            DockOpenGate.afterOpen(() => {
+                observe._deferScheduled = false;
+                const next = observe._deferred;
+                observe._deferred = null;
+                if (next) observe(next.container, next.opts);
+            });
+        }
+        return;
+    }
     const viewKey = opts.viewKey || null;
     const skipCache = isLiveRefreshActive(viewKey);
     state.activeGrid = container;

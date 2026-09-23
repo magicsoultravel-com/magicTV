@@ -585,9 +585,17 @@ function ensureBrowserCatalogVisible() {
         return;
     }
     activateTabPanels(tab);
-    if (tab === 'browse') BrowseView.restoreView();
-    else if (tab === 'favorites') ChannelGrid.refreshFavorites();
-    else if (tab === 'recents') ChannelGrid.refreshRecents();
+    if (tab === 'browse') {
+        BrowseView.restoreView();
+    } else if (tab === 'favorites') {
+        const grid = el('favorites-grid');
+        if (!grid?.querySelector('.channel-tile')) ChannelGrid.refreshFavorites();
+        else ChannelGrid.syncPlayingTiles();
+    } else if (tab === 'recents') {
+        const grid = el('recents-grid');
+        if (!grid?.querySelector('.channel-tile')) ChannelGrid.refreshRecents();
+        else ChannelGrid.syncPlayingTiles();
+    }
 }
 
 function activateTabPanels(tabName) {
@@ -631,11 +639,15 @@ function switchTab(tabName) {
     ListSort.syncSortControls();
     if (tabName === 'favorites') {
         applyCatalogFilterInput(el('search-countries'), 'favorites', appState);
-        ChannelGrid.refreshFavorites();
+        const favGrid = el('favorites-grid');
+        if (!favGrid?.querySelector('.channel-tile')) ChannelGrid.refreshFavorites();
+        else ChannelGrid.syncPlayingTiles();
         restoreActiveTabScroll('favorites');
     } else if (tabName === 'recents') {
         applyCatalogFilterInput(el('search-countries'), 'recents', appState);
-        ChannelGrid.refreshRecents();
+        const recentGrid = el('recents-grid');
+        if (!recentGrid?.querySelector('.channel-tile')) ChannelGrid.refreshRecents();
+        else ChannelGrid.syncPlayingTiles();
         restoreActiveTabScroll('recents');
     } else if (tabName === 'browse') {
         BrowseView.restoreView();

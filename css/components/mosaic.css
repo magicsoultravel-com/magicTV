@@ -1,35 +1,58 @@
 /** @css {slice}: Active-tile indicators, tile body, mosaic grid/free-layout, back button (tv-landing.css lines 1274–1488) */
 
 /* ===== ACTIVE TILE INDICATORS =====
-   Scrolling sinusoid wave (wave) and breathing pulse (pulse).
-   Gated via data-active-tile-style on <html> so no perf cost when disabled. */
+   Scrolling dotted sinusoid (wave), breathing pulse (pulse), equalizer (visualizer).
+   Gated via data-active-tile-style on <html> so no perf cost when disabled.
+   Wave/visualizer use transform/opacity only (compositor-friendly). */
 
-/* --- Scrolling sinusoid wave --- */
-@keyframes active-tile-wave {
-    0% { background-position: 0 0; }
-    100% { background-position: -30px 0; }
+/* One period of dotted sine (white) — used as mask; period = 40px */
+/* stylelint-disable-next-line */
+:root {
+    --active-tile-wave-period: 40px;
+    --active-tile-wave-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='16' viewBox='0 0 40 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-dasharray='0.2 4.8' d='M0 8C10 1 10 15 20 8S30 1 40 8'/%3E%3C/svg%3E");
 }
 
-html[data-active-tile-style="wave"] .channel-tile.is-playing::before {
+/* --- Scrolling dotted sinusoid --- */
+@keyframes active-tile-wave {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(calc(-1 * var(--active-tile-wave-period)), 0, 0); }
+}
+
+html[data-active-tile-style="wave"] .channel-tile.is-playing::before,
+html[data-active-tile-style="wave"] .channel-tile.is-playing::after {
     content: '';
     position: absolute;
-    inset: -1px;
-    border-radius: inherit;
+        left: 0;
+    bottom: 2px;
+    height: 16px;
+    width: calc(100% + var(--active-tile-wave-period));
     pointer-events: none;
     z-index: 5;
-    background-image:
-        radial-gradient(circle, var(--tv-primary) 1.25px, transparent 1.25px),
-        radial-gradient(circle, var(--tv-secondary) 1.25px, transparent 1.25px);
-    background-size: 30px 12px, 30px 12px;
-    background-position: 0 3px, 15px 9px;
-    background-repeat: repeat-x, repeat-x;
-    opacity: 0;
-    transition: opacity 0.25s ease;
+    -webkit-mask-image: var(--active-tile-wave-mask);
+    mask-image: var(--active-tile-wave-mask);
+    -webkit-mask-repeat: repeat-x;
+    mask-repeat: repeat-x;
+    -webkit-mask-size: var(--active-tile-wave-period) 16px;
+    mask-size: var(--active-tile-wave-period) 16px;
+    -webkit-mask-position: 0 50%;
+    mask-position: 0 50%;
+    opacity: 0.7;
+    will-change: transform;
+    animation: active-tile-wave 2s linear infinite;
 }
 
 html[data-active-tile-style="wave"] .channel-tile.is-playing::before {
-    opacity: 0.65;
-    animation: active-tile-wave 2s linear infinite;
+    background-color: var(--tv-primary);
+}
+
+html[data-active-tile-style="wave"] .channel-tile.is-playing::after {
+    background-color: var(--tv-secondary);
+    /* Half-period phase offset for dual-tone dotted sine */
+    -webkit-mask-position: calc(var(--active-tile-wave-period) / 2) 50%;
+    mask-position: calc(var(--active-tile-wave-period) / 2) 50%;
+    opacity: 0.45;
+    animation-delay: -1s;
+    z-index: 4;
 }
 
 html[data-active-tile-style="wave"] .channel-tile.is-playing .channel-tile__body {
@@ -77,25 +100,23 @@ html[data-active-tile-style="pulse"][data-channel-layout="list"] .channel-tile.i
 }
 
 /* List-layout adjustments */
-html[data-active-tile-style="wave"][data-channel-layout="list"] .channel-tile.is-playing::before {
-    background-size: 24px 10px, 24px 10px;
-    background-position: 0 2px, 12px 7px;
+html[data-active-tile-style="wave"][data-channel-layout="list"] .channel-tile.is-playing::before,
+html[data-active-tile-style="wave"][data-channel-layout="list"] .channel-tile.is-playing::after {
+    height: 12px;
+    bottom: 1px;
+    -webkit-mask-size: 32px 12px;
+    mask-size: 32px 12px;
+    --active-tile-wave-period: 32px;
 }
 
 html[data-active-tile-style="pulse"][data-channel-layout="list"] .channel-tile.is-playing .channel-tile__icon {
     animation-duration: 2.4s;
 }
 
-/* --- Visualizer (audio equalizer bars) --- */
+/* --- Visualizer (static unequal bars + opacity pulse; no background-size thrash) --- */
 @keyframes active-tile-viz {
-    0%   { background-size: 20% 55%, 20% 90%, 20% 40%, 20% 75%, 20% 60%; }
-    15%  { background-size: 20% 95%, 20% 55%, 20% 75%, 20% 45%, 20% 85%; }
-    30%  { background-size: 20% 45%, 20% 80%, 20% 95%, 20% 60%, 20% 40%; }
-    45%  { background-size: 20% 80%, 20% 40%, 20% 60%, 20% 95%, 20% 70%; }
-    60%  { background-size: 20% 60%, 20% 70%, 20% 50%, 20% 55%, 20% 95%; }
-    75%  { background-size: 20% 90%, 20% 60%, 20% 85%, 20% 40%, 20% 55%; }
-    90%  { background-size: 20% 50%, 20% 95%, 20% 65%, 20% 80%, 20% 45%; }
-    100% { background-size: 20% 55%, 20% 90%, 20% 40%, 20% 75%, 20% 60%; }
+    0%, 100% { opacity: 0.45; transform: scaleY(0.92); }
+    50% { opacity: 0.85; transform: scaleY(1); }
 }
 
 html[data-active-tile-style="visualizer"] .channel-tile.is-playing::after {
@@ -105,16 +126,16 @@ html[data-active-tile-style="visualizer"] .channel-tile.is-playing::after {
     height: 14px;
     pointer-events: none;
     z-index: 6;
+    transform-origin: bottom center;
     background:
-        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 0% 100% / 20% 100% no-repeat,
-        linear-gradient(to top, var(--tv-secondary), var(--tv-secondary)) 20% 100% / 20% 100% no-repeat,
-        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 40% 100% / 20% 100% no-repeat,
-        linear-gradient(to top, var(--tv-secondary), var(--tv-secondary)) 60% 100% / 20% 100% no-repeat,
-        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 80% 100% / 20% 100% no-repeat;
-    background-repeat: no-repeat;
-    background-position: 0% 100%, 20% 100%, 40% 100%, 60% 100%, 80% 100%;
+        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 0% 100% / 18% 55% no-repeat,
+        linear-gradient(to top, var(--tv-secondary), var(--tv-secondary)) 20% 100% / 18% 90% no-repeat,
+        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 40% 100% / 18% 40% no-repeat,
+        linear-gradient(to top, var(--tv-secondary), var(--tv-secondary)) 60% 100% / 18% 75% no-repeat,
+        linear-gradient(to top, var(--tv-primary), var(--tv-primary)) 80% 100% / 18% 60% no-repeat;
     opacity: 0.7;
     border-radius: 1px;
+    will-change: transform, opacity;
     animation: active-tile-viz 1.6s ease-in-out infinite;
 }
 
@@ -129,15 +150,20 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
     inset: auto 4px 3px 4px;
 }
 
-/* Reduced-motion: static bars at random-ish heights */
+/* Pause active-tile motion while dock sheet is sliding open */
+body.dock-ui-opening .channel-tile.is-playing::before,
+body.dock-ui-opening .channel-tile.is-playing::after {
+    animation: none !important;
+}
+
+/* Reduced-motion: static indicators */
 @media (prefers-reduced-motion: reduce) {
-    html[data-active-tile-style="wave"] .channel-tile.is-playing::before {
+    html[data-active-tile-style="wave"] .channel-tile.is-playing::before,
+    html[data-active-tile-style="wave"] .channel-tile.is-playing::after {
         animation: none;
-        opacity: 0.4;
-        background-image: radial-gradient(circle, var(--tv-primary) 1.25px, transparent 1.25px);
-        background-size: 8px 8px;
-        background-position: 0 100%;
-        background-repeat: repeat-x;
+        opacity: 0.45;
+        transform: none;
+        will-change: auto;
     }
     html[data-active-tile-style="pulse"] .channel-tile.is-playing::before {
         animation: none;
@@ -147,7 +173,8 @@ html[data-active-tile-style="visualizer"][data-channel-layout="list"] .channel-t
     html[data-active-tile-style="visualizer"] .channel-tile.is-playing::after {
         animation: none;
         opacity: 0.5;
-        background-size: 20% 65%, 20% 85%, 20% 50%, 20% 70%, 20% 55%;
+        transform: none;
+        will-change: auto;
     }
 }
 
