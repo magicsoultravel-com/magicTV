@@ -175,6 +175,12 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
     hls.on(events.ERROR, (_, data) => {
         if (generation !== ctx.playGeneration) return;
         if (data.fatal) {
+            // Mirror video error: clear playing so D/C UI + auto-retry can schedule.
+            try { ctx._clearFreezeTicker?.(); } catch { /* ignore */ }
+            ctx.healing = false;
+            ctx.loading = false;
+            ctx.loadPhase = 'idle';
+            ctx.playing = false;
             ctx.error = 'Stream unavailable';
             ctx.errorCount = (ctx.errorCount || 0) + 1;
             if (typeof ctx._onPlaybackFatal === 'function') {
@@ -194,7 +200,10 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
                 ctx._hlsNonFatalRestarts = (ctx._hlsNonFatalRestarts || 0) + 1;
                 // Wedged-but-non-fatal must escalate: endless startLoad never
                 // reaches the D/C badge/retry. 8 restarts ≈ 20s+ of failure.
-                if ((ctx._hlsNonFatalRestarts || 0) >= 8 && ctx.playing !== true) {
+                // Escalate even while "playing" so live wedges enter reconnect.
+                if ((ctx._hlsNonFatalRestarts || 0) >= 8) {
+                    try { ctx._clearFreezeTicker?.(); } catch { /* ignore */ }
+                    ctx.healing = false;
                     ctx.loading = false;
                     ctx.loadPhase = 'idle';
                     ctx.playing = false;
@@ -206,7 +215,9 @@ export function bindHlsPlaybackHandlers(ctx, hls, generation, opts = {}) {
             || data.type === 'mediaError') {
             ctx.hls.recoverMediaError();
             ctx._hlsNonFatalRestarts = (ctx._hlsNonFatalRestarts || 0) + 1;
-            if ((ctx._hlsNonFatalRestarts || 0) >= 12 && ctx.playing !== true) {
+            if ((ctx._hlsNonFatalRestarts || 0) >= 12) {
+                try { ctx._clearFreezeTicker?.(); } catch { /* ignore */ }
+                ctx.healing = false;
                 ctx.loading = false;
                 ctx.loadPhase = 'idle';
                 ctx.playing = false;

@@ -856,9 +856,8 @@ export function createPlayerInstance(options) {
             const intervalSec = this.getReattemptInterval();
             const gen = ++this._autoRetryGen;
             this._autoRetrySwitchGen = this.switchGeneration;
-            // Stagger herd: base interval + up to 2s jitter so N dead tiles don't slam at once.
-            const jitterMs = Math.floor(Math.random() * 2000);
-            const delayMs = (intervalSec * 1000) + jitterMs;
+            // Exact user interval — countdown must match the setting (no additive jitter).
+            const delayMs = intervalSec * 1000;
             this._autoRetryDeadlineAt = Date.now() + delayMs;
 
             this._autoRetryTickTimer = setInterval(() => {
@@ -872,6 +871,13 @@ export function createPlayerInstance(options) {
             }, delayMs);
         },
 
+        /** If a countdown is live, restart it under current interval/attempts (or cancel). */
+        _rescheduleAutoRetryIfActive() {
+            if (!this._autoRetryDeadlineAt) return;
+            this._clearAutoRetry();
+            this._maybeScheduleAutoRetry();
+        },
+
         _fireAutoRetry() {
             // Clear timers/deadline only — keep attemptsUsed until success or user reset.
             this._clearAutoRetry();
@@ -880,16 +886,13 @@ export function createPlayerInstance(options) {
             if ((this._autoRetryAttemptsUsed || 0) >= max) return;
             if (!this.channel || this.stopped || this.wantPlaying !== true) return;
             // Never clobber a newer user channel pick racing the countdown.
-            if (this._autoRetrySwitchGen != null && this._autoRetrySwitchGen !== this.switchGeneration) return;
-
-            this._autoRetryAttemptsUsed = (this._autoRetryAttemptsUsed || 0) + 1;
-            if (this.playing === true && (this.video?.videoWidth > 0 || this.posterDataUrl)) {
-                // Have something worth keeping: heal in background, front untouched.
-                this._freezeFails = 0;
-                this._freezeQuickKickDone = true;
-                void this._healFrozenStream('full');
+            // Re-emit so a stale timer cannot leave the tile with no deadline/badge refresh.
+            if (this._autoRetrySwitchGen != null && this._autoRetrySwitchGen !== this.switchGeneration) {
+                this.emitState();
                 return;
             }
+
+            this._autoRetryAttemptsUsed = (this._autoRetryAttemptsUsed || 0) + 1;
             // Snapshot a fresh poster so the retry gap covers black, not D/C badge alone.
             try {
                 if (!this.posterDataUrl && this.video?.videoWidth > 0) {
@@ -902,6 +905,7 @@ export function createPlayerInstance(options) {
 
         setReattemptInterval(seconds) {
             this.reattemptInterval = clampReattemptInterval(seconds);
+            this._rescheduleAutoRetryIfActive();
             return this.reattemptInterval;
         },
 
@@ -913,6 +917,7 @@ export function createPlayerInstance(options) {
 
         setReattempts(count) {
             this.reattempts = clampReattempts(count);
+            this._rescheduleAutoRetryIfActive();
             return this.reattempts;
         },
 
