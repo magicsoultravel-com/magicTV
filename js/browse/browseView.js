@@ -214,12 +214,12 @@ export const BrowseView = {
             }
             const grid = el('channels-container');
             if (dirty) {
-                appState.browseChannels = visible;
-                appState.browseOffset = visible.length;
+                appState.browseChannels = results;
+                appState.browseOffset = results.length;
                 ChannelGrid.render(grid, visible, { append: false });
             } else {
                 const append = appState.browseOffset > 0;
-                appState.browseChannels = appState.browseChannels.concat(visible);
+                appState.browseChannels = appState.browseChannels.concat(results);
                 appState.browseOffset += PAGE_SIZE;
                 ChannelGrid.render(grid, visible, { append });
             }
@@ -262,7 +262,9 @@ export const BrowseView = {
         const { sortBy, sortDir } = getSortPrefs(appState);
         appState.browseChannels = sortChannelList(appState.browseChannels, sortBy, sortDir);
         if (!dirOnly) appState.browseSortDirty = true;
-        ChannelGrid.reorder(el('channels-container'), appState.browseChannels);
+        // reorder falls back to a full render when a listed channel has no tile;
+        // hidden channels have no tile, so the list must be filtered first.
+        ChannelGrid.reorder(el('channels-container'), HiddenChannels.filterVisible(appState.browseChannels));
     },
 
     startChannelSearch(query) {
@@ -337,9 +339,13 @@ export const BrowseView = {
             }
             const grid = channels;
             if (appState.browseChannels.length > 0 && grid) {
-                ChannelGrid.render(grid, appState.browseChannels, { append: false });
+                const visible = HiddenChannels.filterVisible(appState.browseChannels);
+                ChannelGrid.render(grid, visible, { append: false });
                 setupScrollLoading();
                 this.restoreScroll();
+                // browseChannels now holds hidden rows too, so a page can under-fill
+                // (or be entirely hidden) — top up instead of stranding "No channels".
+                scheduleBrowseFillCheck();
             } else {
                 this.loadMoreChannels();
             }
