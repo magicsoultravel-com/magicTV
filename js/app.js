@@ -507,7 +507,7 @@ function bindPlayFavoritesMosaic() {
         // Play from where the user is browsing: folder contents when inside a
         // favorites folder, loose root channels when at the favorites root.
         // getFavoritesMosaicQueue mirrors the grid's display order (text
-        // filter + category filter + hidden + sort) and caps at first 5.
+        // filter + category filter + hidden + sort) and caps at Max TVs.
         const { list, folderName } = getFavoritesMosaicQueue({ fallbackFilter: currentFilter() });
         if (!list.length) {
             showAppToast('No channels to play in this view');

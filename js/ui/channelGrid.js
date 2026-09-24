@@ -10,6 +10,7 @@ import { Appearance } from './appearance.js';
 import { FavoritesReorder } from './favoritesReorder.js';
 import { FavoritesFolders } from './favoritesFolders.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
+import { SettingsStore } from '../storage/settingsStore.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
 import { buildChannelIndex, chanNumberAccentHtml } from '../channelNav.js';
 import { marqueeInnerHtml } from './marquee.js';
@@ -195,16 +196,14 @@ function matchesFolderFilter(folder, q) {
     return (folder?.name || '').toLowerCase().includes(q);
 }
 
-export const PLAY_FAVORITES_MOSAIC_LIMIT = 5;
-
 /**
- * Play favorites on multiple TVs — first 5 from the current folder view.
+ * Play favorites on multiple TVs — capped at the user's Max TVs setting.
  * Root (no folder open): loose root channels only, in grid display order.
  * Inside a folder: that folder's channels in grid display order.
  * Mirrors the favorites grid: text filter + category filter + hidden +
  * sort (custom keeps stored order). Folder tiles themselves are skipped.
  * @param {{ fallbackFilter?: string }} opts text filter fallback (search input)
- * @param {{ appState?: object, favoritesList?: object[], getFavoriteFolder?: Function, getFavoritesRootOrder?: Function, filterVisible?: Function }} inject test seams
+ * @param {{ appState?: object, favoritesList?: object[], getFavoriteFolder?: Function, getFavoritesRootOrder?: Function, filterVisible?: Function, getMaxSlots?: Function }} inject test seams
  * @returns {{ list: object[], folderId: string|null, folderName: string, filter: string }}
  */
 export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {}) {
@@ -213,6 +212,9 @@ export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {
     const getFolder = inject.getFavoriteFolder || ((id) => TvPlayer.getFavoriteFolder(id));
     const getRootOrder = inject.getFavoritesRootOrder || (() => TvPlayer.getFavoritesRootOrder());
     const visibleFilter = inject.filterVisible || ((channels) => filterVisibleChannels(channels));
+    const maxSlots = Math.max(1, Math.round(Number(
+        (inject.getMaxSlots || (() => SettingsStore.getMaxMosaicSlots()))()
+    )) || 1);
     const filter = state.favFilter || fallbackFilter || '';
     const { sortBy, sortDir } = getSortPrefs(state);
     const categoryId = state.categoryFilter?.favorites || '';
@@ -228,7 +230,7 @@ export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {
             list = visibleFilter(list);
             list = sortChannelList(list, sortBy, sortDir);
             return {
-                list: list.slice(0, PLAY_FAVORITES_MOSAIC_LIMIT),
+                list: list.slice(0, maxSlots),
                 folderId,
                 folderName: folder.name || '',
                 filter
@@ -246,7 +248,7 @@ export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {
         const visible = visibleFilter([ch]);
         if (visible.length) out.push(visible[0]);
     }
-    return { list: out.slice(0, PLAY_FAVORITES_MOSAIC_LIMIT), folderId: null, folderName: '', filter };
+    return { list: out.slice(0, maxSlots), folderId: null, folderName: '', filter };
 }
 
 function channelByKey(list, key) {

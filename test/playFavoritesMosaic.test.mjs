@@ -2,7 +2,6 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 let ChannelGrid;
-let PLAY_FAVORITES_MOSAIC_LIMIT;
 let getFavoritesMosaicQueue;
 
 before(async () => {
@@ -13,7 +12,7 @@ before(async () => {
         setItem: () => {},
         removeItem: () => {}
     };
-    ({ ChannelGrid, PLAY_FAVORITES_MOSAIC_LIMIT, getFavoritesMosaicQueue } = await import('../js/ui/channelGrid.js'));
+    ({ ChannelGrid, getFavoritesMosaicQueue } = await import('../js/ui/channelGrid.js'));
 });
 
 function ch(name, extra = {}) {
@@ -46,7 +45,7 @@ function baseState(overrides = {}) {
     };
 }
 
-test('root queue uses loose root channels only, caps at 5, skips folders', () => {
+test('root queue uses loose root channels only, caps at Max TVs, skips folders', () => {
     ChannelGrid.init({ appState: baseState(), getRefreshKey: () => '', onPlay: () => {} });
     const channels = Array.from({ length: 7 }, (_, i) => ch(`Channel ${i + 1}`));
     const rootKeys = channels.map(keyOf);
@@ -56,16 +55,16 @@ test('root queue uses loose root channels only, caps at 5, skips folders', () =>
         appState: state,
         getFavoriteFolder: () => folder,
         getFavoritesRootOrder: () => rootKeys,
-        filterVisible: (arr) => arr
+        filterVisible: (arr) => arr,
+        getMaxSlots: () => 3
     });
-    assert.equal(PLAY_FAVORITES_MOSAIC_LIMIT, 5);
     assert.equal(folderId, null);
     assert.equal(folderName, '');
-    assert.equal(list.length, 5);
-    assert.deepEqual(list.map((c) => c.name), ['Channel 1', 'Channel 2', 'Channel 3', 'Channel 4', 'Channel 5']);
+    assert.equal(list.length, 3);
+    assert.deepEqual(list.map((c) => c.name), ['Channel 1', 'Channel 2', 'Channel 3']);
 });
 
-test('folder queue plays first 5 of open folder in display order', () => {
+test('folder queue plays channels up to injected Max TVs in display order', () => {
     ChannelGrid.init({ appState: baseState(), getRefreshKey: () => '', onPlay: () => {} });
     const channels = Array.from({ length: 8 }, (_, i) => ch(`Club ${i + 1}`));
     const folder = { id: 'f_9', name: 'Clubs', items: channels.map(keyOf) };
@@ -74,12 +73,16 @@ test('folder queue plays first 5 of open folder in display order', () => {
         appState: state,
         getFavoriteFolder: (id) => (id === 'f_9' ? folder : null),
         getFavoritesRootOrder: () => [keyOf(channels[0])],
-        filterVisible: (arr) => arr
+        filterVisible: (arr) => arr,
+        getMaxSlots: () => 7
     });
     assert.equal(folderId, 'f_9');
     assert.equal(folderName, 'Clubs');
-    assert.equal(list.length, 5);
-    assert.deepEqual(list.map((c) => c.name), ['Club 1', 'Club 2', 'Club 3', 'Club 4', 'Club 5']);
+    assert.equal(list.length, 7);
+    assert.deepEqual(
+        list.map((c) => c.name),
+        ['Club 1', 'Club 2', 'Club 3', 'Club 4', 'Club 5', 'Club 6', 'Club 7']
+    );
 });
 
 test('folder queue respects text filter, category filter, and hidden', () => {
@@ -98,7 +101,8 @@ test('folder queue respects text filter, category filter, and hidden', () => {
         appState: state,
         getFavoriteFolder: () => folder,
         getFavoritesRootOrder: () => [],
-        filterVisible: (arr) => arr.filter((c) => c.name !== 'Secret Stream')
+        filterVisible: (arr) => arr.filter((c) => c.name !== 'Secret Stream'),
+        getMaxSlots: () => 6
     });
     assert.deepEqual(list.map((c) => c.name), ['Daily News']);
 });
@@ -112,7 +116,8 @@ test('stale folder id falls back to root view', () => {
         appState: state,
         getFavoriteFolder: () => null,
         getFavoritesRootOrder: () => [keyOf(a), keyOf(b)],
-        filterVisible: (arr) => arr
+        filterVisible: (arr) => arr,
+        getMaxSlots: () => 6
     });
     assert.equal(folderId, null);
     assert.deepEqual(list.map((c) => c.name), ['Alpha', 'Beta']);
@@ -125,7 +130,8 @@ test('empty view returns empty queue', () => {
         appState: state,
         getFavoriteFolder: () => null,
         getFavoritesRootOrder: () => [],
-        filterVisible: (arr) => arr
+        filterVisible: (arr) => arr,
+        getMaxSlots: () => 6
     });
     assert.deepEqual(list, []);
 });
