@@ -10,7 +10,7 @@
 
 import { IndexedDBStore } from './indexedDbStore.js';
 
-const FRAME_CACHE_KEY = 'matrix_tv_frame_cache_v2';
+const FRAME_CACHE_KEY = 'magictv_frame_cache_v2';
 const FRAME_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /** Serialize blob read-modify-write so concurrent captures don't clobber each other. */

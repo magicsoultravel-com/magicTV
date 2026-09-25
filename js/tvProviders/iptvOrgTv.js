@@ -6,7 +6,8 @@ const IPTV_STREAMS_URL = 'https://iptv-org.github.io/api/streams.json';
 const IPTV_COUNTRIES_URL = 'https://iptv-org.github.io/api/countries.json';
 const IPTV_CATEGORIES_URL = 'https://iptv-org.github.io/api/categories.json';
 const IPTV_BLOCKLIST_URL = 'https://iptv-org.github.io/api/blocklist.json';
-const CACHE_KEY = 'matrix_tv_iptv_cache';
+const CACHE_KEY = 'magictv_iptv_cache';
+const LEGACY_CACHE_KEY = 'matrix_tv_iptv_cache';
 
 /** Hard ceiling for any catalog fetch so boot/browse never hang on a stalled CDN. */
 const DEFAULT_CATALOG_FETCH_TIMEOUT_MS = 12000;
@@ -74,7 +75,7 @@ let categoryMapPromise = null;
 // the refresh arrow in the tab bar. No auto-refetch on site reload.
 async function loadCache() {
     try {
-        const cached = await IndexedDBStore.get(CACHE_KEY, CACHE_KEY);
+        const cached = await IndexedDBStore.get(CACHE_KEY, LEGACY_CACHE_KEY);
         if (cached) {
             lastRefreshedAt = cached.cachedAt || Date.now();
             return cached.data;

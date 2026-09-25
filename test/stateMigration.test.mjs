@@ -30,6 +30,7 @@ before(() => {
 });
 
 let STATE_KEY;
+let LEGACY_STATE_KEY;
 let CORRUPT_BACKUP_KEY;
 let STATE_SCHEMA_VERSION;
 let parsePersistedStateRaw;
@@ -37,6 +38,7 @@ let patchPersistedState;
 let writePersistedState;
 let compactNonEssentialPersistedState;
 let migratePersistedState;
+let migrateStateKeyNamespace;
 let canonicalizePersistedState;
 let loadPlayerState;
 let loadPlayerStateFrom;
@@ -44,10 +46,12 @@ let loadPlayerStateFrom;
 before(async () => {
     ({
         STATE_KEY,
+        LEGACY_STATE_KEY,
         parsePersistedStateRaw,
         patchPersistedState,
         writePersistedState,
-        compactNonEssentialPersistedState
+        compactNonEssentialPersistedState,
+        migrateStateKeyNamespace
     } = await import('../js/storage/persistedState.js'));
     ({
         migratePersistedState,
@@ -331,4 +335,30 @@ test('loadPlayerStateFrom matches loadPlayerState for stored raw', () => {
     assert.deepEqual(fromRaw.favorites, fromStore.favorites);
     assert.equal(fromRaw.volume, fromStore.volume);
     assert.equal(fromRaw.bufferSize, fromStore.bufferSize);
+});
+
+test('migrateStateKeyNamespace copies legacy matrix_tv_state once and leaves it in place', () => {
+    const legacy = JSON.stringify({ favorites: ['iptv-org:LEGACY.us'], volume: 0.7 });
+    store.set(LEGACY_STATE_KEY, legacy);
+    assert.equal(migrateStateKeyNamespace(), true);
+    assert.equal(store.get(STATE_KEY), legacy);
+    assert.equal(store.get(LEGACY_STATE_KEY), legacy, 'legacy key must remain for magiclists');
+    assert.equal(migrateStateKeyNamespace(), false, 'second call is a no-op');
+});
+
+test('migratePersistedState imports from legacy key then only writes isolated key', () => {
+    store.set(LEGACY_STATE_KEY, JSON.stringify({
+        favorites: ['iptv-org:LEGACY.us'],
+        volume: 0.55
+    }));
+    const result = migratePersistedState();
+    assert.equal(result.migrated, true);
+    const isolated = JSON.parse(store.get(STATE_KEY));
+    assert.ok(isolated.favorites.includes('iptv-org:LEGACY.us'));
+    assert.equal(isolated.stateSchemaVersion, STATE_SCHEMA_VERSION);
+    // Subsequent write path never touches the magiclists key
+    const legacyBefore = store.get(LEGACY_STATE_KEY);
+    patchPersistedState({ volume: 0.11 });
+    assert.equal(store.get(LEGACY_STATE_KEY), legacyBefore);
+    assert.equal(JSON.parse(store.get(STATE_KEY)).volume, 0.11);
 });

@@ -1,7 +1,7 @@
 /**
  * IndexedDBStore - Single-database, single-store async key-value storage.
  *
- * Uses one database (magicnotes_cache_db) with one object store (cache_store).
+ * Uses one database (magictv_cache_db) with one object store (cache_store).
  * Each entry is { key: string, value: any }.
  *
  * Falls back to an in-memory Map if IndexedDB is unavailable (private mode,
@@ -12,11 +12,37 @@
  * before reading from IndexedDB. If the legacy key is found, its value is
  * migrated to IndexedDB and the localStorage key is removed. This is
  * idempotent — after the first migration the legacy key is gone.
+ *
+ * Also one-time-copies TV-owned entries from the legacy shared DB
+ * (magicnotes_cache_db) into magictv_cache_db under magictv_* key names.
+ * Does not delete from the legacy DB (magiclists may still use it).
  */
 
-const DB_NAME = 'magicnotes_cache_db';
+const DB_NAME = 'magictv_cache_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'cache_store';
+const LEGACY_DB_NAME = 'magicnotes_cache_db';
+const IDB_NAMESPACE_FLAG = 'magictv_idb_namespace_v1';
+
+/**
+ * Exact key renames when copying from the shared magicnotes_cache_db.
+ * Prefix remaps are applied separately for dynamic EPG keys.
+ */
+const LEGACY_KEY_RENAMES = {
+    matrix_tv_iptv_cache: 'magictv_iptv_cache',
+    matrix_tv_frame_cache_v2: 'magictv_frame_cache_v2',
+    matrix_tv_poster_cache_v1: 'magictv_poster_cache_v1',
+    matrix_tv_epg_guides: 'magictv_epg_guides',
+    matrix_tv_epg_guides_index: 'magictv_epg_guides_index'
+};
+
+const LEGACY_PREFIX_RENAMES = [
+    ['matrix_tv_epg_feed:', 'magictv_epg_feed:'],
+    ['matrix_tv_epg_index:', 'magictv_epg_index:'],
+    ['matrix_tv_epg_map:', 'magictv_epg_map:'],
+    ['matrix_tv_epg_cors:', 'magictv_epg_cors:'],
+    ['matrix_tv_epg_prog:', 'magictv_epg_prog:']
+];
 
 /**
  * Legacy localStorage→IndexedDB migration guard. localStorage is capped near
@@ -27,20 +53,23 @@ const LEGACY_MIGRATE_MAX_CHARS = 4 * 1024 * 1024;
 
 let dbPromise = null;
 let memoryFallback = null;
+let legacyDbMigratePromise = null;
 
-function openDb() {
-    if (memoryFallback) return Promise.resolve(null);
-    if (dbPromise) return dbPromise;
+function remapLegacyKey(key) {
+    if (LEGACY_KEY_RENAMES[key]) return LEGACY_KEY_RENAMES[key];
+    for (const [from, to] of LEGACY_PREFIX_RENAMES) {
+        if (key.startsWith(from)) return to + key.slice(from.length);
+    }
+    return null;
+}
 
-    dbPromise = new Promise((resolve, reject) => {
+function openNamedDb(name, version) {
+    return new Promise((resolve) => {
         if (typeof indexedDB === 'undefined') {
-            memoryFallback = new Map();
-            dbPromise = null;
             resolve(null);
             return;
         }
-
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        const req = indexedDB.open(name, version);
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -48,21 +77,147 @@ function openDb() {
             }
         };
         req.onsuccess = () => resolve(req.result);
-        req.onerror = () => {
-            memoryFallback = new Map();
-            dbPromise = null;
-            resolve(null);
-        };
-        req.onblocked = () => {
-            // A pending version change on another connection (e.g. a stale tab
-            // holding an old DB version) can block this open forever. Treat it
-            // like a failure and fall back to in-memory so boot/cache reads
-            // never hang on an IndexedDB open that will never resolve.
-            memoryFallback = new Map();
-            dbPromise = null;
-            resolve(null);
-        };
+        req.onerror = () => resolve(null);
+        req.onblocked = () => resolve(null);
     });
+}
+
+function readAllFromDb(db) {
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(STORE_NAME)) {
+            resolve([]);
+            return;
+        }
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+        } catch {
+            resolve([]);
+        }
+    });
+}
+
+function namespaceAlreadyMigrated() {
+    try {
+        return localStorage.getItem(IDB_NAMESPACE_FLAG) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function markNamespaceMigrated() {
+    try {
+        localStorage.setItem(IDB_NAMESPACE_FLAG, '1');
+    } catch {
+        /* ignore */
+    }
+}
+
+/**
+ * Copy TV-owned entries from magicnotes_cache_db into magictv_cache_db once.
+ * Leaves the legacy DB intact for magiclists.
+ */
+async function migrateLegacyDbOnce(targetDb) {
+    if (namespaceAlreadyMigrated()) return;
+    if (legacyDbMigratePromise) return legacyDbMigratePromise;
+
+    legacyDbMigratePromise = (async () => {
+        let legacyDb = null;
+        try {
+            legacyDb = await openNamedDb(LEGACY_DB_NAME, 1);
+            // magiclists may have opened at v2 — try without forcing version if v1 failed
+            if (!legacyDb) {
+                legacyDb = await new Promise((resolve) => {
+                    if (typeof indexedDB === 'undefined') {
+                        resolve(null);
+                        return;
+                    }
+                    const req = indexedDB.open(LEGACY_DB_NAME);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => resolve(null);
+                    req.onblocked = () => resolve(null);
+                });
+            }
+            if (!legacyDb) {
+                markNamespaceMigrated();
+                return;
+            }
+            const entries = await readAllFromDb(legacyDb);
+            for (const entry of entries) {
+                const key = entry?.key;
+                if (!key) continue;
+                const newKey = remapLegacyKey(key);
+                if (!newKey) continue;
+                try {
+                    const tx = targetDb.transaction(STORE_NAME, 'readwrite');
+                    tx.objectStore(STORE_NAME).put({ key: newKey, value: entry.value });
+                    await new Promise((resolve) => {
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => resolve();
+                    });
+                } catch {
+                    /* skip individual entry */
+                }
+            }
+            markNamespaceMigrated();
+        } catch {
+            markNamespaceMigrated();
+        } finally {
+            try {
+                legacyDb?.close?.();
+            } catch {
+                /* ignore */
+            }
+        }
+    })();
+
+    return legacyDbMigratePromise;
+}
+
+function openDb() {
+    if (memoryFallback) return Promise.resolve(null);
+    if (dbPromise) return dbPromise;
+
+    dbPromise = (async () => {
+        if (typeof indexedDB === 'undefined') {
+            memoryFallback = new Map();
+            dbPromise = null;
+            return null;
+        }
+
+        const db = await new Promise((resolve) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = () => {
+                const result = req.result;
+                if (!result.objectStoreNames.contains(STORE_NAME)) {
+                    result.createObjectStore(STORE_NAME, { keyPath: 'key' });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => {
+                memoryFallback = new Map();
+                dbPromise = null;
+                resolve(null);
+            };
+            req.onblocked = () => {
+                // A pending version change on another connection (e.g. a stale tab
+                // holding an old DB version) can block this open forever. Treat it
+                // like a failure and fall back to in-memory so boot/cache reads
+                // never hang on an IndexedDB open that will never resolve.
+                memoryFallback = new Map();
+                dbPromise = null;
+                resolve(null);
+            };
+        });
+
+        if (db) {
+            await migrateLegacyDbOnce(db);
+        }
+        return db;
+    })();
 
     return dbPromise;
 }
@@ -218,6 +373,7 @@ async function getAll() {
 
 /**
  * Clear all entries from IndexedDB (or in-memory fallback).
+ * Only clears magictv_cache_db — never touches magicnotes_cache_db.
  *
  * @returns {Promise<void>}
  */
@@ -246,5 +402,10 @@ export const IndexedDBStore = {
     remove,
     clear,
     getAll,
-    openDb
+    openDb,
+    /** @internal test seam */
+    _DB_NAME: DB_NAME,
+    _LEGACY_DB_NAME: LEGACY_DB_NAME,
+    _IDB_NAMESPACE_FLAG: IDB_NAMESPACE_FLAG,
+    _remapLegacyKey: remapLegacyKey
 };

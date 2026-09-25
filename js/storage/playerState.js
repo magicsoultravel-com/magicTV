@@ -1,5 +1,5 @@
 /**
- * Player-relevant slice of matrix_tv_state (volume, buffer, last channel, lists).
+ * Player-relevant slice of magictv_persisted_state (volume, buffer, last channel, lists).
  * Merges via shared persistedState so SettingsStore / registry patches survive.
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';

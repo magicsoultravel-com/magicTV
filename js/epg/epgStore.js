@@ -3,11 +3,11 @@
  */
 import { IndexedDBStore } from '../storage/indexedDbStore.js';
 
-const FEED_PREFIX = 'matrix_tv_epg_feed:';
-const INDEX_PREFIX = 'matrix_tv_epg_index:';
-const MAP_PREFIX = 'matrix_tv_epg_map:';
-const CORS_PREFIX = 'matrix_tv_epg_cors:';
-const PROG_PREFIX = 'matrix_tv_epg_prog:';
+const FEED_PREFIX = 'magictv_epg_feed:';
+const INDEX_PREFIX = 'magictv_epg_index:';
+const MAP_PREFIX = 'magictv_epg_map:';
+const CORS_PREFIX = 'magictv_epg_cors:';
+const PROG_PREFIX = 'magictv_epg_prog:';
 
 const INDEX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROG_TTL_MS = 6 * 60 * 60 * 1000;

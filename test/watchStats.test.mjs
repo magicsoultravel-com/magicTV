@@ -55,15 +55,15 @@ test('clearWatchStats removes all entries', () => {
     WatchStats.addWatchSeconds('iptv-org:CNN.us', 60, CHANNEL);
     WatchStats.clearWatchStats();
     assert.deepEqual(WatchStats.getTopWatched(), []);
-    const raw = JSON.parse(store.get('matrix_tv_state') || '{}');
+    const raw = JSON.parse(store.get('magictv_persisted_state') || '{}');
     assert.deepEqual(raw.watchStatsMeta, []);
 });
 
-test('watch stats persist under matrix_tv_state', () => {
+test('watch stats persist under magictv_persisted_state', () => {
     WatchStats.scheduleWatchStatsPersist(true);
     WatchStats.addWatchSeconds('iptv-org:CNN.us', 90, CHANNEL);
     WatchStats.scheduleWatchStatsPersist(true);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.ok(Array.isArray(raw.watchStatsMeta));
     assert.equal(raw.watchStatsMeta[0].key, 'iptv-org:CNN.us');
     assert.equal(raw.watchStatsMeta[0].seconds, 90);
@@ -110,7 +110,7 @@ test('savePlayerState without watchStatsMeta patch preserves persisted watch sta
     WatchStats.addWatchSeconds('iptv-org:CNN.us', 120, CHANNEL);
     WatchStats.scheduleWatchStatsPersist(true);
     savePlayerState({ volume: 0.5 });
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.watchStatsMeta.length, 1);
     assert.equal(raw.watchStatsMeta[0].seconds, 120);
 });

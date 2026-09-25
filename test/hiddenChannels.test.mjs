@@ -81,9 +81,9 @@ test('hide and unhide do not emit player state', () => {
     }
 });
 
-test('hidden channels are persisted under matrix_tv_state', () => {
+test('hidden channels are persisted under magictv_persisted_state', () => {
     TvPlayer.hideChannel(CHANNEL);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.ok(raw.hiddenChannels.includes('iptv-org:BBC.uk'));
     assert.equal(raw.hiddenChannelsMeta[0].name, 'BBC One');
     assert.equal(raw.hiddenChannelsMeta[0].countrycode, 'GB');

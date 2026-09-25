@@ -150,8 +150,8 @@ Volume and catalog layout (tiles/list) live on the player chrome / catalog toolb
 
 ## 💾 Storage
 
-- **localStorage** — Favorites, recents, settings (same keys as magiclists for compatibility)
-- **IndexedDB** — Catalog + frame cache (manual refresh; frames TTL 7 days)
+- **localStorage** — Favorites, recents, settings under isolated `magictv_*` keys (separate from magiclists)
+- **IndexedDB** — `magictv_cache_db` for catalog + frame cache (manual refresh; frames TTL 7 days)
 
 ## 🎨 Color Scheme
 

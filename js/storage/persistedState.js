@@ -1,5 +1,27 @@
-/** Shared localStorage blob for magicTV (legacy key name). */
-export const STATE_KEY = 'matrix_tv_state';
+/**
+ * magicTV persisted state — isolated from magiclists sidebar TV.
+ * Legacy key `matrix_tv_state` is copied once into the new key and never written again.
+ */
+export const STATE_KEY = 'magictv_persisted_state';
+export const LEGACY_STATE_KEY = 'matrix_tv_state';
+
+/**
+ * One-time copy from the shared magiclists-era key into the isolated key.
+ * Leaves the legacy key untouched so magiclists sidebar TV keeps its own data.
+ * @returns {boolean} true if a copy was performed
+ */
+export function migrateStateKeyNamespace() {
+    try {
+        const current = localStorage.getItem(STATE_KEY);
+        if (current != null && current !== '') return false;
+        const legacy = localStorage.getItem(LEGACY_STATE_KEY);
+        if (legacy == null || legacy === '') return false;
+        localStorage.setItem(STATE_KEY, legacy);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 /**
  * Parse the stored blob. Returns `{ ok, value }` — on corrupt JSON, `ok` is false

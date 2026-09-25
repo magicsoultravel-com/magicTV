@@ -65,9 +65,9 @@ test('favorites toggle on and off', () => {
     assert.equal(TvPlayer.isFavorite(CHANNEL), false);
 });
 
-test('favorites are persisted under matrix_tv_state', () => {
+test('favorites are persisted under magictv_persisted_state', () => {
     TvPlayer.toggleFavorite(CHANNEL);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.ok(raw.favorites.includes('iptv-org:CNN.us'), 'favorite key persisted');
     assert.equal(TvPlayer.getFavorites()[0], 'iptv-org:CNN.us');
 });
@@ -82,7 +82,7 @@ test('favorites keep display metadata for instant tab rendering', () => {
 
     TvPlayer.toggleFavorite(CHANNEL); // remove
     assert.equal(TvPlayer.getFavoritesMeta().length, 0, 'meta removed with the favorite');
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.ok(!Array.isArray(raw.favoritesMeta) || raw.favoritesMeta.length === 0);
 });
 
@@ -139,7 +139,7 @@ test('mergeVisibleFavoriteOrder keeps non-visible slots', async () => {
 
 test('favorites root order migrates from legacy favorites list', () => {
     TvPlayer.toggleFavorite(CHANNEL);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.deepEqual(raw.favoritesRootOrder, ['iptv-org:CNN.us']);
     assert.deepEqual(raw.favoriteFolders, []);
 });
@@ -249,13 +249,13 @@ test('markVisited records a channel and isVisited resolves it', () => {
 test('markVisited is idempotent and persists without duplicates', () => {
     assert.equal(FavoritesRecents.markVisited('iptv-org:CNN.us'), true);
     assert.equal(FavoritesRecents.markVisited('CNN.us'), false, 'bare ref maps to same key');
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.visitedChannels.filter((k) => k === 'iptv-org:CNN.us').length, 1);
     assert.equal(FavoritesRecents.isVisited('iptv-org:CNN.us'), true);
 });
 
 test('reconciliation seeds visited from recents, favorites and last channel exactly once', () => {
-    store.set('matrix_tv_state', JSON.stringify({
+    store.set('magictv_persisted_state', JSON.stringify({
         favorites: ['iptv-org:CNN.us'],
         recentsMeta: [{ key: 'iptv-org:BBC.uk', name: 'BBC', at: 1 }],
         lastChannelKey: 'bbc-world' // legacy bare id → resolves to iptv-org:bbc-world
@@ -266,19 +266,19 @@ test('reconciliation seeds visited from recents, favorites and last channel exac
     assert.equal(FavoritesRecents.isVisited('iptv-org:BBC.uk'), true, 'recent seeded');
     assert.equal(FavoritesRecents.isVisited('bbc-world'), true, 'lastChannelKey seeded with migration');
 
-    let raw = JSON.parse(store.get('matrix_tv_state'));
+    let raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.visitedChannelsReconciled, true, 'reconcile flag persisted');
     assert.ok(raw.visitedChannels.includes('iptv-org:bbc-world'));
 
     // Second run must not re-add anything (flag short-circuits).
     FavoritesRecents.markVisited('iptv-org:NOW.us');
-    raw = JSON.parse(store.get('matrix_tv_state'));
+    raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.visitedChannels.includes('iptv-org:bbc-world'), true);
 });
 
 test('visited channels persist alongside recents after playback-record path', () => {
     TvPlayer.pushRecent('iptv-org:CNN.us', CHANNEL);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     // pushRecent alone does not mark visited; the player calls markVisited explicitly.
     assert.equal((raw.visitedChannels || []).length, 0);
     TvPlayer.markVisited('iptv-org:CNN.us');
@@ -306,7 +306,7 @@ test('unvisitChannel removes the channel from visited keys and meta', () => {
 });
 
 test('reconciliation seeds visitedChannelsMeta alongside keys', () => {
-    store.set('matrix_tv_state', JSON.stringify({
+    store.set('magictv_persisted_state', JSON.stringify({
         favorites: [],
         recentsMeta: [{ key: 'iptv-org:BBC.uk', name: 'BBC', logo: '', countrycode: 'GB', at: 1 }],
         lastChannelKey: null
@@ -352,7 +352,7 @@ test('lowering the recents cap trims existing history', () => {
 
 test('recents cap persists in localStorage', () => {
     SettingsStore.setRecentsCap(5);
-    assert.equal(JSON.parse(store.get('matrix_tv_state')).recentsCap, 5);
+    assert.equal(JSON.parse(store.get('magictv_persisted_state')).recentsCap, 5);
 });
 
 // ----- Visited style setting -----
@@ -372,7 +372,7 @@ test('visited style accepts the accent options and falls back', () => {
 
 test('visited style persists in localStorage', () => {
     SettingsStore.setVisitedStyle('accent-3');
-    assert.equal(JSON.parse(store.get('matrix_tv_state')).visitedStyle, 'accent-3');
+    assert.equal(JSON.parse(store.get('magictv_persisted_state')).visitedStyle, 'accent-3');
 });
 
 // ----- Non-visited style setting -----
@@ -392,7 +392,7 @@ test('non-visited style accepts the accent options and falls back', () => {
 
 test('non-visited style persists in localStorage', () => {
     SettingsStore.setNonVisitedStyle('accent-3');
-    assert.equal(JSON.parse(store.get('matrix_tv_state')).nonVisitedStyle, 'accent-3');
+    assert.equal(JSON.parse(store.get('magictv_persisted_state')).nonVisitedStyle, 'accent-3');
 });
 
 // ----- Buffer -----
@@ -406,7 +406,7 @@ test('buffer size clamps to 5..120 seconds', () => {
 
 test('buffer size persists', () => {
     TvPlayer.setBufferSize(30);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.bufferSize, 30);
 });
 
@@ -419,7 +419,7 @@ test('volume clamps to 0..1 and persists', () => {
     assert.equal(TvPlayer.volume, 0);
     TvPlayer.setVolume(0.42);
     assert.equal(TvPlayer.volume, 0.42);
-    assert.equal(JSON.parse(store.get('matrix_tv_state')).volume, 0.42);
+    assert.equal(JSON.parse(store.get('magictv_persisted_state')).volume, 0.42);
 });
 
 test('mosaicSlots per-TV volume normalizes and defaults to 1', async () => {
@@ -470,7 +470,7 @@ test('textSize clamps to range', () => {
 
 test('textSize persists in localStorage', () => {
     SettingsStore.setTextSize(14);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.textSize, 14);
 });
 
@@ -493,7 +493,7 @@ test('tileWidth clamps to range', () => {
 
 test('tileWidth persists in localStorage', () => {
     SettingsStore.setTileWidth(150);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.tileWidth, 150);
 });
 
@@ -516,7 +516,7 @@ test('listWidth clamps to range', () => {
 
 test('listWidth persists in localStorage', () => {
     SettingsStore.setListWidth(200);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.listWidth, 200);
 });
 
@@ -549,7 +549,7 @@ test('chanSwitchMode defaults to classic', () => {
 test('chanSwitchMode round-trip and invalid fallback', () => {
     SettingsStore.setChanSwitchMode('safeLoading');
     assert.equal(SettingsStore.getChanSwitchMode(), 'safeLoading');
-    let raw = JSON.parse(store.get('matrix_tv_state'));
+    let raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.chanSwitchMode, 'safeLoading');
 
     SettingsStore.setChanSwitchMode('bogus');
@@ -560,9 +560,9 @@ test('chanSwitchMode round-trip and invalid fallback', () => {
 });
 
 test('remoteModuleOpacity migrates from channelPickerOpacity', () => {
-    store.set('matrix_tv_state', JSON.stringify({ channelPickerOpacity: 55 }));
+    store.set('magictv_persisted_state', JSON.stringify({ channelPickerOpacity: 55 }));
     assert.equal(SettingsStore.getRemoteModuleOpacity(), 55);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.remoteModuleOpacity, 55);
     assert.equal(raw.channelPickerOpacity, undefined);
 });
@@ -571,7 +571,7 @@ test('screen toggles persist and retrieve correctly', () => {
     assert.equal(SettingsStore.getScreenTopLeft(), false, 'defaults to false');
     SettingsStore.setScreenTopLeft(true);
     assert.equal(SettingsStore.getScreenTopLeft(), true);
-    let raw = JSON.parse(store.get('matrix_tv_state'));
+    let raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.screenTopLeft, true);
 
     assert.equal(SettingsStore.getScreenTopRight(), false);
@@ -606,12 +606,12 @@ test('dismissing or disabling a screen clears it from mosaicSlots and settings',
     MultiView.slotsHydrated = true;
 
     MultiView.persistSlots();
-    let state = JSON.parse(store.get('matrix_tv_state'));
+    let state = JSON.parse(store.get('magictv_persisted_state'));
     assert.ok(state.mosaicSlots.topLeft);
 
     MultiView.setSideEnabled('topLeft', false);
     assert.equal(SettingsStore.getScreenTopLeft(), false);
-    state = JSON.parse(store.get('matrix_tv_state'));
+    state = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(state.screenTopLeft, false);
     assert.equal(Object.prototype.hasOwnProperty.call(state, 'screenLeft'), false);
     assert.equal(state.mosaicSlots.topLeft, undefined);

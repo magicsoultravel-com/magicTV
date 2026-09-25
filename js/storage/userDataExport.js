@@ -444,12 +444,45 @@ function removeLocalStorageByPrefix(prefixes) {
     }
 }
 
+/** Legacy shared-origin TV cache keys that are no longer owned by magicTV. */
+const LEGACY_TV_CACHE_PREFIXES = [
+    'matrix_tv_iptv_cache',
+    'matrix_tv_frame_cache',
+    'matrix_tv_poster_cache',
+    'matrix_tv_epg_',
+    'matrix_tv_state_corrupt_backup'
+];
+
+function removeLegacyTvCacheKeys() {
+    let keys = [];
+    try {
+        keys = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (key) keys.push(key);
+        }
+    } catch {
+        return;
+    }
+    for (const key of keys) {
+        // Never remove matrix_tv_state — that belongs to magiclists sidebar TV.
+        if (key === 'matrix_tv_state') continue;
+        if (LEGACY_TV_CACHE_PREFIXES.some((p) => key === p || key.startsWith(p))) {
+            try {
+                localStorage.removeItem(key);
+            } catch { /* ignore */ }
+        }
+    }
+}
+
 /**
- * Last-resort wipe: all magicTV localStorage keys + IndexedDB caches.
+ * Last-resort wipe: all magicTV localStorage keys + magictv_cache_db.
+ * Does not touch magiclists keys (matrix_tv_state, magicnotes_cache_db, notes).
  * Tile previews and catalog caches must be rebuilt after this.
  */
 export async function factoryResetUserData() {
     clearAllUserData();
-    removeLocalStorageByPrefix(['matrix_tv_', 'magic_tv_', 'magicTV:']);
+    removeLocalStorageByPrefix(['magictv_', 'magic_tv_', 'magicTV:']);
+    removeLegacyTvCacheKeys();
     await IndexedDBStore.clear();
 }

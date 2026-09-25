@@ -4,8 +4,8 @@
 import { IndexedDBStore } from '../storage/indexedDbStore.js';
 
 const GUIDES_URL = 'https://iptv-org.github.io/api/guides.json';
-const CACHE_KEY = 'matrix_tv_epg_guides';
-const INDEX_CACHE_KEY = 'matrix_tv_epg_guides_index';
+const CACHE_KEY = 'magictv_epg_guides';
+const INDEX_CACHE_KEY = 'magictv_epg_guides_index';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** @type {Map<string, object[]>|null} */

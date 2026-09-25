@@ -7,7 +7,7 @@
 
 import { IndexedDBStore } from './indexedDbStore.js';
 
-const POSTER_CACHE_KEY = 'matrix_tv_poster_cache_v1';
+const POSTER_CACHE_KEY = 'magictv_poster_cache_v1';
 const POSTER_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 let writeChain = Promise.resolve();

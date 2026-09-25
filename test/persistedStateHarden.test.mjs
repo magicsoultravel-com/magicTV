@@ -93,7 +93,7 @@ test('catalogChrome bar survives unrelated savePlayerState volume write', () => 
     assert.equal(SettingsStore.setCatalogChrome('nope'), 'wing');
 });
 
-test('corrupt matrix_tv_state refuses patch write and keeps raw string', () => {
+test('corrupt magictv_persisted_state refuses patch write and keeps raw string', () => {
     const corrupt = '{not-valid-json';
     store.set(STATE_KEY, corrupt);
 

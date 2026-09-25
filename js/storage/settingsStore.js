@@ -1,6 +1,6 @@
 /**
  * Appearance settings (text size / tile width / list width / theme colors).
- * Persists into the shared matrix_tv_state blob alongside catalog prefs.
+ * Persists into the magictv_persisted_state blob alongside catalog prefs.
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';
 import {

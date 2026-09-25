@@ -1,9 +1,10 @@
 /**
- * Boot-time rewrite of matrix_tv_state into the current canonical shape.
+ * Boot-time rewrite of magictv_persisted_state into the current canonical shape.
  * Keeps library + settings; strips legacy keys; can drop session chrome on quota.
  */
 import {
     STATE_KEY,
+    migrateStateKeyNamespace,
     parsePersistedStateRaw,
     writePersistedState
 } from './persistedState.js';
@@ -11,7 +12,20 @@ import { loadPlayerStateFrom } from './playerState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
 export const STATE_SCHEMA_VERSION = 2;
-export const CORRUPT_BACKUP_KEY = 'matrix_tv_state_corrupt_backup';
+export const CORRUPT_BACKUP_KEY = 'magictv_state_corrupt_backup';
+export const LEGACY_CORRUPT_BACKUP_KEY = 'matrix_tv_state_corrupt_backup';
+
+function migrateCorruptBackupKey() {
+    try {
+        const current = localStorage.getItem(CORRUPT_BACKUP_KEY);
+        if (current != null && current !== '') return;
+        const legacy = localStorage.getItem(LEGACY_CORRUPT_BACKUP_KEY);
+        if (legacy == null || legacy === '') return;
+        localStorage.setItem(CORRUPT_BACKUP_KEY, legacy);
+    } catch {
+        /* ignore — best-effort */
+    }
+}
 
 const HEADER_MODES = new Set(['full', 'colorMark', 'greyMark', 'greyMarkBehind']);
 const HEADER_MARK_MODES = new Set(['colorMark', 'greyMark', 'greyMarkBehind']);
@@ -174,10 +188,15 @@ export function canonicalizePersistedState(base) {
 }
 
 /**
- * Migrate legacy / unversioned matrix_tv_state once at boot.
+ * Migrate legacy / unversioned persisted state once at boot.
+ * First isolates from magiclists (`matrix_tv_state` → `magictv_persisted_state`),
+ * then canonicalizes schema.
  * @returns {{ migrated: boolean, repaired: boolean }}
  */
 export function migratePersistedState() {
+    migrateStateKeyNamespace();
+    migrateCorruptBackupKey();
+
     let repaired = false;
     const parsed = parsePersistedStateRaw();
 

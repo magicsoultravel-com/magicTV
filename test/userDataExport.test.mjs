@@ -44,7 +44,7 @@ function seedLocalState() {
         textSize: 14,
         volume: 0.5
     };
-    store.set('matrix_tv_state', JSON.stringify(state));
+    store.set('magictv_persisted_state', JSON.stringify(state));
     store.set('magic_tv_clock_style', 'digital');
     store.set('magic_tv_clock_hidden', 'false');
     store.set('magicTV:castHostAudio', 'true');
@@ -115,7 +115,7 @@ test('applyUserDataReplace overwrites local state and extras', () => {
     UserDataExport.applyUserDataReplace(payload);
     const player = loadPlayerState();
     assert.deepEqual(player.favorites, ['iptv-org:B.us']);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.textSize, 16);
     assert.equal(raw.stateSchemaVersion, 2);
     assert.equal(store.get('magic_tv_clock_style'), 'analog');
@@ -125,7 +125,7 @@ test('applyUserDataReplace overwrites local state and extras', () => {
 
 test('applyUserDataReplace canonicalizes sparse backup and strips orphans', async () => {
     seedLocalState();
-    const localBefore = store.get('matrix_tv_state');
+    const localBefore = store.get('magictv_persisted_state');
     const payload = {
         format: UserDataExport.EXPORT_FORMAT,
         version: UserDataExport.EXPORT_VERSION,
@@ -149,12 +149,12 @@ test('applyUserDataReplace canonicalizes sparse backup and strips orphans', asyn
     };
     const { canonicalizePersistedState } = await import('../js/storage/stateMigration.js');
     const preview = canonicalizePersistedState(payload.state);
-    assert.equal(store.get('matrix_tv_state'), localBefore);
+    assert.equal(store.get('magictv_persisted_state'), localBefore);
     assert.equal(preview.browserW, undefined);
     assert.equal(preview.stateSchemaVersion, 2);
 
     UserDataExport.applyUserDataReplace(payload);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.deepEqual(raw.favorites, ['iptv-org:Sparse.us']);
     assert.equal(raw.stateSchemaVersion, 2);
     assert.equal(raw.browserW, undefined);
@@ -165,7 +165,7 @@ test('applyUserDataReplace canonicalizes sparse backup and strips orphans', asyn
 });
 
 test('buildUserDataExport emits canonical state without mutating storage', () => {
-    store.set('matrix_tv_state', JSON.stringify({
+    store.set('magictv_persisted_state', JSON.stringify({
         favorites: ['iptv-org:A.us'],
         volume: 0.4,
         browserW: 908,
@@ -173,9 +173,9 @@ test('buildUserDataExport emits canonical state without mutating storage', () =>
         hideOfflineChannels: true
     }));
     store.set('magic_tv_clock_hidden', '1');
-    const before = store.get('matrix_tv_state');
+    const before = store.get('magictv_persisted_state');
     const payload = UserDataExport.buildUserDataExport();
-    assert.equal(store.get('matrix_tv_state'), before);
+    assert.equal(store.get('magictv_persisted_state'), before);
     assert.equal(payload.state.stateSchemaVersion, 2);
     assert.equal(payload.state.browserW, undefined);
     assert.equal(payload.state.liveOffset, undefined);
@@ -226,7 +226,7 @@ test('applyUserDataMergeLibrary unions library data and keeps local settings', (
     assert.deepEqual(player.hiddenChannels, ['iptv-org:C.us']);
     assert.equal(player.watchStatsMeta.find((e) => e.key === 'iptv-org:A.us')?.seconds, 30);
     assert.equal(player.watchStatsMeta.find((e) => e.key === 'iptv-org:B.us')?.seconds, 40);
-    const raw = JSON.parse(store.get('matrix_tv_state'));
+    const raw = JSON.parse(store.get('magictv_persisted_state'));
     assert.equal(raw.themeId, 'neon');
     assert.equal(raw.textSize, 14);
     assert.equal(raw.volume, 0.5);
@@ -260,12 +260,13 @@ test('summarizeUserData reports counts', () => {
 
 test('clearAllUserData removes exportable localStorage keys only', () => {
     seedLocalState();
-    store.set('matrix_tv_state_corrupt_backup', '{"broken":true}');
+    store.set('magictv_state_corrupt_backup', '{"broken":true}');
     store.set('magicTV:castState', '{"connected":true}');
     store.set('matrix_tv_iptv_cache', '{"legacy":true}');
+    store.set('matrix_tv_state', '{"favorites":["lists-only"]}');
     UserDataExport.clearAllUserData();
-    assert.equal(store.has('matrix_tv_state'), false);
-    assert.equal(store.has('matrix_tv_state_corrupt_backup'), false);
+    assert.equal(store.has('magictv_persisted_state'), false);
+    assert.equal(store.has('magictv_state_corrupt_backup'), false);
     assert.equal(store.has('magic_tv_clock_style'), false);
     assert.equal(store.has('magic_tv_clock_hidden'), false);
     assert.equal(store.has('magicTV:castHostAudio'), false);
@@ -273,18 +274,22 @@ test('clearAllUserData removes exportable localStorage keys only', () => {
     assert.equal(store.has('magicTV:castState'), false);
     // Legacy/cache-ish key left alone by flush
     assert.equal(store.get('matrix_tv_iptv_cache'), '{"legacy":true}');
+    // magiclists sidebar key left alone
+    assert.equal(store.get('matrix_tv_state'), '{"favorites":["lists-only"]}');
 });
 
-test('factoryResetUserData clears user data and prefixed localStorage keys', async () => {
+test('factoryResetUserData clears magicTV keys but preserves magiclists matrix_tv_state', async () => {
     seedLocalState();
-    store.set('matrix_tv_state_corrupt_backup', '{"broken":true}');
+    store.set('magictv_state_corrupt_backup', '{"broken":true}');
     store.set('magicTV:castState', '{"connected":true}');
     store.set('matrix_tv_iptv_cache', '{"legacy":true}');
     store.set('matrix_tv_epg_guides', '[]');
+    store.set('matrix_tv_state', '{"favorites":["lists-only"]}');
     await UserDataExport.factoryResetUserData();
-    assert.equal(store.has('matrix_tv_state'), false);
+    assert.equal(store.has('magictv_persisted_state'), false);
     assert.equal(store.has('magic_tv_clock_style'), false);
     assert.equal(store.has('magicTV:castState'), false);
     assert.equal(store.has('matrix_tv_iptv_cache'), false);
     assert.equal(store.has('matrix_tv_epg_guides'), false);
+    assert.equal(store.get('matrix_tv_state'), '{"favorites":["lists-only"]}');
 });
