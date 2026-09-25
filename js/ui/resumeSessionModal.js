@@ -5,7 +5,7 @@
 import { el } from '../tvUtils.js';
 import { loadPlayerState } from '../storage/playerState.js';
 import { resolveSavedMosaicMap } from '../mosaic/persist.js';
-import { PLAY_FILL_ORDER, slotOutlineAccent, slotOutlineIntensity } from '../mosaic/constants.js';
+import { PLAY_FILL_ORDER, slotOutlineAccent } from '../mosaic/constants.js';
 import { fetchStoredFramesForMosaic, resolveStoredFrameDataUrl, collectFrameLookupKeys } from '../mosaic/frameLookup.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { applyMarquee, marqueeInnerHtml } from './marquee.js';
@@ -114,7 +114,6 @@ function renderList(tiles, posterMap = new Map()) {
     listEl.innerHTML = tiles.map(({ slotId, channelName, channelKey, isLastActive }) => {
         const screenNum = SLOT_SCREEN_LABELS[slotId] || slotId;
         const accent = slotOutlineAccent(slotId);
-        const intensity = slotOutlineIntensity(slotId);
         const activeClass = isLastActive ? ' is-last-active' : '';
         const playerPoster = MultiView.slots[slotId]?.player?.posterDataUrl || '';
         const cachedPoster = posterMap.get(channelKey) || '';
@@ -132,7 +131,7 @@ function renderList(tiles, posterMap = new Map()) {
             ? `<span class="resume-session__tile-chan-num" aria-hidden="true">${chanNumberAccentHtml(chanNum)}</span>`
             : '';
         return `<li class="resume-session__item${activeClass}">
-            <button type="button" class="resume-session__tile" data-slot-id="${escapeHtml(slotId)}" data-outline-accent="${accent}" data-outline-intensity="${intensity}" aria-label="Play TV ${escapeHtml(screenNum)}: ${escapeHtml(channelName)}">
+            <button type="button" class="resume-session__tile" data-slot-id="${escapeHtml(slotId)}" data-outline-accent="${accent}" aria-label="Play TV ${escapeHtml(screenNum)}: ${escapeHtml(channelName)}">
                 <span class="resume-session__tile-frame">
                     ${posterHtml}
                     <span class="resume-session__tile-fallback${fallbackClass}" aria-hidden="true">${escapeHtml(initial)}</span>

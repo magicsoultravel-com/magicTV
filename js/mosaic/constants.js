@@ -58,27 +58,20 @@ export const SLOT_SCREEN_LABELS = Object.freeze({
 });
 
 /**
- * Outline / accent index 1–3 cycling by screen label (TV1→1, TV2→2, TV3→3, TV4→1, …).
+ * Outline / accent index 1–3, rotated per row of three screens so no shade
+ * variants are needed. TV-number order:
+ *   1 2 3
+ *   3 1 2
+ *   2 3 1
  * @param {string} slotId
  * @returns {1|2|3}
  */
 export function slotOutlineAccent(slotId) {
     const label = Number(SLOT_SCREEN_LABELS[slotId] || '1');
     const n = Number.isFinite(label) && label > 0 ? label : 1;
-    return /** @type {1|2|3} */ (((n - 1) % 3) + 1);
-}
-
-/**
- * Outline intensity band by screen label: 1–3 full, 4–6 soft, 7–9 softer.
- * @param {string} slotId
- * @returns {'full'|'soft'|'softer'}
- */
-export function slotOutlineIntensity(slotId) {
-    const label = Number(SLOT_SCREEN_LABELS[slotId] || '1');
-    const n = Number.isFinite(label) && label > 0 ? label : 1;
-    if (n <= 3) return 'full';
-    if (n <= 6) return 'soft';
-    return 'softer';
+    const row = Math.floor((n - 1) / 3);
+    const col = (n - 1) % 3;
+    return /** @type {1|2|3} */ ((((col - row) % 3 + 3) % 3) + 1);
 }
 
 /**
@@ -89,7 +82,7 @@ export function slotOutlineIntensity(slotId) {
 export function applySlotOutlineAttrs(el, slotId) {
     if (!el) return;
     el.dataset.outlineAccent = String(slotOutlineAccent(slotId));
-    el.dataset.outlineIntensity = slotOutlineIntensity(slotId);
+    delete el.dataset.outlineIntensity;
 }
 
 export const DRAG_THRESHOLD_PX = 6;
