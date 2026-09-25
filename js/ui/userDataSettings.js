@@ -5,7 +5,9 @@ import {
     parseUserDataImport,
     summarizeUserData,
     applyUserDataReplace,
-    applyUserDataMergeLibrary
+    applyUserDataMergeLibrary,
+    clearAllUserData,
+    factoryResetUserData
 } from '../storage/userDataExport.js';
 
 function formatSummary(summary) {
@@ -68,10 +70,52 @@ async function handleImportFile(file) {
     window.setTimeout(() => window.location.reload(), 400);
 }
 
+function handleFlushUserData() {
+    const ok = window.confirm(
+        'Flush all user data?\n\n'
+        + 'This deletes favorites, folders, settings, session, watch stats, and clock/cast prefs.\n'
+        + 'Tile previews and catalog caches are kept.\n\n'
+        + 'Export a backup first if you might need it.'
+    );
+    if (!ok) return;
+    try {
+        clearAllUserData();
+    } catch (err) {
+        showAppToast(err?.message || 'Flush failed');
+        return;
+    }
+    showAppToast('User data flushed — reloading…');
+    window.setTimeout(() => window.location.reload(), 400);
+}
+
+async function handleFactoryReset() {
+    const ok = window.confirm(
+        'Factory reset?\n\n'
+        + 'Last resort: deletes all user data AND tile/catalog caches (IndexedDB).\n'
+        + 'Caches are not in exports and must rebuild after reload.\n\n'
+        + 'Export a backup first if you might need it.'
+    );
+    if (!ok) return;
+    const really = window.confirm(
+        'Really factory reset?\n\nThis cannot be undone except by importing a backup.'
+    );
+    if (!really) return;
+    try {
+        await factoryResetUserData();
+    } catch (err) {
+        showAppToast(err?.message || 'Factory reset failed');
+        return;
+    }
+    showAppToast('Factory reset done — reloading…');
+    window.setTimeout(() => window.location.reload(), 400);
+}
+
 export const UserDataSettings = {
     bind() {
         const exportBtn = el('export-user-data-btn');
         const importBtn = el('import-user-data-btn');
+        const flushBtn = el('flush-user-data-btn');
+        const factoryBtn = el('factory-reset-user-data-btn');
         const fileInput = el('import-user-data-input');
 
         if (exportBtn && exportBtn.dataset.bound !== '1') {
@@ -93,6 +137,18 @@ export const UserDataSettings = {
                 const file = fileInput.files?.[0];
                 fileInput.value = '';
                 handleImportFile(file);
+            });
+        }
+
+        if (flushBtn && flushBtn.dataset.bound !== '1') {
+            flushBtn.dataset.bound = '1';
+            flushBtn.addEventListener('click', handleFlushUserData);
+        }
+
+        if (factoryBtn && factoryBtn.dataset.bound !== '1') {
+            factoryBtn.dataset.bound = '1';
+            factoryBtn.addEventListener('click', () => {
+                handleFactoryReset();
             });
         }
     }

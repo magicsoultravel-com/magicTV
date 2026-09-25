@@ -257,3 +257,34 @@ test('summarizeUserData reports counts', () => {
     assert.equal(summary.visited, 1);
     assert.equal(summary.watchStats, 1);
 });
+
+test('clearAllUserData removes exportable localStorage keys only', () => {
+    seedLocalState();
+    store.set('matrix_tv_state_corrupt_backup', '{"broken":true}');
+    store.set('magicTV:castState', '{"connected":true}');
+    store.set('matrix_tv_iptv_cache', '{"legacy":true}');
+    UserDataExport.clearAllUserData();
+    assert.equal(store.has('matrix_tv_state'), false);
+    assert.equal(store.has('matrix_tv_state_corrupt_backup'), false);
+    assert.equal(store.has('magic_tv_clock_style'), false);
+    assert.equal(store.has('magic_tv_clock_hidden'), false);
+    assert.equal(store.has('magicTV:castHostAudio'), false);
+    assert.equal(store.has('magicTV:castHostVideo'), false);
+    assert.equal(store.has('magicTV:castState'), false);
+    // Legacy/cache-ish key left alone by flush
+    assert.equal(store.get('matrix_tv_iptv_cache'), '{"legacy":true}');
+});
+
+test('factoryResetUserData clears user data and prefixed localStorage keys', async () => {
+    seedLocalState();
+    store.set('matrix_tv_state_corrupt_backup', '{"broken":true}');
+    store.set('magicTV:castState', '{"connected":true}');
+    store.set('matrix_tv_iptv_cache', '{"legacy":true}');
+    store.set('matrix_tv_epg_guides', '[]');
+    await UserDataExport.factoryResetUserData();
+    assert.equal(store.has('matrix_tv_state'), false);
+    assert.equal(store.has('magic_tv_clock_style'), false);
+    assert.equal(store.has('magicTV:castState'), false);
+    assert.equal(store.has('matrix_tv_iptv_cache'), false);
+    assert.equal(store.has('matrix_tv_epg_guides'), false);
+});

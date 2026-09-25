@@ -572,6 +572,11 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     margin-top: var(--tv-spacing-sm);
 }
 
+.settings-data-actions .settings-reset-defaults-btn {
+    margin-top: 0;
+    align-self: auto;
+}
+
 .settings-data-hint {
     font-size: 0.8rem;
     margin: 0.5rem 0 0;

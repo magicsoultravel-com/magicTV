@@ -1,7 +1,7 @@
 /**
  * Export / import user data (localStorage only — excludes IndexedDB tile/catalog caches).
  */
-import { readPersistedState, writePersistedState } from './persistedState.js';
+import { readPersistedState, writePersistedState, STATE_KEY } from './persistedState.js';
 import {
     loadPlayerState,
     savePlayerState,
@@ -9,7 +9,8 @@ import {
     normalizeWatchStatsMeta,
     normalizeChanBindScopeBySlot
 } from './playerState.js';
-import { canonicalizePersistedState } from './stateMigration.js';
+import { canonicalizePersistedState, CORRUPT_BACKUP_KEY } from './stateMigration.js';
+import { IndexedDBStore } from './indexedDbStore.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
 
 export const EXPORT_FORMAT = 'magictv-user-data';
@@ -20,6 +21,17 @@ const CLOCK_STYLE_KEY = 'magic_tv_clock_style';
 const CLOCK_HIDDEN_KEY = 'magic_tv_clock_hidden';
 const CAST_HOST_AUDIO_KEY = 'magicTV:castHostAudio';
 const CAST_HOST_VIDEO_KEY = 'magicTV:castHostVideo';
+const CAST_STATE_KEY = 'magicTV:castState';
+
+/** localStorage keys covered by export / Flush user data. */
+const USER_DATA_EXTRA_KEYS = [
+    CLOCK_STYLE_KEY,
+    CLOCK_HIDDEN_KEY,
+    CAST_HOST_AUDIO_KEY,
+    CAST_HOST_VIDEO_KEY,
+    CAST_STATE_KEY,
+    CORRUPT_BACKUP_KEY
+];
 
 function readExtra(key) {
     try {
@@ -397,4 +409,47 @@ export function downloadUserDataExport() {
     anchor.download = `magictv-user-data-${date}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+}
+
+/**
+ * Wipe exportable user data only (localStorage blob + extras).
+ * Leaves IndexedDB tile/catalog caches alone.
+ */
+export function clearAllUserData() {
+    try {
+        localStorage.removeItem(STATE_KEY);
+    } catch { /* ignore */ }
+    for (const key of USER_DATA_EXTRA_KEYS) {
+        writeExtra(key, null);
+    }
+}
+
+function removeLocalStorageByPrefix(prefixes) {
+    let keys = [];
+    try {
+        keys = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (key) keys.push(key);
+        }
+    } catch {
+        return;
+    }
+    for (const key of keys) {
+        if (prefixes.some((p) => key === p || key.startsWith(p))) {
+            try {
+                localStorage.removeItem(key);
+            } catch { /* ignore */ }
+        }
+    }
+}
+
+/**
+ * Last-resort wipe: all magicTV localStorage keys + IndexedDB caches.
+ * Tile previews and catalog caches must be rebuilt after this.
+ */
+export async function factoryResetUserData() {
+    clearAllUserData();
+    removeLocalStorageByPrefix(['matrix_tv_', 'magic_tv_', 'magicTV:']);
+    await IndexedDBStore.clear();
 }
