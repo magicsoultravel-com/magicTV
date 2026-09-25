@@ -204,7 +204,7 @@ test('playback busy lowers heavy concurrency', () => {
     TileFrames.setPlaybackBusy(false);
 });
 
-test('observe enqueues hotBudget into hot and overflow into warm', () => {
+test('observe enqueues hotBudget into hot and overflow into warm', async () => {
     TileFrames._resetForTests();
     const restoreIO = stubIO();
     holdDrain();
@@ -224,7 +224,7 @@ test('observe enqueues hotBudget into hot and overflow into warm', () => {
     };
 
     try {
-        TileFrames.observe(container);
+        await TileFrames.observe(container);
         const budget = TileFrames.DEFAULT_HOT_BUDGET;
         assert.equal(TileFrames._state.hot.length, budget);
         assert.equal(TileFrames._state.warm.length, 40 - budget);
@@ -389,17 +389,7 @@ test('settleFrameCapture ignores stale epoch for UI and cache', async () => {
     assert.equal(await FrameCache.getFrame(url), null);
 });
 
-test('live refresh key sticks until synced away', () => {
-    TileFrames._resetForTests();
-    TileFrames._state.liveRefreshKey = 'browse:US';
-    assert.equal(TileFrames.isLiveRefreshActive('browse:US'), true);
-    assert.equal(TileFrames.isLiveRefreshActive('favorites'), false);
-    TileFrames.syncLiveRefresh('favorites');
-    assert.equal(TileFrames.isLiveRefreshActive('browse:US'), false);
-    assert.equal(TileFrames._state.liveRefreshKey, null);
-});
-
-test('refresh with viewKey clears cache, paints provisional, and requeues', async () => {
+test('refresh is one-shot: clears cache and requeues without sticky live-refresh', async () => {
     await FrameCache.clearFrames();
     TileFrames._resetForTests();
     const restoreIO = stubIO();
@@ -425,7 +415,7 @@ test('refresh with viewKey clears cache, paints provisional, and requeues', asyn
 
     try {
         await TileFrames.refresh(container, { viewKey: 'browse:US' });
-        assert.equal(TileFrames.isLiveRefreshActive('browse:US'), true);
+        assert.equal(TileFrames._state.liveRefreshKey, undefined);
         assert.equal(await FrameCache.getFrame(url), null);
         assert.equal(await FrameCache.getFrame(chKey), null);
         assert.equal(frame.dataset.provisional, '1');
@@ -434,6 +424,19 @@ test('refresh with viewKey clears cache, paints provisional, and requeues', asyn
         assert.ok(
             TileFrames._state.hot.includes(frame) || TileFrames._state.warm.includes(frame)
         );
+
+        // After a successful settle + cache write, a later observe uses cache again.
+        TileFrames._resetForTests();
+        holdDrain();
+        const restored = 'data:image/jpeg;base64,fresh';
+        await FrameCache.setFrame(url, restored);
+        delete frame.dataset.captured;
+        delete frame.dataset.provisional;
+        setFrameState(frame, 'waiting');
+        await TileFrames.observe(container);
+        assert.equal(frame.dataset.frameState, 'captured');
+        assert.equal(frame._img.src, restored);
+        assert.equal(TileFrames._state.pending.has(frame), false);
     } finally {
         restoreIO();
         TileFrames._resetForTests();
@@ -498,14 +501,49 @@ test('observe primes from FrameCache and queues uncached tiles', async () => {
     };
 
     try {
-        TileFrames.observe(container);
-        await new Promise((r) => setTimeout(r, 30));
+        await TileFrames.observe(container);
         assert.equal(cached.dataset.frameState, 'captured');
         assert.equal(cached._img.src, dataUrl);
+        assert.equal(TileFrames._state.pending.has(cached), false);
         assert.equal(TileFrames._state.pending.has(fresh), true);
         assert.ok(
             ['waiting', 'provisional', 'loading'].includes(fresh.dataset.frameState)
         );
+    } finally {
+        restoreIO();
+        TileFrames._resetForTests();
+        await FrameCache.clearFrames();
+    }
+});
+
+test('observe primes before queue so cached tiles never enter the drain', async () => {
+    await FrameCache.clearFrames();
+    TileFrames._resetForTests();
+    const restoreIO = stubIO();
+    holdDrain();
+
+    const url = 'https://example.test/prime-first.m3u8';
+    const dataUrl = 'data:image/jpeg;base64,prime';
+    await FrameCache.setFrame(url, dataUrl);
+
+    const frame = makeFrame({ url });
+    const container = {
+        closest() { return null; },
+        clientHeight: 0,
+        clientWidth: 0,
+        querySelectorAll(sel) {
+            if (sel === '.channel-tile__capture-frame') return [frame];
+            return [];
+        }
+    };
+
+    try {
+        await TileFrames.observe(container);
+        assert.equal(frame.dataset.frameState, 'captured');
+        assert.equal(frame._img.src, dataUrl);
+        assert.equal(TileFrames._state.pending.has(frame), false);
+        assert.equal(TileFrames._state.hot.includes(frame), false);
+        assert.equal(TileFrames._state.warm.includes(frame), false);
     } finally {
         restoreIO();
         TileFrames._resetForTests();
@@ -535,8 +573,7 @@ test('observe primes skeleton tiles from channel-key cache without stream URL', 
     };
 
     try {
-        TileFrames.observe(container);
-        await new Promise((r) => setTimeout(r, 30));
+        await TileFrames.observe(container);
         assert.equal(frame.dataset.frameState, 'captured');
         assert.equal(frame._img.src, dataUrl);
     } finally {

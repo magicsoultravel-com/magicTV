@@ -49,7 +49,6 @@ const state = {
     heavyRunning: 0,
     playbackBusy: false,
     refreshEpoch: 0,
-    liveRefreshKey: null,
     activeGrid: null
 };
 
@@ -82,10 +81,6 @@ function tileChannelKey(frame) {
 
 function tileLogo(frame) {
     return (frame.closest('.channel-tile')?.dataset?.logo || '').trim();
-}
-
-function isLiveRefreshActive(viewKey) {
-    return !!state.liveRefreshKey && state.liveRefreshKey === viewKey;
 }
 
 function hotBudget(container) {
@@ -320,9 +315,9 @@ async function captureFrame(frame, tier, epoch) {
     const chKey = tileChannelKey(frame);
     const logo = tileLogo(frame);
     const alreadyHeavy = state.forceHeavy.has(frame);
-    const skipCache = !!state.liveRefreshKey;
 
-    if (!alreadyHeavy && !skipCache) {
+    // Skip cache only when this frame was force-queued (per-tile refresh / heavy upgrade).
+    if (!alreadyHeavy) {
         const keys = [url, chKey, logo].filter(Boolean);
         for (const key of keys) {
             const cached = await FrameCache.getFrame(key).catch(() => null);
@@ -372,20 +367,6 @@ async function captureFrame(frame, tier, epoch) {
     }
 }
 
-let folderFramePumpQueued = false;
-function scheduleFolderFramePump() {
-    if (folderFramePumpQueued) return;
-    folderFramePumpQueued = true;
-    const run = () => {
-        folderFramePumpQueued = false;
-        if (state.running > 0) return;
-        if (!state.liveRefreshKey) return;
-        promoteUncapturedFolderFrames(state.activeGrid);
-    };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
-    else setTimeout(run, 0);
-}
-
 function drain() {
     pruneQueues();
     let next;
@@ -422,9 +403,6 @@ function drain() {
                     state.forceHeavy.delete(frame);
                 }
                 drain();
-                if (state.running === 0 && state.hot.length === 0 && state.warm.length === 0) {
-                    scheduleFolderFramePump();
-                }
             });
     }
 }
@@ -505,8 +483,8 @@ function queueContainer(container, { reobserve = false } = {}) {
     drain();
 }
 
-async function primeFromCache(container, { skipCache = false } = {}) {
-    if (!container || skipCache) return;
+async function primeFromCache(container) {
+    if (!container) return;
     const frames = [];
     const keys = [];
     container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
@@ -539,7 +517,12 @@ async function primeFromCache(container, { skipCache = false } = {}) {
 
 // ===== PUBLIC API =====
 
-function observe(container, opts = {}) {
+/**
+ * Paint provisional logos, restore cached frames, then queue misses for capture.
+ * @param {HTMLElement} container
+ * @param {{ viewKey?: string }} [opts] viewKey kept for call-site compat (unused)
+ */
+async function observe(container, opts = {}) {
     if (!container) return;
     if (DockOpenGate.isOpening()) {
         // Coalesce: keep latest container; one flush after settle.
@@ -555,32 +538,24 @@ function observe(container, opts = {}) {
         }
         return;
     }
-    const viewKey = opts.viewKey || null;
-    const skipCache = isLiveRefreshActive(viewKey);
     state.activeGrid = container;
 
     paintProvisionalLogos(container);
+    // Prime before queue so revisits paint from IDB without starting heavy work.
+    await primeFromCache(container).catch(() => {});
     queueContainer(container);
-    primeFromCache(container, { skipCache }).catch(() => {});
-
-    if (state.liveRefreshKey) {
-        enqueueFolderFramesForRefresh(container);
-    }
 }
 
 /**
- * Wipe cache for this grid and requeue hot+warm live grabs.
+ * One-shot wipe of this grid's cached thumbs and requeue captures.
+ * Does not leave a sticky cache-bypass mode — after captures settle, the next
+ * observe uses FrameCache again.
  * @param {HTMLElement} container
- * @param {{ viewKey?: string }} [opts]
+ * @param {{ viewKey?: string }} [opts] viewKey kept for call-site compat (unused)
  */
 async function refresh(container, opts = {}) {
     if (!container) return;
-    const viewKey = opts.viewKey || null;
-    if (viewKey && viewKey !== 'browseCountries' && viewKey !== 'settings') {
-        state.liveRefreshKey = viewKey;
-    } else {
-        state.liveRefreshKey = null;
-    }
+    void opts;
 
     abortAllCaptures();
     state.refreshEpoch++;
@@ -667,79 +642,6 @@ async function refreshFrame(frameOrTile) {
     state.hot.unshift(frame);
     markWaiting(frame);
     drain();
-}
-
-function enqueueFolderFramesForRefresh(container) {
-    if (!container || !state.liveRefreshKey) return;
-    paintProvisionalLogos(container);
-    const keys = [];
-    const hot = [];
-    const warm = [];
-    const budget = Math.max(0, hotBudget(container) - state.hot.length);
-    let added = false;
-
-    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
-        if (frame.dataset.captured || state.pending.has(frame)) return;
-        const url = streamUrl(frame);
-        const chKey = tileChannelKey(frame);
-        const logo = tileLogo(frame);
-        if (url) keys.push(url);
-        if (chKey) keys.push(chKey);
-        if (logo) keys.push(logo);
-        if (!url) return;
-        if (logo && !frame.dataset.provisional) applyProvisional(frame, logo);
-        state.pending.add(frame);
-        markWaiting(frame);
-        if (hot.length < budget) hot.push(frame);
-        else warm.push(frame);
-        added = true;
-    });
-
-    state.hot.push(...hot);
-    state.warm.push(...warm);
-    if (keys.length) FrameCache.removeFrames(keys).catch(() => {});
-    if (added) drain();
-}
-
-function promoteUncapturedFolderFrames(container) {
-    if (!container || !state.liveRefreshKey) return;
-    paintProvisionalLogos(container);
-    const keys = [];
-    const hot = [];
-    const warm = [];
-    const budget = hotBudget(container);
-    let added = false;
-
-    container.querySelectorAll('.channel-tile__capture-frame').forEach((frame) => {
-        if (frame.dataset.captured || state.pending.has(frame)) return;
-        const url = streamUrl(frame);
-        if (!url) return;
-        if (!isNearViewport(frame)) return;
-        const logo = tileLogo(frame);
-        const chKey = tileChannelKey(frame);
-        if (logo) applyProvisional(frame, logo);
-        if (url) keys.push(url);
-        if (chKey) keys.push(chKey);
-        if (logo) keys.push(logo);
-        state.pending.add(frame);
-        markWaiting(frame);
-        if (hot.length < budget) hot.push(frame);
-        else warm.push(frame);
-        added = true;
-    });
-    if (!added) return;
-    state.hot.unshift(...hot);
-    state.warm.push(...warm);
-    if (keys.length) FrameCache.removeFrames(keys).catch(() => {});
-    drain();
-}
-
-function clearLiveRefresh() {
-    state.liveRefreshKey = null;
-}
-
-function syncLiveRefresh(viewKey) {
-    if (!isLiveRefreshActive(viewKey)) clearLiveRefresh();
 }
 
 function setPlaybackBusy(busy) {
@@ -919,7 +821,6 @@ function _resetForTests() {
     state.heavyRunning = 0;
     state.playbackBusy = false;
     state.refreshEpoch++;
-    state.liveRefreshKey = null;
     state.activeGrid = null;
     liveSnapByUrl.clear();
     liveTileSnap = waitAndSnapshotTileFrame;
@@ -945,13 +846,8 @@ export const TileFrames = {
     observe,
     refresh,
     refreshFrame,
-    clearLiveRefresh,
-    syncLiveRefresh,
-    isLiveRefreshActive,
     setPlaybackBusy,
     warmup,
-    enqueueFolderFramesForRefresh,
-    promoteUncapturedFolderFrames,
     armLiveSnap,
     notePlayingVideo,
     paintPlayingFrame,

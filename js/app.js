@@ -635,7 +635,6 @@ function switchTab(tabName) {
     }
 
     syncRemoteTabChrome();
-    TileFrames.syncLiveRefresh(currentRefreshKey());
     ListSort.syncSortControls();
     if (tabName === 'favorites') {
         applyCatalogFilterInput(el('search-countries'), 'favorites', appState);
