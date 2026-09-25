@@ -12,6 +12,8 @@ export const STALLED_PAUSE_RESTART_MS = 30000;
 export const STALLED_PAUSE_BEHIND_MS = 30000;
 /** Stuck-load recovery: no media progress for this long → fresh attach. */
 export const STUCK_LOAD_RECOVERY_MS = 5000;
+/** Seconds of ahead buffer to prefer before first play() after attach. */
+export const STARTUP_BUFFER_SEC = 3;
 
 /**
  * Freeze-heal: clock/frame stall must persist this long before acting.
@@ -254,9 +256,39 @@ export function shouldFreshResume({
 }
 
 /**
+ * Ahead-of-playhead (or first-range) buffered duration in seconds.
+ * Before play(), currentTime is often 0 while live buffers start at the edge.
+ */
+export function bufferedAheadSeconds(buffered, currentTime = 0) {
+    if (!buffered || typeof buffered.length !== 'number' || buffered.length < 1) return 0;
+    const range = findBufferedRange(buffered, currentTime);
+    if (range) {
+        const t = Number.isFinite(Number(currentTime)) ? Number(currentTime) : 0;
+        return Math.max(0, range.end - t);
+    }
+    try {
+        if (typeof buffered.start !== 'function' || typeof buffered.end !== 'function') return 0;
+        const start = buffered.start(0);
+        const end = buffered.end(0);
+        if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+        return Math.max(0, end - start);
+    } catch {
+        return 0;
+    }
+}
+
+/** True when buffered ahead meets the startup dwell target. */
+export function hasStartupBuffer(buffered, currentTime = 0, minSec = STARTUP_BUFFER_SEC) {
+    const need = Number(minSec);
+    if (!Number.isFinite(need) || need <= 0) return true;
+    return bufferedAheadSeconds(buffered, currentTime) >= need;
+}
+
+/**
  * A repeated toggle while a load intent is stuck (wantPlaying but no media
  * progress for a while) must recover with a fresh attach — re-running
  * video.play() on the same dead engine only spins.
+ * Also recovers mid-stream underruns where playing stays true during buffering.
  */
 export function shouldRecoverStuckLoad({
     wantPlaying = false,
@@ -267,11 +299,15 @@ export function shouldRecoverStuckLoad({
     now = Date.now(),
     hardStallMs = STUCK_LOAD_RECOVERY_MS
 } = {}) {
-    if (wantPlaying !== true || playing === true) return false;
+    if (wantPlaying !== true) return false;
     const inFlight = loading === true
         || loadPhase === 'connecting'
         || loadPhase === 'buffering';
     if (!inFlight) return false;
+    // Healthy playing (not buffering) must not trigger toggle reattach.
+    if (playing === true && loading !== true && loadPhase !== 'buffering' && loadPhase !== 'connecting') {
+        return false;
+    }
     if (lastProgressAt <= 0) return false;
     return now - lastProgressAt >= hardStallMs;
 }

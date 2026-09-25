@@ -25,6 +25,8 @@ import {
     shouldClearStaleBufferOnTimeupdate,
     shouldFreshResume,
     shouldRecoverStuckLoad,
+    bufferedAheadSeconds,
+    hasStartupBuffer,
     isClockStalled,
     didClockAdvance,
     didFramesAdvance,
@@ -33,6 +35,7 @@ import {
     STALLED_PAUSE_RESTART_MS,
     STALLED_PAUSE_BEHIND_MS,
     STUCK_LOAD_RECOVERY_MS,
+    STARTUP_BUFFER_SEC,
     FREEZE_CONFIRM_MS,
     FREEZE_VIDEO_MIN_FPS,
     PARK_HEADROOM_RATIO
@@ -634,6 +637,14 @@ test('shouldRecoverStuckLoad only fires on a stalled in-flight load', () => {
         loadPhase: 'connecting',
         ...stalled
     }), true);
+    // Mid-stream underrun: playing stays true while buffering → recover.
+    assert.equal(shouldRecoverStuckLoad({
+        wantPlaying: true,
+        playing: true,
+        loading: true,
+        loadPhase: 'buffering',
+        ...stalled
+    }), true);
     // No progress marker → do not invent a recovery.
     assert.equal(shouldRecoverStuckLoad({
         wantPlaying: true,
@@ -643,7 +654,7 @@ test('shouldRecoverStuckLoad only fires on a stalled in-flight load', () => {
         lastProgressAt: 0,
         now
     }), false);
-    // Actually playing/paused → never recover.
+    // Healthy playing (not buffering) → never recover.
     assert.equal(shouldRecoverStuckLoad({
         wantPlaying: true,
         playing: true,
@@ -667,6 +678,43 @@ test('shouldRecoverStuckLoad only fires on a stalled in-flight load', () => {
         now,
         lastProgressAt: now - STUCK_LOAD_RECOVERY_MS + 1000
     }), false);
+});
+
+test('bufferedAheadSeconds / hasStartupBuffer measure startup dwell target', () => {
+    assert.equal(STARTUP_BUFFER_SEC, 3);
+    const deep = fakeBuffered([[100, 105]]);
+    assert.equal(bufferedAheadSeconds(deep, 100), 5);
+    assert.equal(hasStartupBuffer(deep, 100, 3), true);
+    assert.equal(hasStartupBuffer(deep, 100, 6), false);
+    // Playhead not in range yet (pre-play live edge): use first-range depth.
+    assert.equal(bufferedAheadSeconds(deep, 0), 5);
+    assert.equal(hasStartupBuffer(deep, 0, 3), true);
+    assert.equal(hasStartupBuffer(fakeBuffered([[0, 1]]), 0, 3), false);
+    assert.equal(bufferedAheadSeconds(null, 0), 0);
+});
+
+test('waitForStartupBuffer resolves when target met or aborts on continueCheck', async () => {
+    const { waitForStartupBuffer } = await import('../js/player/prepareCommit.js');
+    const video = {
+        currentTime: 0,
+        buffered: fakeBuffered([[0, 4]])
+    };
+    const ok = await waitForStartupBuffer(
+        { video },
+        { continueCheck: () => true, minSec: 3, timeoutMs: 200 }
+    );
+    assert.equal(ok, true);
+
+    let calls = 0;
+    const aborted = await waitForStartupBuffer(
+        { video: { currentTime: 0, buffered: fakeBuffered([[0, 0.5]]) } },
+        {
+            continueCheck: () => (++calls) < 2,
+            minSec: 3,
+            timeoutMs: 5000
+        }
+    );
+    assert.equal(aborted, false);
 });
 
 test('isClockStalled needs a sustained frozen clock (elapsed = since last motion)', () => {

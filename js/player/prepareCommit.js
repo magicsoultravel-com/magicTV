@@ -25,10 +25,38 @@ import {
 import {
     shouldContinuePlayAfterAttach,
     isAutoplayNotAllowedError,
-    shouldRetryPlayMuted
+    shouldRetryPlayMuted,
+    hasStartupBuffer,
+    STARTUP_BUFFER_SEC
 } from './pauseBuffer.js';
 import { releasePausedFill } from './loadBudget.js';
 
+/** Poll interval while waiting for startup buffer before first play(). */
+const STARTUP_BUFFER_POLL_MS = 100;
+
+/**
+ * Dwell until ahead buffer meets STARTUP_BUFFER_SEC or timeout / abort.
+ * @param {object} player
+ * @param {{ continueCheck: () => boolean, minSec?: number, timeoutMs?: number }} opts
+ * @returns {Promise<boolean>} true if target met, false on timeout/abort
+ */
+export async function waitForStartupBuffer(player, {
+    continueCheck,
+    minSec = STARTUP_BUFFER_SEC,
+    timeoutMs = PRELOAD_STALL_MS
+} = {}) {
+    if (typeof continueCheck !== 'function') return false;
+    const startedAt = Date.now();
+    while (continueCheck()) {
+        const video = player?.video;
+        if (video && hasStartupBuffer(video.buffered, video.currentTime || 0, minSec)) {
+            return true;
+        }
+        if (Date.now() - startedAt >= timeoutMs) return false;
+        await new Promise((r) => setTimeout(r, STARTUP_BUFFER_POLL_MS));
+    }
+    return false;
+}
 /**
  * Resolve a channel object or key string, aborting when `isCurrent` goes false.
  * @param {object} player
@@ -87,7 +115,12 @@ export async function tryMutedAutoplayRetry(player, playErr) {
  * @param {{ generation: number, transportAtStart: number, retryAbort?: boolean }} opts
  * @returns {Promise<boolean>}
  */
-export async function playAfterAttach(player, { generation, transportAtStart, retryAbort = false }) {
+export async function playAfterAttach(player, {
+    generation,
+    transportAtStart,
+    retryAbort = false,
+    skipStartupDwell = false
+} = {}) {
     const continueCheck = () => shouldContinuePlayAfterAttach({
         generation,
         playGeneration: player.playGeneration,
@@ -95,6 +128,14 @@ export async function playAfterAttach(player, { generation, transportAtStart, re
         transportGen: player.transportGen,
         transportAtStart
     });
+
+    if (!continueCheck()) return false;
+    // Classic attach: bank a short buffer before first play(). Safe Loading /
+    // heal commit already warmed staging — skip the dwell there.
+    if (!skipStartupDwell) {
+        await waitForStartupBuffer(player, { continueCheck });
+        if (!continueCheck()) return false;
+    }
 
     try {
         await player.video.play();
@@ -439,7 +480,8 @@ export const prepareCommitMethods = {
             const played = await playAfterAttach(this, {
                 generation,
                 transportAtStart,
-                retryAbort: true
+                retryAbort: true,
+                skipStartupDwell: true
             });
             if (!played) return false;
         } catch {

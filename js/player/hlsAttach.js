@@ -1,8 +1,8 @@
 import { canPlayNativeHls, isHlsUrl, loadHlsLibrary } from '../tvHls.js';
 import { shouldRestartHlsOnError } from './loadBudget.js';
 
-export const HLS_MAX_BUFFER_BYTES = 20 * 1024 * 1024;
-export const HLS_MAX_BITRATE = 5_000_000;
+export const HLS_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
+export const HLS_MAX_BITRATE = 12_000_000;
 /** Segments to sync to the live edge (fixed; no longer a user preference). */
 export const LIVE_SYNC_DURATION_COUNT = 3;
 /** Max latency (in segments) before hls.js seeks to the live edge. */
@@ -62,7 +62,7 @@ export function buildHlsConfig(Hls, bufferSize) {
     return {
         maxBufferSize: HLS_MAX_BUFFER_BYTES,
         maxBufferLength: bufferSize,
-        minBufferLength: 1.0,
+        minBufferLength: 3.0,
         maxBitrate: HLS_MAX_BITRATE,
         startPosition: 0,
         enableWorker: true,

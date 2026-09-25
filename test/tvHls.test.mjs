@@ -28,3 +28,20 @@ test('canPlayNativeHls gates on canPlayType', () => {
         canPlayType: (t) => (t.includes('mpegurl') ? 'maybe' : '')
     }), true);
 });
+
+test('buildHlsConfig applies deeper buffer caps for high-bitrate IPTV', async () => {
+    const {
+        buildHlsConfig,
+        HLS_MAX_BUFFER_BYTES,
+        HLS_MAX_BITRATE
+    } = await import('../js/player/hlsAttach.js');
+    const { DEFAULT_BUFFER_SIZE } = await import('../js/storage/playerState.js');
+    assert.equal(DEFAULT_BUFFER_SIZE, 30);
+    assert.equal(HLS_MAX_BUFFER_BYTES, 64 * 1024 * 1024);
+    assert.equal(HLS_MAX_BITRATE, 12_000_000);
+    const cfg = buildHlsConfig({ AbrController: class {} }, 30);
+    assert.equal(cfg.maxBufferLength, 30);
+    assert.equal(cfg.minBufferLength, 3.0);
+    assert.equal(cfg.maxBufferSize, HLS_MAX_BUFFER_BYTES);
+    assert.equal(cfg.maxBitrate, HLS_MAX_BITRATE);
+});

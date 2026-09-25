@@ -511,6 +511,8 @@ test('stuck-load watchdog clears stuck loading and surfaces error state', async 
     player.playing = false;
     player.loading = true;
     player.loadPhase = 'buffering';
+    // Disable reattach budget so the watchdog surfaces the error terminal path.
+    player.reattempts = 0;
 
     player._armStuckLoadWatchdog();
     assert.ok(player._stuckLoadTimer != null);
@@ -531,7 +533,7 @@ test('stuck-load watchdog clears stuck loading and surfaces error state', async 
     }
 });
 
-test('stuck-load watchdog is a no-op while playing and clear disarms it', async () => {
+test('stuck-load watchdog kicks startLoad while playing+buffering', async () => {
     const { createPlayerInstance } = await import('../js/player/playerInstance.js');
     const player = createPlayerInstance({
         id: 'center',
@@ -546,9 +548,77 @@ test('stuck-load watchdog is a no-op while playing and clear disarms it', async 
     player.playing = true;
     player.loading = true;
     player.loadPhase = 'buffering';
+    let startLoadCalls = 0;
+    player.hls = { startLoad() { startLoadCalls += 1; } };
 
     player._armStuckLoadWatchdog();
     try {
+        player._loadLastProgressAt = Date.now() - PRELOAD_STALL_MS - 1;
+        player._stuckLoadTick();
+        assert.equal(startLoadCalls, 1);
+        assert.equal(player._stuckLoadRetried, true);
+        assert.equal(player.error, null);
+        assert.equal(player.playing, true);
+    } finally {
+        player._clearStuckLoadWatchdog();
+    }
+});
+
+test('stuck-load escalate reattaches while playing+buffering after startLoad', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player.loading = true;
+    player.loadPhase = 'buffering';
+    player.reattempts = 5;
+    player._stuckLoadRetried = true;
+    let playCalls = 0;
+    player.playChannel = async () => { playCalls += 1; };
+
+    player._armStuckLoadWatchdog();
+    try {
+        player._loadLastProgressAt = Date.now() - PRELOAD_STALL_MS - 1;
+        player._stuckLoadTick();
+        assert.equal(playCalls, 1);
+        assert.equal(player.playing, false);
+        assert.equal(player.loading, false);
+        assert.equal(player.error, null);
+        assert.equal(player._autoRetryAttemptsUsed, 1);
+    } finally {
+        player._clearStuckLoadWatchdog();
+    }
+
+    assert.equal(player._stuckLoadTimer, null);
+});
+
+test('stuck-load watchdog is a no-op while healthy playing and clear disarms it', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player.loading = false;
+    player.loadPhase = 'idle';
+
+    player._armStuckLoadWatchdog();
+    try {
+        player._loadLastProgressAt = Date.now() - PRELOAD_STALL_MS - 1;
         player._stuckLoadTick();
         assert.equal(player.error, null);
 
@@ -556,6 +626,7 @@ test('stuck-load watchdog is a no-op while playing and clear disarms it', async 
         player.playing = false;
         player.loading = true;
         player.loadPhase = 'buffering';
+        player.reattempts = 0;
         player._stuckLoadRetried = true;
         player._loadLastProgressAt = Date.now() - PRELOAD_STALL_MS - 1;
         player._stuckLoadTick();

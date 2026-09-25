@@ -18,7 +18,7 @@ export const DEFAULT_VISITED_STYLE = 'accent-2';
 export const VISITED_STYLES = ['undistinguished', 'accent-1', 'accent-2', 'accent-3'];
 export const DEFAULT_NON_VISITED_STYLE = 'undistinguished';
 
-export const DEFAULT_BUFFER_SIZE = 15;
+export const DEFAULT_BUFFER_SIZE = 30;
 export const MAX_BUFFER_SIZE = 120;
 export const MIN_BUFFER_SIZE = 5;
 

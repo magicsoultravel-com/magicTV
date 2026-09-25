@@ -412,7 +412,7 @@ export function createPlayerInstance(options) {
                 if (transportGen !== this.transportGen) return;
                 if (playGen !== this.playGeneration) return;
                 if (channelKeyStr && channelKeyStr !== channelKey(this.channel)) return;
-                if (this.playing) return;
+                // Mid-stream underruns keep playing===true while buffering — still recover.
                 if (!(this.loading || this.loadPhase === 'connecting' || this.loadPhase === 'buffering')) return;
 
                 const sinceProgress = Date.now() - (this._loadLastProgressAt || 0);
@@ -433,10 +433,27 @@ export function createPlayerInstance(options) {
                     return;
                 }
 
-                tvDebug('player', 'stuck-load giving up', { slot: this.id });
+                // Escalate like stop/start: fresh attach (counts against auto-retry budget).
+                tvDebug('player', 'stuck-load escalate reattach', { slot: this.id });
+                this._clearStuckLoadWatchdog();
                 this.loading = false;
                 this.loadPhase = 'idle';
                 this.preparing = false;
+                this.playing = false;
+
+                const max = this.getReattempts?.() ?? 0;
+                if (
+                    max > 0
+                    && (this._autoRetryAttemptsUsed || 0) < max
+                    && this.channel?.url_resolved
+                ) {
+                    this.error = null;
+                    this._autoRetryAttemptsUsed = (this._autoRetryAttemptsUsed || 0) + 1;
+                    this.emitState();
+                    void this.playChannel(this.channel, { fromAutoRetry: true });
+                    return;
+                }
+
                 this.error = 'Stream unavailable';
                 this.emitState();
                 scheduleSlotPrefetch(this.id, this);
