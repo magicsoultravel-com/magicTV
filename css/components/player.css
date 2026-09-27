@@ -947,6 +947,38 @@
     left: 0.55rem;
 }
 
+/* Cast volume rocker — leftmost; local rocker shifts when tile is casting */
+.tv-player-tile__vol-rocker--cast {
+    left: 0.55rem;
+    grid-template-rows: 18px repeat(3, 22px);
+    color: #7ecbff;
+    border-color: color-mix(in srgb, #7ecbff 45%, transparent);
+}
+
+.tv-player-tile__rocker-cast-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 18px;
+    color: #7ecbff;
+    pointer-events: none;
+}
+
+.tv-player-tile__rocker-cast-icon svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+
+.tv-player-tile.is-casting-slot .tv-player-tile__vol-rocker:not(.tv-player-tile__vol-rocker--cast) {
+    left: 3.05rem;
+}
+
+.tv-player-tile__vol-rocker--cast[hidden] {
+    display: none;
+}
+
 .tv-player-tile__chan-rocker {
     right: 0.55rem;
 }

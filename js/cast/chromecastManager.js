@@ -89,12 +89,96 @@ function emitHostToggled() {
     }));
 }
 
-/** Receiver is playing only for PLAYING/BUFFERING — IDLE/no media is not playing. */
+/** Receiver is playing only for PLAYING/BUFFERING/LOADING — IDLE/no media is not playing. */
 export function deriveCastPlaying(remote, media) {
     const raw = remote?.playerState || media?.playerState || '';
     const state = String(raw).toUpperCase();
     if (!state || state === 'IDLE' || state === 'STOPPED') return false;
-    return state === 'PLAYING' || state === 'BUFFERING';
+    return state === 'PLAYING' || state === 'BUFFERING' || state === 'LOADING';
+}
+
+const CONTENT_TYPE_APPLE = 'application/vnd.apple.mpegurl';
+const CONTENT_TYPE_XMPEG = 'application/x-mpegURL';
+const LOAD_VERIFY_MS = 3500;
+const LOAD_VERIFY_POLL_MS = 200;
+
+/** Prefer apple MPEG-URL for .m3u8 (and common HLS query forms). */
+export function sniffCastContentType(url) {
+    const u = String(url || '').trim().toLowerCase();
+    if (!u) return CONTENT_TYPE_XMPEG;
+    if (u.includes('.m3u8') || u.includes('m3u8') || u.includes('format=m3u')) {
+        return CONTENT_TYPE_APPLE;
+    }
+    return CONTENT_TYPE_XMPEG;
+}
+
+/**
+ * Ordered load attempts for Default Media Receiver live HLS.
+ * @returns {Array<{ contentType: string, segment: 'TS'|'FMP4'|null }>}
+ */
+export function buildCastLoadAttempts(url) {
+    const primary = sniffCastContentType(url);
+    const secondary = primary === CONTENT_TYPE_APPLE ? CONTENT_TYPE_XMPEG : CONTENT_TYPE_APPLE;
+    return [
+        { contentType: primary, segment: 'TS' },
+        { contentType: primary, segment: 'FMP4' },
+        { contentType: primary, segment: null },
+        { contentType: secondary, segment: 'TS' }
+    ];
+}
+
+/** Short toast-friendly message from Cast / load errors. */
+export function formatCastError(err) {
+    const raw = String(err?.message || err || '').trim();
+    const lower = raw.toLowerCase();
+    if (!raw) return 'Cast failed';
+    if (lower.includes('cancel')) return raw;
+    if (lower.includes('unreachable') || lower.includes('cors') || lower.includes('network')) {
+        return 'Stream unreachable by Cast device';
+    }
+    if (lower.includes('idle') || lower.includes('load failed') || lower.includes('did not start')) {
+        return 'Cast load failed — stream may be blocked for Chromecast';
+    }
+    if (lower.includes('no stream') || lower.includes('no cast session')) return raw;
+    if (raw.length > 72) return `${raw.slice(0, 69)}…`;
+    return raw;
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveHlsSegmentFormat(segment) {
+    const map = chrome.cast?.media?.HlsSegmentFormat;
+    if (!map || !segment) return null;
+    if (segment === 'TS' && map.TS != null) return map.TS;
+    if (segment === 'FMP4' && map.FMP4 != null) return map.FMP4;
+    return null;
+}
+
+function resolveHlsVideoSegmentFormat(segment) {
+    const map = chrome.cast?.media?.HlsVideoSegmentFormat;
+    if (!map || !segment) return null;
+    if (segment === 'TS' && map.MPEG2_TS != null) return map.MPEG2_TS;
+    if (segment === 'FMP4' && map.FMP4 != null) return map.FMP4;
+    return null;
+}
+
+function getPlayerStateString() {
+    const media = getMedia();
+    const raw = remotePlayer?.playerState || media?.playerState || '';
+    return String(raw).toUpperCase();
+}
+
+function getIdleReasonString(media = getMedia()) {
+    const reason = media?.idleReason
+        ?? remotePlayer?.playerStateExact
+        ?? '';
+    return String(reason || '').toUpperCase();
+}
+
+function isAbsoluteHttpUrl(url) {
+    return /^https?:\/\//i.test(String(url || '').trim());
 }
 
 function getSession() {
@@ -182,12 +266,41 @@ function bindCastContextListeners() {
     );
 }
 
-function buildMediaInfo(channel) {
+/**
+ * @param {object} channel
+ * @param {{ contentType?: string, segment?: 'TS'|'FMP4'|null }} [opts]
+ */
+export function buildMediaInfoOptions(channel, opts = {}) {
     const url = (channel?.url_resolved || channel?.url || '').trim();
-    const mediaInfo = new chrome.cast.media.MediaInfo(url, 'application/x-mpegURL');
+    const contentType = opts.contentType || sniffCastContentType(url);
+    return {
+        url,
+        contentType,
+        segment: opts.segment === undefined ? null : opts.segment,
+        title: channel?.name || 'magicTV',
+        logo: isAbsoluteHttpUrl(channel?.logo) ? String(channel.logo).trim() : ''
+    };
+}
+
+function buildMediaInfo(channel, opts = {}) {
+    const info = buildMediaInfoOptions(channel, opts);
+    const mediaInfo = new chrome.cast.media.MediaInfo(info.url, info.contentType);
     mediaInfo.streamType = chrome.cast.media.StreamType.LIVE;
+    mediaInfo.hlsSegmentFormat = undefined;
+    mediaInfo.hlsVideoSegmentFormat = undefined;
+
+    const seg = resolveHlsSegmentFormat(info.segment);
+    if (seg != null) mediaInfo.hlsSegmentFormat = seg;
+    const vseg = resolveHlsVideoSegmentFormat(info.segment);
+    if (vseg != null) mediaInfo.hlsVideoSegmentFormat = vseg;
+
     const metadata = new chrome.cast.media.GenericMediaMetadata();
-    metadata.title = channel?.name || 'magicTV';
+    metadata.title = info.title;
+    if (info.logo && chrome.cast?.Image) {
+        try {
+            metadata.images = [new chrome.cast.Image(info.logo)];
+        } catch { /* ignore */ }
+    }
     mediaInfo.metadata = metadata;
     return mediaInfo;
 }
@@ -196,24 +309,105 @@ function getMedia() {
     return getSession()?.getMediaSession?.() || null;
 }
 
-async function loadMediaOnSession(session, channel) {
-    const request = new chrome.cast.media.LoadRequest(buildMediaInfo(channel));
-    request.autoplay = true;
-    await session.loadMedia(request);
+function syncLocalCastFlagsFromRemote() {
     const media = getMedia();
     castPlaying = deriveCastPlaying(remotePlayer, media);
-    if (media && !castPlaying) {
-        const state = String(remotePlayer?.playerState || media.playerState || '').toUpperCase();
-        if (state !== 'PAUSED' && state !== 'IDLE' && state !== 'STOPPED') {
-            castPlaying = true;
-        }
-    }
     if (remotePlayer) {
         castMuted = remotePlayer.isMuted === true;
         if (typeof remotePlayer.volumeLevel === 'number') {
             castVolume = remotePlayer.volumeLevel;
         }
     }
+}
+
+/**
+ * Wait until PLAYING/BUFFERING/LOADING, or fail on IDLE+error / timeout still IDLE.
+ * PAUSED after load counts as success (autoplay may be blocked but media loaded).
+ */
+async function verifyMediaStarted(timeoutMs = LOAD_VERIFY_MS) {
+    const deadline = Date.now() + timeoutMs;
+    let sawNonIdle = false;
+
+    while (Date.now() < deadline) {
+        const state = getPlayerStateString();
+        if (state === 'PLAYING' || state === 'BUFFERING' || state === 'LOADING') {
+            syncLocalCastFlagsFromRemote();
+            return;
+        }
+        if (state === 'PAUSED') {
+            syncLocalCastFlagsFromRemote();
+            castPlaying = false;
+            return;
+        }
+        if (state && state !== 'IDLE' && state !== 'STOPPED') {
+            sawNonIdle = true;
+        }
+        if (state === 'IDLE' || state === 'STOPPED' || !state) {
+            const idleReason = getIdleReasonString();
+            if (idleReason === 'ERROR' || idleReason === 'INTERRUPTED') {
+                throw new Error('Cast load failed — stream may be blocked for Chromecast');
+            }
+            // After we briefly left IDLE, returning to IDLE is a hard fail.
+            if (sawNonIdle && state === 'IDLE') {
+                throw new Error('Cast load failed — stream may be blocked for Chromecast');
+            }
+        }
+        await sleep(LOAD_VERIFY_POLL_MS);
+    }
+
+    const finalState = getPlayerStateString();
+    if (finalState === 'PLAYING' || finalState === 'BUFFERING' || finalState === 'LOADING' || finalState === 'PAUSED') {
+        syncLocalCastFlagsFromRemote();
+        if (finalState === 'PAUSED') castPlaying = false;
+        return;
+    }
+    throw new Error('Cast load did not start — stream unreachable by Cast device');
+}
+
+async function loadMediaAttempt(session, channel, attempt) {
+    const request = new chrome.cast.media.LoadRequest(
+        buildMediaInfo(channel, { contentType: attempt.contentType, segment: attempt.segment })
+    );
+    request.autoplay = true;
+    try {
+        await session.loadMedia(request);
+    } catch (err) {
+        const msg = String(err?.description || err?.message || err || 'loadMedia failed');
+        throw new Error(msg);
+    }
+    await verifyMediaStarted();
+}
+
+async function loadMediaOnSession(session, channel) {
+    const url = (channel?.url_resolved || channel?.url || '').trim();
+    if (!url) throw new Error('No stream URL');
+    if (!isAbsoluteHttpUrl(url)) {
+        throw new Error('Stream unreachable by Cast device');
+    }
+
+    const attempts = buildCastLoadAttempts(url);
+    let lastError = null;
+
+    for (let i = 0; i < attempts.length; i++) {
+        try {
+            await loadMediaAttempt(session, channel, attempts[i]);
+            syncLocalCastFlagsFromRemote();
+            return;
+        } catch (err) {
+            lastError = err;
+            // Brief pause before next format attempt
+            await sleep(120);
+        }
+    }
+
+    throw lastError || new Error('Cast load failed');
+}
+
+async function abortFailedCast(slotId) {
+    ChromecastManager._onSessionEnded(slotId);
+    try {
+        castContext?.endCurrentSession?.(true);
+    } catch { /* ignore */ }
 }
 
 function getLocalPlayer(slotId) {
@@ -377,9 +571,12 @@ export const ChromecastManager = {
         await this.ensureSdk();
         const url = (channel?.url_resolved || channel?.url || '').trim();
         if (!url) throw new Error('No stream URL');
+        if (!isAbsoluteHttpUrl(url)) {
+            throw new Error('Stream unreachable by Cast device');
+        }
 
-        const session = getSession();
-        const sameSlot = castActiveSlotId === slotId && session;
+        const existing = getSession();
+        const sameSlot = castActiveSlotId === slotId && existing;
 
         if (sameSlot) {
             await this.stopCast();
@@ -393,13 +590,17 @@ export const ChromecastManager = {
         castActiveSlotId = slotId;
         currentChannel = channel;
 
-        if (session) {
+        try {
+            let session = getSession();
+            if (!session) {
+                await castContext.requestSession();
+                session = getSession();
+            }
+            if (!session) throw new Error('No cast session');
             await loadMediaOnSession(session, channel);
-        } else {
-            await castContext.requestSession();
-            const newSession = getSession();
-            if (!newSession) throw new Error('No cast session');
-            await loadMediaOnSession(newSession, channel);
+        } catch (err) {
+            await abortFailedCast(slotId);
+            throw err;
         }
 
         applyHostPlaybackState(slotId);
@@ -411,7 +612,14 @@ export const ChromecastManager = {
         const session = getSession();
         if (!session || !castActiveSlotId) return;
         currentChannel = channel;
-        await loadMediaOnSession(session, channel);
+        try {
+            await loadMediaOnSession(session, channel);
+        } catch (err) {
+            // Channel switch while casting: keep session, surface error to caller
+            castPlaying = false;
+            emitCastStateChanged();
+            throw err;
+        }
         saveCastPersistedState();
         emitCastStateChanged();
     },

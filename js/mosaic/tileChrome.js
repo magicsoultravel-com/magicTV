@@ -10,7 +10,7 @@ import { TileFrames } from '../tileFrames.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { classifyTilePlayback } from '../player/pauseBuffer.js';
-import { ChromecastManager } from '../cast/chromecastManager.js';
+import { ChromecastManager, formatCastError } from '../cast/chromecastManager.js';
 import { buildChannelIndex, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
 import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
 import { setMarqueeText } from '../ui/marquee.js';
@@ -113,7 +113,7 @@ export const tileChromeMethods = {
             } catch (err) {
                 const msg = String(err?.message || err || '');
                 if (!msg.toLowerCase().includes('cancel')) {
-                    showAppToast('Cast failed');
+                    showAppToast(formatCastError(err));
                 }
             }
             this.scheduleRefreshTiles();
@@ -153,12 +153,16 @@ export const tileChromeMethods = {
                 }
                 break;
             case 'vol-up':
-                if (!useCast && player.channel) {
+                if (useCast) {
+                    ChromecastManager.adjustVolume(0.1);
+                } else if (player.channel) {
                     this.setSlotVolume(slotId, (player.volume ?? 1) + 0.05);
                 }
                 break;
             case 'vol-down':
-                if (!useCast && player.channel) {
+                if (useCast) {
+                    ChromecastManager.adjustVolume(-0.1);
+                } else if (player.channel) {
                     this.setSlotVolume(slotId, (player.volume ?? 1) - 0.05);
                 }
                 break;
@@ -168,16 +172,6 @@ export const tileChromeMethods = {
                 await navigateChannel(slotId, action === 'chan-up' ? 'up' : 'down');
                 break;
             }
-            case 'cast-vol-down':
-                if (castActive && ChromecastManager.isCasting()) {
-                    ChromecastManager.adjustVolume(-0.1);
-                }
-                break;
-            case 'cast-vol-up':
-                if (castActive && ChromecastManager.isCasting()) {
-                    ChromecastManager.adjustVolume(0.1);
-                }
-                break;
             case 'swap':
                 this.swapWithCenter(slotId);
                 if (ChromecastManager.isCasting()) {
@@ -506,6 +500,8 @@ export const tileChromeMethods = {
 
         const dual = isCasting && isActiveCastSlot;
 
+        tile.classList.toggle('is-casting-slot', dual);
+
         if (hover) {
             hover.classList.toggle('is-casting', dual);
             hover.classList.toggle('has-dual-rows', dual);
@@ -519,6 +515,11 @@ export const tileChromeMethods = {
         }
         if (localLabel) {
             localLabel.classList.toggle('is-hidden', !dual);
+        }
+
+        const castVolRocker = tile.querySelector('[data-tile-cast-vol-rocker]');
+        if (castVolRocker) {
+            castVolRocker.hidden = !dual;
         }
 
         tile.querySelectorAll('[data-tile-action="cast"]').forEach((castBtn) => {
@@ -550,6 +551,12 @@ export const tileChromeMethods = {
         if (volPct) {
             const slotVol = Math.min(1, Math.max(0, Number.isFinite(player?.volume) ? player.volume : 1));
             volPct.textContent = String(Math.round(slotVol * 100));
+        }
+
+        const castVolPct = tile.querySelector('[data-tile-cast-vol-pct]');
+        if (castVolPct) {
+            const castVol = Math.min(1, Math.max(0, Number(ChromecastManager.getCastVolume()) || 0));
+            castVolPct.textContent = String(Math.round(castVol * 100));
         }
 
         if (isCasting && isActiveCastSlot) {

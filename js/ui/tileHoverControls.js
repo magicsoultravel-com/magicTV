@@ -68,6 +68,16 @@ export function buildTileVolRockerHtml(target = 'local') {
     </div>`;
 }
 
+/** Cast target volume rocker — cast icon above ±/%; shown only while casting this tile. */
+export function buildTileCastVolRockerHtml() {
+    return `<div class="tv-player-tile__rocker tv-player-tile__vol-rocker tv-player-tile__vol-rocker--cast" data-tile-cast-vol-rocker hidden>
+        <span class="tv-player-tile__rocker-cast-icon" title="Cast volume" aria-hidden="true">${CAST_SVG}</span>
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-player-tile__rocker-btn" data-tile-action="vol-up" data-controls-target="cast" title="Cast volume up" aria-label="Cast volume up">${VOL_UP_SVG}</button>
+        <span class="tv-player-tile__rocker-mid tv-player-tile__vol-rocker-pct" data-tile-cast-vol-pct aria-hidden="true">100</span>
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn" data-tile-action="vol-down" data-controls-target="cast" title="Cast volume down" aria-label="Cast volume down">${VOL_DOWN_SVG}</button>
+    </div>`;
+}
+
 /** Vertical channel rocker — right mid-height of the tile. */
 export function buildTileChanRockerHtml(target = 'local') {
     return `<div class="tv-player-tile__rocker tv-player-tile__chan-rocker" data-tile-chan-rocker>
@@ -89,6 +99,10 @@ export function syncTileRockers() {
     mosaic.querySelectorAll('.tv-player-tile').forEach((tile) => {
         const hover = tile.querySelector('.tv-player-tile__hover');
         if (!hover) return;
+
+        const castVol = tile.querySelector('[data-tile-cast-vol-rocker]');
+        if (castVol) castVol.outerHTML = buildTileCastVolRockerHtml();
+        else hover.insertAdjacentHTML('beforebegin', buildTileCastVolRockerHtml());
 
         const vol = tile.querySelector('[data-tile-vol-rocker]');
         if (vol) vol.outerHTML = buildTileVolRockerHtml('local');
@@ -146,8 +160,6 @@ export function buildTileHoverHtml(variant) {
         ${controlBtn('play', 'Play', '▶', 'cast', 'tv-controls__btn--main-1')}
         ${controlBtn('stop', 'Stop', '⏹', 'cast', 'tv-controls__btn--main-1')}
         ${muteBtn('cast')}
-        ${controlBtn('cast-vol-down', 'Volume down', VOL_DOWN_SVG, 'cast', 'tv-controls__btn--main-1')}
-        ${controlBtn('cast-vol-up', 'Volume up', VOL_UP_SVG, 'cast', 'tv-controls__btn--main-1')}
     </div>
     <div class="tv-controls__row tv-controls__row--local" data-controls-row="local">
         <span class="tv-controls__row-label tv-controls__row-label--local is-hidden">Local</span>
