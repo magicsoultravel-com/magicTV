@@ -1,7 +1,10 @@
 /**
  * TV Clock styles and rendering for magicTV header.
  * Reuses designs from magiclists (digital, seconds, analog, compact, military, retro, segment, mantel, hidden).
+ * When the header collapses, the same zone becomes a fixed draggable overlay over the mosaic.
  */
+
+import { DRAG_THRESHOLD_PX } from '../mosaic/constants.js';
 
 export const CLOCK_STYLES = [
     { id: 'digital', label: 'Digital', desc: 'Hours & minutes' },
@@ -17,6 +20,8 @@ export const CLOCK_STYLES = [
 
 const STORAGE_KEY = 'magic_tv_clock_style';
 const HIDDEN_STORAGE_KEY = 'magic_tv_clock_hidden';
+const FLOAT_POS_STORAGE_KEY = 'magic_tv_clock_float_pos';
+const FLOAT_VIEW_PAD = 8;
 
 const SEG_POS = {
     a: [3, 1, 10, 2],
@@ -125,8 +130,6 @@ function formatStationDate(now) {
     return `${weekday} · ${day} ${month}`;
 }
 
-
-
 function setHandRotation(svg, selector, degrees) {
     const hand = svg?.querySelector(selector);
     if (hand) hand.setAttribute('transform', `rotate(${degrees} 50 50)`);
@@ -142,6 +145,67 @@ function updateAnalogHands(svg, now) {
     setHandRotation(svg, '.clock-hand--second', s * 6);
 }
 
+function safeAreaInset(side) {
+    if (typeof window === 'undefined' || typeof getComputedStyle !== 'function') return 0;
+    try {
+        const raw = getComputedStyle(document.documentElement)
+            .getPropertyValue(`env(safe-area-inset-${side})`);
+        const n = parseFloat(raw);
+        return Number.isFinite(n) ? n : 0;
+    } catch {
+        return 0;
+    }
+}
+
+function defaultFloatPosition() {
+    return {
+        left: Math.max(16, FLOAT_VIEW_PAD + safeAreaInset('left')),
+        top: Math.max(12, FLOAT_VIEW_PAD + safeAreaInset('top'))
+    };
+}
+
+function clampFloatPosition(left, top, width, height) {
+    const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const padL = Math.max(FLOAT_VIEW_PAD, safeAreaInset('left'));
+    const padR = Math.max(FLOAT_VIEW_PAD, safeAreaInset('right'));
+    const padT = Math.max(FLOAT_VIEW_PAD, safeAreaInset('top'));
+    const padB = Math.max(FLOAT_VIEW_PAD, safeAreaInset('bottom'));
+    const w = Math.max(1, width);
+    const h = Math.max(1, height);
+    const maxLeft = Math.max(padL, vw - padR - w);
+    const maxTop = Math.max(padT, vh - padB - h);
+    return {
+        left: Math.round(Math.min(Math.max(padL, left), maxLeft)),
+        top: Math.round(Math.min(Math.max(padT, top), maxTop))
+    };
+}
+
+function loadFloatPosition() {
+    try {
+        const raw = localStorage.getItem(FLOAT_POS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const left = Number(parsed?.left);
+        const top = Number(parsed?.top);
+        if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+        return { left, top };
+    } catch {
+        return null;
+    }
+}
+
+function saveFloatPosition(pos) {
+    try {
+        localStorage.setItem(FLOAT_POS_STORAGE_KEY, JSON.stringify({
+            left: Math.round(pos.left),
+            top: Math.round(pos.top)
+        }));
+    } catch {
+        // ignore
+    }
+}
+
 export const TvClock = {
     zone: null,
     dateEl: null,
@@ -154,6 +218,14 @@ export const TvClock = {
     intervalId: null,
     currentStyle: 'digital',
     isHidden: false,
+    isFloating: false,
+    _floatWanted: false,
+    _dragBound: false,
+    _drag: null,
+    _onPointerDown: null,
+    _onPointerMove: null,
+    _onPointerUp: null,
+    _onResize: null,
 
     init() {
         this.zone = document.getElementById('tv-clock-zone');
@@ -181,6 +253,7 @@ export const TvClock = {
         this.intervalId = setInterval(() => this.updateTime(), 1000);
 
         this.bindSettings();
+        this._bindDrag();
     },
 
     loadStoredPrefs() {
@@ -231,6 +304,7 @@ export const TvClock = {
         if (select) {
             select.value = this.isHidden ? 'hidden' : this.currentStyle;
         }
+        this._syncFloating();
     },
 
     applyHidden(hidden, { silent = false } = {}) {
@@ -248,6 +322,152 @@ export const TvClock = {
         const select = document.getElementById('tv-clock-style-select');
         if (select) {
             select.value = this.isHidden ? 'hidden' : this.currentStyle;
+        }
+        this._syncFloating();
+    },
+
+    /**
+     * Header collapse asks the clock to float (or return to the header row).
+     * Hidden clocks never float.
+     * @param {boolean} enabled
+     */
+    setFloating(enabled) {
+        this._floatWanted = Boolean(enabled);
+        this._syncFloating();
+    },
+
+    _syncFloating() {
+        const shouldFloat = this._floatWanted && !this.isHidden && !!this.zone;
+        if (shouldFloat === this.isFloating) {
+            if (shouldFloat) this._applyFloatPosition();
+            return;
+        }
+        if (shouldFloat) {
+            this._enterFloating();
+        } else {
+            this._exitFloating();
+        }
+    },
+
+    _enterFloating() {
+        if (!this.zone) return;
+        this.isFloating = true;
+        this.zone.classList.add('is-clock-floating');
+        this._applyFloatPosition();
+    },
+
+    _exitFloating() {
+        if (!this.zone) return;
+        this._endDrag();
+        this.isFloating = false;
+        this.zone.classList.remove('is-clock-floating', 'is-clock-dragging');
+        this.zone.style.left = '';
+        this.zone.style.top = '';
+    },
+
+    _applyFloatPosition() {
+        if (!this.zone || !this.isFloating) return;
+        const saved = loadFloatPosition();
+        const fallback = defaultFloatPosition();
+        const rect = this.zone.getBoundingClientRect();
+        const w = rect.width || this.zone.offsetWidth || 120;
+        const h = rect.height || this.zone.offsetHeight || 32;
+        const next = clampFloatPosition(
+            saved?.left ?? fallback.left,
+            saved?.top ?? fallback.top,
+            w,
+            h
+        );
+        this.zone.style.left = `${next.left}px`;
+        this.zone.style.top = `${next.top}px`;
+    },
+
+    _bindDrag() {
+        if (this._dragBound || !this.zone) return;
+        this._dragBound = true;
+
+        this._onPointerDown = (e) => {
+            if (!this.isFloating || this.isHidden || !this.zone) return;
+            if (e.button != null && e.button !== 0) return;
+            e.preventDefault();
+            const rect = this.zone.getBoundingClientRect();
+            this._drag = {
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                originLeft: rect.left,
+                originTop: rect.top,
+                width: rect.width,
+                height: rect.height,
+                moved: false
+            };
+            try {
+                this.zone.setPointerCapture(e.pointerId);
+            } catch {
+                // ignore
+            }
+            window.addEventListener('pointermove', this._onPointerMove);
+            window.addEventListener('pointerup', this._onPointerUp);
+            window.addEventListener('pointercancel', this._onPointerUp);
+        };
+
+        this._onPointerMove = (e) => {
+            const drag = this._drag;
+            if (!drag || e.pointerId !== drag.pointerId || !this.zone) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            if (!drag.moved) {
+                if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+                drag.moved = true;
+                this.zone.classList.add('is-clock-dragging');
+            }
+            e.preventDefault();
+            const next = clampFloatPosition(
+                drag.originLeft + dx,
+                drag.originTop + dy,
+                drag.width,
+                drag.height
+            );
+            this.zone.style.left = `${next.left}px`;
+            this.zone.style.top = `${next.top}px`;
+        };
+
+        this._onPointerUp = (e) => {
+            const drag = this._drag;
+            if (!drag || (e.pointerId != null && e.pointerId !== drag.pointerId)) return;
+            if (drag.moved && this.zone) {
+                const rect = this.zone.getBoundingClientRect();
+                const next = clampFloatPosition(rect.left, rect.top, rect.width, rect.height);
+                this.zone.style.left = `${next.left}px`;
+                this.zone.style.top = `${next.top}px`;
+                saveFloatPosition(next);
+            }
+            this._endDrag();
+        };
+
+        this._onResize = () => {
+            if (!this.isFloating) return;
+            this._applyFloatPosition();
+        };
+
+        this.zone.addEventListener('pointerdown', this._onPointerDown);
+        window.addEventListener('resize', this._onResize);
+    },
+
+    _endDrag() {
+        if (this._drag && this.zone) {
+            try {
+                this.zone.releasePointerCapture(this._drag.pointerId);
+            } catch {
+                // ignore
+            }
+        }
+        this._drag = null;
+        this.zone?.classList.remove('is-clock-dragging');
+        if (this._onPointerMove) window.removeEventListener('pointermove', this._onPointerMove);
+        if (this._onPointerUp) {
+            window.removeEventListener('pointerup', this._onPointerUp);
+            window.removeEventListener('pointercancel', this._onPointerUp);
         }
     },
 

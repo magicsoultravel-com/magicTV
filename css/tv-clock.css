@@ -16,6 +16,28 @@
     display: none !important;
 }
 
+/* Floating overlay when header is collapsed — above mosaic tiles (≤7500),
+   below brand watermark (7800) and remote chrome (8500+). */
+.tv-clock-zone.is-clock-floating {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: auto;
+    margin-left: 0;
+    z-index: 7750;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    opacity: 1;
+    visibility: visible;
+}
+
+.tv-clock-zone.is-clock-floating.is-clock-dragging {
+    cursor: grabbing;
+}
+
 .tv-clock-display {
     display: inline-flex;
     align-items: center;

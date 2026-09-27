@@ -107,9 +107,14 @@ body.is-header-collapsed .tv-header,
 }
 
 body.is-header-collapsed .tv-channel-info,
-body.is-header-collapsed .tv-clock-zone,
-#app-container.is-header-collapsed .tv-channel-info,
-#app-container.is-header-collapsed .tv-clock-zone {
+#app-container.is-header-collapsed .tv-channel-info {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+body.is-header-collapsed .tv-clock-zone:not(.is-clock-floating),
+#app-container.is-header-collapsed .tv-clock-zone:not(.is-clock-floating) {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;

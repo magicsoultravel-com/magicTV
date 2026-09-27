@@ -12,6 +12,7 @@ import {
 } from '../storage/settingsStore.js';
 import { MultiView } from '../multiView.js';
 import { showAppToast } from './toast.js';
+import { TvClock } from './tvClock.js';
 
 const COLLAPSED_CLASS = 'is-header-collapsed';
 const FLIP_MS = 380;
@@ -72,6 +73,7 @@ function applyHeaderModeDom(mode) {
     document.getElementById('app-container')?.setAttribute('data-header-mode', mode);
     syncAria(collapsed);
     syncModeSelect(mode);
+    TvClock.setFloating(collapsed);
 }
 
 function reflowMosaic() {
