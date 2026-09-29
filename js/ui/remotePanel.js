@@ -241,6 +241,11 @@ function clampLayoutPopout(wrap, popout) {
 
 export function syncLayoutPicker() {
     const mode = MultiView.getSelectedLayoutMode?.() || 'grid-h';
+    const modeIconKey = mode === 'grid-h'
+        ? 'gridH'
+        : mode === 'grid-v'
+            ? 'gridV'
+            : mode;
     queryAllInApp('[data-layout-mode]').forEach((btn) => {
         const layoutMode = btn.getAttribute('data-layout-mode');
         const active = layoutMode === mode;
@@ -254,8 +259,9 @@ export function syncLayoutPicker() {
         if (LAYOUT_ICONS[iconKey]) btn.innerHTML = LAYOUT_ICONS[iconKey];
     });
     const pickerBtn = el('remote-layout-picker-btn');
-    if (pickerBtn && LAYOUT_ICONS.picker) {
-        pickerBtn.innerHTML = LAYOUT_ICONS.picker;
+    if (pickerBtn) {
+        const activeIcon = LAYOUT_ICONS[modeIconKey] || LAYOUT_ICONS.picker;
+        if (activeIcon) pickerBtn.innerHTML = activeIcon;
     }
 }
 
