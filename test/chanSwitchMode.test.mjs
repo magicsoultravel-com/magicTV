@@ -69,6 +69,7 @@ before(() => {
         addEventListener: () => {}
     };
     globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+    globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
     globalThis.window = {
         dispatchEvent: () => true,
         addEventListener: () => {},
@@ -1057,4 +1058,180 @@ test('heal refuses to swap onto a dead staging buffer', async () => {
     assert.equal(player.playing, true);
     player._clearFreezeTicker();
     player._clearStuckLoadWatchdog();
+});
+
+function mockBuffered(start, end) {
+    return {
+        length: 1,
+        start: () => start,
+        end: () => end
+    };
+}
+
+test('startBankBuffer freezes with wantPlaying and arms stall timer', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.wantPlaying = true;
+    player.playing = true;
+    player.bufferSize = 30;
+    player.video.currentTime = 10;
+    player.video.buffered = mockBuffered(0, 20);
+    player.video.videoWidth = 640;
+    player.hls = { config: {}, startLoad() {}, stopLoad() {} };
+
+    assert.equal(player.startBankBuffer(), true);
+    assert.equal(player.banking, true);
+    assert.equal(player.wantPlaying, true);
+    assert.equal(player.playing, false);
+    assert.ok(player._bankStallTimer != null);
+    assert.notEqual(player.pausePhase, 'idle');
+
+    player._clearBankStallTimer();
+    player.banking = false;
+});
+
+test('bank auto-resumes via resume() when pausePhase becomes ready', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.bufferSize = 10;
+    player.video.currentTime = 0;
+    player.video.buffered = mockBuffered(0, 12);
+    player.video.src = 'https://example.com/live.m3u8';
+    player.hls = { config: { liveMaxLatencyDurationCount: 10 }, startLoad() {}, stopLoad() {} };
+
+    let playChannelCalls = 0;
+    player.playChannel = async () => { playChannelCalls += 1; };
+    let resumeCalls = 0;
+    const origResume = player.resume.bind(player);
+    player.resume = (...args) => {
+        resumeCalls += 1;
+        return origResume(...args);
+    };
+
+    player.startBankBuffer();
+    player._clearBankStallTimer();
+    // Simulate filled buffer → updatePauseBuffer auto-resumes.
+    player.pausePhase = 'buffering';
+    player.updatePauseBuffer();
+
+    assert.equal(player.banking, false);
+    assert.ok(resumeCalls >= 1);
+    assert.equal(playChannelCalls, 0);
+    player._clearBankStallTimer();
+});
+
+test('bank stall timeout resumes with partial fill without playChannel', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.bufferSize = 60;
+    player.video.currentTime = 0;
+    player.video.buffered = mockBuffered(0, 5);
+    player.video.src = 'https://example.com/live.m3u8';
+    player.hls = { config: {}, startLoad() {}, stopLoad() {} };
+
+    let playChannelCalls = 0;
+    player.playChannel = async () => { playChannelCalls += 1; };
+
+    player.startBankBuffer();
+    assert.equal(player.banking, true);
+    // Fire stall path directly (same as timer callback).
+    player._finishBank({ partial: true });
+
+    assert.equal(player.banking, false);
+    assert.equal(player.bankPartialFill, true);
+    assert.equal(playChannelCalls, 0);
+    assert.equal(player.wantPlaying, true);
+});
+
+test('pause while banking demotes to user pause and keeps hls', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.video.currentTime = 5;
+    player.video.buffered = mockBuffered(0, 20);
+    player.video.videoWidth = 640;
+    const hls = { config: {}, startLoad() {}, stopLoad() {} };
+    player.hls = hls;
+
+    player.startBankBuffer();
+    player._clearBankStallTimer();
+    assert.equal(player.banking, true);
+    assert.equal(player.wantPlaying, true);
+
+    player.pause();
+    assert.equal(player.banking, false);
+    assert.equal(player.wantPlaying, false);
+    assert.equal(player.hls, hls);
+    assert.notEqual(player.pausePhase, 'idle');
+});
+
+test('toggleBankBuffer off cancels and resumes parked buffer', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.video.currentTime = 5;
+    player.video.buffered = mockBuffered(0, 20);
+    player.video.src = 'https://example.com/live.m3u8';
+    player.hls = { config: {}, startLoad() {}, stopLoad() {} };
+
+    let playChannelCalls = 0;
+    player.playChannel = async () => { playChannelCalls += 1; };
+
+    player.toggleBankBuffer();
+    assert.equal(player.banking, true);
+    player.toggleBankBuffer();
+    assert.equal(player.banking, false);
+    assert.equal(playChannelCalls, 0);
+    assert.equal(player.wantPlaying, true);
+});
+
+test('banking overlay CSS keeps pointer-events none on playback-state', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { dirname, join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const css = readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), '../css/components/player.css'),
+        'utf8'
+    );
+    assert.match(css, /\.tv-player-tile__playback-state\s*\{[^}]*pointer-events:\s*none/s);
+    assert.match(css, /\.tv-player-tile\.is-banking/);
+    assert.match(css, /tv-controls__play-popout/);
 });

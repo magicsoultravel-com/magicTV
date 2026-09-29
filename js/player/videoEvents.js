@@ -61,6 +61,9 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
         player.resumeBlocked = false;
         player.posterDataUrl = null;
         player.healing = false;
+        player.banking = false;
+        player.bankPartialFill = false;
+        try { player._clearBankStallTimer?.(); } catch { /* ignore */ }
         // NOTE: _freezeFails is intentionally NOT reset here. A `playing`
         // blip must not forgive strikes — the tick resets them only after
         // 30s of sustained healthy motion (FREEZE_HEALTHY_RESET_MS).

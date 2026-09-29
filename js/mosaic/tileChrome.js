@@ -9,7 +9,7 @@ import { countryFlagEmoji, el } from '../tvUtils.js';
 import { TileFrames } from '../tileFrames.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
-import { classifyTilePlayback } from '../player/pauseBuffer.js';
+import { classifyTilePlayback, bankRemainingSeconds } from '../player/pauseBuffer.js';
 import { ChromecastManager, formatCastError } from '../cast/chromecastManager.js';
 import { buildChannelIndex, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
 import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
@@ -130,6 +130,9 @@ export const tileChromeMethods = {
             case 'play':
                 if (useCast) ChromecastManager.togglePlayPause();
                 else player.toggle();
+                break;
+            case 'bank':
+                if (!useCast) player.toggleBankBuffer?.();
                 break;
             case 'stop':
                 if (useCast) {
@@ -253,7 +256,15 @@ export const tileChromeMethods = {
             const empty = tile.querySelector('.tv-player-tile__empty');
             const mediaPlaying = player?.playing === true;
             const tuningLive = player?.preparing === true && mediaPlaying;
-            const { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback({
+            const isBanking = player?.banking === true;
+            const {
+                uiPlaying,
+                uiLoading,
+                uiPaused,
+                uiStopped,
+                uiDisconnected,
+                uiBanking
+            } = classifyTilePlayback({
                 hasChannel,
                 playing: mediaPlaying,
                 posterDataUrl: player?.posterDataUrl,
@@ -263,7 +274,8 @@ export const tileChromeMethods = {
                 loadPhase: player?.loadPhase || 'idle',
                 wantPlaying: player?.wantPlaying === true,
                 preparing: player?.preparing === true,
-                error: player?.error || null
+                error: player?.error || null,
+                banking: isBanking
             });
 
             const enabled = id === 'center' || slot.enabled === true;
@@ -299,6 +311,7 @@ export const tileChromeMethods = {
             tile.classList.toggle('is-paused', uiPaused);
             tile.classList.toggle('is-stopped', uiStopped);
             tile.classList.toggle('is-disconnected', uiDisconnected);
+            tile.classList.toggle('is-banking', uiBanking);
             const stateEl = tile.querySelector('.tv-player-tile__playback-state');
             const countdownEl = tile.querySelector('.tv-player-tile__retry-countdown');
             if (stateEl) {
@@ -323,6 +336,25 @@ export const tileChromeMethods = {
                         deadlineAt > 0
                             ? `Unable to connect. Reconnecting in ${remainingSec}s`
                             : 'Unable to connect'
+                    );
+                } else if (uiBanking) {
+                    stateEl.setAttribute('aria-hidden', 'false');
+                    stateEl.setAttribute('role', 'status');
+                    const ahead = Number(player?.getBufferInfo?.()?.buffered) || 0;
+                    const target = Number(player?.getBufferSize?.() ?? player?.bufferSize) || 0;
+                    const remainingSec = bankRemainingSeconds(ahead, target);
+                    const held = Math.max(0, Math.floor(ahead));
+                    if (countdownEl) {
+                        countdownEl.hidden = false;
+                        countdownEl.textContent = remainingSec > 0
+                            ? String(remainingSec)
+                            : String(held || target || 0);
+                    }
+                    stateEl.setAttribute(
+                        'aria-label',
+                        remainingSec > 0
+                            ? `Banking buffer — ${remainingSec}s remaining`
+                            : `Banking buffer — ready`
                     );
                 } else {
                     stateEl.setAttribute('aria-hidden', 'true');
@@ -391,7 +423,7 @@ export const tileChromeMethods = {
                 && player.posterDataUrl
                 && !uiPlaying
                 && !tuningLive
-                && (uiLoading || !videoHasFrame)
+                && (uiLoading || uiBanking || !videoHasFrame)
             );
             tile.classList.toggle('has-poster', showPoster);
             if (posterEl) {
@@ -537,11 +569,13 @@ export const tileChromeMethods = {
         });
 
         const intentPlaying = player?.wantPlaying === true || player?.playing === true;
+        const isBanking = player?.banking === true;
         const showAudio = this.isSlotAudible(player);
 
         tile.querySelectorAll('[data-controls-row="local"] [data-tile-action]').forEach((btn) => {
             this.syncTileControlButton(btn, player, slotId, {
                 intentPlaying,
+                isBanking,
                 isMuted: !showAudio,
                 target: 'local'
             });
@@ -572,13 +606,23 @@ export const tileChromeMethods = {
         }
     },
 
-    syncTileControlButton(btn, player, slotId, { intentPlaying, isMuted, target }) {
+    syncTileControlButton(btn, player, slotId, { intentPlaying, isMuted, target, isBanking = false }) {
         const action = btn.getAttribute('data-tile-action');
         if (action === 'play') {
             btn.classList.remove('is-hidden');
-            btn.textContent = intentPlaying ? '⏸' : '▶';
-            btn.title = intentPlaying ? 'Pause' : 'Play';
-            btn.setAttribute('aria-label', intentPlaying ? 'Pause' : 'Play');
+            // While banking, Pause demotes to stay-paused; label stays Pause.
+            btn.textContent = intentPlaying || isBanking ? '⏸' : '▶';
+            btn.title = isBanking
+                ? 'Pause (stop banking)'
+                : (intentPlaying ? 'Pause' : 'Play');
+            btn.setAttribute('aria-label', btn.title);
+            return;
+        }
+        if (action === 'bank') {
+            btn.classList.toggle('is-active', isBanking === true);
+            btn.setAttribute('aria-pressed', String(isBanking === true));
+            btn.title = isBanking ? 'Cancel bank — resume' : 'Bank buffer';
+            btn.setAttribute('aria-label', btn.title);
             return;
         }
         if (action === 'mute') {

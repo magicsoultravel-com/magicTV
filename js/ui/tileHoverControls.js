@@ -34,6 +34,9 @@ const CHAN_CHEVRON_DOWN = `<svg viewBox="0 0 12 12" width="12" height="12" focus
 
 export const CHAN_BIND_SVG = `<svg viewBox="0 0 12 12" width="11" height="11" focusable="false" aria-hidden="true"><path d="M2 3.5h8M2 6h8M2 8.5h5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="9.2" cy="8.5" r="1.3" fill="currentColor"/></svg>`;
 
+/** Bank buffer — fill toward headroom (hourglass-ish stack). */
+export const BANK_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M3 2.2h6M3 9.8h6M3.4 2.5 6 6l2.6-3.5M3.4 9.5 6 6l2.6 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.8h2.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+
 const VOL_CHEVRON_UP = CHAN_CHEVRON_UP;
 const VOL_CHEVRON_DOWN = CHAN_CHEVRON_DOWN;
 
@@ -55,6 +58,15 @@ function muteWrap(target) {
         ${muteBtn(target)}
         <div class="tv-controls__mute-popout" aria-hidden="true">
             <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="mute-solo" data-controls-target="${target}" title="Mute other TVs" aria-label="Mute other TVs">${MUTE_SOLO_SVG}</button>
+        </div>
+    </div>`;
+}
+
+function playWrap(target) {
+    return `<div class="tv-controls__play-wrap">
+        ${controlBtn('play', 'Play', '▶', target, 'tv-controls__btn--main-1')}
+        <div class="tv-controls__play-popout" aria-hidden="true">
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="bank" data-controls-target="${target}" title="Bank buffer" aria-label="Bank buffer" aria-pressed="false">${BANK_SVG}</button>
         </div>
     </div>`;
 }
@@ -126,7 +138,7 @@ function castWrap() {
 function coreRowButtons(target) {
     return [
         controlBtn('browse', 'Pick channel', BROWSE_SVG, target, 'tv-controls__btn--main-3'),
-        controlBtn('play', 'Play', '▶', target, 'tv-controls__btn--main-1'),
+        playWrap(target),
         controlBtn('stop', 'Stop', '⏹', target, 'tv-controls__btn--main-1'),
         controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2'),
         controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),

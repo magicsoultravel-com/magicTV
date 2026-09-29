@@ -58,6 +58,8 @@ import {
     didFramesAdvance,
     isVideoFrameStalled,
     shouldRunFreezeTick,
+    shouldAutoResumeBank,
+    bankStallTimeoutMs,
     FREEZE_CONFIRM_MS,
     FREEZE_TICK_MS,
     FREEZE_VIDEO_MIN_FPS,
@@ -177,6 +179,12 @@ export function createPlayerInstance(options) {
         _pausedFillArmed: false,
 
         pausePhase: 'idle',
+        /** Per-slot Bank toggle: freeze + fill toward bufferSize, then auto-resume. */
+        banking: false,
+        /** Brief UI flag after stall-timeout resume with incomplete headroom. */
+        bankPartialFill: false,
+        _bankStallTimer: null,
+        _bankStartedAt: 0,
         /** True only after an explicit stop(); cleared on play/pause/load. */
         stopped: false,
         playGeneration: 0,
@@ -819,6 +827,8 @@ export function createPlayerInstance(options) {
                     loading: this.loading,
                     loadPhase: this.loadPhase,
                     pausePhase: this.pausePhase,
+                    banking: this.banking === true,
+                    bankPartialFill: this.bankPartialFill === true,
                     error: this.error,
                     resumeBlocked: this.resumeBlocked,
                     volume: getSharedVolume(),
@@ -1154,6 +1164,15 @@ export function createPlayerInstance(options) {
             }
             if (this.pausePhase !== prevPhase) {
                 this.emitState();
+            } else if (this.banking) {
+                // Countdown ticks as ahead-buffer grows.
+                this.emitState();
+            }
+            if (shouldAutoResumeBank({
+                banking: this.banking,
+                pausePhase: this.pausePhase
+            })) {
+                this._finishBank({ partial: false });
             }
         },
 
@@ -1254,6 +1273,11 @@ export function createPlayerInstance(options) {
          * with a fresh attach instead of re-running play() on the dead engine.
          */
         toggle() {
+            // While banking: main Pause demotes to a stay-paused user pause.
+            if (this.banking) {
+                this.pause();
+                return;
+            }
             if (shouldPauseOnToggle(this.wantPlaying, this.playing)) {
                 this.pause();
                 return;
@@ -1385,6 +1409,8 @@ export function createPlayerInstance(options) {
             // Live-edge guard was disabled (Infinity) while pause-buffered.
             // Resume keeps the parked playhead, then playing re-arms normal
             // latency via _restoreLiveSyncOnPlaying — never yank to live here.
+            this._clearBankStallTimer();
+            this.banking = false;
             this.pausePhase = 'idle';
             this._pausedFillArmed = false;
             releasePausedFill(this.id);
@@ -1434,8 +1460,12 @@ export function createPlayerInstance(options) {
          * Instant pause — snap stays off the click path via rAF.
          * Always refresh poster when the video has a decoded frame so stubs
          * do not block a fresher pause freeze into IDB.
+         * While banking: demote to user pause (keep parked buffer, clear bank).
          */
         pause() {
+            this._clearBankStallTimer();
+            this.banking = false;
+            this.bankPartialFill = false;
             this._clearAutoRetry({ full: true });
             this._clearStuckLoadWatchdog();
             this._clearFreezeTicker();
@@ -1486,6 +1516,114 @@ export function createPlayerInstance(options) {
                     this.emitState();
                 }
             });
+        },
+
+        _clearBankStallTimer() {
+            if (this._bankStallTimer) {
+                clearTimeout(this._bankStallTimer);
+                this._bankStallTimer = null;
+            }
+        },
+
+        /**
+         * Clear bank mode without tearing down the parked buffer.
+         * @param {{ resume?: boolean, partial?: boolean }} [opts]
+         */
+        cancelBankBuffer({ resume = true, partial = false } = {}) {
+            if (!this.banking && !resume) return;
+            this._clearBankStallTimer();
+            const wasBanking = this.banking === true;
+            this.banking = false;
+            this.bankPartialFill = partial === true;
+            if (resume && (wasBanking || this.pausePhase !== 'idle')) {
+                this.resume();
+                return;
+            }
+            if (wasBanking) this.emitState();
+        },
+
+        /** Ready or stall-timeout end of a bank fill. */
+        _finishBank({ partial = false } = {}) {
+            if (!this.banking) return;
+            this.cancelBankBuffer({ resume: true, partial });
+        },
+
+        /**
+         * Freeze this slot and fill toward Buffer Size, then auto-resume.
+         * Keeps wantPlaying true (unlike user Pause).
+         */
+        startBankBuffer() {
+            this.init();
+            if (this.banking) return false;
+            if (!this.channel?.url_resolved) return false;
+            if (this.stopped && !(this.video?.src || this.hls)) return false;
+
+            this._clearAutoRetry({ full: true });
+            this._clearStuckLoadWatchdog();
+            this._clearFreezeTicker();
+            this._clearBankStallTimer();
+            this.healing = false;
+
+            if (this._parkRaf) {
+                cancelAnimationFrame(this._parkRaf);
+                this._parkRaf = 0;
+            }
+
+            this.transportGen += 1;
+            const gen = this.transportGen;
+            this.wantPlaying = true;
+            this.banking = true;
+            this.bankPartialFill = false;
+            this._bankStartedAt = Date.now();
+            this._enterPauseAt = this._bankStartedAt;
+            this._pausedFillArmed = false;
+            this.stopped = false;
+            this.error = null;
+
+            if (this.video?.videoWidth > 0) {
+                const poster = snapshotVideoPoster(this.video, { rejectBlack: false });
+                if (poster) this.posterDataUrl = poster;
+            }
+
+            this.pausePhase = this.posterDataUrl ? 'pausing' : 'buffering';
+            this.setPauseLiveSync(true);
+            try { this.video?.pause(); } catch { /* ignore */ }
+            this.playing = false;
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.emitState();
+
+            this._parkRaf = requestAnimationFrame(() => {
+                this._parkRaf = 0;
+                if (gen !== this.transportGen || !this.banking || !this.wantPlaying) return;
+                this.parkBehindBuffer();
+                this.persistPauseCaches();
+                if (this.hls) {
+                    try { this.hls.startLoad(); } catch { /* ignore */ }
+                }
+                this.updatePauseBuffer();
+            });
+
+            const timeoutMs = bankStallTimeoutMs(this.getBufferSize());
+            this._bankStallTimer = setTimeout(() => {
+                this._bankStallTimer = null;
+                if (!this.banking) return;
+                tvDebug('player', 'bank stall timeout — resume partial', { slot: this.id });
+                this._finishBank({ partial: true });
+            }, timeoutMs);
+            if (typeof this._bankStallTimer?.unref === 'function') {
+                try { this._bankStallTimer.unref(); } catch { /* ignore */ }
+            }
+            return true;
+        },
+
+        /** Toggle Bank on this slot: freeze+fill, or cancel+resume early. */
+        toggleBankBuffer() {
+            if (this.banking) {
+                this.cancelBankBuffer({ resume: true });
+                return;
+            }
+            this.startBankBuffer();
         },
 
         updateBufferSize() {
@@ -1549,6 +1687,9 @@ export function createPlayerInstance(options) {
             this.resumeBlocked = false;
             this.stopped = false;
             this.pausePhase = 'idle';
+            this._clearBankStallTimer();
+            this.banking = false;
+            this.bankPartialFill = false;
             this._stuckLoadRetried = false;
             this._loadLastProgressAt = Date.now();
             const transportAtStart = this.beginTransport(true);
@@ -1633,6 +1774,9 @@ export function createPlayerInstance(options) {
             this._clearAutoRetry({ full: true });
             this._clearStuckLoadWatchdog();
             this._clearFreezeTicker();
+            this._clearBankStallTimer();
+            this.banking = false;
+            this.bankPartialFill = false;
             this.healing = false;
             this.playGeneration += 1;
             this.switchGeneration += 1;

@@ -637,8 +637,10 @@
 }
 
 /* Soft dark wash behind the same-weight outline glyph as pause/stop. */
-.tv-player-tile.is-disconnected .tv-player-tile__playback-state {
+.tv-player-tile.is-disconnected .tv-player-tile__playback-state,
+.tv-player-tile.is-banking .tv-player-tile__playback-state {
     background: rgba(40, 40, 40, 0.5);
+    pointer-events: none;
 }
 
 .tv-player-tile__retry-countdown {
@@ -658,8 +660,13 @@
     z-index: 1;
 }
 
-.tv-player-tile.is-disconnected .tv-player-tile__retry-countdown:not([hidden]) {
+.tv-player-tile.is-disconnected .tv-player-tile__retry-countdown:not([hidden]),
+.tv-player-tile.is-banking .tv-player-tile__retry-countdown:not([hidden]) {
     display: flex;
+}
+
+.tv-player-tile.is-banking .tv-player-tile__state-icon {
+    display: none;
 }
 
 .tv-player-tile.is-playing .tv-player-tile__playback-state,
@@ -1111,13 +1118,15 @@
 }
 
 .tv-controls__cast-wrap,
-.tv-controls__mute-wrap {
+.tv-controls__mute-wrap,
+.tv-controls__play-wrap {
     position: relative;
     display: inline-flex;
 }
 
 .tv-controls__cast-wrap::after,
-.tv-controls__mute-wrap::after {
+.tv-controls__mute-wrap::after,
+.tv-controls__play-wrap::after {
     content: '';
     position: absolute;
     left: -10px;
@@ -1133,7 +1142,8 @@
 }
 
 .tv-controls__cast-popout,
-.tv-controls__mute-popout {
+.tv-controls__mute-popout,
+.tv-controls__play-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
     bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
@@ -1160,7 +1170,9 @@
 .tv-controls__cast-wrap:hover .tv-controls__cast-popout,
 .tv-controls__cast-wrap:focus-within .tv-controls__cast-popout,
 .tv-controls__mute-wrap:hover .tv-controls__mute-popout,
-.tv-controls__mute-wrap:focus-within .tv-controls__mute-popout {
+.tv-controls__mute-wrap:focus-within .tv-controls__mute-popout,
+.tv-controls__play-wrap:hover .tv-controls__play-popout,
+.tv-controls__play-wrap:focus-within .tv-controls__play-popout {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
     visibility: visible;
@@ -1169,11 +1181,18 @@
 }
 
 .tv-controls__cast-popout .tv-controls__btn,
-.tv-controls__mute-popout .tv-controls__btn {
+.tv-controls__mute-popout .tv-controls__btn,
+.tv-controls__play-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;
     padding: 0;
+}
+
+.tv-controls__play-popout .tv-controls__btn[aria-pressed='true'],
+.tv-controls__play-popout .tv-controls__btn.is-active {
+    color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
+    border-color: color-mix(in srgb, var(--tv-accent, #7ecbff) 55%, transparent);
 }
 
 .tv-player-tile__hover.has-dual-rows {

@@ -27,6 +27,10 @@ import {
     shouldRecoverStuckLoad,
     bufferedAheadSeconds,
     hasStartupBuffer,
+    bankRemainingSeconds,
+    bankStallTimeoutMs,
+    shouldAutoResumeBank,
+    resolveTileChromePriority,
     isClockStalled,
     didClockAdvance,
     didFramesAdvance,
@@ -36,6 +40,7 @@ import {
     STALLED_PAUSE_BEHIND_MS,
     STUCK_LOAD_RECOVERY_MS,
     STARTUP_BUFFER_SEC,
+    BANK_STALL_CAP_MS,
     FREEZE_CONFIRM_MS,
     FREEZE_VIDEO_MIN_FPS,
     PARK_HEADROOM_RATIO
@@ -129,6 +134,7 @@ test('STOPPED only when stopped===true (not residual idle)', () => {
     assert.equal(idleWithChannel.uiStopped, false);
     assert.equal(idleWithChannel.uiPaused, false);
     assert.equal(idleWithChannel.uiPlaying, false);
+    assert.equal(idleWithChannel.uiBanking, false);
 
     const afterStop = classifyTilePlayback({
         hasChannel: true,
@@ -137,6 +143,67 @@ test('STOPPED only when stopped===true (not residual idle)', () => {
         stopped: true
     });
     assert.equal(afterStop.uiStopped, true);
+});
+
+test('banking wins over loading/paused in classifyTilePlayback', () => {
+    const state = classifyTilePlayback({
+        hasChannel: true,
+        playing: false,
+        wantPlaying: true,
+        banking: true,
+        pausePhase: 'buffering',
+        loading: true,
+        loadPhase: 'buffering'
+    });
+    assert.equal(state.uiBanking, true);
+    assert.equal(state.uiLoading, false);
+    assert.equal(state.uiPaused, false);
+    assert.equal(state.uiDisconnected, false);
+});
+
+test('resolveTileChromePriority is error > banking > loading > paused > playing', () => {
+    assert.equal(resolveTileChromePriority({
+        hasChannel: true,
+        playing: false,
+        error: 'Stream unavailable',
+        banking: true
+    }), 'disconnected');
+    assert.equal(resolveTileChromePriority({
+        hasChannel: true,
+        playing: false,
+        wantPlaying: true,
+        banking: true,
+        pausePhase: 'buffering'
+    }), 'banking');
+    assert.equal(resolveTileChromePriority({
+        hasChannel: true,
+        playing: false,
+        wantPlaying: true,
+        loading: true,
+        loadPhase: 'connecting'
+    }), 'loading');
+    assert.equal(resolveTileChromePriority({
+        hasChannel: true,
+        playing: false,
+        pausePhase: 'ready'
+    }), 'paused');
+    assert.equal(resolveTileChromePriority({
+        hasChannel: true,
+        playing: true,
+        wantPlaying: true
+    }), 'playing');
+});
+
+test('bankRemainingSeconds / bankStallTimeoutMs / shouldAutoResumeBank', () => {
+    assert.equal(bankRemainingSeconds(10, 30), 20);
+    assert.equal(bankRemainingSeconds(30, 30), 0);
+    assert.equal(bankRemainingSeconds(35, 30), 0);
+    assert.equal(bankStallTimeoutMs(15), 30_000); // 2×15=30s, capped
+    assert.equal(bankStallTimeoutMs(10), 20_000);
+    assert.equal(bankStallTimeoutMs(60), BANK_STALL_CAP_MS); // 2×60=120 → cap 30
+    assert.equal(shouldAutoResumeBank({ banking: true, pausePhase: 'ready' }), true);
+    assert.equal(shouldAutoResumeBank({ banking: true, pausePhase: 'buffering' }), false);
+    assert.equal(shouldAutoResumeBank({ banking: false, pausePhase: 'ready' }), false);
 });
 
 test('pausePhase or poster classifies as paused, not stopped', () => {

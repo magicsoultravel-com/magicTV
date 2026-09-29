@@ -14,6 +14,8 @@ export const STALLED_PAUSE_BEHIND_MS = 30000;
 export const STUCK_LOAD_RECOVERY_MS = 5000;
 /** Seconds of ahead buffer to prefer before first play() after attach. */
 export const STARTUP_BUFFER_SEC = 3;
+/** Hard cap for bank fill stall before resume-with-partial. */
+export const BANK_STALL_CAP_MS = 30_000;
 
 /**
  * Freeze-heal: clock/frame stall must persist this long before acting.
@@ -128,10 +130,73 @@ export function shouldAcceptPauseEvent(wantPlaying) {
 }
 
 /**
+ * Seconds still needed to reach bufferSize headroom (ceil, floored at 0).
+ */
+export function bankRemainingSeconds(ahead, bufferSize) {
+    const target = Number(bufferSize);
+    const have = Number(ahead);
+    if (!Number.isFinite(target) || target <= 0) return 0;
+    const held = Number.isFinite(have) ? Math.max(0, have) : 0;
+    return Math.max(0, Math.ceil(target - held));
+}
+
+/**
+ * Bank fill stall timeout: min(30s, 2 × bufferSize seconds).
+ */
+export function bankStallTimeoutMs(bufferSizeSec) {
+    const sec = Number(bufferSizeSec);
+    const scaled = Number.isFinite(sec) && sec > 0 ? sec * 2 * 1000 : BANK_STALL_CAP_MS;
+    return Math.min(BANK_STALL_CAP_MS, Math.max(0, Math.round(scaled)));
+}
+
+/** Auto-resume Bank once pause-fill reports ready. */
+export function shouldAutoResumeBank({ banking = false, pausePhase = 'idle' } = {}) {
+    return banking === true && pausePhase === 'ready';
+}
+
+/**
+ * Fixed tile chrome priority (first match wins):
+ * error > banking > buffering > paused > playing
+ * @returns {'disconnected'|'banking'|'loading'|'paused'|'stopped'|'playing'|'idle'}
+ */
+export function resolveTileChromePriority({
+    hasChannel = false,
+    playing = false,
+    banking = false,
+    pausePhase = 'idle',
+    stopped = false,
+    loading = false,
+    loadPhase = 'idle',
+    wantPlaying = false,
+    preparing = false,
+    error = null
+} = {}) {
+    const classified = classifyTilePlayback({
+        hasChannel,
+        playing,
+        banking,
+        pausePhase,
+        stopped,
+        loading,
+        loadPhase,
+        wantPlaying,
+        preparing,
+        error
+    });
+    if (classified.uiDisconnected) return 'disconnected';
+    if (classified.uiBanking) return 'banking';
+    if (classified.uiLoading) return 'loading';
+    if (classified.uiPaused) return 'paused';
+    if (classified.uiStopped) return 'stopped';
+    if (classified.uiPlaying) return 'playing';
+    return 'idle';
+}
+
+/**
  * Tile overlay classes from player intent (not residual idle).
- * Disconnected (stream unavailable) wins over loading/pause/stop.
- * Loading wins over pause/stop so only one status icon shows.
- * Between play click and first paint: wantPlaying without playing → loading.
+ * Priority: disconnected > banking > loading > paused > stopped > playing.
+ * Between play click and first paint: wantPlaying without playing → loading
+ * (unless banking, which owns the freeze UI).
  */
 export function classifyTilePlayback({
     hasChannel = false,
@@ -143,7 +208,8 @@ export function classifyTilePlayback({
     loadPhase = 'idle',
     wantPlaying = false,
     preparing = false,
-    error = null
+    error = null,
+    banking = false
 } = {}) {
     const uiPlaying = playing === true;
     const uiDisconnected = Boolean(
@@ -151,13 +217,20 @@ export function classifyTilePlayback({
         && !uiPlaying
         && !!error
     );
+    const uiBanking = Boolean(
+        hasChannel
+        && !uiPlaying
+        && !uiDisconnected
+        && banking === true
+    );
     /** Background warm-up while the front stream is still live — keep showing TV, not loading. */
     const tuningWithLivePicture = preparing === true && uiPlaying;
-    const awaitingFirstPaint = wantPlaying === true && !uiPlaying && !tuningWithLivePicture;
+    const awaitingFirstPaint = wantPlaying === true && !uiPlaying && !tuningWithLivePicture && !uiBanking;
     const uiLoading = Boolean(
         hasChannel
         && !uiPlaying
         && !uiDisconnected
+        && !uiBanking
         && !tuningWithLivePicture
         && (
             loading === true
@@ -170,6 +243,7 @@ export function classifyTilePlayback({
         hasChannel
         && !uiPlaying
         && !uiDisconnected
+        && !uiBanking
         && !uiLoading
         && pausePhase && pausePhase !== 'idle'
     );
@@ -177,11 +251,12 @@ export function classifyTilePlayback({
         hasChannel
         && !uiPlaying
         && !uiDisconnected
+        && !uiBanking
         && !uiLoading
         && !uiPaused
         && stopped === true
     );
-    return { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected };
+    return { uiPlaying, uiLoading, uiPaused, uiStopped, uiDisconnected, uiBanking };
 }
 
 /**
@@ -191,8 +266,9 @@ export function classifyTilePlayback({
  */
 export function isHealthyWatchPlayback(state = {}) {
     if (state.freezePressure === true) return false;
-    const { uiPlaying, uiPaused, uiStopped, uiDisconnected } = classifyTilePlayback(state);
-    if (!state.hasChannel || !uiPlaying || uiPaused || uiStopped || uiDisconnected) return false;
+    if (state.banking === true) return false;
+    const { uiPlaying, uiPaused, uiStopped, uiDisconnected, uiBanking } = classifyTilePlayback(state);
+    if (!state.hasChannel || !uiPlaying || uiPaused || uiStopped || uiDisconnected || uiBanking) return false;
     if (state.wantPlaying !== true) return false;
     if (state.loadPhase === 'connecting' || state.loadPhase === 'buffering') return false;
     if (state.loading === true) return false;
