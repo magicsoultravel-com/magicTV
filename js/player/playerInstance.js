@@ -184,6 +184,7 @@ export function createPlayerInstance(options) {
         /** Brief UI flag after stall-timeout resume with incomplete headroom. */
         bankPartialFill: false,
         _bankStallTimer: null,
+        _bankFillPoll: null,
         _bankStartedAt: 0,
         /** True only after an explicit stop(); cleared on play/pause/load. */
         stopped: false,
@@ -405,6 +406,11 @@ export function createPlayerInstance(options) {
         },
 
         _armStuckLoadWatchdog() {
+            // Bank owns fill/resume — stuck-load reattach would wipe banking.
+            if (this.banking === true) {
+                this._clearStuckLoadWatchdog();
+                return;
+            }
             this._clearStuckLoadWatchdog();
             const transportGen = this.transportGen;
             const playGen = this.playGeneration;
@@ -416,6 +422,7 @@ export function createPlayerInstance(options) {
             }
 
             this._stuckLoadTick = () => {
+                if (this.banking === true) return;
                 if (this.wantPlaying !== true) return;
                 if (transportGen !== this.transportGen) return;
                 if (playGen !== this.playGeneration) return;
@@ -1146,10 +1153,18 @@ export function createPlayerInstance(options) {
                 releasePausedFill(this.id);
             } else {
                 this.pausePhase = 'buffering';
-                // Only ONE paused slot backfills its buffer at a time (turn
-                // rotates via loadBudget) so paused refills cannot starve the
-                // active player's connections.
-                if (takePausedFillTurn(this.id)) {
+                // Banking always keeps loading — turn rotation must not stopLoad
+                // a bank fill or the countdown freezes and stuck recovery fights us.
+                if (this.banking === true) {
+                    takePausedFillTurn(this.id);
+                    if (this.hls) {
+                        try { this.hls.startLoad(); } catch { /* ignore */ }
+                    }
+                    this._pausedFillArmed = true;
+                } else if (takePausedFillTurn(this.id)) {
+                    // Only ONE paused slot backfills its buffer at a time (turn
+                    // rotates via loadBudget) so paused refills cannot starve the
+                    // active player's connections.
                     if (!this._pausedFillArmed) {
                         if (this.hls) this.hls.startLoad();
                         this._pausedFillArmed = true;
@@ -1523,6 +1538,32 @@ export function createPlayerInstance(options) {
                 clearTimeout(this._bankStallTimer);
                 this._bankStallTimer = null;
             }
+            this._clearBankFillPoll();
+        },
+
+        _clearBankFillPoll() {
+            if (this._bankFillPoll) {
+                clearInterval(this._bankFillPoll);
+                this._bankFillPoll = null;
+            }
+        },
+
+        /** Keep HLS loading + countdown moving while video is paused for bank. */
+        _armBankFillPoll() {
+            this._clearBankFillPoll();
+            this._bankFillPoll = setInterval(() => {
+                if (this.banking !== true) {
+                    this._clearBankFillPoll();
+                    return;
+                }
+                if (this.hls) {
+                    try { this.hls.startLoad(); } catch { /* ignore */ }
+                }
+                this.updatePauseBuffer();
+            }, 500);
+            if (typeof this._bankFillPoll?.unref === 'function') {
+                try { this._bankFillPoll.unref(); } catch { /* ignore */ }
+            }
         },
 
         /**
@@ -1535,6 +1576,9 @@ export function createPlayerInstance(options) {
             const wasBanking = this.banking === true;
             this.banking = false;
             this.bankPartialFill = partial === true;
+            // Bank may have run ≥30s — do not treat that as a stale pause that
+            // forces playChannel; resume from the parked buffer instead.
+            if (wasBanking) this._enterPauseAt = 0;
             if (resume && (wasBanking || this.pausePhase !== 'idle')) {
                 this.resume();
                 return;
@@ -1579,6 +1623,8 @@ export function createPlayerInstance(options) {
             this._pausedFillArmed = false;
             this.stopped = false;
             this.error = null;
+            this.loading = false;
+            this.loadPhase = 'idle';
 
             if (this.video?.videoWidth > 0) {
                 const poster = snapshotVideoPoster(this.video, { rejectBlack: false });
@@ -1589,8 +1635,6 @@ export function createPlayerInstance(options) {
             this.setPauseLiveSync(true);
             try { this.video?.pause(); } catch { /* ignore */ }
             this.playing = false;
-            this.loading = false;
-            this.loadPhase = 'idle';
             this.emitState();
 
             this._parkRaf = requestAnimationFrame(() => {
@@ -1603,6 +1647,8 @@ export function createPlayerInstance(options) {
                 }
                 this.updatePauseBuffer();
             });
+
+            this._armBankFillPoll();
 
             const timeoutMs = bankStallTimeoutMs(this.getBufferSize());
             this._bankStallTimer = setTimeout(() => {

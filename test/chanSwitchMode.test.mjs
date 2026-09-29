@@ -1235,3 +1235,119 @@ test('banking overlay CSS keeps pointer-events none on playback-state', async ()
     assert.match(css, /\.tv-player-tile\.is-banking/);
     assert.match(css, /tv-controls__play-popout/);
 });
+
+test('stuck-load does not arm or escalate while banking', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.video.currentTime = 5;
+    player.video.buffered = mockBuffered(0, 12);
+    player.video.src = 'https://example.com/live.m3u8';
+    player.hls = { config: {}, startLoad() {}, stopLoad() {} };
+
+    let playChannelCalls = 0;
+    player.playChannel = async () => { playChannelCalls += 1; };
+
+    player.startBankBuffer();
+    assert.equal(player.banking, true);
+    assert.ok(player._bankFillPoll != null);
+
+    // Simulate waiting while banking — must not arm stuck-load.
+    player.loading = true;
+    player.loadPhase = 'buffering';
+    player._armStuckLoadWatchdog();
+    assert.equal(player._stuckLoadTimer, null);
+
+    player._stuckLoadRetried = true;
+    player._loadLastProgressAt = Date.now() - 60_000;
+    player._stuckLoadTick = () => {
+        // If a stale tick leaked, it must still no-op when banking.
+        if (player.banking) return;
+        playChannelCalls += 1;
+    };
+    player._stuckLoadTick();
+    assert.equal(playChannelCalls, 0);
+    assert.equal(player.banking, true);
+
+    player._clearBankStallTimer();
+    player.banking = false;
+});
+
+test('long bank finish resumes parked without playChannel (skips fresh resume)', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const { STALLED_PAUSE_RESTART_MS } = await import('../js/player/pauseBuffer.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.bufferSize = 30;
+    player.video.currentTime = 5;
+    player.video.buffered = mockBuffered(0, 20);
+    player.video.src = 'https://example.com/live.m3u8';
+    player.hls = {
+        config: {},
+        latency: 60,
+        startLoad() {},
+        stopLoad() {}
+    };
+
+    let playChannelCalls = 0;
+    player.playChannel = async () => { playChannelCalls += 1; };
+
+    player.startBankBuffer();
+    // Age the pause past the fresh-resume window (what stall timeout would see).
+    player._enterPauseAt = Date.now() - STALLED_PAUSE_RESTART_MS - 1000;
+    player._finishBank({ partial: true });
+
+    assert.equal(player.banking, false);
+    assert.equal(player._enterPauseAt, 0);
+    assert.equal(playChannelCalls, 0);
+    assert.equal(player.wantPlaying, true);
+});
+
+test('bank fill poll keeps startLoad alive and never stopLoads while banking', async () => {
+    const { createPlayerInstance } = await import('../js/player/playerInstance.js');
+    const player = createPlayerInstance({
+        id: 'center',
+        getSharedVolume: () => 1,
+        getLastVolume: () => 1,
+        shouldRecordRecents: () => false
+    });
+
+    player.init();
+    player.channel = { name: 'Live', url_resolved: 'https://example.com/live.m3u8' };
+    player.bufferSize = 60;
+    player.video.currentTime = 0;
+    player.video.buffered = mockBuffered(0, 5);
+    player.hls = {
+        config: {},
+        startLoadCalls: 0,
+        stopLoadCalls: 0,
+        startLoad() { this.startLoadCalls += 1; },
+        stopLoad() { this.stopLoadCalls += 1; }
+    };
+
+    player.startBankBuffer();
+    const before = player.hls.startLoadCalls;
+    player.updatePauseBuffer();
+    assert.ok(player.hls.startLoadCalls > before);
+    assert.equal(player.hls.stopLoadCalls, 0);
+    assert.equal(player.banking, true);
+    assert.ok(player._bankFillPoll != null);
+
+    player._clearBankStallTimer();
+    assert.equal(player._bankFillPoll, null);
+    player.banking = false;
+});

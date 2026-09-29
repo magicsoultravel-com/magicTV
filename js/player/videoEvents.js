@@ -130,7 +130,10 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
         if (player.pausePhase !== 'idle') {
             player.pausePhase = 'buffering';
         }
-        player._armStuckLoadWatchdog();
+        // Bank fills via its own poll — stuck-load reattach would wipe banking.
+        if (player.banking !== true) {
+            player._armStuckLoadWatchdog();
+        }
         player.emitState();
     });
     videoEl.addEventListener('stalled', () => {
@@ -141,7 +144,9 @@ export function bindPlayerVideoEvents(player, videoEl, { shouldRecordRecents, sy
             if (player.pausePhase !== 'idle') {
                 player.pausePhase = 'buffering';
             }
-            player._armStuckLoadWatchdog();
+            if (player.banking !== true) {
+                player._armStuckLoadWatchdog();
+            }
             player.emitState();
         }
     });
