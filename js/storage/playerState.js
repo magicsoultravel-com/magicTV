@@ -312,8 +312,9 @@ function clamp01(n) {
     return Math.min(1, Math.max(0, n));
 }
 
-/** Multi-TV layout preset: equal grid (default) or butterfly CSS grid. */
+/** Multi-TV layout preset: equal grid (default), butterfly CSS grid, or theatre stage. */
 export function normalizeMosaicLayoutMode(raw) {
+    if (raw === 'theatre') return 'theatre';
     if (raw === 'butterfly') return 'butterfly';
     if (raw === 'grid-v') return 'grid-v';
     if (raw === 'grid' || raw === 'grid-h') return 'grid-h';

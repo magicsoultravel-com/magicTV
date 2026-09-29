@@ -59,6 +59,7 @@ function gridBoxForCell(cell, orientation, enabledCount = 6) {
 }
 
 function normalizeSelectedLayoutMode(mode) {
+    if (mode === 'theatre') return 'theatre';
     if (mode === 'butterfly') return 'butterfly';
     if (mode === 'grid-v') return 'grid-v';
     if (mode === 'grid' || mode === 'grid-h') return 'grid-h';
@@ -67,6 +68,47 @@ function normalizeSelectedLayoutMode(mode) {
 
 function isGridLayoutMode(mode) {
     return mode === 'grid-h' || mode === 'grid-v';
+}
+
+function isTheatreLayoutMode(mode) {
+    return mode === 'theatre';
+}
+
+/** Placement presets that write mosaicPlacement (vs butterfly CSS shell). */
+function isPlacementPresetMode(mode) {
+    return isGridLayoutMode(mode) || isTheatreLayoutMode(mode);
+}
+
+/**
+ * Theatre satellites on a 4×3 board (TV numbers ≠ CSS area names).
+ *   7 [1][1] 9
+ *   6 [1][1] 8
+ *   2  3  4  5
+ */
+const THEATRE_SATELLITE_BOX_BY_SLOT = Object.freeze({
+    topLeft: { x: 0, y: 2 / 3, w: 0.25, h: 1 / 3 },
+    topRight: { x: 0.25, y: 2 / 3, w: 0.25, h: 1 / 3 },
+    bottomLeft: { x: 0.5, y: 2 / 3, w: 0.25, h: 1 / 3 },
+    bottomRight: { x: 0.75, y: 2 / 3, w: 0.25, h: 1 / 3 },
+    bottomCenter: { x: 0, y: 1 / 3, w: 0.25, h: 1 / 3 },
+    topCenter: { x: 0, y: 0, w: 0.25, h: 1 / 3 },
+    midLeft: { x: 0.75, y: 1 / 3, w: 0.25, h: 1 / 3 },
+    midRight: { x: 0.75, y: 0, w: 0.25, h: 1 / 3 }
+});
+
+/**
+ * TV1 stage rectangle in the top 2/3; expands into fully empty side columns.
+ * @param {{ bottomCenter?: boolean, topCenter?: boolean, midLeft?: boolean, midRight?: boolean }} flags
+ */
+function resolveTheatreStageBox(flags = {}) {
+    const hasLeft = flags.bottomCenter === true || flags.topCenter === true;
+    const hasRight = flags.midLeft === true || flags.midRight === true;
+    return {
+        x: hasLeft ? 0.25 : 0,
+        y: 0,
+        w: 0.5 + (hasLeft ? 0 : 0.25) + (hasRight ? 0 : 0.25),
+        h: 2 / 3
+    };
 }
 
 /**
@@ -614,6 +656,14 @@ export const freeLayoutMethods = {
         return isGridLayoutMode(this.getSelectedLayoutMode());
     },
 
+    isTheatreLayoutMode() {
+        return isTheatreLayoutMode(this.getSelectedLayoutMode());
+    },
+
+    isPlacementPresetMode() {
+        return isPlacementPresetMode(this.getSelectedLayoutMode());
+    },
+
     setSelectedLayoutMode(mode) {
         const next = normalizeSelectedLayoutMode(mode);
         savePlayerState({ mosaicLayoutMode: next });
@@ -663,10 +713,57 @@ export const freeLayoutMethods = {
     },
 
     /**
+     * Theatre: big TV1 stage + bottom strip 2–5 + left 6/7 + right 8/9.
+     * Stage expands into empty side columns.
+     * @param {{ animate?: boolean }} [opts]
+     */
+    async applyTheatreLayoutPreset(opts = {}) {
+        const enabledIds = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled);
+        const stage = resolveTheatreStageBox({
+            bottomCenter: this.slots.bottomCenter?.enabled === true,
+            topCenter: this.slots.topCenter?.enabled === true,
+            midLeft: this.slots.midLeft?.enabled === true,
+            midRight: this.slots.midRight?.enabled === true
+        });
+        const next = {};
+        let z = 1;
+        enabledIds.forEach((id) => {
+            if (id === 'center') {
+                next[id] = { ...stage, z: z++ };
+                return;
+            }
+            const box = THEATRE_SATELLITE_BOX_BY_SLOT[id];
+            if (!box) return;
+            next[id] = { ...box, z: z++ };
+        });
+        if (!Object.keys(next).length) return;
+
+        const animate = opts.animate === true && travelAnimationsEnabled();
+        const firstRects = animate ? captureTileRects(enabledIds) : null;
+
+        this.mosaicPlacement = next;
+        this.placementZTop = Object.values(next).reduce((max, p) => Math.max(max, p.z || 1), 1);
+        this.ensureCenterOnTop();
+        this.syncLayout();
+        this.applyFreeLayout();
+        this.persistPlacement();
+        this.mountAll();
+        this.scheduleRefreshTiles();
+        this.syncPlacementChrome();
+
+        if (firstRects) {
+            await flipTilesToCurrent(enabledIds, firstRects);
+        }
+    },
+
+    /**
      * @param {{ animate?: boolean }} [opts]
      */
     resetToSelectedLayout(opts = {}) {
         const mode = this.getSelectedLayoutMode();
+        if (isTheatreLayoutMode(mode)) {
+            return this.applyTheatreLayoutPreset(opts);
+        }
         if (isGridLayoutMode(mode)) {
             return this.applyGridLayoutPreset(mode, opts);
         }
@@ -675,10 +772,11 @@ export const freeLayoutMethods = {
 
     ensureLayoutModeOnInit() {
         const mode = this.getSelectedLayoutMode();
-        if (!isGridLayoutMode(mode)) return;
+        if (!isPlacementPresetMode(mode)) return;
         const missingSlot = SLOT_IDS.some((id) => this.slots[id]?.enabled && !this.mosaicPlacement[id]);
         if (!this.hasCustomPlacement() || missingSlot) {
-            this.applyGridLayoutPreset(mode);
+            if (isTheatreLayoutMode(mode)) this.applyTheatreLayoutPreset();
+            else this.applyGridLayoutPreset(mode);
         }
     },
 };

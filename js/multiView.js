@@ -708,7 +708,7 @@ export const MultiView = {
             slot.player.muted = true;
             slot.player.applyAudioToVideo();
             if (this.hasCustomPlacement() && !this.mosaicPlacement[sideId]) {
-                if (!this.isGridLayoutMode?.()) {
+                if (!this.isPlacementPresetMode?.()) {
                     this.mosaicPlacement[sideId] = {
                         x: 0.04,
                         y: 0.04,
@@ -735,10 +735,14 @@ export const MultiView = {
         SCREEN_SETTERS[sideId]?.(next);
 
         this.syncLayout();
-        if (next && this.isGridLayoutMode?.() && !silent) {
+        if (!silent && this.isPlacementPresetMode?.()) {
             const mosaic = el('player-mosaic');
             if (mosaic?.classList?.add) {
-                this.applyGridLayoutPreset(undefined, { animate: true });
+                if (this.isTheatreLayoutMode?.()) {
+                    this.applyTheatreLayoutPreset({ animate: true });
+                } else if (next && this.isGridLayoutMode?.()) {
+                    this.applyGridLayoutPreset(undefined, { animate: true });
+                }
             }
         }
         this.mountAll();
