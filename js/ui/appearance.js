@@ -122,6 +122,8 @@ export const Appearance = {
         const listValue = el('list-width-value');
         const pickerOpacitySlider = el('remote-module-opacity-slider');
         const pickerOpacityValue = el('remote-module-opacity-value');
+        const screenDimSlider = el('screen-dim-slider');
+        const screenDimValue = el('screen-dim-value');
         const idleFadeEnabled = el('remote-idle-fade-enabled');
         const idleDelaySlider = el('remote-idle-delay-slider');
         const idleDelayValue = el('remote-idle-delay-value');
@@ -153,6 +155,12 @@ export const Appearance = {
             if (pickerOpacitySlider) pickerOpacitySlider.value = String(pct);
             if (pickerOpacityValue) pickerOpacityValue.textContent = `${pct}%`;
             if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pct}%`);
+        };
+
+        const syncScreenDimUi = (pct) => {
+            if (screenDimSlider) screenDimSlider.value = String(pct);
+            if (screenDimValue) screenDimValue.textContent = `${pct}%`;
+            if (screenDimSlider) screenDimSlider.setAttribute('aria-valuetext', `${pct}%`);
         };
 
         const syncIdleFadeUi = syncRemoteIdleFadeUi;
@@ -239,6 +247,14 @@ export const Appearance = {
             pickerOpacitySlider.addEventListener('input', () => {
                 const pct = SettingsStore.setRemoteModuleOpacity(Number(pickerOpacitySlider.value));
                 syncPickerOpacityUi(pct);
+                this.applyStyles();
+            });
+        }
+
+        if (screenDimSlider) {
+            screenDimSlider.addEventListener('input', () => {
+                const pct = SettingsStore.setScreenDim(Number(screenDimSlider.value));
+                syncScreenDimUi(pct);
                 this.applyStyles();
             });
         }
@@ -415,6 +431,7 @@ export const Appearance = {
                     tileWidth,
                     listWidth,
                     remoteModuleOpacity,
+                    screenDim,
                     remoteIdleFadeEnabled,
                     showMosaicWatchSession,
                     showMosaicWatchTotal,
@@ -436,6 +453,7 @@ export const Appearance = {
                 syncTileUi(tileWidth);
                 syncListUi(listWidth);
                 syncPickerOpacityUi(remoteModuleOpacity);
+                syncScreenDimUi(screenDim);
                 syncIdleFadeUi({
                     enabled: remoteIdleFadeEnabled,
                     delaySec: remoteIdleDelaySec,
@@ -561,6 +579,7 @@ export const Appearance = {
         root.style.setProperty('--tv-tile-width', `${tileWidth}px`);
         root.style.setProperty('--tv-list-width', `${listWidth}px`);
         root.style.setProperty('--remote-module-opacity', String(remoteModuleOpacity / 100));
+        root.style.setProperty('--screen-dim-opacity', String(SettingsStore.getScreenDim() / 100));
         root.setAttribute('data-remote-texture', SettingsStore.getRemoteTexture());
         root.setAttribute('data-remote-button-shape', SettingsStore.getRemoteButtonShape());
         root.setAttribute('data-theme', themeId);
@@ -669,6 +688,13 @@ export const Appearance = {
         if (pickerOpacitySlider) pickerOpacitySlider.value = String(pickerOpacity);
         if (pickerOpacityValue) pickerOpacityValue.textContent = `${pickerOpacity}%`;
         if (pickerOpacitySlider) pickerOpacitySlider.setAttribute('aria-valuetext', `${pickerOpacity}%`);
+
+        const screenDim = SettingsStore.getScreenDim();
+        const screenDimSlider = el('screen-dim-slider');
+        const screenDimValue = el('screen-dim-value');
+        if (screenDimSlider) screenDimSlider.value = String(screenDim);
+        if (screenDimValue) screenDimValue.textContent = `${screenDim}%`;
+        if (screenDimSlider) screenDimSlider.setAttribute('aria-valuetext', `${screenDim}%`);
 
         syncRemoteIdleFadeUi({
             enabled: SettingsStore.getRemoteIdleFadeEnabled(),

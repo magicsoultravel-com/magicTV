@@ -21,6 +21,7 @@
         </div>
     </div>
     <div id="shutdown-screen" class="shutdown-screen" aria-hidden="true"></div>
+    <div id="screen-dimmer" class="screen-dimmer" aria-hidden="true"></div>
     <div id="app-container">
         <header class="tv-header">
             <div class="tv-brand" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse header">
@@ -1078,6 +1079,13 @@
                                                 <div class="settings-section__control">
                                                     <input type="range" class="settings-slider" id="remote-module-opacity-slider" min="33" max="100" step="1" value="100" aria-valuetext="100%">
                                                     <span class="settings-value" id="remote-module-opacity-value">100%</span>
+                                                </div>
+                                            </div>
+                                            <div class="settings-section__item">
+                                                <label class="settings-section__label" for="screen-dim-slider">Screen dim</label>
+                                                <div class="settings-section__control">
+                                                    <input type="range" class="settings-slider" id="screen-dim-slider" min="0" max="80" step="1" value="0" aria-valuetext="0%">
+                                                    <span class="settings-value" id="screen-dim-value">0%</span>
                                                 </div>
                                             </div>
                                             <div class="settings-section__item">

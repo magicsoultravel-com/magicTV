@@ -46,6 +46,7 @@ const DEFAULT_TILE_WIDTH = 120;
 const DEFAULT_LIST_WIDTH = 120;
 const DEFAULT_CATALOG_LAYOUT = 'tiles';
 const DEFAULT_REMOTE_MODULE_OPACITY = 100;
+const DEFAULT_SCREEN_DIM = 0;
 const TEXT_SIZE_MIN = 8;
 const TEXT_SIZE_MAX = 18;
 const TILE_WIDTH_MIN = 100;
@@ -56,6 +57,8 @@ const LIST_WIDTH_MAX = 300;
 const LIST_WIDTH_STEP = 10;
 const REMOTE_MODULE_OPACITY_MIN = 33;
 const REMOTE_MODULE_OPACITY_MAX = 100;
+const SCREEN_DIM_MIN = 0;
+const SCREEN_DIM_MAX = 80;
 const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
 const DEFAULT_SHOW_MOSAIC_WATCH_SESSION = true;
 const DEFAULT_SHOW_MOSAIC_WATCH_TOTAL = true;
@@ -143,6 +146,12 @@ function clampRemoteModuleOpacity(value) {
         REMOTE_MODULE_OPACITY_MAX,
         Math.max(REMOTE_MODULE_OPACITY_MIN, Math.round(n))
     );
+}
+
+function clampScreenDim(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_SCREEN_DIM;
+    return Math.min(SCREEN_DIM_MAX, Math.max(SCREEN_DIM_MIN, Math.round(n)));
 }
 
 function clampTvEmptySpaceTransparency(value) {
@@ -263,6 +272,17 @@ export const SettingsStore = {
             remoteModuleOpacity: clampedValue,
             channelPickerOpacity: undefined
         });
+        return clampedValue;
+    },
+
+    getScreenDim() {
+        const raw = readPersistedState();
+        return raw.screenDim != null ? clampScreenDim(raw.screenDim) : DEFAULT_SCREEN_DIM;
+    },
+
+    setScreenDim(value) {
+        const clampedValue = clampScreenDim(value);
+        patchPersistedState({ screenDim: clampedValue });
         return clampedValue;
     },
 
@@ -461,6 +481,7 @@ export const SettingsStore = {
         const tileWidth = this.setTileWidth(DEFAULT_TILE_WIDTH);
         const listWidth = this.setListWidth(DEFAULT_LIST_WIDTH);
         const remoteModuleOpacity = this.setRemoteModuleOpacity(DEFAULT_REMOTE_MODULE_OPACITY);
+        const screenDim = this.setScreenDim(DEFAULT_SCREEN_DIM);
         const remoteIdleFadeEnabled = this.setRemoteIdleFadeEnabled(DEFAULT_REMOTE_IDLE_FADE_ENABLED);
         const showMosaicWatchSession = this.setShowMosaicWatchSession(DEFAULT_SHOW_MOSAIC_WATCH_SESSION);
         const showMosaicWatchTotal = this.setShowMosaicWatchTotal(DEFAULT_SHOW_MOSAIC_WATCH_TOTAL);
@@ -483,6 +504,7 @@ export const SettingsStore = {
             tileWidth,
             listWidth,
             remoteModuleOpacity,
+            screenDim,
             remoteIdleFadeEnabled,
             showMosaicWatchSession,
             showMosaicWatchTotal,

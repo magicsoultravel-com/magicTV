@@ -494,3 +494,13 @@ body.has-channel-picker .tv-tab .ui-icon {
     display: none;
 }
 
+/* Page screen dimmer — visual only; clicks pass through to UI below. */
+.screen-dimmer {
+    position: fixed;
+    inset: 0;
+    z-index: 90000;
+    pointer-events: none;
+    background: #000;
+    opacity: var(--screen-dim-opacity, 0);
+}
+

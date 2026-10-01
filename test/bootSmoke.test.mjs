@@ -38,6 +38,7 @@ const KNOWN_IDS = [
     'tile-width-slider', 'tile-width-value',
     'list-width-slider', 'list-width-value',
     'remote-module-opacity-slider', 'remote-module-opacity-value',
+    'screen-dimmer', 'screen-dim-slider', 'screen-dim-value',
     'remote-texture-select',
     'catalog-layout-btn',
     'reset-appearance-btn', 'appearance-preview-tile',
