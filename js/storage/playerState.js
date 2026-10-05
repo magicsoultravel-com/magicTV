@@ -9,9 +9,15 @@ import { SLOT_IDS } from '../mosaic/constants.js';
 function hasFavoriteFolders(folders) {
     return Array.isArray(folders) && folders.length > 0;
 }
-export const DEFAULT_RECENTS_CAP = 20;
+export const DEFAULT_RECENTS_CAP = 100;
 export const RECENTS_CAP_MIN = 0;
-export const RECENTS_CAP_MAX = 100;
+export const RECENTS_CAP_MAX = 500;
+/** Sentinel: no trim on push / history stacks. */
+export const UNLIMITED_RECENTS_CAP = -1;
+
+export function isUnlimitedRecentsCap(cap) {
+    return Number(cap) === UNLIMITED_RECENTS_CAP;
+}
 
 
 export const DEFAULT_VISITED_STYLE = 'accent-2';
@@ -287,6 +293,26 @@ const MOSAIC_SLOT_IDS = [
     'midRight'
 ];
 
+function normalizeMosaicChannelHistory(raw) {
+    const out = Object.fromEntries(MOSAIC_SLOT_IDS.map((id) => [id, []]));
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    for (const id of MOSAIC_SLOT_IDS) {
+        const list = raw[id];
+        if (!Array.isArray(list)) continue;
+        const seen = new Set();
+        const keys = [];
+        for (const key of list) {
+            if (typeof key !== 'string' || !key || seen.has(key)) continue;
+            seen.add(key);
+            keys.push(key);
+        }
+        out[id] = keys;
+    }
+    return out;
+}
+
+export { normalizeMosaicChannelHistory };
+
 function normalizeMosaicSlots(raw) {
     if (!raw || typeof raw !== 'object') return {};
     const out = {};
@@ -418,13 +444,27 @@ export function normalizeVisitedStyle(value, fallback = DEFAULT_VISITED_STYLE) {
     return VISITED_STYLES.includes(value) ? value : fallback;
 }
 
-/** Recents history cap, clamped to the 0..100 range enforced in settings. */
+/**
+ * Recents / previous-channel history cap.
+ * Returns {@link UNLIMITED_RECENTS_CAP} (-1) for unlimited, else 0..{@link RECENTS_CAP_MAX}.
+ */
 export function getRecentsCap() {
     const raw = readPersistedState().recentsCap;
     if (raw == null || raw === '') return DEFAULT_RECENTS_CAP;
     const n = Number(raw);
     if (!Number.isFinite(n)) return DEFAULT_RECENTS_CAP;
-    return Math.min(RECENTS_CAP_MAX, Math.max(RECENTS_CAP_MIN, Math.round(n)));
+    const rounded = Math.round(n);
+    if (rounded === UNLIMITED_RECENTS_CAP) return UNLIMITED_RECENTS_CAP;
+    return Math.min(RECENTS_CAP_MAX, Math.max(RECENTS_CAP_MIN, rounded));
+}
+
+/** Clamp a user/settings value into a valid recents cap (including unlimited). */
+export function clampRecentsCap(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_RECENTS_CAP;
+    const rounded = Math.round(n);
+    if (rounded === UNLIMITED_RECENTS_CAP) return UNLIMITED_RECENTS_CAP;
+    return Math.min(RECENTS_CAP_MAX, Math.max(RECENTS_CAP_MIN, rounded));
 }
 
 function normalizeVisitedChannels(raw) {
@@ -463,6 +503,7 @@ function emptyPlayerState() {
         reattemptInterval: DEFAULT_REATTEMPT_INTERVAL,
         reattempts: DEFAULT_REATTEMPTS,
         mosaicSlots: {},
+        mosaicChannelHistory: Object.fromEntries(MOSAIC_SLOT_IDS.map((id) => [id, []])),
         mosaicPlacement: {},
         mosaicLayoutMode: 'grid-h',
         remoteModule: null,
@@ -543,6 +584,7 @@ export function loadPlayerStateFrom(raw) {
             reattemptInterval: clampReattemptInterval(src.reattemptInterval),
             reattempts: clampReattempts(src.reattempts),
             mosaicSlots: normalizeMosaicSlots(src.mosaicSlots),
+            mosaicChannelHistory: normalizeMosaicChannelHistory(src.mosaicChannelHistory),
             mosaicPlacement: normalizeMosaicPlacement(src.mosaicPlacement),
             mosaicLayoutMode: normalizeMosaicLayoutMode(src.mosaicLayoutMode),
             remoteModule: normalizeRemoteModule(src.remoteModule, src.channelPicker),
@@ -587,6 +629,7 @@ const KNOWN_PLAYER_PATCH_KEYS = new Set([
     'reattemptInterval',
     'reattempts',
     'mosaicSlots',
+    'mosaicChannelHistory',
     'mosaicPlacement',
     'mosaicLayoutMode',
     'remoteModule',
@@ -714,6 +757,9 @@ export function savePlayerState(patch) {
         payload.reattempts = clampReattempts(merged.reattempts);
     }
     if ('mosaicSlots' in patch) payload.mosaicSlots = merged.mosaicSlots || {};
+    if ('mosaicChannelHistory' in patch) {
+        payload.mosaicChannelHistory = normalizeMosaicChannelHistory(merged.mosaicChannelHistory);
+    }
     if ('mosaicPlacement' in patch) payload.mosaicPlacement = merged.mosaicPlacement || {};
     if ('mosaicLayoutMode' in patch) {
         payload.mosaicLayoutMode = normalizeMosaicLayoutMode(merged.mosaicLayoutMode);

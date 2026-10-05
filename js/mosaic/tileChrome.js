@@ -72,6 +72,8 @@ export const tileChromeMethods = {
         }
 
         if (action === 'play-all') {
+            // Chrome popout only shows when something is paused — always playAll.
+            // Remote morphs to pause-all via sync; still ok to toggle when all playing.
             if (this.isAllPlaying()) await this.pauseAll();
             else await this.playAll();
             return;
@@ -79,6 +81,52 @@ export const tileChromeMethods = {
 
         if (action === 'stop-all') {
             await this.stopAll();
+            return;
+        }
+
+        if (action === 'stop-play') {
+            const player = this.slots[slotId]?.player;
+            if (!player?.channel) return;
+            const channel = player.channel;
+            const key = channelKey(channel);
+            const gen = (player._stopPlayGeneration = (player._stopPlayGeneration || 0) + 1);
+            const shouldAnimate = player.playing || player.loading || player.pausePhase !== 'idle';
+            if (shouldAnimate) {
+                await this.withChannelSwitchTransition(slotId, () => player.stop());
+            } else {
+                await player.stop();
+            }
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            const { waitMs } = await import('./constants.js');
+            await waitMs(1000);
+            if (gen !== player._stopPlayGeneration) return;
+            if (channelKey(player.channel) !== key) return;
+            await player.playChannel(channel);
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            return;
+        }
+
+        if (action === 'chan-prev') {
+            const { popSlotChannelHistory } = await import('./channelHistory.js');
+            const prevKey = popSlotChannelHistory(slotId);
+            if (!prevKey) {
+                showAppToast('No previous channel');
+                this.syncMosaicChrome();
+                return;
+            }
+            const { parseChannelKey } = await import('../tvProviders/channelShape.js');
+            const { TvProviderRegistry } = await import('../tvProviders/registry.js');
+            const parsed = parseChannelKey(prevKey);
+            const channel = await TvProviderRegistry.getChannel(parsed);
+            if (!channel?.url_resolved) {
+                showAppToast('Previous channel unavailable');
+                this.syncMosaicChrome();
+                return;
+            }
+            await this.playOnSlot(slotId, channel, { skipHistory: true });
+            this.syncMosaicChrome();
             return;
         }
 
@@ -138,6 +186,7 @@ export const tileChromeMethods = {
                 if (useCast) {
                     await ChromecastManager.stopMedia();
                 } else {
+                    player._stopPlayGeneration = (player._stopPlayGeneration || 0) + 1;
                     const shouldAnimate = player.playing || player.loading || player.pausePhase !== 'idle';
                     if (shouldAnimate) {
                         await this.withChannelSwitchTransition(slotId, () => player.stop());

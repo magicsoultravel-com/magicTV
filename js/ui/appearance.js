@@ -2,6 +2,7 @@ import { forEachAppDocument } from '../appDocuments.js';
 import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
+import { UNLIMITED_RECENTS_CAP, isUnlimitedRecentsCap } from '../storage/playerState.js';
 import { clearWatchStats, formatWatchDuration, flushAllWatchAccruals, getTopWatched } from '../storage/watchStats.js';
 import { ACTION_ICONS } from './icons.js';
 import { copyThemeAttributes } from './popoutWindows.js';
@@ -388,16 +389,42 @@ export const Appearance = {
         }
 
         const recentsCapInput = el('recents-cap-input');
+        const recentsUnlimited = el('recents-cap-unlimited');
         if (recentsCapInput && recentsCapInput.dataset.bound !== '1') {
             recentsCapInput.dataset.bound = '1';
+            const syncUnlimitedUi = (cap) => {
+                const unlimited = isUnlimitedRecentsCap(cap);
+                if (recentsUnlimited) recentsUnlimited.checked = unlimited;
+                recentsCapInput.disabled = unlimited;
+                if (!unlimited) recentsCapInput.value = String(cap);
+            };
             recentsCapInput.addEventListener('change', () => {
                 const cap = SettingsStore.setRecentsCap(Number(recentsCapInput.value));
-                recentsCapInput.value = String(cap);
-                showAppToast(`Recent channels: ${cap}`);
+                syncUnlimitedUi(cap);
+                showAppToast(
+                    isUnlimitedRecentsCap(cap)
+                        ? 'Recent channels: unlimited'
+                        : `Recent channels: ${cap}`
+                );
             });
             recentsCapInput.addEventListener('blur', () => {
-                recentsCapInput.value = String(SettingsStore.getRecentsCap());
+                const cap = SettingsStore.getRecentsCap();
+                if (!isUnlimitedRecentsCap(cap)) recentsCapInput.value = String(cap);
             });
+            if (recentsUnlimited && recentsUnlimited.dataset.bound !== '1') {
+                recentsUnlimited.dataset.bound = '1';
+                recentsUnlimited.addEventListener('change', () => {
+                    const cap = SettingsStore.setRecentsCap(
+                        recentsUnlimited.checked ? UNLIMITED_RECENTS_CAP : Number(recentsCapInput.value) || 100
+                    );
+                    syncUnlimitedUi(cap);
+                    showAppToast(
+                        isUnlimitedRecentsCap(cap)
+                            ? 'Recent channels: unlimited'
+                            : `Recent channels: ${cap}`
+                    );
+                });
+            }
         }
 
         const nonVisitedStyleSelect = el('non-visited-style-select');
@@ -772,8 +799,12 @@ export const Appearance = {
 
         const recentsCap = SettingsStore.getRecentsCap();
         const recentsCapInput = el('recents-cap-input');
+        const recentsUnlimited = el('recents-cap-unlimited');
         if (recentsCapInput) {
-            recentsCapInput.value = String(recentsCap);
+            const unlimited = isUnlimitedRecentsCap(recentsCap);
+            recentsCapInput.disabled = unlimited;
+            if (!unlimited) recentsCapInput.value = String(recentsCap);
+            if (recentsUnlimited) recentsUnlimited.checked = unlimited;
         }
 
         const fontId = SettingsStore.getFontId();

@@ -4,6 +4,7 @@ import {
     loadPlayerState,
     savePlayerState,
     getRecentsCap,
+    isUnlimitedRecentsCap,
     normalizeChanBindScope
 } from './playerState.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
@@ -247,7 +248,8 @@ export const FavoritesRecents = {
             countrycode: channel?.countrycode || '',
             at: Date.now()
         });
-        savePlayerState({ recentsMeta: meta.slice(0, cap) });
+        const next = isUnlimitedRecentsCap(cap) ? meta : meta.slice(0, Math.max(0, cap));
+        savePlayerState({ recentsMeta: next });
     },
 
     /**

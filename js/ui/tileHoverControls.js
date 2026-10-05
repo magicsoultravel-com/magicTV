@@ -24,6 +24,12 @@ export const PLAY_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" foc
 
 export const PAUSE_ALL_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path class="mosaic-stop-all-sigma" d="${ACTION_ALL_SIGMA}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="8.2" y="2.6" width="1.7" height="6.8" fill="currentColor"/><rect x="11.4" y="2.6" width="1.7" height="6.8" fill="currentColor"/></svg>`;
 
+/** Stop square + play triangle — stop, wait, play same channel. */
+export const STOP_PLAY_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><rect x="1.4" y="2.8" width="5.2" height="6.4" rx="0.6" fill="currentColor"/><path d="M9.2 2.8v6.4l6.2-3.2-6.2-3.2z" fill="currentColor"/></svg>`;
+
+/** Previous channel — curved back arrow. */
+export const CHAN_PREV_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M4.2 3.2 2 5.4l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.2 5.4h4.6a3.2 3.2 0 0 1 0 6.4H5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
 export const VOL_DOWN_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
 export const VOL_UP_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
@@ -67,6 +73,17 @@ function playWrap(target) {
         ${controlBtn('play', 'Play', '▶', target, 'tv-controls__btn--main-1')}
         <div class="tv-controls__play-popout" aria-hidden="true">
             <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="bank" data-controls-target="${target}" title="Bank buffer" aria-label="Bank buffer" aria-pressed="false">${BANK_SVG}</button>
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="play-all" data-controls-target="${target}" title="Play all" aria-label="Play all">${PLAY_ALL_SVG}</button>
+        </div>
+    </div>`;
+}
+
+function stopWrap(target) {
+    return `<div class="tv-controls__stop-wrap">
+        ${controlBtn('stop', 'Stop', '⏹', target, 'tv-controls__btn--main-1')}
+        <div class="tv-controls__stop-popout" aria-hidden="true">
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="stop-play" data-controls-target="${target}" title="Stop &amp; play" aria-label="Stop and play">${STOP_PLAY_SVG}</button>
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="stop-all" data-controls-target="${target}" title="Stop all" aria-label="Stop all">${STOP_ALL_SVG}</button>
         </div>
     </div>`;
 }
@@ -90,6 +107,15 @@ export function buildTileCastVolRockerHtml() {
     </div>`;
 }
 
+function chanDownWrap(target) {
+    return `<div class="tv-controls__chan-prev-wrap">
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn" data-tile-action="chan-down" data-controls-target="${target}" title="Channel down" aria-label="Channel down">${CHAN_CHEVRON_DOWN}</button>
+        <div class="tv-controls__chan-prev-popout" aria-hidden="true">
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="chan-prev" data-controls-target="${target}" title="Previous channel" aria-label="Previous channel" hidden>${CHAN_PREV_SVG}</button>
+        </div>
+    </div>`;
+}
+
 /** Vertical channel rocker — right mid-height of the tile. */
 export function buildTileChanRockerHtml(target = 'local') {
     return `<div class="tv-player-tile__rocker tv-player-tile__chan-rocker" data-tile-chan-rocker>
@@ -98,7 +124,7 @@ export function buildTileChanRockerHtml(target = 'local') {
             <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn tv-player-tile__chan-bind-btn" data-tile-chan-bind-btn title="Bind channels" aria-label="Bind channels" aria-haspopup="menu" aria-expanded="false">${CHAN_BIND_SVG}</button>
             <div class="chan-bind-menu tv-player-tile__chan-bind-menu" role="menu" aria-label="Channel bind scope" hidden></div>
         </div>
-        <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn" data-tile-action="chan-down" data-controls-target="${target}" title="Channel down" aria-label="Channel down">${CHAN_CHEVRON_DOWN}</button>
+        ${chanDownWrap(target)}
     </div>`;
 }
 
@@ -139,7 +165,7 @@ function coreRowButtons(target) {
     return [
         controlBtn('browse', 'Pick channel', BROWSE_SVG, target, 'tv-controls__btn--main-3'),
         playWrap(target),
-        controlBtn('stop', 'Stop', '⏹', target, 'tv-controls__btn--main-1'),
+        stopWrap(target),
         controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2'),
         controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),
         controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
@@ -151,21 +177,12 @@ function cornerExtras(target) {
     return controlBtn('swap', 'Swap with main', SWAP_SVG, target, 'tv-controls__btn--main-1');
 }
 
-function centerExtras(target) {
-    return [
-        `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 mosaic-reset-btn is-hidden" id="mosaic-reset-btn" data-tile-action="reset" data-controls-target="${target}" title="Reset multi-TV layout" aria-label="Reset multi-TV layout" hidden>${RESET_SVG}</button>`,
-        `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__volume-btn" id="mosaic-mute-all-btn" data-tile-action="mute-all" data-controls-target="${target}" title="Mute all" aria-label="Mute all" aria-pressed="false">${MUTE_ALL_SVG}</button>`,
-        `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__volume-btn" id="mosaic-play-all-btn" data-tile-action="play-all" data-controls-target="${target}" title="Play all" aria-label="Play all" aria-pressed="false">${PLAY_ALL_SVG}</button>`,
-        `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__volume-btn" id="mosaic-stop-all-btn" data-tile-action="stop-all" data-controls-target="${target}" title="Stop all" aria-label="Stop all" aria-pressed="false">${STOP_ALL_SVG}</button>`
-    ].join('');
-}
-
 /**
  * @param {'corner' | 'center'} variant
  * @returns {string}
  */
 export function buildTileHoverHtml(variant) {
-    const extras = variant === 'center' ? centerExtras('local') : cornerExtras('local');
+    const extras = variant === 'center' ? '' : cornerExtras('local');
 
     return `<div class="tv-controls__row tv-controls__row--cast" data-controls-row="cast" hidden>
         <span class="tv-controls__row-label">CAST</span>

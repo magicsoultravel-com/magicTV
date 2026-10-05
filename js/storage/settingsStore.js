@@ -18,13 +18,12 @@ import {
     DEFAULT_REMOTE_BUTTON_SHAPE
 } from '../ui/remoteButtonShapes.js';
 import {
-    DEFAULT_RECENTS_CAP,
-    RECENTS_CAP_MIN,
-    RECENTS_CAP_MAX,
     DEFAULT_VISITED_STYLE,
     DEFAULT_NON_VISITED_STYLE,
     normalizeVisitedStyle,
     getRecentsCap,
+    clampRecentsCap,
+    isUnlimitedRecentsCap,
     loadPlayerState,
     savePlayerState
 } from './playerState.js';
@@ -189,12 +188,6 @@ export function isCatalogBarTab(tab) {
 
 function normalizeActiveTileStyle(value) {
     return ACTIVE_TILE_STYLES.includes(value) ? value : DEFAULT_ACTIVE_TILE_STYLE;
-}
-
-function clampRecentsCap(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return DEFAULT_RECENTS_CAP;
-    return Math.min(RECENTS_CAP_MAX, Math.max(RECENTS_CAP_MIN, Math.round(n)));
 }
 
 function normalizeThemeId(value) {
@@ -687,10 +680,14 @@ export const SettingsStore = {
     setRecentsCap(value) {
         const next = clampRecentsCap(value);
         patchPersistedState({ recentsCap: next });
-        // Trim any recents already recorded beyond the new cap.
-        const { recentsMeta } = loadPlayerState();
-        if (recentsMeta.length > next) {
-            savePlayerState({ recentsMeta: recentsMeta.slice(0, next) });
+        if (!isUnlimitedRecentsCap(next)) {
+            const { recentsMeta } = loadPlayerState();
+            if (recentsMeta.length > next) {
+                savePlayerState({ recentsMeta: recentsMeta.slice(0, next) });
+            }
+            import('../mosaic/channelHistory.js')
+                .then(({ trimAllSlotChannelHistory }) => trimAllSlotChannelHistory())
+                .catch(() => {});
         }
         return next;
     },

@@ -6,6 +6,7 @@ import {
     loadPlayerState,
     savePlayerState,
     getRecentsCap,
+    isUnlimitedRecentsCap,
     normalizeWatchStatsMeta,
     normalizeChanBindScopeBySlot
 } from './playerState.js';
@@ -167,9 +168,9 @@ function mergeRecentsMetaList(localMeta, importedMeta, cap) {
     };
     (localMeta || []).forEach(add);
     (importedMeta || []).forEach(add);
-    return [...map.values()]
-        .sort((a, b) => (b.at || 0) - (a.at || 0))
-        .slice(0, cap);
+    const sorted = [...map.values()].sort((a, b) => (b.at || 0) - (a.at || 0));
+    if (isUnlimitedRecentsCap(cap)) return sorted;
+    return sorted.slice(0, Math.max(0, cap));
 }
 
 function mergeFavoriteFoldersList(localFolders, importedFolders, favKeys) {

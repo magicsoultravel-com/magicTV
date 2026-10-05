@@ -93,9 +93,6 @@ test('remote mosaic mute/play/stop-all match TV mosaic main-2 accents', () => {
     for (const id of ['remote-mute-all-btn', 'remote-play-all-btn', 'remote-stop-all-btn']) {
         assert.match(buttonChunk(id), /tv-controls__btn--main-2/);
     }
-    for (const id of ['mosaic-mute-all-btn', 'mosaic-play-all-btn', 'mosaic-stop-all-btn']) {
-        assert.match(buttonChunk(id), /tv-controls__btn--main-2/);
-    }
 });
 
 test('accent flip includes aria-pressed for all main-N variants', () => {

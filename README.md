@@ -49,7 +49,7 @@ npm test            # or: node --test
 | `test/moduleGraph.test.mjs` | **Module-graph integrity** — every local import reachable from `app.js` must resolve (regression test for the empty-page bug) |
 | `test/appBoot.test.mjs` | `app.js` imports safely without a DOM + every `el('id')` the app uses exists in `index.html` |
 | `test/bootSmoke.test.mjs` | Runs the real `init()` with a DOM stub & mocked offline fetch — asserts the app boots and renders a graceful empty state |
-| `test/tvPlayer.test.mjs` | Favorites, favorites metadata, recents (cap 20, newest-first), buffer-size clamping (5–120s), volume clamping, provider settings |
+| `test/tvPlayer.test.mjs` | Favorites, favorites metadata, recents (cap 100 default / 0–500 / unlimited, newest-first), buffer-size clamping (5–120s), volume clamping, provider settings |
 | `test/tvUtils.test.mjs` | `escapeHtml`, `countryFlagEmoji`, `debounce`, `formatRelativeTime` |
 | `test/channelShape.test.mjs` | `channelKey`, `parseChannelKey`, `normalizeChannel`, `migrateFavoriteRef` |
 | `test/shareChannel.test.mjs` | Deep-link build/parse round-trip, stream link, `chooseSharedPlayTarget` slot policy (free → center, full → last/fallback) |
@@ -131,7 +131,7 @@ Opening a magicTV deep link resolves the channel from the active catalog and pla
 Open via the remote/browser **Settings** tab (`#settings-panel`):
 
 - **Clock** — Clock style
-- **Playback** — Buffer size (5–120s), max recents (0–100)
+- **Playback** — Buffer size (5–120s), max recents / previous channels (0–500 or unlimited)
 - **Transitions** — Channel-switch and catalog view transitions (default: Random)
 - **Appearance** — Theme, font, color groups, text size (default 75%), tile/list width (default 120px), active-tile (default Wave), visited accents (default Accent 2 / undistinguished), remote opacity & idle fade, remote texture, live preview; **Reset to defaults** under the preview
 - **Hidden / Visited Channels** — Browse and restore/remove entries by country

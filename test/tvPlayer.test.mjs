@@ -221,12 +221,12 @@ test('recents are recorded newest-first', () => {
     assert.equal(meta[1].key, 'iptv-org:B');
 });
 
-test('recents are capped at 20 entries', () => {
-    for (let i = 0; i < 25; i += 1) {
+test('recents are capped at the default 100 entries', () => {
+    for (let i = 0; i < 105; i += 1) {
         TvPlayer.pushRecent(`iptv-org:channel-${i}`);
     }
-    assert.equal(TvPlayer.getRecents().length, 20);
-    assert.equal(TvPlayer.getRecents()[0], 'iptv-org:channel-24', 'newest first');
+    assert.equal(TvPlayer.getRecents().length, 100);
+    assert.equal(TvPlayer.getRecents()[0], 'iptv-org:channel-104', 'newest first');
     assert.ok(!TvPlayer.getRecents().includes('iptv-org:channel-0'), 'oldest dropped');
 });
 
@@ -318,16 +318,17 @@ test('reconciliation seeds visitedChannelsMeta alongside keys', () => {
 
 // ----- Recents cap -----
 
-test('recents cap defaults to 20 entries', () => {
-    assert.equal(SettingsStore.getRecentsCap(), 20);
+test('recents cap defaults to 100 entries', () => {
+    assert.equal(SettingsStore.getRecentsCap(), 100);
 });
 
-test('recents cap clamps to the 0..100 range', () => {
-    assert.equal(SettingsStore.setRecentsCap(-1), 0, 'below min clamps to 0');
-    assert.equal(SettingsStore.setRecentsCap(500), 100, 'above max clamps to 100');
+test('recents cap clamps to the 0..500 range and allows unlimited', () => {
+    assert.equal(SettingsStore.setRecentsCap(-2), 0, 'below min clamps to 0');
+    assert.equal(SettingsStore.setRecentsCap(600), 500, 'above max clamps to 500');
     assert.equal(SettingsStore.setRecentsCap(0), 0, 'zero is allowed');
     assert.equal(SettingsStore.setRecentsCap(42), 42);
-    assert.equal(SettingsStore.setRecentsCap('nope'), 20, 'non-number falls back to default');
+    assert.equal(SettingsStore.setRecentsCap(-1), -1, 'unlimited sentinel');
+    assert.equal(SettingsStore.setRecentsCap('nope'), 100, 'non-number falls back to default');
 });
 
 test('pushRecent honors a custom cap', () => {
@@ -338,6 +339,14 @@ test('pushRecent honors a custom cap', () => {
     const recents = TvPlayer.getRecents();
     assert.equal(recents.length, 3);
     assert.equal(recents[0], 'iptv-org:cap-5', 'newest first');
+});
+
+test('unlimited recents cap does not trim', () => {
+    SettingsStore.setRecentsCap(-1);
+    for (let i = 0; i < 12; i += 1) {
+        TvPlayer.pushRecent(`iptv-org:u-${i}`);
+    }
+    assert.equal(TvPlayer.getRecents().length, 12);
 });
 
 test('lowering the recents cap trims existing history', () => {

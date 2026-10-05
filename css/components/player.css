@@ -1119,14 +1119,16 @@
 
 .tv-controls__cast-wrap,
 .tv-controls__mute-wrap,
-.tv-controls__play-wrap {
+.tv-controls__play-wrap,
+.tv-controls__stop-wrap {
     position: relative;
     display: inline-flex;
 }
 
 .tv-controls__cast-wrap::after,
 .tv-controls__mute-wrap::after,
-.tv-controls__play-wrap::after {
+.tv-controls__play-wrap::after,
+.tv-controls__stop-wrap::after {
     content: '';
     position: absolute;
     left: -10px;
@@ -1143,7 +1145,8 @@
 
 .tv-controls__cast-popout,
 .tv-controls__mute-popout,
-.tv-controls__play-popout {
+.tv-controls__play-popout,
+.tv-controls__stop-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
     bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
@@ -1172,7 +1175,9 @@
 .tv-controls__mute-wrap:hover .tv-controls__mute-popout,
 .tv-controls__mute-wrap:focus-within .tv-controls__mute-popout,
 .tv-controls__play-wrap:hover .tv-controls__play-popout,
-.tv-controls__play-wrap:focus-within .tv-controls__play-popout {
+.tv-controls__play-wrap:focus-within .tv-controls__play-popout,
+.tv-controls__stop-wrap:hover .tv-controls__stop-popout,
+.tv-controls__stop-wrap:focus-within .tv-controls__stop-popout {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
     visibility: visible;
@@ -1182,7 +1187,8 @@
 
 .tv-controls__cast-popout .tv-controls__btn,
 .tv-controls__mute-popout .tv-controls__btn,
-.tv-controls__play-popout .tv-controls__btn {
+.tv-controls__play-popout .tv-controls__btn,
+.tv-controls__stop-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;
@@ -1193,6 +1199,68 @@
 .tv-controls__play-popout .tv-controls__btn.is-active {
     color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
     border-color: color-mix(in srgb, var(--tv-accent, #7ecbff) 55%, transparent);
+}
+
+/* Chan-down → previous: slide inward (left of rocker). */
+.tv-controls__chan-prev-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.tv-controls__chan-prev-wrap::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    bottom: -10px;
+    right: 100%;
+    width: 16px;
+}
+
+.tv-controls__chan-prev-popout {
+    position: absolute;
+    right: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%) translateX(calc(100% + 6px));
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.25rem 0.35rem;
+    border-radius: 8px 0 0 8px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
+    border-right: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        transform 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.14s,
+        opacity 0.18s ease 0.14s,
+        visibility 0.22s ease 0.14s;
+    white-space: nowrap;
+    z-index: 40;
+}
+
+.tv-controls__chan-prev-wrap:hover .tv-controls__chan-prev-popout,
+.tv-controls__chan-prev-wrap:focus-within .tv-controls__chan-prev-popout {
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+.tv-controls__chan-prev-popout .tv-controls__btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+}
+
+.tv-controls__chan-prev-popout .tv-controls__btn[hidden],
+.tv-controls__play-popout .tv-controls__btn[hidden],
+.tv-controls__stop-popout .tv-controls__btn[hidden],
+.tv-controls__play-popout .tv-controls__btn.is-hidden,
+.tv-controls__stop-popout .tv-controls__btn.is-hidden {
+    display: none;
 }
 
 .tv-player-tile__hover.has-dual-rows {

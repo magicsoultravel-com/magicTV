@@ -74,6 +74,20 @@ details.settings-section > summary::-webkit-details-marker {
     gap: var(--tv-spacing-sm);
 }
 
+.settings-section__control--stack {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.settings-section__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85em;
+    cursor: pointer;
+    user-select: none;
+}
+
 .settings-section__header {
     display: flex;
     align-items: center;

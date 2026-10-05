@@ -12,6 +12,7 @@ import { computeMosaicLaunchDelay } from '../player/loadBudget.js';
 import { tvDebug } from '../player/tvDebug.js';
 import { ChromecastManager } from '../cast/chromecastManager.js';
 import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from '../ui/tileHoverControls.js';
+import { pushSlotChannelHistory, hasSlotChannelHistory } from './channelHistory.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -94,10 +95,17 @@ async function warmAndCommitOrPlay(mv, id, player, normalized, switchGen, {
  * @param {string} id
  * @param {object} channel
  * @param {object} player
- * @param {{ syncStatus?: boolean }} [opts]
+ * @param {{ syncStatus?: boolean, previousKey?: string|null, skipHistory?: boolean }} [opts]
  */
-async function finishSlotChannelSwitch(mv, id, channel, player, { syncStatus = true } = {}) {
+async function finishSlotChannelSwitch(mv, id, channel, player, {
+    syncStatus = true,
+    previousKey = null,
+    skipHistory = false
+} = {}) {
     player._suppressErrorToast = false;
+    if (!skipHistory) {
+        pushSlotChannelHistory(id, previousKey, channelKey(channel || player?.channel));
+    }
     mv.persistSlots();
     mv.scheduleRefreshTiles();
     if (syncStatus) mv.syncStatusChrome();
@@ -327,7 +335,7 @@ export const playbackMethods = {
         const muteAllActive = this.isMuteAllActive();
         app.classList.toggle('is-mute-all-active', muteAllActive);
 
-        const muteAllBtns = [el('mosaic-mute-all-btn'), el('remote-mute-all-btn')].filter(Boolean);
+        const muteAllBtns = [el('remote-mute-all-btn')].filter(Boolean);
         muteAllBtns.forEach((btn) => {
             const label = muteAllActive ? 'Unmute all' : 'Mute all';
             btn.title = label;
@@ -342,24 +350,46 @@ export const playbackMethods = {
         const anyPlaying = this.isAnyPlaying();
         const allPlaying = this.isAllPlaying();
 
-        const playAllBtns = [el('mosaic-play-all-btn'), el('remote-play-all-btn')].filter(Boolean);
-        playAllBtns.forEach((btn) => {
+        // Remote play-all morphs to pause-all; tile chrome play-all only shows when needed.
+        const remotePlayAll = el('remote-play-all-btn');
+        if (remotePlayAll) {
             const isPause = allPlaying;
             const label = isPause ? 'Pause all' : 'Play all';
-            btn.title = label;
-            btn.setAttribute('aria-label', label);
-            btn.setAttribute('aria-pressed', String(isPause));
-            btn.innerHTML = isPause ? PAUSE_ALL_SVG : PLAY_ALL_SVG;
+            remotePlayAll.title = label;
+            remotePlayAll.setAttribute('aria-label', label);
+            remotePlayAll.setAttribute('aria-pressed', String(isPause));
+            remotePlayAll.innerHTML = isPause ? PAUSE_ALL_SVG : PLAY_ALL_SVG;
+        }
+
+        const mosaic = el('player-mosaic');
+        mosaic?.querySelectorAll('.tv-controls__play-popout [data-tile-action="play-all"]').forEach((btn) => {
+            const hide = allPlaying;
+            btn.classList.toggle('is-hidden', hide);
+            btn.hidden = hide;
         });
 
-        const stopAllBtns = [el('mosaic-stop-all-btn'), el('remote-stop-all-btn')].filter(Boolean);
-        stopAllBtns.forEach((btn) => {
-            const label = 'Stop all';
-            btn.title = label;
-            btn.setAttribute('aria-label', label);
-            btn.classList.toggle('is-hidden', !anyPlaying);
-            btn.setAttribute('aria-disabled', String(!anyPlaying));
-            btn.setAttribute('aria-pressed', String(anyPlaying));
+        const remoteStopAll = el('remote-stop-all-btn');
+        if (remoteStopAll) {
+            remoteStopAll.title = 'Stop all';
+            remoteStopAll.setAttribute('aria-label', 'Stop all');
+            remoteStopAll.classList.toggle('is-hidden', !anyPlaying);
+            remoteStopAll.setAttribute('aria-disabled', String(!anyPlaying));
+            remoteStopAll.setAttribute('aria-pressed', String(anyPlaying));
+        }
+
+        mosaic?.querySelectorAll('.tv-controls__stop-popout [data-tile-action="stop-all"]').forEach((btn) => {
+            const hide = !anyPlaying;
+            btn.classList.toggle('is-hidden', hide);
+            btn.hidden = hide;
+        });
+
+        mosaic?.querySelectorAll('.tv-player-tile').forEach((tile) => {
+            const slotId = tile.getAttribute('data-slot');
+            const prevBtn = tile.querySelector('[data-tile-action="chan-prev"]');
+            if (!prevBtn || !slotId) return;
+            const hasPrev = hasSlotChannelHistory(slotId);
+            prevBtn.hidden = !hasPrev;
+            prevBtn.classList.toggle('is-hidden', !hasPrev);
         });
 
         if (typeof document !== 'undefined') {
@@ -381,11 +411,12 @@ export const playbackMethods = {
      * @param {object} channel
      * @returns {Promise<boolean>}
      */
-    async playChannelSafe(slotId, channel) {
+    async playChannelSafe(slotId, channel, { skipHistory = false } = {}) {
         const id = slotId || 'center';
         const player = prepareSlotForPlay(this, id);
         if (!player) return false;
 
+        const previousKey = channelKey(player.channel);
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
         const key = channelKey(normalized);
 
@@ -403,7 +434,11 @@ export const playbackMethods = {
             if (result === 'committed') return player.playing === true;
             return false;
         } finally {
-            await finishSlotChannelSwitch(this, id, channel, player, { syncStatus: true });
+            await finishSlotChannelSwitch(this, id, channel, player, {
+                syncStatus: true,
+                previousKey,
+                skipHistory
+            });
         }
     },
 
@@ -414,8 +449,12 @@ export const playbackMethods = {
      * @param {object} player
      * @param {object} normalized
      * @param {string} key
+     * @param {{ skipHistory?: boolean, previousKey?: string|null }} [opts]
      */
-    async playOnSlotSafeLoading(id, channel, player, normalized, key) {
+    async playOnSlotSafeLoading(id, channel, player, normalized, key, {
+        skipHistory = false,
+        previousKey = null
+    } = {}) {
         cancelSlotPrefetch(id);
         showAppToast('Fetching next channel…');
         this.syncStatusChrome();
@@ -438,7 +477,11 @@ export const playbackMethods = {
 
             this.syncStatusChrome();
         } finally {
-            await finishSlotChannelSwitch(this, id, channel, player, { syncStatus: true });
+            await finishSlotChannelSwitch(this, id, channel, player, {
+                syncStatus: true,
+                previousKey,
+                skipHistory
+            });
         }
     },
 
@@ -446,17 +489,22 @@ export const playbackMethods = {
      * Play a channel on a specific mosaic slot (enables the side if needed).
      * @param {string} slotId
      * @param {object} channel
+     * @param {{ skipHistory?: boolean }} [opts]
      */
-    playOnSlot(slotId, channel) {
+    playOnSlot(slotId, channel, { skipHistory = false } = {}) {
         const id = slotId || 'center';
         const player = prepareSlotForPlay(this, id);
         if (!player) return Promise.reject(new Error(`No player for slot ${id}`));
 
+        const previousKey = channelKey(player.channel);
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
         const key = channelKey(normalized);
 
         if (SettingsStore.getChanSwitchMode() === 'safeLoading') {
-            return this.playOnSlotSafeLoading(id, channel, player, normalized, key);
+            return this.playOnSlotSafeLoading(id, channel, player, normalized, key, {
+                skipHistory,
+                previousKey
+            });
         }
 
         const hasVisibleContent = Boolean(
@@ -495,7 +543,11 @@ export const playbackMethods = {
             },
             { skipOut: !hasVisibleContent }
         ).finally(async () => {
-            await finishSlotChannelSwitch(this, id, channel, player, { syncStatus: false });
+            await finishSlotChannelSwitch(this, id, channel, player, {
+                syncStatus: false,
+                previousKey,
+                skipHistory
+            });
         });
     },
 
