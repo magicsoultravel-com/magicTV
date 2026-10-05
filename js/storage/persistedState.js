@@ -85,8 +85,9 @@ export function compactNonEssentialPersistedState(state) {
         next.remoteModule = {
             left: 24,
             top: 48,
-            width: 320,
+            width: 260,
             height: 560,
+            scale: 1,
             mode: 'hidden',
             pinned: false,
             open: false,

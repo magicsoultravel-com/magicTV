@@ -35,9 +35,19 @@ import {
     bringModuleToFront,
     SHELL_REMOTE
 } from './moduleLayout.js';
+import {
+    REMOTE_BASE_W,
+    REMOTE_BASE_H,
+    SCALE_MIN,
+    SCALE_MAX,
+    clampModuleScale,
+    clampFloatGeometry,
+    uniformScaleFromCorner,
+    scaleFromWidth
+} from './moduleScaleResize.js';
 
-const MIN_W = 260;
-const MIN_H = 560;
+const MIN_W = REMOTE_BASE_W;
+const MIN_H = REMOTE_BASE_H;
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
@@ -45,8 +55,20 @@ const DEFAULT_SHEET_HEIGHT = 0.62;
 const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * (3 / 8);
 const SHEET_TRANSITION_MS = 280;
 
+function wingMultiplier() {
+    return WingPanel.isOpen?.() ? 2 : 1;
+}
+
 function minDialogWidth() {
-    return WingPanel.isOpen?.() ? MIN_W * 2 : MIN_W;
+    return Math.round(MIN_W * scale * wingMultiplier());
+}
+
+function baseWidthForScale(s = scale) {
+    return Math.round(MIN_W * clampModuleScale(s) * wingMultiplier());
+}
+
+function baseHeightForScale(s = scale) {
+    return Math.round(MIN_H * clampModuleScale(s));
 }
 
 let deps = {
@@ -75,8 +97,10 @@ let dockSide = 'left';
 let externalHost = null;
 
 let idleActivityBound = false;
+/** Uniform content/window scale (0.5–1.5). */
+let scale = 1;
 
-/** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetH?: number } | null} */
+/** @type {{ mode: 'drag'|'resize'|'dock-resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originScale?: number } | null} */
 let gesture = null;
 
 function moduleEl() {
@@ -127,8 +151,8 @@ function viewportSize() {
 
 function defaultGeometry() {
     const { h: vh } = viewportSize();
-    const width = MIN_W;
-    const height = MIN_H;
+    const width = baseWidthForScale(1);
+    const height = baseHeightForScale(1);
     const tabClearance = 44;
     return {
         left: edgeInsetLeft(dockSide, width),
@@ -136,6 +160,17 @@ function defaultGeometry() {
         width,
         height
     };
+}
+
+function applyRemoteScaleCss() {
+    const s = String(clampModuleScale(scale));
+    const dialog = dialogEl();
+    const sheet = dockSheetEl();
+    const tab = dockTabEl();
+    dialog?.style.setProperty('--remote-scale', s);
+    sheet?.style.setProperty('--remote-scale', s);
+    tab?.style.setProperty('--remote-scale', s);
+    document.documentElement.style.setProperty('--remote-scale', s);
 }
 
 function normalizeDockSide(value) {
@@ -269,34 +304,44 @@ function toggleDockSide() {
 
 function clampGeometry({ left, top, width, height }) {
     const minW = minDialogWidth();
+    const minH = baseHeightForScale();
     const { w: vw, h: vh } = viewportSize();
-    let w = Math.max(minW, Math.min(width, vw - VIEW_PAD * 2));
-    let h = Math.max(MIN_H, Math.min(height, vh - VIEW_PAD * 2));
-    let x = left;
-    let y = top;
-    x = Math.min(Math.max(VIEW_PAD, x), vw - VIEW_PAD - Math.min(w, 80));
-    y = Math.min(Math.max(VIEW_PAD, y), vh - VIEW_PAD - 40);
-    if (x + w > vw - VIEW_PAD) w = Math.max(minW, vw - VIEW_PAD - x);
-    if (y + h > vh - VIEW_PAD) h = Math.max(MIN_H, vh - VIEW_PAD - y);
-    return { left: Math.round(x), top: Math.round(y), width: Math.round(w), height: Math.round(h) };
+    return clampFloatGeometry(
+        { left, top, width: width ?? minW, height: height ?? minH },
+        { minW, minH, viewPad: VIEW_PAD, vw, vh }
+    );
 }
 
 function readDialogGeometry() {
     const dialog = dialogEl();
-    if (!dialog) return defaultGeometry();
-    const rect = dialog.getBoundingClientRect();
+    if (!dialog) {
+        return {
+            ...defaultGeometry(),
+            width: baseWidthForScale(),
+            height: baseHeightForScale()
+        };
+    }
+    // Prefer persisted scale box over live rect (avoids CSS inflation).
+    const left = parseFloat(dialog.style.left);
+    const top = parseFloat(dialog.style.top);
     return clampGeometry({
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
+        left: Number.isFinite(left) ? left : dialog.getBoundingClientRect().left,
+        top: Number.isFinite(top) ? top : dialog.getBoundingClientRect().top,
+        width: baseWidthForScale(),
+        height: baseHeightForScale()
     });
 }
 
 function applyGeometry(geom, { pinned: pinFlag } = {}) {
     const dialog = dialogEl();
     if (!dialog || !geom) return;
-    const next = clampGeometry(geom);
+    applyRemoteScaleCss();
+    const next = clampGeometry({
+        left: geom.left,
+        top: geom.top,
+        width: baseWidthForScale(),
+        height: baseHeightForScale()
+    });
     dialog.style.left = `${next.left}px`;
     dialog.style.top = `${next.top}px`;
     dialog.style.width = `${next.width}px`;
@@ -342,6 +387,7 @@ function persistState(overrides = {}) {
     savePlayerState({
         remoteModule: {
             ...geom,
+            scale: clampModuleScale(overrides.scale != null ? overrides.scale : scale),
             mode: nextMode,
             open: nextOpen,
             pinned: nextPinned,
@@ -715,14 +761,22 @@ function mountToActiveHost() {
     updateBodyClasses();
 }
 
-function applySheetHeight(ratio) {
+function applyDockScaleGeometry() {
     const sheet = dockSheetEl();
+    const tab = dockTabEl();
     if (!sheet) return;
+    applyRemoteScaleCss();
     const { h: vh } = viewportSize();
-    const clamped = Math.min(0.85, Math.max(DEFAULT_SHEET_HEIGHT, ratio));
-    const px = Math.round(vh * clamped);
-    sheet.style.setProperty('--remote-sheet-height', String(clamped));
-    sheet.style.height = `${px}px`;
+    const width = baseWidthForScale();
+    const height = Math.min(Math.round(vh * 0.85), baseHeightForScale());
+    const ratio = height / Math.max(1, vh);
+    sheet.style.setProperty('--remote-sheet-height', String(ratio));
+    sheet.style.width = `${width}px`;
+    sheet.style.height = `${height}px`;
+    if (tab) {
+        tab.style.width = `${width}px`;
+    }
+    BrowserModule.syncCatalogChrome?.();
 }
 
 function clearBarSheetInline() {
@@ -807,7 +861,8 @@ function syncCatalogChromeGeometry(tab = resolveActiveCatalogTab()) {
         } else {
             clearBarSheetInline();
             const saved = getSavedState();
-            applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+            if (saved?.scale != null) scale = clampModuleScale(saved.scale);
+            applyDockScaleGeometry();
         }
     } else if (mode === 'undocked') {
         if (bar) {
@@ -815,7 +870,10 @@ function syncCatalogChromeGeometry(tab = resolveActiveCatalogTab()) {
         } else {
             clearBarSheetInline();
             const saved = getSavedState();
-            if (saved) applyGeometry(saved, { pinned });
+            if (saved) {
+                if (saved.scale != null) scale = clampModuleScale(saved.scale);
+                applyGeometry(saved, { pinned });
+            }
         }
     } else {
         clearBarSheetInline();
@@ -879,23 +937,14 @@ function endGesture() {
     if (!gesture) return;
     moduleEl()?.querySelector('[data-remote-module-drag]')?.classList.remove('is-dragging');
     dialogEl()?.classList.remove('is-dragging');
-    dockSheetEl()?.querySelector('[data-dock-resize]')?.classList.remove('is-dragging');
     gesture = null;
-    persistState();
+    persistState({ scale });
 }
 
 function onPointerMove(e) {
     if (!gesture || e.pointerId !== gesture.pointerId) return;
     const dx = e.clientX - gesture.startX;
     const dy = e.clientY - gesture.startY;
-
-    if (gesture.mode === 'sheet') {
-        const { h: vh } = viewportSize();
-        const originPx = gesture.originSheetH ?? vh * DEFAULT_SHEET_HEIGHT;
-        const nextPx = Math.max(vh * 0.25, Math.min(vh * 0.85, originPx - dy));
-        applySheetHeight(nextPx / vh);
-        return;
-    }
 
     if (gesture.mode === 'drag') {
         applyGeometry({
@@ -907,34 +956,32 @@ function onPointerMove(e) {
         return;
     }
 
-    const edge = gesture.edge || '';
-    let left = gesture.originLeft;
-    let top = gesture.originTop;
-    let width = gesture.originW;
-    let height = gesture.originH;
-
-    if (edge.includes('e')) width = gesture.originW + dx;
-    if (edge.includes('s')) height = gesture.originH + dy;
-    if (edge.includes('w')) {
-        width = gesture.originW - dx;
-        left = gesture.originLeft + dx;
+    const edge = gesture.edge || 'se';
+    const next = uniformScaleFromCorner({
+        originLeft: gesture.originLeft,
+        originTop: gesture.originTop,
+        originW: gesture.originW,
+        originH: gesture.originH,
+        originScale: gesture.originScale ?? scale,
+        baseW: MIN_W * wingMultiplier(),
+        baseH: MIN_H,
+        dx,
+        dy,
+        edge,
+        minScale: SCALE_MIN,
+        maxScale: SCALE_MAX
+    });
+    scale = next.scale;
+    if (gesture.mode === 'dock-resize') {
+        applyDockScaleGeometry();
+        return;
     }
-    if (edge.includes('n')) {
-        height = gesture.originH - dy;
-        top = gesture.originTop + dy;
-    }
-
-    if (width < minDialogWidth()) {
-        const minW = minDialogWidth();
-        if (edge.includes('w')) left = gesture.originLeft + gesture.originW - minW;
-        width = minW;
-    }
-    if (height < MIN_H) {
-        if (edge.includes('n')) top = gesture.originTop + gesture.originH - MIN_H;
-        height = MIN_H;
-    }
-
-    applyGeometry({ left, top, width, height });
+    applyGeometry({
+        left: next.left,
+        top: next.top,
+        width: next.width,
+        height: next.height
+    });
 }
 
 function onPointerUp(e) {
@@ -949,21 +996,21 @@ function onPointerUp(e) {
 function beginGesture(e, modeName, edge = '') {
     if (e.button != null && e.button !== 0) return;
 
-    if (modeName === 'sheet') {
+    if (modeName === 'dock-resize') {
         const sheet = dockSheetEl();
-        const { h: vh } = viewportSize();
+        const rect = sheet?.getBoundingClientRect();
         gesture = {
-            mode: 'sheet',
+            mode: 'dock-resize',
+            edge,
             pointerId: e.pointerId,
             startX: e.clientX,
             startY: e.clientY,
-            originLeft: 0,
-            originTop: 0,
-            originW: 0,
-            originH: 0,
-            originSheetH: sheet?.getBoundingClientRect().height ?? vh * DEFAULT_SHEET_HEIGHT
+            originLeft: rect?.left ?? 0,
+            originTop: rect?.top ?? 0,
+            originW: rect?.width ?? baseWidthForScale(),
+            originH: rect?.height ?? baseHeightForScale(),
+            originScale: scale
         };
-        sheet?.querySelector('[data-dock-resize]')?.classList.add('is-dragging');
     } else {
         const dialog = dialogEl();
         if (!dialog) return;
@@ -977,7 +1024,8 @@ function beginGesture(e, modeName, edge = '') {
             originLeft: geom.left,
             originTop: geom.top,
             originW: geom.width,
-            originH: geom.height
+            originH: geom.height,
+            originScale: scale
         };
         if (modeName === 'drag') {
             e.currentTarget?.classList?.add('is-dragging');
@@ -1022,6 +1070,12 @@ function bindOnce() {
     modal?.querySelectorAll('[data-remote-resize]').forEach((handle) => {
         handle.addEventListener('pointerdown', (e) => {
             beginGesture(e, 'resize', handle.getAttribute('data-remote-resize') || '');
+        });
+    });
+
+    dockSheetEl()?.querySelectorAll('[data-remote-dock-resize]').forEach((handle) => {
+        handle.addEventListener('pointerdown', (e) => {
+            beginGesture(e, 'dock-resize', handle.getAttribute('data-remote-dock-resize') || 'se');
         });
     });
 
@@ -1071,10 +1125,6 @@ function bindOnce() {
         RemoteModule.hide();
     });
 
-    dockSheetEl()?.querySelector('[data-dock-resize]')?.addEventListener('pointerdown', (e) => {
-        beginGesture(e, 'sheet');
-    });
-
     document.addEventListener('keydown', onKeydown);
     window.addEventListener('resize', () => {
         if (mode === 'undocked' || (mode === 'docked' && sheetExpanded)) {
@@ -1085,19 +1135,13 @@ function bindOnce() {
         if (mode !== 'hidden') persistState();
     });
 
-    window.addEventListener('wing:mode_changed', (e) => {
-        const open = e.detail?.open === true;
+    window.addEventListener('wing:mode_changed', () => {
         if (mode === 'undocked') {
-            const geom = readDialogGeometry();
-            if (open && geom.width < MIN_W * 2) {
-                applyGeometry({ ...geom, width: MIN_W * 2 });
-            } else if (!open && geom.width >= MIN_W * 2) {
-                applyGeometry({ ...geom, width: MIN_W });
-            } else {
-                applyGeometry(geom);
-            }
+            applyGeometry(readDialogGeometry());
+        } else if (mode === 'docked' && sheetExpanded) {
+            applyDockScaleGeometry();
         }
-        persistState({ guideOpen: WingPanel.isGuidePreferred?.() });
+        persistState({ guideOpen: WingPanel.isGuidePreferred?.(), scale });
     });
 
     window.addEventListener('guide:visibility_changed', (e) => {
@@ -1111,21 +1155,27 @@ function bindOnce() {
 function restoreFromState() {
     const saved = getSavedState();
     const geom = defaultGeometry();
-    const guideOpen = saved?.guideOpen === true;
-    const minW = guideOpen ? MIN_W * 2 : MIN_W;
     applyDockSide(saved?.dockSide, { persist: false, moveGeometry: false });
     if (saved) {
+        if (Number.isFinite(saved.scale)) {
+            scale = clampModuleScale(saved.scale);
+        } else if (Number.isFinite(saved.width)) {
+            scale = scaleFromWidth(saved.width / wingMultiplier(), MIN_W);
+        } else {
+            scale = 1;
+        }
         applyGeometry({
             left: Number.isFinite(saved.left) ? saved.left : geom.left,
             top: Number.isFinite(saved.top) ? saved.top : geom.top,
-            width: Math.max(minW, Number.isFinite(saved.width) ? saved.width : minW),
-            height: MIN_H
+            width: baseWidthForScale(),
+            height: baseHeightForScale()
         }, { pinned: saved.pinned === true });
-        applySheetHeight(saved.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+        applyDockScaleGeometry();
         return;
     }
-    applyGeometry({ ...defaultGeometry(), width: minW }, { pinned: false });
-    applySheetHeight(DEFAULT_SHEET_HEIGHT);
+    scale = 1;
+    applyGeometry(defaultGeometry(), { pinned: false });
+    applyDockScaleGeometry();
 }
 
 function finishClose() {
@@ -1291,8 +1341,9 @@ export const RemoteModule = {
                 showUndockedUI(false);
                 mountToActiveHost();
                 const saved = getSavedState();
+                if (saved?.scale != null) scale = clampModuleScale(saved.scale);
                 setSheetExpanded(true, { persist: false, animateOpen: true });
-                applySheetHeight(saved?.sheetHeight ?? DEFAULT_SHEET_HEIGHT);
+                applyDockScaleGeometry();
             }
         } else if (mode === 'docked' && openMode === 'undocked') {
             this.undock();

@@ -1,21 +1,50 @@
 /** Magic Radio — theme-matched float shell; browse reuses TV tile grids */
 .radio-module {
+    --radio-scale: 1;
     opacity: calc(var(--remote-module-opacity, 1) * var(--ui-idle-opacity-mult, 1));
     transition: opacity 0.15s ease;
 }
 
-/* Inherit remote dialog chrome; only tighten min size for the compact player */
+/* Fully independent float — never inherit remote dock/wing geometry */
 .radio-module .radio-module__dialog {
-    min-width: 280px;
-    min-height: 200px;
+    position: fixed;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: calc(340px * var(--radio-scale, 1));
+    height: calc(260px * var(--radio-scale, 1));
+    min-width: calc(280px * var(--radio-scale, 1));
+    min-height: calc(200px * var(--radio-scale, 1));
+    max-width: calc(100vw - 0.5rem);
+    max-height: calc(100vh - 0.5rem);
+    background: var(--tv-bg-secondary, #141829);
+    border: 1px solid var(--tv-border, #2A2E3A);
+    border-radius: calc(18px * var(--radio-scale, 1));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    pointer-events: auto;
     color: var(--tv-text-primary);
+    cursor: grab;
+    transition: opacity 0.15s ease;
+}
+
+body.remote-dock-expanded .radio-module .radio-module__dialog,
+body.remote-dock-side-right .radio-module .radio-module__dialog {
+    min-width: calc(280px * var(--radio-scale, 1));
+    width: calc(340px * var(--radio-scale, 1));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
 }
 
 .radio-module__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: calc(8px * var(--radio-scale, 1));
+    padding: calc(6px * var(--radio-scale, 1)) calc(8px * var(--radio-scale, 1)) 0;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
 }
 
 .radio-module__brand {
@@ -23,7 +52,7 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    font-size: 12px;
+    font-size: calc(12px * var(--radio-scale, 1));
     letter-spacing: 0.05em;
     line-height: 1.2;
     text-transform: lowercase;
@@ -34,9 +63,9 @@
 .radio-module__body {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px 12px 12px;
-    height: calc(100% - 36px);
+    gap: calc(10px * var(--radio-scale, 1));
+    padding: calc(10px * var(--radio-scale, 1)) calc(12px * var(--radio-scale, 1)) calc(12px * var(--radio-scale, 1));
+    height: calc(100% - 36px * var(--radio-scale, 1));
     box-sizing: border-box;
     background: var(--tv-bg-secondary, #141829);
 }
@@ -45,8 +74,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 52px;
-    border-radius: 8px;
+    height: calc(52px * var(--radio-scale, 1));
+    border-radius: calc(8px * var(--radio-scale, 1));
     border: 1px solid var(--tv-border, #2A2E3A);
     background:
         linear-gradient(
@@ -58,8 +87,8 @@
 }
 
 .radio-module__cassette svg {
-    width: 120px;
-    height: 44px;
+    width: calc(120px * var(--radio-scale, 1));
+    height: calc(44px * var(--radio-scale, 1));
     display: block;
 }
 
@@ -98,15 +127,15 @@
 .radio-module__now {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: 44px;
+    gap: calc(10px * var(--radio-scale, 1));
+    min-height: calc(44px * var(--radio-scale, 1));
 }
 
 .radio-module__art {
     position: relative;
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
+    width: calc(44px * var(--radio-scale, 1));
+    height: calc(44px * var(--radio-scale, 1));
+    border-radius: calc(8px * var(--radio-scale, 1));
     border: 1px solid var(--tv-border, #2A2E3A);
     background: color-mix(in srgb, var(--tv-bg-primary, #0b0e18) 80%, transparent);
     overflow: hidden;
@@ -123,8 +152,8 @@
 }
 
 .radio-module__art-cassette svg {
-    width: 34px;
-    height: 34px;
+    width: calc(34px * var(--radio-scale, 1));
+    height: calc(34px * var(--radio-scale, 1));
 }
 
 .radio-module__art img {
@@ -144,12 +173,12 @@
     flex: 1;
     min-width: 0;
     color: var(--tv-text-primary);
-    font-size: 0.95rem;
+    font-size: calc(0.95rem * var(--radio-scale, 1));
 }
 
 .radio-module__error {
     margin: 0;
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--radio-scale, 1));
     color: var(--tv-danger, #ff6b6b);
 }
 
@@ -157,24 +186,31 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--radio-scale, 1));
+}
+
+.radio-module__transport .tv-controls__btn {
+    width: calc(36px * var(--radio-scale, 1));
+    height: calc(36px * var(--radio-scale, 1));
+    min-width: calc(36px * var(--radio-scale, 1));
+    min-height: calc(36px * var(--radio-scale, 1));
 }
 
 .radio-module__vol {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    min-width: 90px;
+    gap: calc(4px * var(--radio-scale, 1));
+    min-width: calc(90px * var(--radio-scale, 1));
     color: var(--tv-text-secondary, #9aa3b5);
 }
 
 .radio-module__vol input[type="range"] {
-    width: 72px;
+    width: calc(72px * var(--radio-scale, 1));
     accent-color: var(--tv-primary);
 }
 
 .radio-module__vol span {
-    font-size: 0.7rem;
+    font-size: calc(0.7rem * var(--radio-scale, 1));
     opacity: 0.8;
     min-width: 1.6em;
 }
@@ -182,15 +218,15 @@
 .radio-module__cast-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--radio-scale, 1));
     flex-wrap: wrap;
 }
 
 .radio-module__cast-menu {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding-top: 4px;
+    gap: calc(8px * var(--radio-scale, 1));
+    padding-top: calc(4px * var(--radio-scale, 1));
     border-top: 1px solid var(--tv-border, #2A2E3A);
 }
 
@@ -201,7 +237,7 @@
 }
 
 .radio-module__cast-label {
-    font-size: 0.7rem;
+    font-size: calc(0.7rem * var(--radio-scale, 1));
     text-transform: uppercase;
     letter-spacing: 0.06em;
     opacity: 0.75;

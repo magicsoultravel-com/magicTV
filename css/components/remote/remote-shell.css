@@ -3,9 +3,12 @@
 /* ===== Remote module overhaul ===== */
 :root {
     --remote-grid-cols: 5;
-    --remote-btn-size: 40px;
+    --remote-scale: 1;
+    --remote-btn-size: calc(40px * var(--remote-scale, 1));
     --remote-grid-gap: 0.4rem;
     --remote-edge-inset: 1.5rem;
+    --browser-tile-scale: 1;
+    --radio-scale: 1;
     --remote-min-width: calc(
         var(--remote-grid-cols) * var(--remote-btn-size)
         + (var(--remote-grid-cols) - 1) * var(--remote-grid-gap)
@@ -144,7 +147,8 @@ body.dock-ui-opening .remote-module__host > #tv-catalog-body,
 body.dock-ui-opening .remote-dock-sheet__inner > #tv-catalog-body,
 body.dock-ui-opening.remote-wing-mode-browser .remote-module__host > #tv-catalog-body,
 body.dock-ui-opening.remote-wing-mode-browser .remote-dock-sheet__inner > #tv-catalog-body,
-body.dock-ui-opening .remote-module__dialog {
+body.dock-ui-opening #remote-module .remote-module__dialog,
+body.dock-ui-opening .browser-module .remote-module__dialog {
     transition: none !important;
 }
 
@@ -160,21 +164,6 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
 
 .remote-dock-sheet.is-collapsed:not(.is-expanded):not(.is-collapsing) {
     height: 0 !important;
-}
-
-.remote-dock-sheet__resize {
-    flex: 0 0 6px;
-    cursor: row-resize;
-    touch-action: none;
-    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tv-border) 60%, transparent));
-}
-
-.remote-dock-sheet__resize {
-    display: none;
-}
-
-.remote-dock-sheet__resize.is-dragging {
-    background: var(--tv-main-2, #00FF88);
 }
 
 .remote-dock-sheet__inner {
@@ -218,7 +207,9 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
     pointer-events: none;
 }
 
-.remote-module__dialog {
+/* Scope geometry chrome to remote + browser only — never radio */
+#remote-module .remote-module__dialog,
+.browser-module .remote-module__dialog {
     position: fixed;
     z-index: 1;
     display: flex;
@@ -249,7 +240,8 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
 }
 
 /* Dock / remote on the right — extrude bottom-left instead */
-body.remote-dock-side-right .remote-module__dialog {
+body.remote-dock-side-right #remote-module .remote-module__dialog,
+body.remote-dock-side-right .browser-module .remote-module__dialog {
     box-shadow:
         0 6px 20px rgba(0, 0, 0, 0.28),
         calc(var(--remote-extrude) * -1) var(--remote-extrude) 0 0 var(--remote-extrude-face),
@@ -274,7 +266,8 @@ body.remote-dock-side-right .remote-module__dialog {
     cursor: grabbing;
 }
 
-.remote-module__dialog.is-dragging {
+#remote-module .remote-module__dialog.is-dragging,
+.browser-module .remote-module__dialog.is-dragging {
     cursor: grabbing;
 }
 
@@ -432,8 +425,24 @@ body.remote-dock-expanded .remote-dock-tab {
     width: calc(var(--remote-min-width) * 2);
 }
 
-body.remote-dock-expanded .remote-module__dialog {
+body.remote-dock-expanded #remote-module .remote-module__dialog {
     min-width: calc(var(--remote-min-width) * 2);
+}
+
+/* Dock corner scale handles (replace sheet-height strip) */
+.remote-dock-sheet .remote-module__resize,
+.browser-dock-sheet .remote-module__resize {
+    position: absolute;
+    z-index: 6;
+    width: 18px;
+    height: 18px;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.remote-dock-sheet__resize,
+.browser-dock-sheet__resize {
+    display: none !important;
 }
 
 /* Split: each shell fills its own host window */
@@ -725,7 +734,8 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__inne
     border-radius: 12px 12px 0 0;
 }
 
-html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-module__dialog.is-catalog-bar {
+html[data-catalog-chrome="bar"] body.catalog-bar-active #remote-module .remote-module__dialog.is-catalog-bar,
+html[data-catalog-chrome="bar"] body.catalog-bar-active .browser-module .remote-module__dialog.is-catalog-bar {
     border-radius: 12px 12px 0 0;
     cursor: default;
 }

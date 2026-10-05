@@ -307,20 +307,29 @@
     opacity: 0.85;
 }
 
-.remote-module__resize[data-remote-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
-.remote-module__resize[data-remote-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
-.remote-module__resize[data-remote-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
-.remote-module__resize[data-remote-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+.remote-module__resize[data-remote-resize="nw"],
+.remote-module__resize[data-browser-resize="nw"],
+.remote-module__resize[data-radio-resize="nw"],
+.remote-module__resize[data-remote-dock-resize="nw"],
+.remote-module__resize[data-browser-dock-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
 
-.remote-module__resize[data-browser-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
-.remote-module__resize[data-browser-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
-.remote-module__resize[data-browser-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
-.remote-module__resize[data-browser-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+.remote-module__resize[data-remote-resize="ne"],
+.remote-module__resize[data-browser-resize="ne"],
+.remote-module__resize[data-radio-resize="ne"],
+.remote-module__resize[data-remote-dock-resize="ne"],
+.remote-module__resize[data-browser-dock-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
 
-.remote-module__resize[data-radio-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
-.remote-module__resize[data-radio-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
-.remote-module__resize[data-radio-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
-.remote-module__resize[data-radio-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+.remote-module__resize[data-remote-resize="sw"],
+.remote-module__resize[data-browser-resize="sw"],
+.remote-module__resize[data-radio-resize="sw"],
+.remote-module__resize[data-remote-dock-resize="sw"],
+.remote-module__resize[data-browser-dock-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+
+.remote-module__resize[data-remote-resize="se"],
+.remote-module__resize[data-browser-resize="se"],
+.remote-module__resize[data-radio-resize="se"],
+.remote-module__resize[data-remote-dock-resize="se"],
+.remote-module__resize[data-browser-dock-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
 
 /* Browser window + layout controls — same circular row as nav/tools when split */
 .browser-window-controls,
@@ -947,7 +956,7 @@ body.remote-docked-expanded .remote-dock-tab {
 body.remote-external-popout-active--full .remote-dock-tab,
 body.remote-external-popout-active--full .remote-dock-sheet,
 body.remote-external-popout-active--full #remote-module,
-body.remote-external-popout-active--full .remote-module__dialog {
+body.remote-external-popout-active--full #remote-module .remote-module__dialog {
     visibility: hidden !important;
     pointer-events: none !important;
 }

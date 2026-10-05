@@ -414,16 +414,23 @@ function normalizeRemoteModule(raw, legacyPicker) {
     if (!src || typeof src !== 'object') return null;
     const left = Number(src.left);
     const top = Number(src.top);
-    const width = Number(src.width);
-    const height = Number(src.height);
+    let width = Number(src.width);
+    let height = Number(src.height);
     if (![left, top, width, height].every(Number.isFinite)) return null;
-    if (width < 200 || height < 160) return null;
+    if (width < 130 || height < 280) return null;
     const target = typeof src.targetSlotId === 'string' && MOSAIC_SLOT_IDS.includes(src.targetSlotId)
         ? src.targetSlotId
         : 'center';
     let mode = src.mode;
     if (!mode) mode = src.open === true ? 'undocked' : 'hidden';
     if (!['hidden', 'docked', 'undocked'].includes(mode)) mode = 'hidden';
+    const baseW = 260;
+    const rawScale = Number(src.scale);
+    const scale = Number.isFinite(rawScale)
+        ? Math.min(1.5, Math.max(0.5, rawScale))
+        : Math.min(1.5, Math.max(0.5, width / baseW));
+    width = Math.round(baseW * scale);
+    height = Math.round(560 * scale);
     const sheetHeight = Number.isFinite(Number(src.sheetHeight))
         ? Math.min(0.85, Math.max(0.25, Number(src.sheetHeight)))
         : 0.45;
@@ -433,6 +440,7 @@ function normalizeRemoteModule(raw, legacyPicker) {
         top,
         width,
         height,
+        scale,
         mode,
         pinned: src.pinned === true,
         open: src.open === true,
@@ -448,21 +456,31 @@ function normalizeChannelPicker(raw) {
     return normalizeRemoteModule(null, raw);
 }
 
-/** Floating radio module geometry (CSS px). */
+/** Floating radio module geometry (CSS px) + uniform scale 0.5–1.5. */
 function normalizeRadioModule(raw) {
     const src = raw && typeof raw === 'object' ? raw : null;
     if (!src) return null;
     const left = Number(src.left);
     const top = Number(src.top);
-    const width = Number(src.width);
-    const height = Number(src.height);
-    if (![left, top, width, height].every(Number.isFinite)) return null;
-    if (width < 220 || height < 160) return null;
+    if (![left, top].every(Number.isFinite)) return null;
+    const baseW = 340;
+    const baseH = 260;
+    const rawScale = Number(src.scale);
+    let scale;
+    if (Number.isFinite(rawScale)) {
+        scale = Math.min(1.5, Math.max(0.5, rawScale));
+    } else {
+        const width = Number(src.width);
+        scale = Number.isFinite(width)
+            ? Math.min(1.5, Math.max(0.5, width / baseW))
+            : 1;
+    }
     return {
         left,
         top,
-        width,
-        height,
+        width: Math.round(baseW * scale),
+        height: Math.round(baseH * scale),
+        scale,
         pinned: src.pinned === true,
         open: src.open === true
     };

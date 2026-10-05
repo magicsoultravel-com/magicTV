@@ -1,5 +1,6 @@
 /**
  * Float-only Magic Radio shell — cassette-style transport overlay.
+ * Uniform scale 0.5–1.5 (same model as Magic Remote undocked); independent of browser/remote CSS.
  */
 import { el } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
@@ -10,6 +11,14 @@ import { RadioPlayer } from '../radio/radioPlayer.js';
 import { RadioCast } from '../radio/radioCast.js';
 import { stationKey } from '../radio/stationShape.js';
 import { setMarqueeText } from './marquee.js';
+import {
+    RADIO_BASE_W,
+    RADIO_BASE_H,
+    clampModuleScale,
+    clampFloatGeometry,
+    uniformScaleFromCorner,
+    scaleFromWidth
+} from './moduleScaleResize.js';
 
 /** @type {{ sharedVolume?: number, focusRadio?: () => Promise<void> } | null} */
 let multiViewRef = null;
@@ -21,10 +30,7 @@ async function getMultiView() {
     return multiViewRef;
 }
 
-const MIN_W = 280;
-const MIN_H = 200;
 const VIEW_PAD = 8;
-const DEFAULT_GEOM = { left: 72, top: 96, width: 340, height: 260 };
 
 /** @type {(opts?: { tab?: string }) => void} */
 let openRadioBrowser = () => {};
@@ -32,7 +38,10 @@ let openRadioBrowser = () => {};
 let bound = false;
 let open = false;
 let pinned = false;
-/** @type {{ mode: 'drag'|'resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number } | null} */
+let scale = 1;
+/** @type {{ left: number, top: number } | null} */
+let position = null;
+/** @type {{ mode: 'drag'|'resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originScale: number } | null} */
 let gesture = null;
 
 function moduleEl() {
@@ -50,44 +59,58 @@ function viewportSize() {
     };
 }
 
-function clampGeometry({ left, top, width, height }) {
-    const { w: vw, h: vh } = viewportSize();
-    let w = Math.max(MIN_W, Math.min(width, vw - VIEW_PAD * 2));
-    let h = Math.max(MIN_H, Math.min(height, vh - VIEW_PAD * 2));
-    let x = Math.min(Math.max(VIEW_PAD, left), vw - VIEW_PAD - Math.min(w, 80));
-    let y = Math.min(Math.max(VIEW_PAD, top), vh - VIEW_PAD - 40);
-    if (x + w > vw - VIEW_PAD) w = Math.max(MIN_W, vw - VIEW_PAD - x);
-    if (y + h > vh - VIEW_PAD) h = Math.max(MIN_H, vh - VIEW_PAD - y);
-    return { left: Math.round(x), top: Math.round(y), width: Math.round(w), height: Math.round(h) };
+function sizeForScale(s = scale) {
+    const next = clampModuleScale(s);
+    return {
+        width: Math.round(RADIO_BASE_W * next),
+        height: Math.round(RADIO_BASE_H * next),
+        scale: next
+    };
 }
 
-function readDialogGeometry() {
-    const dialog = dialogEl();
-    if (!dialog) return { ...DEFAULT_GEOM };
-    const rect = dialog.getBoundingClientRect();
-    return clampGeometry({
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
+function currentGeometry() {
+    const { width, height } = sizeForScale(scale);
+    const { w: vw, h: vh } = viewportSize();
+    const fallback = {
+        left: Math.round((vw - width) / 2),
+        top: Math.round(Math.max(48, (vh - height) / 3))
+    };
+    return clampFloatGeometry({
+        left: position?.left ?? fallback.left,
+        top: position?.top ?? fallback.top,
+        width,
+        height
+    }, {
+        minW: Math.round(RADIO_BASE_W * 0.5),
+        minH: Math.round(RADIO_BASE_H * 0.5),
+        viewPad: VIEW_PAD,
+        vw,
+        vh
     });
 }
 
-function applyGeometry(geom) {
+function applyScaleAndPosition() {
     const dialog = dialogEl();
-    if (!dialog || !geom) return;
-    const next = clampGeometry(geom);
-    dialog.style.left = `${next.left}px`;
-    dialog.style.top = `${next.top}px`;
-    dialog.style.width = `${next.width}px`;
-    dialog.style.height = `${next.height}px`;
+    if (!dialog) return;
+    const geom = currentGeometry();
+    position = { left: geom.left, top: geom.top };
+    scale = clampModuleScale(scale);
+    dialog.style.setProperty('--radio-scale', String(scale));
+    dialog.style.left = `${geom.left}px`;
+    dialog.style.top = `${geom.top}px`;
+    dialog.style.width = `${geom.width}px`;
+    dialog.style.height = `${geom.height}px`;
 }
 
 function persistState() {
-    const geom = readDialogGeometry();
+    const geom = currentGeometry();
     savePlayerState({
         radioModule: {
-            ...geom,
+            left: geom.left,
+            top: geom.top,
+            width: geom.width,
+            height: geom.height,
+            scale,
             pinned,
             open
         }
@@ -104,14 +127,20 @@ function showUI(show) {
     if (show) bringOverlayToFront('radio');
 }
 
-function defaultGeometry() {
-    const { w: vw, h: vh } = viewportSize();
-    return clampGeometry({
-        left: Math.round((vw - DEFAULT_GEOM.width) / 2),
-        top: Math.round(Math.max(48, (vh - DEFAULT_GEOM.height) / 3)),
-        width: DEFAULT_GEOM.width,
-        height: DEFAULT_GEOM.height
-    });
+function restoreFromSaved(saved) {
+    if (saved && Number.isFinite(saved.scale)) {
+        scale = clampModuleScale(saved.scale);
+    } else if (saved && Number.isFinite(saved.width)) {
+        scale = scaleFromWidth(saved.width, RADIO_BASE_W);
+    } else {
+        scale = 1;
+    }
+    if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+        position = { left: saved.left, top: saved.top };
+    } else {
+        position = null;
+    }
+    applyScaleAndPosition();
 }
 
 function syncTransportUi() {
@@ -219,7 +248,7 @@ function syncTransportUi() {
 }
 
 function beginGesture(mode, pointerId, clientX, clientY, edge) {
-    const geom = readDialogGeometry();
+    const geom = currentGeometry();
     gesture = {
         mode,
         pointerId,
@@ -229,7 +258,8 @@ function beginGesture(mode, pointerId, clientX, clientY, edge) {
         originLeft: geom.left,
         originTop: geom.top,
         originW: geom.width,
-        originH: geom.height
+        originH: geom.height,
+        originScale: scale
     };
     dialogEl()?.setPointerCapture?.(pointerId);
     bringOverlayToFront('radio');
@@ -241,30 +271,28 @@ function onPointerMove(e) {
     const dy = e.clientY - gesture.startY;
     if (gesture.mode === 'drag') {
         if (pinned) return;
-        applyGeometry({
+        position = {
             left: gesture.originLeft + dx,
-            top: gesture.originTop + dy,
-            width: gesture.originW,
-            height: gesture.originH
-        });
+            top: gesture.originTop + dy
+        };
+        applyScaleAndPosition();
         return;
     }
-    let left = gesture.originLeft;
-    let top = gesture.originTop;
-    let width = gesture.originW;
-    let height = gesture.originH;
-    const edge = gesture.edge || 'se';
-    if (edge.includes('e')) width = gesture.originW + dx;
-    if (edge.includes('s')) height = gesture.originH + dy;
-    if (edge.includes('w')) {
-        width = gesture.originW - dx;
-        left = gesture.originLeft + dx;
-    }
-    if (edge.includes('n')) {
-        height = gesture.originH - dy;
-        top = gesture.originTop + dy;
-    }
-    applyGeometry({ left, top, width, height });
+    const next = uniformScaleFromCorner({
+        originLeft: gesture.originLeft,
+        originTop: gesture.originTop,
+        originW: gesture.originW,
+        originH: gesture.originH,
+        originScale: gesture.originScale,
+        baseW: RADIO_BASE_W,
+        baseH: RADIO_BASE_H,
+        dx,
+        dy,
+        edge: gesture.edge || 'se'
+    });
+    scale = next.scale;
+    position = { left: next.left, top: next.top };
+    applyScaleAndPosition();
 }
 
 function endGesture(e) {
@@ -385,7 +413,7 @@ function bindOnce() {
         syncTransportUi();
     });
     window.addEventListener('resize', () => {
-        if (open) applyGeometry(readDialogGeometry());
+        if (open) applyScaleAndPosition();
     });
 }
 
@@ -442,7 +470,7 @@ export const RadioModule = {
             RadioPlayer.setMasterVolumeGetter(() => mv.sharedVolume ?? 1);
         }).catch(() => {});
         const saved = loadPlayerState().radioModule;
-        applyGeometry(saved || defaultGeometry());
+        restoreFromSaved(saved);
         if (saved?.pinned) {
             pinned = true;
             moduleEl()?.classList.toggle('is-pinned', true);

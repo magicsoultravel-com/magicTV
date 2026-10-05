@@ -19,6 +19,13 @@ import {
 import { assembleEndCluster, browserEndActionsEl, startActionsEl } from './moduleActions.js';
 import { RemoteModule } from './remoteModule.js';
 import { DockOpenGate } from './dockOpenGate.js';
+import {
+    BROWSER_BASE_W,
+    BROWSER_BASE_H,
+    clampFloatGeometry,
+    freeCornerResize,
+    browserTileScaleFromGeom
+} from './moduleScaleResize.js';
 
 const MIN_W = 260;
 const MIN_H = 480;
@@ -34,7 +41,10 @@ let ensureBrowserCatalog = () => {};
 let switchTab = () => {};
 /** @type {'hidden'|'docked'|'undocked'} */
 let uiMode = 'hidden';
-/** @type {{ mode: 'drag'|'resize'|'sheet', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originSheetH?: number } | null} */
+/** Saved dock footprint when user corner-resizes (px). */
+/** @type {{ width: number, height: number } | null} */
+let dockSizeOverride = null;
+/** @type {{ mode: 'drag'|'resize'|'dock-resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number } | null} */
 let gesture = null;
 
 let startDockParent = null;
@@ -81,25 +91,43 @@ function viewportSize() {
 
 function clampGeometry({ left, top, width, height }) {
     const { w: vw, h: vh } = viewportSize();
-    let w = Math.max(MIN_W, Math.min(width, vw - VIEW_PAD * 2));
-    let h = Math.max(MIN_H, Math.min(height, vh - VIEW_PAD * 2));
-    let x = Math.min(Math.max(VIEW_PAD, left), vw - VIEW_PAD - Math.min(w, 80));
-    let y = Math.min(Math.max(VIEW_PAD, top), vh - VIEW_PAD - 40);
-    if (x + w > vw - VIEW_PAD) w = Math.max(MIN_W, vw - VIEW_PAD - x);
-    if (y + h > vh - VIEW_PAD) h = Math.max(MIN_H, vh - VIEW_PAD - y);
-    return { left: Math.round(x), top: Math.round(y), width: Math.round(w), height: Math.round(h) };
+    return clampFloatGeometry(
+        { left, top, width, height },
+        { minW: MIN_W, minH: MIN_H, viewPad: VIEW_PAD, vw, vh }
+    );
 }
 
 function readDialogGeometry() {
     const dialog = dialogEl();
     if (!dialog) return getLayoutState().browser;
-    const rect = dialog.getBoundingClientRect();
-    return clampGeometry({
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
+    const left = parseFloat(dialog.style.left);
+    const top = parseFloat(dialog.style.top);
+    const width = parseFloat(dialog.style.width);
+    const height = parseFloat(dialog.style.height);
+    if (![left, top, width, height].every(Number.isFinite)) {
+        const rect = dialog.getBoundingClientRect();
+        return clampGeometry({
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height
+        });
+    }
+    return clampGeometry({ left, top, width, height });
+}
+
+function applyBrowserTileScale(width, height) {
+    const tileScale = browserTileScaleFromGeom({
+        width,
+        height,
+        baseW: BROWSER_BASE_W,
+        baseH: BROWSER_BASE_H
     });
+    const value = String(tileScale);
+    dialogEl()?.style.setProperty('--browser-tile-scale', value);
+    dockSheetEl()?.style.setProperty('--browser-tile-scale', value);
+    dockHostEl()?.style.setProperty('--browser-tile-scale', value);
+    floatHostEl()?.style.setProperty('--browser-tile-scale', value);
 }
 
 function applyGeometry(geom, { pinned: pinFlag } = {}) {
@@ -110,6 +138,7 @@ function applyGeometry(geom, { pinned: pinFlag } = {}) {
     dialog.style.top = `${next.top}px`;
     dialog.style.width = `${next.width}px`;
     dialog.style.height = `${next.height}px`;
+    applyBrowserTileScale(next.width, next.height);
     if (typeof pinFlag === 'boolean') setPinned(pinFlag, { persist: false });
 }
 
@@ -166,7 +195,7 @@ function measureRemoteDockGeometry() {
     };
 }
 
-function applyDockGeometry(heightOverride = null) {
+function applyDockGeometry(sizeOverride = null) {
     const sheet = dockSheetEl();
     const tab = dockTabEl();
     if (!sheet) return;
@@ -185,6 +214,7 @@ function applyDockGeometry(heightOverride = null) {
         sheet.style.maxHeight = '30vh';
         sheet.style.setProperty('--browser-sheet-height', String(BAR_SHEET_HEIGHT));
         sheet.classList.add('is-catalog-bar');
+        applyBrowserTileScale(vw, height);
         if (tab) {
             tab.style.width = `${vw}px`;
             tab.style.maxWidth = '100vw';
@@ -197,10 +227,15 @@ function applyDockGeometry(heightOverride = null) {
 
     sheet.classList.remove('is-catalog-bar');
     const base = measureRemoteDockGeometry();
-    const height = heightOverride != null
-        ? Math.round(Math.min(vh * 0.85, Math.max(MIN_H, heightOverride)))
-        : base.height;
-    const width = base.width;
+    const override = sizeOverride || dockSizeOverride;
+    const width = Math.round(Math.min(
+        vw * 0.9,
+        Math.max(MIN_W * 2, override?.width ?? base.width)
+    ));
+    const height = Math.round(Math.min(
+        vh * 0.85,
+        Math.max(MIN_H, override?.height ?? base.height)
+    ));
     sheet.style.width = `${width}px`;
     sheet.style.height = `${height}px`;
     sheet.style.top = 'auto';
@@ -210,6 +245,7 @@ function applyDockGeometry(heightOverride = null) {
     sheet.style.maxHeight = '85vh';
     sheet.style.maxWidth = '';
     sheet.style.setProperty('--browser-sheet-height', String(height / Math.max(1, vh)));
+    applyBrowserTileScale(width, height);
     if (tab) {
         tab.style.width = `${width}px`;
         tab.style.removeProperty('left');
@@ -316,14 +352,6 @@ function onPointerMove(e) {
     const dx = e.clientX - gesture.startX;
     const dy = e.clientY - gesture.startY;
 
-    if (gesture.mode === 'sheet') {
-        const originPx = gesture.originSheetH ?? measureRemoteDockGeometry().height;
-        // Top-edge resize on a bottom sheet: dragging up grows height.
-        const nextPx = Math.max(MIN_H, originPx - dy);
-        applyDockGeometry(nextPx);
-        return;
-    }
-
     if (gesture.mode === 'drag') {
         applyGeometry({
             left: gesture.originLeft + dx,
@@ -334,27 +362,25 @@ function onPointerMove(e) {
         return;
     }
 
-    let { originLeft: left, originTop: top, originW: width, originH: height } = gesture;
-    const edge = gesture.edge || '';
-    if (edge.includes('e')) width = gesture.originW + dx;
-    if (edge.includes('s')) height = gesture.originH + dy;
-    if (edge.includes('w')) {
-        left = gesture.originLeft + dx;
-        width = gesture.originW - dx;
+    const edge = gesture.edge || 'se';
+    const next = freeCornerResize({
+        originLeft: gesture.originLeft,
+        originTop: gesture.originTop,
+        originW: gesture.originW,
+        originH: gesture.originH,
+        dx,
+        dy,
+        edge,
+        minW: gesture.mode === 'dock-resize' ? MIN_W * 2 : MIN_W,
+        minH: MIN_H
+    });
+
+    if (gesture.mode === 'dock-resize') {
+        dockSizeOverride = { width: next.width, height: next.height };
+        applyDockGeometry(dockSizeOverride);
+        return;
     }
-    if (edge.includes('n')) {
-        top = gesture.originTop + dy;
-        height = gesture.originH - dy;
-    }
-    if (width < MIN_W) {
-        if (edge.includes('w')) left = gesture.originLeft + gesture.originW - MIN_W;
-        width = MIN_W;
-    }
-    if (height < MIN_H) {
-        if (edge.includes('n')) top = gesture.originTop + gesture.originH - MIN_H;
-        height = MIN_H;
-    }
-    applyGeometry({ left, top, width, height });
+    applyGeometry(next);
 }
 
 function onPointerUp(e) {
@@ -368,18 +394,20 @@ function onPointerUp(e) {
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
     dialogEl()?.classList.remove('is-dragging');
-    dockSheetEl()?.querySelector('[data-browser-dock-resize]')?.classList.remove('is-dragging');
 
-    const wasSheet = gesture.mode === 'sheet';
+    const wasDock = gesture.mode === 'dock-resize';
     gesture = null;
-    if (wasSheet) {
+    if (wasDock) {
         const sheet = dockSheetEl();
+        const width = sheet?.getBoundingClientRect().width;
         const height = sheet?.getBoundingClientRect().height;
-        const { h: vh } = viewportSize();
-        if (Number.isFinite(height) && vh > 0) {
-            patchLayout({ browserSheetHeight: height / vh }, { reconcile: false });
+        if (Number.isFinite(width) && Number.isFinite(height)) {
+            dockSizeOverride = { width: Math.round(width), height: Math.round(height) };
+            patchLayout({
+                browserSheetWidth: width / Math.max(1, viewportSize().w)
+            }, { reconcile: false });
         }
-        applyDockGeometry(height);
+        applyDockGeometry(dockSizeOverride);
         return;
     }
     if (uiMode === 'undocked') {
@@ -390,20 +418,20 @@ function onPointerUp(e) {
 function beginGesture(e, mode, edge = '') {
     if (e.button != null && e.button !== 0) return;
 
-    if (mode === 'sheet') {
+    if (mode === 'dock-resize') {
         const sheet = dockSheetEl();
+        const rect = sheet?.getBoundingClientRect();
         gesture = {
-            mode: 'sheet',
+            mode: 'dock-resize',
+            edge,
             pointerId: e.pointerId,
             startX: e.clientX,
             startY: e.clientY,
-            originLeft: 0,
-            originTop: 0,
-            originW: 0,
-            originH: 0,
-            originSheetH: sheet?.getBoundingClientRect().height ?? measureRemoteDockGeometry().height
+            originLeft: rect?.left ?? 0,
+            originTop: rect?.top ?? 0,
+            originW: rect?.width ?? MIN_W * 2,
+            originH: rect?.height ?? MIN_H
         };
-        sheet?.querySelector('[data-browser-dock-resize]')?.classList.add('is-dragging');
     } else {
         const dialog = dialogEl();
         if (!dialog || uiMode !== 'undocked') return;
@@ -533,8 +561,10 @@ function bindOnce() {
         });
     });
 
-    dockSheetEl()?.querySelector('[data-browser-dock-resize]')?.addEventListener('pointerdown', (e) => {
-        beginGesture(e, 'sheet');
+    dockSheetEl()?.querySelectorAll('[data-browser-dock-resize]').forEach((handle) => {
+        handle.addEventListener('pointerdown', (e) => {
+            beginGesture(e, 'dock-resize', handle.getAttribute('data-browser-dock-resize') || 'se');
+        });
     });
 
     dockTabEl()?.addEventListener('click', () => {
