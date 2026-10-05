@@ -685,11 +685,10 @@ function switchTab(tabName) {
         else ChannelGrid.syncPlayingTiles();
         restoreActiveTabScroll('recents');
     } else if (tabName === 'browse') {
-        if (appState.catalogMode === 'radio') {
-            // Radio paints its own grid; skip TV browse restore/rebuild.
-        } else {
+        if (appState.catalogMode !== 'radio') {
             BrowseView.restoreView();
-        } else if (tabName === 'settings') {
+        }
+    } else if (tabName === 'settings') {
         Appearance.refreshWatchStats();
         Appearance.updateStorageStats();
         HiddenChannelsSettings.refresh();
