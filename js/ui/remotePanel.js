@@ -392,6 +392,11 @@ async function handleRemoteAction(action) {
             GuidePanel.toggle();
             break;
         }
+        case 'radio-toggle': {
+            const { RadioModule } = await import('./radioModule.js');
+            RadioModule.toggle();
+            break;
+        }
         case 'rotate': {
             await MultiView.rotateScreens();
             break;

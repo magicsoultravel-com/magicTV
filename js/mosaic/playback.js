@@ -20,6 +20,19 @@ import {
     PLAY_FILL_ORDER,
     waitMs
 } from './constants.js';
+import { RadioBridge } from '../radio/radioBridge.js';
+
+function radioEnabled() {
+    return SettingsStore.getRadioEnabled() === true;
+}
+
+function RP() {
+    return RadioBridge.getPlayer();
+}
+
+function RM() {
+    return RadioBridge.getModule();
+}
 
 /**
  * Warm staging then commit (or play directly when nothing visible).
@@ -151,10 +164,22 @@ export const playbackMethods = {
 
     isMuteAllActive() {
         if (this.sharedVolume <= 0) return true;
+        let anyEnabled = false;
         for (const id of SLOT_IDS) {
             const slot = this.slots[id];
             if (!slot?.enabled) continue;
+            anyEnabled = true;
             if (this.isSlotAudible(slot.player)) return false;
+        }
+        const player = RP();
+        const mod = RM();
+        if (radioEnabled() && mod?.isOpen?.() && player?.hasActiveStation?.()) {
+            anyEnabled = true;
+            if (player.isAudible?.()) return false;
+        }
+        if (!anyEnabled) return true;
+        if (radioEnabled() && mod?.isOpen?.() && player?.hasActiveStation?.()) {
+            return !player.isAudible?.();
         }
         return true;
     },
@@ -165,6 +190,7 @@ export const playbackMethods = {
             if (!slot?.enabled || !slot.player?.channel) continue;
             if (slot.player.wantPlaying === true || slot.player.playing === true) return true;
         }
+        if (radioEnabled() && RP()?.playing) return true;
         return false;
     },
 
@@ -176,6 +202,12 @@ export const playbackMethods = {
             hasChannel = true;
             if (!(slot.player.wantPlaying === true || slot.player.playing === true)) return false;
         }
+        const player = RP();
+        const mod = RM();
+        if (radioEnabled() && mod?.isOpen?.() && player?.hasActiveStation?.()) {
+            hasChannel = true;
+            if (!player.playing) return false;
+        }
         return hasChannel;
     },
 
@@ -185,13 +217,14 @@ export const playbackMethods = {
             if (!slot?.enabled || !slot.player?.channel) return;
             slot.player.mute();
         });
+        if (radioEnabled() && RP()?.hasActiveStation?.()) RP().mute();
         this.persistSlots();
         // emitState → onState → scheduleRefreshTiles
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
     },
 
-    /** Mute every other TV; unmute this one (one-way). */
+    /** Mute every other TV; unmute this one (one-way). Also mutes radio. */
     muteSolo(slotId) {
         if (this.sharedVolume <= 0) {
             const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
@@ -203,6 +236,7 @@ export const playbackMethods = {
             if (id === slotId) slot.player.unmute();
             else slot.player.mute();
         });
+        if (radioEnabled()) RP()?.mute?.();
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
@@ -218,9 +252,36 @@ export const playbackMethods = {
             if (!slot?.enabled || !slot.player?.channel) return;
             slot.player.unmute();
         });
+        if (radioEnabled() && RP()?.hasActiveStation?.()) RP().unmute();
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
+    },
+
+    /** Mute all TVs and play/unmute radio. */
+    async focusRadio() {
+        if (!radioEnabled()) return;
+        const mod = RM();
+        const player = RP();
+        if (!mod || !player) return;
+        if (!mod.isOpen?.()) mod.open();
+        SLOT_IDS.forEach((id) => {
+            const slot = this.slots[id];
+            if (!slot?.enabled || !slot.player?.channel) return;
+            slot.player.mute();
+        });
+        if (this.sharedVolume <= 0) {
+            const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
+            this.setSharedVolume(restored);
+        }
+        player.unmute();
+        try {
+            if (!player.playing) await player.play();
+        } catch { /* toast handled by caller UI */ }
+        this.persistSlots();
+        this.getPrimary()?.emitState();
+        this.syncMosaicChrome();
+        mod.syncTransportUi?.();
     },
 
     async stopAll() {
@@ -254,6 +315,9 @@ export const playbackMethods = {
             await Promise.allSettled(jobs);
         } finally {
             if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
+        }
+        if (SettingsStore.getRadioEnabled()) {
+            RP()?.stop?.();
         }
         this.persistSlots();
         this.getPrimary()?.emitState();
@@ -307,6 +371,12 @@ export const playbackMethods = {
         } finally {
             if (!this.isAnyPlaying()) TileFrames.setPlaybackBusy(false);
         }
+        if (radioEnabled()
+            && RM()?.isOpen?.()
+            && RP()?.hasActiveStation?.()
+            && !RP()?.playing) {
+            try { await RP().play(); } catch { /* ignore */ }
+        }
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
@@ -324,6 +394,9 @@ export const playbackMethods = {
                 /* ignore per-slot failures */
             }
         }));
+        if (radioEnabled() && RP()?.playing) {
+            RP().pause();
+        }
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();

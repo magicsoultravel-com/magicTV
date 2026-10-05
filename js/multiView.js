@@ -38,6 +38,7 @@ import {
     applySlotOutlineAttrs
 } from './mosaic/constants.js';
 import { freeLayoutMethods } from './mosaic/freeLayout.js';
+import { RadioBridge } from './radio/radioBridge.js';
 import { swapMethods } from './mosaic/swap.js';
 import { rotateMethods } from './mosaic/rotate.js';
 import { persistMethods } from './mosaic/persist.js';
@@ -789,6 +790,7 @@ export const MultiView = {
         SLOT_IDS.forEach((id) => {
             this.slots[id].player?.applyAudioToVideo();
         });
+        RadioBridge.getPlayer()?.applyAudioGain?.();
     },
 
     setBufferSize(size) {

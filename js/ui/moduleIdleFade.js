@@ -11,7 +11,8 @@ const UI_HOSTS = [
     '#remote-dock-tab',
     '#browser-module',
     '#browser-dock-sheet',
-    '#browser-dock-tab'
+    '#browser-dock-tab',
+    '#radio-module'
 ].join(', ');
 
 const CSS_VAR = '--ui-idle-opacity-mult';

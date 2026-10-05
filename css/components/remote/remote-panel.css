@@ -317,6 +317,11 @@
 .remote-module__resize[data-browser-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
 .remote-module__resize[data-browser-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
 
+.remote-module__resize[data-radio-resize="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+.remote-module__resize[data-radio-resize="ne"] { top: 0; right: 0; cursor: nesw-resize; }
+.remote-module__resize[data-radio-resize="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+.remote-module__resize[data-radio-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+
 /* Browser window + layout controls — same circular row as nav/tools when split */
 .browser-window-controls,
 .layout-window-controls {

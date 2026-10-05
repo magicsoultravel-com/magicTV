@@ -130,6 +130,7 @@ export const Appearance = {
         const idleDelayValue = el('remote-idle-delay-value');
         const idleFadeSlider = el('remote-idle-fade-slider');
         const idleFadeValue = el('remote-idle-fade-value');
+        const radioEnabled = el('radio-enabled');
         const themeSelect = el('theme-select');
         const fontTrigger = el('font-picker-trigger');
         const fontMenu = el('font-picker-menu');
@@ -264,6 +265,16 @@ export const Appearance = {
             idleFadeEnabled.addEventListener('change', () => {
                 SettingsStore.setRemoteIdleFadeEnabled(idleFadeEnabled.checked);
                 RemoteModule.resetIdleFade();
+            });
+        }
+
+        if (radioEnabled && radioEnabled.dataset.bound !== '1') {
+            radioEnabled.dataset.bound = '1';
+            radioEnabled.checked = SettingsStore.getRadioEnabled();
+            radioEnabled.addEventListener('change', async () => {
+                SettingsStore.setRadioEnabled(radioEnabled.checked);
+                const { RadioModule } = await import('./radioModule.js');
+                RadioModule.syncEnabledUi();
             });
         }
 
@@ -728,6 +739,9 @@ export const Appearance = {
             delaySec: SettingsStore.getRemoteIdleDelaySec(),
             fadeSec: SettingsStore.getRemoteIdleFadeSec()
         });
+
+        const radioEnabledEl = el('radio-enabled');
+        if (radioEnabledEl) radioEnabledEl.checked = SettingsStore.getRadioEnabled();
 
         const showMosaicWatchSession = el('show-mosaic-watch-session');
         if (showMosaicWatchSession) {

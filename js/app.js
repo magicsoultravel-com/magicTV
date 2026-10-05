@@ -10,6 +10,7 @@ import { SettingsStore } from './storage/settingsStore.js';
 import { ChannelGrid, getFavoritesMosaicQueue } from './ui/channelGrid.js';
 import { FavoritesFolders } from './ui/favoritesFolders.js';
 import { BrowseView } from './browse/browseView.js';
+import { RadioBrowseView } from './browse/radioBrowseView.js';
 import { Appearance } from './ui/appearance.js';
 import { PlayerChrome } from './ui/playerChrome.js';
 import { MultiView } from './multiView.js';
@@ -17,6 +18,9 @@ import { SLOT_IDS, MAX_MOSAIC_SLOTS, slotIsOccupied } from './mosaic/constants.j
 import { parseDeepLink, resolveDeepLinkChannel, chooseSharedPlayTarget } from './share/shareChannel.js';
 import { TvClock } from './ui/tvClock.js';
 import { RemoteModule } from './ui/remoteModule.js';
+import { RadioModule } from './ui/radioModule.js';
+import { RadioPlayer } from './radio/radioPlayer.js';
+import { RadioBridge } from './radio/radioBridge.js';
 import { RemotePanel, syncRemoteNav, syncRemoteChannelBar } from './ui/remotePanel.js';
 import { RemoteExternalPopout } from './ui/remoteExternalPopout.js';
 import { HiddenChannelsSettings } from './ui/hiddenChannelsSettings.js';
@@ -57,6 +61,7 @@ let appState = {
     browseGeneration: 0,
     browseSortDirty: false,
     activeTab: 'remote',
+    catalogMode: 'tv',
     countryFilter: '',
     browseQuery: '',
     favFilter: '',
@@ -548,6 +553,28 @@ function syncRemoteTabChrome() {
 
 const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
 
+function setCatalogMode(mode) {
+    appState.catalogMode = mode === 'radio' ? 'radio' : 'tv';
+    RadioBrowseView.setMode(appState.catalogMode);
+}
+
+function openRadioCatalog({ tab = 'browse' } = {}) {
+    setCatalogMode('radio');
+    if (!RemoteModule.isOpen?.()) {
+        RemoteModule.open?.({ tab: 'browse' });
+    }
+    ensureBrowserCatalogVisible();
+    switchTab(BROWSER_TABS.includes(tab) ? tab : 'browse');
+    if (tab === 'browse') RadioBrowseView.openBrowse();
+}
+
+function switchTabFromRemote(tabName) {
+    if (BROWSER_TABS.includes(tabName) || tabName === 'remote') {
+        setCatalogMode('tv');
+    }
+    switchTabAnimated(tabName);
+}
+
 function saveActiveTabScroll() {
     const tab = appState.activeTab;
     const panel = el(`${tab}-panel`);
@@ -619,9 +646,16 @@ function switchTab(tabName) {
 
     activateTabPanels(tabName);
 
+    if (tabName === 'browse' || tabName === 'favorites' || tabName === 'recents') {
+        RadioBrowseView.refresh();
+    }
+
     const backBtn = el('back-btn');
     if (backBtn) {
-        if (appState.browseCountry !== null && tabName === 'browse') {
+        if (appState.catalogMode === 'radio') {
+            backBtn.classList.add('is-hidden');
+            backBtn.classList.remove('is-active', 'is-pink-active');
+        } else if (appState.browseCountry !== null && tabName === 'browse') {
             backBtn.classList.remove('is-hidden');
             backBtn.classList.add('is-active', 'is-pink-active');
             backBtn.dataset.tab = 'back-to-countries';
@@ -776,8 +810,13 @@ async function init() {
         RemoteModule.init({
             getDefaultOnPlay: () => startPlayback,
             switchTab,
-            switchTabNav: switchTabAnimated,
+            switchTabNav: switchTabFromRemote,
             ensureBrowserCatalog: ensureBrowserCatalogVisible
+        });
+        RadioBrowseView.init();
+        RadioBridge.register({ player: RadioPlayer, module: RadioModule });
+        RadioModule.init({
+            openBrowser: openRadioCatalog
         });
         RemotePanel.bind();
         GuidePanel.init();
@@ -818,6 +857,7 @@ async function init() {
         syncCatalogLayoutBtn();
         syncBrowserRefreshBtn();
         syncRemoteTabChrome();
+        RadioModule.syncEnabledUi();
         switchTab('remote');
         if (GuidePanel.isVisible()) {
             GuidePanel.refresh().catch(() => {});

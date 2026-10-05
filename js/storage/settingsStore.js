@@ -59,6 +59,7 @@ const REMOTE_MODULE_OPACITY_MAX = 100;
 const SCREEN_DIM_MIN = 0;
 const SCREEN_DIM_MAX = 80;
 const DEFAULT_REMOTE_IDLE_FADE_ENABLED = true;
+const DEFAULT_RADIO_ENABLED = false;
 const DEFAULT_SHOW_MOSAIC_WATCH_SESSION = true;
 const DEFAULT_SHOW_MOSAIC_WATCH_TOTAL = true;
 const DEFAULT_TV_EMPTY_SPACE_TRANSPARENT = false;
@@ -289,6 +290,19 @@ export const SettingsStore = {
     setRemoteIdleFadeEnabled(value) {
         const next = value === true;
         patchPersistedState({ remoteIdleFadeEnabled: next });
+        return next;
+    },
+
+    getRadioEnabled() {
+        const raw = readPersistedState();
+        return raw.radioEnabled != null
+            ? raw.radioEnabled === true
+            : DEFAULT_RADIO_ENABLED;
+    },
+
+    setRadioEnabled(value) {
+        const next = value === true;
+        patchPersistedState({ radioEnabled: next });
         return next;
     },
 

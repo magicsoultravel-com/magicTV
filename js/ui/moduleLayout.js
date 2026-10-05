@@ -174,12 +174,11 @@ export function toggleSplitBrowser({ hostKind = 'undocked' } = {}) {
     return splitBrowser({ hostKind });
 }
 
-/** @typedef {'remote'|'browser'} OverlayTarget */
+/** @typedef {'remote'|'browser'|'radio'} OverlayTarget */
 
 /**
- * Raise remote or browser float + dock hosts so last interaction wins between modules.
- * Mosaic tiles use free-layout placement z only (below this band) — do not pass `{ tile }`.
- * @param {typeof SHELL_REMOTE | typeof SHELL_BROWSER | string} target
+ * Raise remote, browser, or radio float hosts so last interaction wins.
+ * @param {typeof SHELL_REMOTE | typeof SHELL_BROWSER | 'radio' | string} target
  * @returns {number} assigned z-index
  */
 export function bringOverlayToFront(target) {
@@ -191,10 +190,14 @@ export function bringOverlayToFront(target) {
     stackZ += 1;
     const z = String(stackZ);
 
-    const shell = target === SHELL_BROWSER || target === 'browser' ? 'browser' : 'remote';
-    const ids = shell === 'browser'
-        ? ['browser-module', 'browser-dock-sheet', 'browser-dock-tab']
-        : ['remote-module', 'remote-dock-sheet', 'remote-dock-tab'];
+    let ids;
+    if (target === SHELL_BROWSER || target === 'browser') {
+        ids = ['browser-module', 'browser-dock-sheet', 'browser-dock-tab'];
+    } else if (target === 'radio') {
+        ids = ['radio-module'];
+    } else {
+        ids = ['remote-module', 'remote-dock-sheet', 'remote-dock-tab'];
+    }
     for (const id of ids) {
         const node = document.getElementById(id);
         if (node) node.style.zIndex = z;

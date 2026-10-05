@@ -448,6 +448,26 @@ function normalizeChannelPicker(raw) {
     return normalizeRemoteModule(null, raw);
 }
 
+/** Floating radio module geometry (CSS px). */
+function normalizeRadioModule(raw) {
+    const src = raw && typeof raw === 'object' ? raw : null;
+    if (!src) return null;
+    const left = Number(src.left);
+    const top = Number(src.top);
+    const width = Number(src.width);
+    const height = Number(src.height);
+    if (![left, top, width, height].every(Number.isFinite)) return null;
+    if (width < 220 || height < 160) return null;
+    return {
+        left,
+        top,
+        width,
+        height,
+        pinned: src.pinned === true,
+        open: src.open === true
+    };
+}
+
 export function normalizeVisitedStyle(value, fallback = DEFAULT_VISITED_STYLE) {
     return VISITED_STYLES.includes(value) ? value : fallback;
 }
@@ -516,6 +536,7 @@ function emptyPlayerState() {
         mosaicPlacement: {},
         mosaicLayoutMode: 'grid-h',
         remoteModule: null,
+        radioModule: null,
         channelPicker: null,
         sortBy: { ...DEFAULT_SORT_BY },
         sortDir: { ...DEFAULT_SORT_DIR },
@@ -598,6 +619,7 @@ export function loadPlayerStateFrom(raw) {
             mosaicPlacement: normalizeMosaicPlacement(src.mosaicPlacement),
             mosaicLayoutMode: normalizeMosaicLayoutMode(src.mosaicLayoutMode),
             remoteModule: normalizeRemoteModule(src.remoteModule, src.channelPicker),
+            radioModule: normalizeRadioModule(src.radioModule),
             channelPicker: normalizeChannelPicker(src.channelPicker),
             sortBy: normalizeSortBy(src.sortBy),
             sortDir: normalizeSortDir(src.sortDir),
@@ -644,6 +666,7 @@ const KNOWN_PLAYER_PATCH_KEYS = new Set([
     'mosaicPlacement',
     'mosaicLayoutMode',
     'remoteModule',
+    'radioModule',
     'channelPicker',
     'sortBy',
     'sortDir',
@@ -783,6 +806,9 @@ export function savePlayerState(patch) {
         if ('channelPicker' in patch) {
             payload.channelPicker = normalizeChannelPicker(merged.channelPicker);
         }
+    }
+    if ('radioModule' in patch) {
+        payload.radioModule = normalizeRadioModule(merged.radioModule);
     }
     if ('sortBy' in patch) payload.sortBy = normalizeSortBy(merged.sortBy);
     if ('sortDir' in patch) payload.sortDir = normalizeSortDir(merged.sortDir);

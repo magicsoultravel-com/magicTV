@@ -13,7 +13,8 @@ const HOSTS = [
     '#remote-channel-name',
     '.guide-screen__channel',
     '.resume-session__tile-name-text',
-    '.watch-stats-row__name'
+    '.watch-stats-row__name',
+    '.radio-module__title'
 ].join(', ');
 
 export function marqueeInnerHtml(text) {
