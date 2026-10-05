@@ -22,7 +22,9 @@
     z-index: 1;
 }
 
-.radio-module__dialog > * {
+/* Header + body only — never resize grips (they must stay position:absolute) */
+.radio-module__dialog > .radio-module__header,
+.radio-module__dialog > .radio-module__body {
     position: relative;
     z-index: 1;
 }

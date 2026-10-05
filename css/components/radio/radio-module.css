@@ -37,11 +37,16 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__header {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
+    flex-shrink: 0;
     gap: calc(8px * var(--radio-scale, 1));
-    padding: calc(6px * var(--radio-scale, 1)) calc(8px * var(--radio-scale, 1)) 0;
+    /* Match float remote chrome: no strip / separator */
+    padding: calc(0.3rem * var(--radio-scale, 1)) calc(0.85rem * var(--radio-scale, 1));
+    border-bottom: none;
+    background: transparent;
     cursor: grab;
     user-select: none;
     touch-action: none;
@@ -65,6 +70,9 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -75,6 +83,7 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     text-transform: lowercase;
     opacity: 0.85;
     font-weight: 600;
+    pointer-events: none;
 }
 
 .radio-module__body {
