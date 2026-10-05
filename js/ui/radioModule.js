@@ -511,6 +511,9 @@ export const RadioModule = {
         if (btn) {
             btn.hidden = !enabled;
             btn.classList.toggle('is-hidden', !enabled);
+            const active = enabled && open;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', String(active));
         }
         document.body.classList.toggle('radio-enabled', enabled);
         if (!enabled && open) this.close();
@@ -545,6 +548,7 @@ export const RadioModule = {
         persistState();
         syncTransportUi();
         syncScaleResetBtn();
+        this.syncEnabledUi();
     },
 
     close() {
@@ -552,6 +556,7 @@ export const RadioModule = {
         open = false;
         showUI(false);
         persistState();
+        this.syncEnabledUi();
         onCloseCb?.();
     },
 
