@@ -301,27 +301,28 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     min-height: calc(36px * var(--radio-scale, 1));
 }
 
-.radio-module__vol {
+.radio-module__vol.remote-volume-bar {
     grid-column: 1 / span 3;
-    display: inline-flex;
-    align-items: center;
-    gap: calc(4px * var(--radio-scale, 1));
-    min-width: 0;
     justify-self: stretch;
-    color: var(--tv-text-secondary, #9aa3b5);
-}
-
-.radio-module__vol input[type="range"] {
-    flex: 1;
+    width: 100%;
     min-width: 0;
-    width: auto;
-    accent-color: var(--tv-primary);
+    box-sizing: border-box;
+    height: calc(var(--remote-btn-size, 40px) * 0.5 * var(--radio-scale, 1));
+    min-height: calc(var(--remote-btn-size, 40px) * 0.5 * var(--radio-scale, 1));
+    border-radius: calc(var(--remote-btn-size, 40px) * 0.25 * var(--radio-scale, 1));
 }
 
-.radio-module__vol span {
-    font-size: calc(0.7rem * var(--radio-scale, 1));
-    opacity: 0.8;
-    min-width: 1.6em;
+.remote-volume-bar--radio {
+    --volume-accent: var(--tv-primary, var(--tv-main-1, #00FF88));
+}
+
+.radio-module__vol .remote-volume-bar__role {
+    left: calc(0.55rem * var(--radio-scale, 1));
+    font-size: calc(0.55rem * var(--radio-scale, 1));
+}
+
+.radio-module__vol .remote-volume-bar__pct {
+    font-size: calc(0.65rem * var(--radio-scale, 1));
 }
 
 .radio-module__cast-row {
@@ -331,15 +332,10 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     flex-wrap: wrap;
 }
 
-.radio-module__cast-row .radio-module__vol {
+.radio-module__cast-row .radio-module__vol.remote-volume-bar {
     grid-column: auto;
-    justify-self: auto;
-    min-width: calc(90px * var(--radio-scale, 1));
-}
-
-.radio-module__cast-row .radio-module__vol input[type="range"] {
-    width: calc(72px * var(--radio-scale, 1));
-    flex: none;
+    flex: 1 1 auto;
+    min-width: calc(120px * var(--radio-scale, 1));
 }
 
 .radio-module__cast-menu {

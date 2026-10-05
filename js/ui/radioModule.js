@@ -218,11 +218,12 @@ function syncTransportUi() {
     }
 
     const vol = el('radio-volume-slider');
-    if (vol) {
-        vol.value = String(Math.round((RadioPlayer.volume ?? 0.85) * 100));
-    }
-    const volPct = el('radio-volume-pct');
-    if (volPct) volPct.textContent = String(Math.round((RadioPlayer.volume ?? 0.85) * 100));
+    const volPct = Math.round((RadioPlayer.volume ?? 0.85) * 100);
+    const volClamped = Math.max(0, Math.min(1, (RadioPlayer.volume ?? 0.85)));
+    if (vol) vol.value = String(volPct);
+    const volPctEl = el('radio-volume-pct');
+    if (volPctEl) volPctEl.textContent = String(volPct);
+    el('radio-volume-dial')?.style.setProperty('--volume-fill', String(volClamped));
 
     const castBtn = el('radio-cast-btn');
     if (castBtn) {
@@ -244,14 +245,14 @@ function syncTransportUi() {
         hostAudioBtn.setAttribute('aria-pressed', String(hostAudio));
     }
 
+    const castVolRaw = RadioCast.getCastVolume() || 0;
+    const castVolClamped = Math.max(0, Math.min(1, Number(castVolRaw) || 0));
+    const castVolPct = Math.round(castVolClamped * 100);
     const castVol = el('radio-cast-volume-slider');
-    if (castVol) {
-        castVol.value = String(Math.round((RadioCast.getCastVolume() || 0) * 100));
-    }
-    const castVolPct = el('radio-cast-volume-pct');
-    if (castVolPct) {
-        castVolPct.textContent = String(Math.round((RadioCast.getCastVolume() || 0) * 100));
-    }
+    if (castVol) castVol.value = String(castVolPct);
+    const castVolPctEl = el('radio-cast-volume-pct');
+    if (castVolPctEl) castVolPctEl.textContent = String(castVolPct);
+    el('radio-cast-volume-dial')?.style.setProperty('--volume-fill', String(castVolClamped));
     const castMuteBtn = el('radio-cast-mute-btn');
     if (castMuteBtn) {
         const cm = RadioCast.isCastMuted();
