@@ -343,3 +343,106 @@ body.has-resume-session .remote-dock-sheet {
 .resume-session__shortcut {
     flex: 0 0 auto;
 }
+
+/* Radio cassette resume tile — same chrome as #radio-module, tile-scaled */
+.resume-session__tile--radio {
+    --tv-tile-outline: var(--tv-main-2, #00FF88);
+}
+
+.resume-session__tile-frame--cassette {
+    aspect-ratio: 120 / 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 0.65rem;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--tv-primary) 8%, #000) 0%, #050508 55%, color-mix(in srgb, var(--tv-secondary) 6%, #000) 100%);
+}
+
+.resume-session__cassette {
+    position: relative;
+    display: block;
+    width: 100%;
+    max-width: 15.5rem;
+    aspect-ratio: 120 / 70;
+    color: var(--tv-text-secondary, #9aa3b5);
+}
+
+.resume-session__cassette > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    opacity: 0.72;
+}
+
+/* Label rect in viewBox: 18,10,84,13 → ~15% / 14% / 70% / 19% */
+.resume-session__cassette-label {
+    position: absolute;
+    left: 15%;
+    top: 14%;
+    width: 70%;
+    height: 19%;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 0.25rem;
+    padding: 0 0.25rem;
+    box-sizing: border-box;
+    min-width: 0;
+    pointer-events: none;
+}
+
+.resume-session__cassette-leading {
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.resume-session__cassette-balance {
+    justify-self: end;
+    width: 0;
+    height: 1px;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.resume-session__cassette-label .tv-header-channel-flag {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    line-height: 1;
+    font-weight: 300;
+    letter-spacing: 0.03em;
+    color: color-mix(in srgb, var(--tv-text-secondary) 82%, transparent);
+    opacity: 0.9;
+}
+
+.resume-session__cassette-label .tv-header-channel-flag:empty {
+    display: none;
+}
+
+.resume-session__cassette .radio-module__art {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.resume-session__cassette-title {
+    justify-self: center;
+    min-width: 0;
+    max-width: 100%;
+    font-weight: 300;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+    font-size: 0.62rem;
+    color: color-mix(in srgb, var(--tv-text-secondary) 90%, transparent);
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    text-transform: none;
+    white-space: nowrap;
+    overflow: hidden;
+}
