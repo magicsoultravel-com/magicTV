@@ -6,6 +6,7 @@ import { ChannelGrid } from '../ui/channelGrid.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { ListSort, compareCountries, getSortPrefs, getCategoryFilterValue, setCategoryNameMap, sortChannelList } from '../ui/listSort.js';
 import { marqueeInnerHtml } from '../ui/marquee.js';
+import { RadioBrowseView } from './radioBrowseView.js';
 
 const PAGE_SIZE = 60;
 
@@ -86,6 +87,10 @@ export const BrowseView = {
 
     applyFilter(q) {
         const appState = deps.appState;
+        if (appState.catalogMode === 'radio') {
+            RadioBrowseView.applyFilter(q);
+            return;
+        }
         if (appState.activeTab === 'browse') {
             if (appState.browseCountry === null) {
                 appState.countryFilter = q;

@@ -114,6 +114,7 @@ function activeChannelGrid() {
 }
 
 function startPlayback(channel) {
+    if (appState.catalogMode === 'radio') setCatalogMode('tv');
     TileFrames.setPlaybackBusy(true);
     const slotId = MultiView.statusSlotId || 'center';
     MultiView.playOnSlot(slotId, channel)
@@ -184,6 +185,10 @@ function loadLocalState() {
 }
 
 function handleSortChanged(context, opts = {}) {
+    if (appState.catalogMode === 'radio') {
+        RadioBrowseView.onSortChanged(context, opts);
+        return;
+    }
     if (context === 'countries') {
         BrowseView.renderCountries();
     } else if (context === 'channels') {
@@ -196,6 +201,7 @@ function handleSortChanged(context, opts = {}) {
 }
 
 function handleCategoryFilterChanged(context) {
+    if (appState.catalogMode === 'radio') return;
     if (context === 'channels') {
         BrowseView.restartChannelList();
     } else if (context === 'favorites') {
@@ -230,6 +236,10 @@ function bindBackButton() {
                 FavoritesFolders.closeFavoriteFolder();
                 ChannelGrid.renderFavorites();
                 syncCreateFavoriteFolderBtn();
+                return;
+            }
+            if (appState.catalogMode === 'radio') {
+                RadioBrowseView.backToCountries();
                 return;
             }
             BrowseView.showCountriesView();
@@ -301,7 +311,11 @@ function bindTabs() {
             // Controls with no data-tab are not tab switches.
             if (!tabName) return;
             if (tabName === 'back-to-countries') {
-                BrowseView.showCountriesView();
+                if (appState.catalogMode === 'radio') {
+                    RadioBrowseView.backToCountries();
+                } else {
+                    BrowseView.showCountriesView();
+                }
                 return;
             }
             if (tabName === 'back-to-favorites-root') {
@@ -354,14 +368,17 @@ function withBrowseDrillTransition(mutate) {
 function syncPlayFavoritesMosaicBtn() {
     const btn = el('play-favorites-mosaic-btn');
     if (!btn) return;
-    btn.classList.toggle('is-hidden', appState.activeTab !== 'favorites');
-    ChanBindPicker.syncCatalogBindVisibility(appState.activeTab === 'favorites');
+    const visible = appState.activeTab === 'favorites' && appState.catalogMode !== 'radio';
+    btn.classList.toggle('is-hidden', !visible);
+    ChanBindPicker.syncCatalogBindVisibility(visible);
 }
 
 function syncCreateFavoriteFolderBtn() {
     const btn = el('create-favorite-folder-btn');
     if (!btn) return;
-    const visible = appState.activeTab === 'favorites' && !appState.favoritesFolderId;
+    const visible = appState.activeTab === 'favorites'
+        && !appState.favoritesFolderId
+        && appState.catalogMode !== 'radio';
     btn.classList.toggle('is-hidden', !visible);
 }
 
@@ -433,6 +450,9 @@ function bindCatalogLayout() {
 function isBrowserRefreshableView() {
     if (appState.activeTab === 'favorites') return true;
     if (appState.activeTab === 'recents') return true;
+    if (appState.catalogMode === 'radio') {
+        return appState.activeTab === 'browse' && RadioBrowseView.getBrowseLevel?.() === 'stations';
+    }
     return appState.activeTab === 'browse' && appState.browseCountry != null;
 }
 
@@ -463,6 +483,11 @@ async function handleBrowserRefresh() {
     try {
         const tab = appState.activeTab;
         const viewKey = currentRefreshKey();
+        if (appState.catalogMode === 'radio') {
+            RadioBrowseView.refresh();
+            showAppToast('✅ Refreshed');
+            return;
+        }
         if (tab === 'browse') {
             await BrowseView.refreshBrowseCountry();
             stampRefreshView(viewKey);
@@ -554,8 +579,16 @@ function syncRemoteTabChrome() {
 const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
 
 function setCatalogMode(mode) {
-    appState.catalogMode = mode === 'radio' ? 'radio' : 'tv';
+    const next = mode === 'radio' ? 'radio' : 'tv';
+    const prev = appState.catalogMode;
+    appState.catalogMode = next;
     RadioBrowseView.setMode(appState.catalogMode);
+    ListSort.syncSortControls();
+    if (prev === 'radio' && next === 'tv' && BROWSER_TABS.includes(appState.activeTab)) {
+        if (appState.activeTab === 'browse') BrowseView.restoreView();
+        else if (appState.activeTab === 'favorites') ChannelGrid.refreshFavorites();
+        else if (appState.activeTab === 'recents') ChannelGrid.refreshRecents();
+    }
 }
 
 function openRadioCatalog({ tab = 'browse' } = {}) {
@@ -571,9 +604,7 @@ function openRadioCatalog({ tab = 'browse' } = {}) {
 }
 
 function switchTabFromRemote(tabName) {
-    if (BROWSER_TABS.includes(tabName) || tabName === 'remote') {
-        setCatalogMode('tv');
-    }
+    // Sticky catalog mode: do not force TV when navigating Browse/Favorites/Recents.
     switchTabAnimated(tabName);
 }
 
@@ -614,6 +645,10 @@ function ensureBrowserCatalogVisible() {
         return;
     }
     activateTabPanels(tab);
+    if (appState.catalogMode === 'radio') {
+        RadioBrowseView.refresh();
+        return;
+    }
     if (tab === 'browse') {
         BrowseView.restoreView();
     } else if (tab === 'favorites') {
@@ -655,8 +690,15 @@ function switchTab(tabName) {
     const backBtn = el('back-btn');
     if (backBtn) {
         if (appState.catalogMode === 'radio') {
-            backBtn.classList.add('is-hidden');
-            backBtn.classList.remove('is-active', 'is-pink-active');
+            if (tabName === 'browse' && RadioBrowseView.getBrowseLevel?.() === 'stations') {
+                backBtn.classList.remove('is-hidden');
+                backBtn.classList.add('is-active', 'is-pink-active');
+                backBtn.dataset.tab = 'back-to-countries';
+            } else {
+                backBtn.classList.add('is-hidden');
+                backBtn.classList.remove('is-active', 'is-pink-active');
+                backBtn.dataset.tab = 'back-to-countries';
+            }
         } else if (appState.browseCountry !== null && tabName === 'browse') {
             backBtn.classList.remove('is-hidden');
             backBtn.classList.add('is-active', 'is-pink-active');
@@ -672,7 +714,24 @@ function switchTab(tabName) {
 
     syncRemoteTabChrome();
     ListSort.syncSortControls();
-    if (tabName === 'favorites') {
+    if (appState.catalogMode === 'radio') {
+        if (tabName === 'favorites') {
+            applyCatalogFilterInput(el('search-countries'), 'favorites', appState);
+            RadioBrowseView.renderFavorites();
+            restoreActiveTabScroll('favorites');
+        } else if (tabName === 'recents') {
+            applyCatalogFilterInput(el('search-countries'), 'recents', appState);
+            RadioBrowseView.renderRecents();
+            restoreActiveTabScroll('recents');
+        } else if (tabName === 'browse') {
+            RadioBrowseView.refresh();
+        } else if (tabName === 'settings') {
+            Appearance.refreshWatchStats();
+            Appearance.updateStorageStats();
+            HiddenChannelsSettings.refresh();
+            VisitedChannelsSettings.refresh();
+        }
+    } else if (tabName === 'favorites') {
         applyCatalogFilterInput(el('search-countries'), 'favorites', appState);
         const favGrid = el('favorites-grid');
         if (!favGrid?.querySelector('.channel-tile')) ChannelGrid.refreshFavorites();
@@ -685,9 +744,7 @@ function switchTab(tabName) {
         else ChannelGrid.syncPlayingTiles();
         restoreActiveTabScroll('recents');
     } else if (tabName === 'browse') {
-        if (appState.catalogMode !== 'radio') {
-            BrowseView.restoreView();
-        }
+        BrowseView.restoreView();
     } else if (tabName === 'settings') {
         Appearance.refreshWatchStats();
         Appearance.updateStorageStats();
@@ -817,10 +874,13 @@ async function init() {
             switchTabNav: switchTabFromRemote,
             ensureBrowserCatalog: ensureBrowserCatalogVisible
         });
-        RadioBrowseView.init();
+        RadioBrowseView.init({ appState });
         RadioBridge.register({ player: RadioPlayer, module: RadioModule });
         RadioModule.init({
-            openBrowser: openRadioCatalog
+            openBrowser: openRadioCatalog,
+            onClose: () => {
+                if (appState.catalogMode === 'radio') setCatalogMode('tv');
+            }
         });
         RemotePanel.bind();
         GuidePanel.init();

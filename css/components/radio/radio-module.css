@@ -368,63 +368,6 @@ body.radio-enabled #remote-radio-btn.is-hidden {
     display: none;
 }
 
-/* Radio catalog mode: hide TV grids, show radio grids with same tile classes */
-body.catalog-mode-radio #countries-container,
-body.catalog-mode-radio #channels-container,
-body.catalog-mode-radio #favorites-grid,
-body.catalog-mode-radio #favorites-empty,
-body.catalog-mode-radio #recents-grid,
-body.catalog-mode-radio #recents-empty {
-    display: none !important;
-}
-
-body.catalog-mode-radio #radio-browse-root,
-body.catalog-mode-radio #radio-favorites-root,
-body.catalog-mode-radio #radio-recents-root {
-    display: flex !important;
-    flex-direction: column;
-    min-height: 0;
-    flex: 1;
-    gap: 8px;
-}
-
-body:not(.catalog-mode-radio) #radio-browse-root,
-body:not(.catalog-mode-radio) #radio-favorites-root,
-body:not(.catalog-mode-radio) #radio-recents-root {
-    display: none !important;
-}
-
-.radio-browse__toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    padding: 0 2px;
-}
-
-.radio-browse__filter {
-    flex: 1;
-    min-width: 100px;
-    font: inherit;
-    padding: 4px 8px;
-    color: var(--tv-text-primary);
-    background: color-mix(in srgb, var(--tv-bg-primary, #0b0e18) 80%, transparent);
-    border: 1px solid var(--tv-border, #2A2E3A);
-    border-radius: 6px;
-}
-
-.radio-browse__status {
-    margin: 0;
-    padding: 8px;
-    font-size: 0.85rem;
-    opacity: 0.75;
-    color: var(--tv-text-secondary, #9aa3b5);
-}
-
-.radio-browse__sentinel {
-    height: 1px;
-}
-
 /* Playing station uses same is-playing affordance as TV tiles */
 .channel-tile.is-playing-radio {
     outline: 1px solid color-mix(in srgb, var(--tv-primary) 55%, transparent);

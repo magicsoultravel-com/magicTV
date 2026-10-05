@@ -435,9 +435,13 @@ function bindOnce() {
     });
 }
 
+/** @type {(() => void) | null} */
+let onCloseCb = null;
+
 export const RadioModule = {
-    init({ openBrowser } = {}) {
+    init({ openBrowser, onClose } = {}) {
         if (typeof openBrowser === 'function') openRadioBrowser = openBrowser;
+        if (typeof onClose === 'function') onCloseCb = onClose;
         bindOnce();
         RadioPlayer.init({
             getSharedVolume: () => multiViewRef?.sharedVolume ?? 1
@@ -504,6 +508,7 @@ export const RadioModule = {
         open = false;
         showUI(false);
         persistState();
+        onCloseCb?.();
     },
 
     toggle() {

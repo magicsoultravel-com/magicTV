@@ -1,5 +1,5 @@
 /**
- * Radio catalog inside magic browser — same country/channel tile chrome as TV.
+ * Radio catalog inside magic browser — paints into the same grids as TV browse.
  */
 import { el, countryFlagEmoji, escapeHtml } from '../tvUtils.js';
 import { RadioPlayer } from '../radio/radioPlayer.js';
@@ -10,6 +10,7 @@ import { showAppToast } from '../ui/toast.js';
 import { CARD_ICONS } from '../ui/icons.js';
 import { Appearance } from '../ui/appearance.js';
 import { marqueeInnerHtml } from '../ui/marquee.js';
+import { compareCountries, getSortPrefs, ListSort } from '../ui/listSort.js';
 
 const PAGE_SIZE = 60;
 
@@ -30,8 +31,10 @@ let stationsLoading = false;
 let stationsDone = false;
 let bound = false;
 let filterText = '';
-/** @type {IntersectionObserver | null} */
-let sentinelObserver = null;
+let scrollBound = false;
+
+/** @type {{ appState?: any } | null} */
+let deps = null;
 
 const ART_CASSETTE = `<span class="radio-module__art-cassette"><svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="8" width="14" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="16" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>`;
 
@@ -47,6 +50,20 @@ function syncModeClasses() {
     document.body.classList.toggle('catalog-mode-tv', catalogMode !== 'radio');
     const brand = document.querySelector('#browser-shell .remote-module__brand');
     if (brand) brand.textContent = catalogMode === 'radio' ? 'magic radio browser' : 'magic browser';
+}
+
+function syncBackButton() {
+    const backBtn = el('back-btn');
+    if (!backBtn || catalogMode !== 'radio') return;
+    if (browseLevel === 'stations' && activeCountry) {
+        backBtn.classList.remove('is-hidden');
+        backBtn.classList.add('is-active', 'is-pink-active');
+        backBtn.dataset.tab = 'back-to-countries';
+    } else {
+        backBtn.classList.add('is-hidden');
+        backBtn.classList.remove('is-active', 'is-pink-active');
+        backBtn.dataset.tab = 'back-to-countries';
+    }
 }
 
 function countryTileHtml(c) {
@@ -87,16 +104,8 @@ function stationTileHtml(station) {
     `;
 }
 
-function setStatus(text) {
-    const status = el('radio-browse-status');
-    if (!status) return;
-    if (!text) {
-        status.hidden = true;
-        status.textContent = '';
-        return;
-    }
-    status.hidden = false;
-    status.textContent = text;
+function activeTabId() {
+    return document.querySelector('.tv-panel.is-active')?.id || '';
 }
 
 function filteredCountries() {
@@ -109,39 +118,38 @@ function filteredCountries() {
             return name.includes(q) || code.includes(q);
         });
     }
-    const sort = RadioPlayer.getCountrySort();
-    list.sort((a, b) => {
-        if (sort === 'name') {
-            return String(a.name || '').localeCompare(String(b.name || ''));
-        }
-        return (Number(b.stationcount) || 0) - (Number(a.stationcount) || 0);
-    });
+    const appState = deps?.appState;
+    const { sortBy, sortDir } = getSortPrefs(appState || undefined);
+    const by = sortBy || 'stations';
+    const dir = sortDir || 'desc';
+    list.sort((a, b) => compareCountries(a, b, by, dir));
     return list;
 }
 
 function showCountriesLevel() {
-    setVisible(el('radio-countries-grid'), true);
-    setVisible(el('radio-stations-grid'), false);
-    const back = el('radio-browse-back');
-    if (back) back.hidden = true;
+    setVisible(el('countries-container'), true);
+    setVisible(el('channels-container'), false);
+    browseLevel = 'countries';
+    syncBackButton();
+    ListSort.syncSortControls();
 }
 
 function showStationsLevel() {
-    setVisible(el('radio-countries-grid'), false);
-    setVisible(el('radio-stations-grid'), true);
-    const back = el('radio-browse-back');
-    if (back) back.hidden = false;
+    setVisible(el('countries-container'), false);
+    setVisible(el('channels-container'), true);
+    browseLevel = 'stations';
+    syncBackButton();
+    ListSort.syncSortControls();
 }
 
 function renderCountries() {
-    const container = el('radio-countries-grid');
-    if (!container) return;
+    const container = el('countries-container');
+    if (!container || catalogMode !== 'radio') return;
     showCountriesLevel();
     const rows = filteredCountries();
     container.innerHTML = rows.map(countryTileHtml).join('')
         || '<div class="empty-state"><p class="empty-state__text">No countries found</p></div>';
     Appearance.applyToTiles?.(container);
-    setStatus(rows.length ? `${rows.length} countries` : '');
 }
 
 async function loadCountries({ refresh = false } = {}) {
@@ -150,17 +158,15 @@ async function loadCountries({ refresh = false } = {}) {
         return countriesCache;
     }
     if (!refresh && countriesLoadPromise) {
-        setStatus('Loading countries…');
         try {
             await countriesLoadPromise;
             renderCountries();
-        } catch (e) {
-            setStatus(e?.message || 'Failed to load countries');
+        } catch {
+            /* status via empty grid */
         }
         return countriesCache;
     }
 
-    setStatus(countriesCache.length ? `${countriesCache.length} countries` : 'Loading countries…');
     countriesLoadPromise = (async () => {
         const provider = RadioProviderRegistry.getActive();
         return provider.getCountries({ refresh });
@@ -168,19 +174,23 @@ async function loadCountries({ refresh = false } = {}) {
 
     try {
         countriesCache = await countriesLoadPromise;
-        renderCountries();
+        if (catalogMode === 'radio') renderCountries();
         return countriesCache;
     } catch (e) {
-        setStatus(e?.message || 'Failed to load countries');
+        const container = el('countries-container');
+        if (container && catalogMode === 'radio') {
+            container.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed to load countries')}</p></div>`;
+        }
         return countriesCache;
     } finally {
         countriesLoadPromise = null;
     }
 }
 
-/** Warm Radio Browser countries/API base in the background (mirrors TV catalog prefetch). */
 function prefetchCountries() {
-    if (countriesCache.length || countriesLoadPromise) return countriesLoadPromise || Promise.resolve(countriesCache);
+    if (countriesCache.length || countriesLoadPromise) {
+        return countriesLoadPromise || Promise.resolve(countriesCache);
+    }
     countriesLoadPromise = (async () => {
         const provider = RadioProviderRegistry.getActive();
         countriesCache = await provider.getCountries({ refresh: false });
@@ -191,21 +201,31 @@ function prefetchCountries() {
     return countriesLoadPromise;
 }
 
+function stationApiOrder() {
+    const { sortBy } = getSortPrefs(deps?.appState || undefined);
+    // Shared chrome only exposes name for radio stations; keep API aligned.
+    if (sortBy === 'name') return { order: 'name', reverse: false };
+    return { order: 'name', reverse: false };
+}
+
 async function loadMoreStations() {
-    if (stationsLoading || stationsDone || !activeCountry) return;
+    if (stationsLoading || stationsDone || !activeCountry || catalogMode !== 'radio') return;
     stationsLoading = true;
-    setStatus('Loading stations…');
+    const list = el('channels-container');
+    if (list && !stationsCache.length) {
+        list.innerHTML = '<div class="catalog-status" role="status"><p class="catalog-status__text">Loading stations…</p></div>';
+    }
     try {
         const provider = RadioProviderRegistry.getActive();
-        const order = RadioPlayer.getBrowseSort() || 'name';
-        const dir = RadioPlayer.getBrowseSortDir() || 'asc';
+        const { order, reverse } = stationApiOrder();
+        const { sortDir } = getSortPrefs(deps?.appState || undefined);
         const hideOffline = loadRadioState().hideOfflineStations !== false;
         const batch = await provider.searchStations({
             countrycode: activeCountry,
             limit: PAGE_SIZE,
             offset: stationOffset,
-            order: order === 'count' ? 'name' : order,
-            reverse: dir === 'desc',
+            order,
+            reverse: sortDir === 'desc' ? !reverse : reverse,
             hideOffline
         });
         const q = filterText.trim().toLowerCase();
@@ -215,17 +235,15 @@ async function loadMoreStations() {
         stationsCache = stationsCache.concat(filtered);
         stationOffset += batch.length;
         if (batch.length < PAGE_SIZE) stationsDone = true;
-        const list = el('radio-stations-grid');
         if (list) {
             list.innerHTML = stationsCache.map(stationTileHtml).join('')
                 || '<div class="empty-state"><p class="empty-state__text">No stations</p></div>';
             Appearance.applyToTiles?.(list);
         }
-        setStatus(stationsDone
-            ? `${stationsCache.length} stations`
-            : `${stationsCache.length}+ stations`);
     } catch (e) {
-        setStatus(e?.message || 'Failed to load stations');
+        if (list) {
+            list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed to load stations')}</p></div>`;
+        }
     } finally {
         stationsLoading = false;
     }
@@ -233,46 +251,47 @@ async function loadMoreStations() {
 
 async function openCountry(code) {
     activeCountry = code;
-    browseLevel = 'stations';
     stationsCache = [];
     stationOffset = 0;
     stationsDone = false;
     showStationsLevel();
-    const list = el('radio-stations-grid');
+    const list = el('channels-container');
     if (list) list.innerHTML = '';
-    syncSortControlsForLevel();
+    const panel = el('browse-panel');
+    if (panel) panel.scrollTop = 0;
     await loadMoreStations();
 }
 
-function syncSortControlsForLevel() {
-    const sort = el('radio-browse-sort');
-    const dir = el('radio-browse-sort-dir');
-    if (!sort || !dir) return;
-    if (browseLevel === 'countries') {
-        sort.value = RadioPlayer.getCountrySort() === 'name' ? 'name' : 'count';
-        [...sort.options].forEach((opt) => {
-            opt.hidden = !(opt.value === 'count' || opt.value === 'name');
-        });
-        dir.hidden = true;
-    } else {
-        [...sort.options].forEach((opt) => {
-            opt.hidden = opt.value === 'count';
-        });
-        const cur = RadioPlayer.getBrowseSort();
-        sort.value = cur === 'count' ? 'name' : cur;
-        dir.hidden = false;
-        dir.value = RadioPlayer.getBrowseSortDir();
-    }
+function backToCountries() {
+    if (catalogMode !== 'radio') return;
+    activeCountry = null;
+    stationsCache = [];
+    stationOffset = 0;
+    stationsDone = false;
+    renderCountries();
+}
+
+function filterStationsClient(list) {
+    const q = filterText.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((s) => String(s.name || '').toLowerCase().includes(q)
+        || String(s.countrycode || '').toLowerCase().includes(q));
 }
 
 async function renderFavorites() {
-    const list = el('radio-favorites-grid');
-    if (!list) return;
+    const list = el('favorites-grid');
+    const empty = el('favorites-empty');
+    if (!list || catalogMode !== 'radio') return;
     const keys = RadioPlayer.getFavorites();
+    const q = filterText.trim().toLowerCase();
     if (!keys.length) {
-        list.innerHTML = '<div class="empty-state"><p class="empty-state__text">No radio favorites</p></div>';
+        list.innerHTML = '';
+        setVisible(empty, true);
+        setVisible(list, false);
         return;
     }
+    setVisible(empty, false);
+    setVisible(list, true);
     list.innerHTML = '<div class="catalog-status" role="status"><p class="catalog-status__text">Loading…</p></div>';
     try {
         const provider = RadioProviderRegistry.getActive();
@@ -282,95 +301,129 @@ async function renderFavorites() {
         });
         const stations = await provider.getStationsByIds(ids);
         const byKey = new Map(stations.map((s) => [stationKey(s), s]));
-        list.innerHTML = keys.map((k) => {
-            const s = byKey.get(k) || { stationuuid: k, name: k, favicon: '', countrycode: '' };
-            return stationTileHtml(s);
-        }).join('');
+        let rows = keys.map((k) => byKey.get(k) || { stationuuid: k, name: k, favicon: '', countrycode: '' });
+        rows = filterStationsClient(rows);
+        const { sortBy, sortDir } = getSortPrefs(deps?.appState || undefined);
+        if (sortBy === 'name' || sortBy === 'country') {
+            const m = sortDir === 'asc' ? 1 : -1;
+            rows = rows.slice().sort((a, b) => {
+                if (sortBy === 'country') {
+                    const c = String(a.countrycode || '').localeCompare(String(b.countrycode || ''));
+                    if (c) return c * m;
+                }
+                return String(a.name || '').localeCompare(String(b.name || '')) * m;
+            });
+        }
+        list.innerHTML = rows.map(stationTileHtml).join('')
+            || '<div class="empty-state"><p class="empty-state__text">No favorites found</p></div>';
         Appearance.applyToTiles?.(list);
     } catch (e) {
         list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed')}</p></div>`;
     }
 }
 
-async function renderRecents() {
-    const list = el('radio-recents-grid');
-    if (!list) return;
+function renderRecents() {
+    const list = el('recents-grid');
+    const empty = el('recents-empty');
+    if (!list || catalogMode !== 'radio') return;
     const meta = RadioPlayer.getRecentsMeta();
     if (!meta.length) {
-        list.innerHTML = '<div class="empty-state"><p class="empty-state__text">No radio recents</p></div>';
+        list.innerHTML = '';
+        setVisible(empty, true);
+        setVisible(list, false);
         return;
     }
-    list.innerHTML = meta.map((m) => stationTileHtml({
+    setVisible(empty, false);
+    setVisible(list, true);
+    let rows = meta.map((m) => ({
         stationuuid: m.key,
         name: m.name || m.key,
         favicon: m.favicon || '',
-        countrycode: m.countrycode || ''
-    })).join('');
+        countrycode: m.countrycode || '',
+        at: m.at || 0
+    }));
+    rows = filterStationsClient(rows);
+    const { sortBy, sortDir } = getSortPrefs(deps?.appState || undefined);
+    const m = sortDir === 'asc' ? 1 : -1;
+    rows = rows.slice().sort((a, b) => {
+        if (sortBy === 'recent') {
+            const d = (a.at || 0) - (b.at || 0);
+            if (d) return d * m;
+        } else if (sortBy === 'country') {
+            const c = String(a.countrycode || '').localeCompare(String(b.countrycode || ''));
+            if (c) return c * m;
+        }
+        return String(a.name || '').localeCompare(String(b.name || '')) * m;
+    });
+    list.innerHTML = rows.map(stationTileHtml).join('')
+        || '<div class="empty-state"><p class="empty-state__text">No recents found</p></div>';
     Appearance.applyToTiles?.(list);
 }
 
-function ensureSentinel() {
-    const sentinel = el('radio-browse-sentinel');
-    if (!sentinel || sentinelObserver) return;
-    sentinelObserver = new IntersectionObserver((entries) => {
-        if (entries.some((e) => e.isIntersecting) && browseLevel === 'stations') {
+function ensureScrollBind() {
+    if (scrollBound) return;
+    const panel = el('browse-panel');
+    if (!panel) return;
+    scrollBound = true;
+    panel.addEventListener('scroll', () => {
+        if (catalogMode !== 'radio' || browseLevel !== 'stations') return;
+        if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80) {
             loadMoreStations();
         }
-    }, { root: el('browse-panel') || el('radio-browse-root'), rootMargin: '80px' });
-    sentinelObserver.observe(sentinel);
+    }, { passive: true });
+}
+
+function syncFilterFromSearchInput() {
+    const search = el('search-countries');
+    if (search) filterText = search.value || '';
+}
+
+function applyFilter(q) {
+    filterText = q || '';
+    const tab = activeTabId();
+    if (tab === 'favorites-panel') {
+        renderFavorites();
+        return;
+    }
+    if (tab === 'recents-panel') {
+        renderRecents();
+        return;
+    }
+    if (browseLevel === 'countries') {
+        renderCountries();
+        return;
+    }
+    stationsCache = [];
+    stationOffset = 0;
+    stationsDone = false;
+    loadMoreStations();
+}
+
+function onSortChanged() {
+    if (catalogMode !== 'radio') return;
+    const tab = activeTabId();
+    if (tab === 'favorites-panel') {
+        renderFavorites();
+        return;
+    }
+    if (tab === 'recents-panel') {
+        renderRecents();
+        return;
+    }
+    if (browseLevel === 'countries') {
+        renderCountries();
+        return;
+    }
+    stationsCache = [];
+    stationOffset = 0;
+    stationsDone = false;
+    loadMoreStations();
 }
 
 function bindOnce() {
     if (bound) return;
     bound = true;
-
-    el('radio-browse-back')?.addEventListener('click', () => {
-        browseLevel = 'countries';
-        activeCountry = null;
-        syncSortControlsForLevel();
-        renderCountries();
-    });
-
-    el('radio-browse-filter')?.addEventListener('input', (e) => {
-        filterText = e.target.value || '';
-        if (browseLevel === 'countries') renderCountries();
-        else {
-            stationsCache = [];
-            stationOffset = 0;
-            stationsDone = false;
-            loadMoreStations();
-        }
-    });
-
-    el('radio-browse-sort')?.addEventListener('change', (e) => {
-        const value = e.target.value;
-        if (browseLevel === 'countries') {
-            RadioPlayer.saveCountrySort(value === 'name' ? 'name' : 'count');
-            renderCountries();
-        } else {
-            RadioPlayer.saveBrowseSort(value);
-            stationsCache = [];
-            stationOffset = 0;
-            stationsDone = false;
-            loadMoreStations();
-        }
-    });
-
-    el('radio-browse-sort-dir')?.addEventListener('change', (e) => {
-        RadioPlayer.saveBrowseSortDir(e.target.value);
-        if (browseLevel === 'stations') {
-            stationsCache = [];
-            stationOffset = 0;
-            stationsDone = false;
-            loadMoreStations();
-        }
-    });
-
-    el('radio-recents-clear')?.addEventListener('click', () => {
-        if (!confirm('Clear radio recents?')) return;
-        RadioPlayer.clearRecents();
-        renderRecents();
-    });
+    ensureScrollBind();
 
     document.addEventListener('click', (e) => {
         if (catalogMode !== 'radio') return;
@@ -379,7 +432,7 @@ function bindOnce() {
             e.preventDefault();
             e.stopPropagation();
             RadioPlayer.toggleFavorite(star.getAttribute('data-radio-star'));
-            refreshActiveLists();
+            refreshActiveLists({ soft: true });
             return;
         }
         const country = e.target.closest?.('[data-radio-country]');
@@ -421,27 +474,39 @@ function bindOnce() {
 
 function refreshActiveLists({ soft = false } = {}) {
     if (catalogMode !== 'radio') return;
-    const tab = typeof document !== 'undefined'
-        ? document.querySelector('.tv-panel.is-active')?.id
-        : '';
-    // Favorites hit N station-by-uuid fetches — only when that panel is active.
+    syncFilterFromSearchInput();
+    const tab = activeTabId();
     if (tab === 'favorites-panel' || el('favorites-panel')?.classList.contains('is-active')) {
         renderFavorites();
     }
-    renderRecents();
-    if (!soft && browseLevel === 'stations') {
-        const list = el('radio-stations-grid');
-        if (list && stationsCache.length) {
-            list.innerHTML = stationsCache.map(stationTileHtml).join('');
-            Appearance.applyToTiles?.(list);
-        }
-    } else if (!soft && browseLevel === 'countries') {
-        renderCountries();
+    if (tab === 'recents-panel' || el('recents-panel')?.classList.contains('is-active')) {
+        renderRecents();
     }
+    if (tab === 'browse-panel' || el('browse-panel')?.classList.contains('is-active')) {
+        if (!soft && browseLevel === 'stations') {
+            const list = el('channels-container');
+            if (list && stationsCache.length) {
+                list.innerHTML = stationsCache.map(stationTileHtml).join('');
+                Appearance.applyToTiles?.(list);
+            }
+        } else if (!soft && browseLevel === 'countries') {
+            renderCountries();
+        } else if (soft && browseLevel === 'stations' && stationsCache.length) {
+            const list = el('channels-container');
+            if (list) {
+                list.innerHTML = stationsCache.map(stationTileHtml).join('');
+                Appearance.applyToTiles?.(list);
+            }
+        } else if (soft && browseLevel === 'countries') {
+            renderCountries();
+        }
+    }
+    syncBackButton();
 }
 
 export const RadioBrowseView = {
-    init() {
+    init(options = {}) {
+        deps = { appState: options.appState || null };
         bindOnce();
         syncModeClasses();
     },
@@ -450,30 +515,30 @@ export const RadioBrowseView = {
         return catalogMode;
     },
 
+    getBrowseLevel() {
+        return browseLevel;
+    },
+
     setMode(mode) {
         catalogMode = mode === 'radio' ? 'radio' : 'tv';
         syncModeClasses();
-        setVisible(el('radio-browse-root'), catalogMode === 'radio');
-        setVisible(el('radio-favorites-root'), catalogMode === 'radio');
-        setVisible(el('radio-recents-root'), catalogMode === 'radio');
         if (catalogMode === 'radio') {
-            ensureSentinel();
-            syncSortControlsForLevel();
-            // Paint countries immediately when warm; otherwise kick a single fetch.
-            // Defer favorites UUID storm until favorites tab refresh.
-            if (countriesCache.length) renderCountries();
+            ensureScrollBind();
+            if (browseLevel === 'stations' && activeCountry) showStationsLevel();
+            else if (countriesCache.length) renderCountries();
             else loadCountries();
-            renderRecents();
+            ListSort.syncSortControls();
+            syncBackButton();
         }
         return catalogMode;
     },
 
     async openBrowse() {
         this.setMode('radio');
-        browseLevel = 'countries';
         activeCountry = null;
-        syncSortControlsForLevel();
-        // Warm cache: sync paint. Cold: await the in-flight/prefetch load once.
+        stationsCache = [];
+        stationOffset = 0;
+        stationsDone = false;
         if (countriesCache.length) {
             renderCountries();
             return;
@@ -481,7 +546,12 @@ export const RadioBrowseView = {
         await loadCountries();
     },
 
-    /** Boot-time warm of Radio Browser countries (same role as BrowseView.refreshCountries). */
+    backToCountries,
+    applyFilter,
+    onSortChanged,
+    renderFavorites,
+    renderRecents,
+
     prefetch() {
         return prefetchCountries().catch(() => []);
     },
@@ -491,6 +561,5 @@ export const RadioBrowseView = {
         refreshActiveLists();
     },
 
-    /** Shared cassette markup for the floating radio art slot. */
     artCassetteHtml: ART_CASSETTE
 };

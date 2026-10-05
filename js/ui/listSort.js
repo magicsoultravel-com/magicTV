@@ -121,6 +121,13 @@ export function currentSortContext(appState = deps.appState) {
     if (tab === 'favorites') return 'favorites';
     if (tab === 'recents') return 'recents';
     if (tab === 'browse') {
+        if (appState.catalogMode === 'radio') {
+            const channels = el('channels-container');
+            if (channels && !channels.classList.contains('is-hidden') && !channels.hidden) {
+                return 'channels';
+            }
+            return 'countries';
+        }
         return appState.browseCountry == null ? 'countries' : 'channels';
     }
     return null;
@@ -337,7 +344,18 @@ export const ListSort = {
         if (sortBtn) sortBtn.classList.remove('is-hidden');
         if (sortPopup) sortPopup.classList.remove('is-hidden');
 
-        const options = SORT_OPTIONS[context] || [];
+        const radioMode = deps.appState?.catalogMode === 'radio';
+        let options = SORT_OPTIONS[context] || [];
+        if (radioMode) {
+            // No IPTV category sort in radio; favorites stay flat (no custom order).
+            if (context === 'channels') {
+                options = options.filter((o) => o.value === 'name');
+            } else if (context === 'favorites') {
+                options = options.filter((o) => o.value === 'name' || o.value === 'country');
+            } else if (context === 'recents') {
+                options = options.filter((o) => o.value !== 'category');
+            }
+        }
         const html = options.map((o) =>
             `<option value="${o.value}">${o.label}</option>`
         ).join('');
@@ -359,7 +377,8 @@ export const ListSort = {
         const catPopup = catBtn?.closest('.tv-tab-popup') || catMenu?.closest('.tv-tab-popup');
         if (!catMenu) return;
         const ctx = currentSortContext();
-        if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx)) {
+        const radioMode = deps.appState?.catalogMode === 'radio';
+        if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx) || radioMode) {
             catMenu.classList.add('is-hidden');
             catMenu.classList.remove('is-visible');
             if (catBtn) {
