@@ -1,4 +1,4 @@
-import { normalizeChannel, PROVIDER_IPTV_ORG } from './channelShape.js';
+import { normalizeChannel, channelKey, PROVIDER_IPTV_ORG } from './channelShape.js';
 import { IndexedDBStore } from '../storage/indexedDbStore.js';
 
 const IPTV_CHANNELS_URL = 'https://iptv-org.github.io/api/channels.json';
@@ -385,6 +385,28 @@ export const IptvOrgTvProvider = {
         return ids
             .map((id) => normalizeChannel(catalog.byId.get(id), PROVIDER_IPTV_ORG))
             .filter(Boolean);
+    },
+
+    /**
+     * Ordered channel keys for a country (name-sorted), URL-resolvable only.
+     * @param {string} countryCode
+     * @param {{ refresh?: boolean }} [opts]
+     * @returns {Promise<string[]>}
+     */
+    async listCountryChannelKeys(countryCode, { refresh = false } = {}) {
+        const code = String(countryCode || '').trim().toUpperCase();
+        if (!code) return [];
+        const catalog = await loadCatalog(refresh);
+        const rawList = catalog.byCountry.get(code)
+            || catalog.byCountry.get(countryCode)
+            || [];
+        const channels = rawList
+            .map((s) => normalizeChannel(s, PROVIDER_IPTV_ORG))
+            .filter(Boolean)
+            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, {
+                sensitivity: 'base'
+            }));
+        return channels.map((ch) => channelKey(ch)).filter(Boolean);
     },
 
     // When was the catalog data we're serving last fetched from the network?

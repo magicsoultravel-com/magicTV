@@ -11,7 +11,7 @@ import { channelKey } from '../tvProviders/channelShape.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { classifyTilePlayback, bankRemainingSeconds } from '../player/pauseBuffer.js';
 import { ChromecastManager, formatCastError } from '../cast/chromecastManager.js';
-import { buildChannelIndex, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
+import { channelIndexForScope, bindScopeCacheKey, chanNumberAccentDigits, tvLabelAccentChars } from '../channelNav.js';
 import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
 import { setMarqueeText } from '../ui/marquee.js';
 import { SettingsStore } from '../storage/settingsStore.js';
@@ -292,12 +292,10 @@ export const tileChromeMethods = {
         const numberMaps = new Map();
         const numbersForSlot = (slotId) => {
             const scope = FavoritesRecents.getChanBindScope(slotId);
-            const cacheKey = scope?.mode === 'folder'
-                ? `folder:${scope.folderId || ''}`
-                : 'favorites';
+            const cacheKey = bindScopeCacheKey(scope);
             let map = numberMaps.get(cacheKey);
             if (!map) {
-                map = buildChannelIndex(scope).numberByKey;
+                map = channelIndexForScope(scope).numberByKey;
                 numberMaps.set(cacheKey, map);
             }
             return map;

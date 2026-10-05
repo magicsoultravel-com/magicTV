@@ -79,12 +79,20 @@ const CATEGORY_FILTER_KEYS = ['channels', 'favorites', 'recents'];
 
 const DEFAULT_CHAN_BIND_SCOPE = Object.freeze({ mode: 'favorites' });
 
-/** @returns {{ mode: 'favorites' } | { mode: 'folder', folderId: string }} */
+/**
+ * @returns {{ mode: 'favorites' }
+ *   | { mode: 'folder', folderId: string }
+ *   | { mode: 'country', countryCode: string }}
+ */
 export function normalizeChanBindScope(raw, favoriteFolders) {
     if (!raw || typeof raw !== 'object') return { ...DEFAULT_CHAN_BIND_SCOPE };
     if (raw.mode === 'folder' && typeof raw.folderId === 'string' && raw.folderId) {
         const exists = (favoriteFolders || []).some((f) => f.id === raw.folderId);
         if (exists) return { mode: 'folder', folderId: raw.folderId };
+    }
+    if (raw.mode === 'country') {
+        const code = String(raw.countryCode || raw.countrycode || '').trim().toUpperCase();
+        if (code) return { mode: 'country', countryCode: code };
     }
     return { ...DEFAULT_CHAN_BIND_SCOPE };
 }

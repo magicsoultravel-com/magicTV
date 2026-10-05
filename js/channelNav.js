@@ -9,7 +9,28 @@ import {
     currentSlotChannelKey
 } from './mosaic/slotOccupancy.js';
 
-/** @typedef {{ mode: 'favorites' } | { mode: 'folder', folderId: string }} ChanBindScope */
+/**
+ * @typedef {{ mode: 'favorites' }
+ *   | { mode: 'folder', folderId: string }
+ *   | { mode: 'country', countryCode: string }} ChanBindScope
+ */
+
+/** @type {Map<string, { keys: string[], numberByKey: Map<string, number> }>} */
+const countryIndexCache = new Map();
+let countryIndexStamp = -1;
+
+export function clearCountryChannelIndexCache() {
+    countryIndexCache.clear();
+    countryIndexStamp = -1;
+}
+
+function syncCountryCacheStamp() {
+    const stamp = Number(TvProviderRegistry.getLastRefreshed?.()) || 0;
+    if (stamp !== countryIndexStamp) {
+        countryIndexCache.clear();
+        countryIndexStamp = stamp;
+    }
+}
 
 /**
  * @param {ChanBindScope | null | undefined} bindScope
@@ -19,6 +40,11 @@ export function buildChannelIndex(bindScope) {
     const scope = bindScope || { mode: 'favorites' };
     const keys = [];
     const numberByKey = new Map();
+
+    if (scope.mode === 'country') {
+        // Sync callers must use peek / await resolveChannelIndex for country.
+        return { keys, numberByKey };
+    }
 
     if (scope.mode === 'folder') {
         const folder = FavoritesRecents.getFavoriteFolder(scope.folderId);
@@ -42,6 +68,70 @@ export function buildChannelIndex(bindScope) {
     keys.forEach((key, i) => numberByKey.set(key, i + 1));
     return { keys, numberByKey };
 }
+
+/**
+ * @param {string} countryCode
+ * @returns {{ keys: string[], numberByKey: Map<string, number> } | null}
+ */
+export function peekCountryChannelIndex(countryCode) {
+    syncCountryCacheStamp();
+    const code = String(countryCode || '').trim().toUpperCase();
+    if (!code) return null;
+    return countryIndexCache.get(code) || null;
+}
+
+/**
+ * @param {string} countryCode
+ * @returns {Promise<{ keys: string[], numberByKey: Map<string, number> }>}
+ */
+export async function buildCountryChannelIndex(countryCode) {
+    syncCountryCacheStamp();
+    const code = String(countryCode || '').trim().toUpperCase();
+    if (!code) return { keys: [], numberByKey: new Map() };
+    const cached = countryIndexCache.get(code);
+    if (cached) return cached;
+
+    const keys = await TvProviderRegistry.listCountryChannelKeys(code);
+    const numberByKey = new Map();
+    keys.forEach((key, i) => numberByKey.set(key, i + 1));
+    const result = { keys, numberByKey };
+    countryIndexCache.set(code, result);
+    return result;
+}
+
+/**
+ * Sync peek for UI overlays: favorites/folder always; country only if cached.
+ * @param {ChanBindScope | null | undefined} bindScope
+ * @returns {{ keys: string[], numberByKey: Map<string, number> }}
+ */
+export function channelIndexForScope(bindScope) {
+    const scope = bindScope || { mode: 'favorites' };
+    if (scope.mode === 'country') {
+        return peekCountryChannelIndex(scope.countryCode)
+            || { keys: [], numberByKey: new Map() };
+    }
+    return buildChannelIndex(scope);
+}
+
+/**
+ * @param {ChanBindScope | null | undefined} bindScope
+ * @returns {Promise<{ keys: string[], numberByKey: Map<string, number> }>}
+ */
+export async function resolveChannelIndex(bindScope) {
+    const scope = bindScope || { mode: 'favorites' };
+    if (scope.mode === 'country') {
+        return buildCountryChannelIndex(scope.countryCode);
+    }
+    return buildChannelIndex(scope);
+}
+
+function bindScopeCacheKey(scope) {
+    if (scope?.mode === 'folder') return `folder:${scope.folderId || ''}`;
+    if (scope?.mode === 'country') return `country:${scope.countryCode || ''}`;
+    return 'favorites';
+}
+
+export { bindScopeCacheKey };
 
 /**
  * Prefer accent from digit value (1/4/7→1, 2/5/8→2, 3/6/9/0→3), then
@@ -109,12 +199,13 @@ export function tvLabelAccentChars(screenNum) {
 
 /**
  * Walk bind-scope keys to the next/previous candidate ref (no catalog fetch).
+ * Country mode requires a warmed cache (see buildCountryChannelIndex).
  * @param {{ slotId: string, direction: 'up' | 'down', bindScope?: ChanBindScope }} opts
  * @returns {{ key: string, number: number } | null}
  */
 export function resolveAdjacentChannelKey({ slotId, direction, bindScope }) {
     const scope = bindScope || FavoritesRecents.getChanBindScope(slotId);
-    const { keys, numberByKey } = buildChannelIndex(scope);
+    const { keys, numberByKey } = channelIndexForScope(scope);
     if (!keys.length) return null;
 
     const occupied = getOccupiedKeysExcept(slotId);
@@ -143,7 +234,7 @@ export function resolveAdjacentChannelKey({ slotId, direction, bindScope }) {
  */
 export async function resolveAdjacentChannel({ slotId, direction, bindScope }) {
     const scope = bindScope || FavoritesRecents.getChanBindScope(slotId);
-    const { keys, numberByKey } = buildChannelIndex(scope);
+    const { keys, numberByKey } = await resolveChannelIndex(scope);
     if (!keys.length) return null;
 
     const occupied = getOccupiedKeysExcept(slotId);
@@ -179,9 +270,10 @@ export async function resolveAdjacentChannel({ slotId, direction, bindScope }) {
  */
 export async function navigateChannel(slotId, direction, { showToast = null } = {}) {
     const showAppToast = showToast || (await import('./ui/toast.js')).showAppToast;
-    const result = await resolveAdjacentChannel({ slotId, direction });
+    const scope = FavoritesRecents.getChanBindScope(slotId);
+    const result = await resolveAdjacentChannel({ slotId, direction, bindScope: scope });
     if (!result) {
-        const { keys } = buildChannelIndex(FavoritesRecents.getChanBindScope(slotId));
+        const { keys } = await resolveChannelIndex(scope);
         if (!keys.length) {
             showAppToast('No channels bound');
         } else {
@@ -195,7 +287,7 @@ export async function navigateChannel(slotId, direction, { showToast = null } = 
 }
 
 /**
- * Tune a slot to a 1-based bind-scope channel number (favorites / folder index).
+ * Tune a slot to a 1-based bind-scope channel number (favorites / folder / country index).
  * @param {string} slotId
  * @param {number} number
  * @param {{ showToast?: Function }} [options] optional toast override (test seam)
@@ -210,7 +302,7 @@ export async function navigateToChannelNumber(slotId, number, { showToast = null
     }
 
     const scope = FavoritesRecents.getChanBindScope(slotId);
-    const { keys } = buildChannelIndex(scope);
+    const { keys } = await resolveChannelIndex(scope);
     if (!keys.length) {
         showAppToast('No channels bound');
         return false;

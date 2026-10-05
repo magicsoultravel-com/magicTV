@@ -12,7 +12,7 @@ import { FavoritesFolders } from './favoritesFolders.js';
 import { HiddenChannels } from '../storage/hiddenChannels.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
-import { buildChannelIndex, chanNumberAccentHtml } from '../channelNav.js';
+import { channelIndexForScope, chanNumberAccentHtml } from '../channelNav.js';
 import { marqueeInnerHtml } from './marquee.js';
 
 const wiredTiles = new WeakSet();
@@ -268,7 +268,7 @@ function renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir,
     const folders = TvPlayer.getFavoriteFolders().filter((folder) => matchesFolderFilter(folder, filter));
     let rootChannelKeys = TvPlayer.getFavoritesRootOrder();
     rootChannelKeys = sortRootChannelRefs(rootChannelKeys, appState.favoritesList, sortBy, sortDir);
-    const { numberByKey } = buildChannelIndex(TvPlayer.getChanBindScope(MultiView.statusSlotId || 'center'));
+    const { numberByKey } = channelIndexForScope(TvPlayer.getChanBindScope(MultiView.statusSlotId || 'center'));
 
     const parts = folders.map((folder) => ({ type: 'folder', folder }));
     for (const ref of rootChannelKeys) {
@@ -316,7 +316,7 @@ function renderFavoritesFolderGrid(appState, grid, empty, folderId, filter, sort
         .filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
     list = filterVisibleChannels(list);
     list = sortChannelList(list, sortBy, sortDir);
-    const { numberByKey } = buildChannelIndex(TvPlayer.getChanBindScope(MultiView.statusSlotId || 'center'));
+    const { numberByKey } = channelIndexForScope(TvPlayer.getChanBindScope(MultiView.statusSlotId || 'center'));
 
     const parentHtml = FavoritesFolders.folderParentTileHtml();
     if (!list.length) {

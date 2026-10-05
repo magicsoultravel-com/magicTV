@@ -1,5 +1,5 @@
 import { IptvOrgTvProvider } from './iptvOrgTv.js';
-import { PROVIDER_IPTV_ORG } from './channelShape.js';
+import { PROVIDER_IPTV_ORG, channelKey } from './channelShape.js';
 import { readPersistedState, patchPersistedState } from '../storage/persistedState.js';
 
 const PROVIDERS = {
@@ -63,6 +63,33 @@ export const TvProviderRegistry = {
 
     async searchChannels(opts = {}) {
         return this.getActiveProvider().searchChannels(opts);
+    },
+
+    async listCountryChannelKeys(countryCode, opts = {}) {
+        const provider = this.getActiveProvider();
+        if (typeof provider.listCountryChannelKeys === 'function') {
+            return provider.listCountryChannelKeys(countryCode, opts);
+        }
+        const code = String(countryCode || '').trim().toUpperCase();
+        if (!code) return [];
+        const pageSize = 500;
+        const keys = [];
+        for (let offset = 0; offset < 20000; offset += pageSize) {
+            const page = await provider.searchChannels({
+                countrycode: code,
+                limit: pageSize,
+                offset,
+                order: 'name',
+                ...opts
+            });
+            if (!page?.length) break;
+            for (const ch of page) {
+                const k = channelKey(ch);
+                if (k) keys.push(k);
+            }
+            if (page.length < pageSize) break;
+        }
+        return keys;
     },
 
     getLastRefreshed() {

@@ -9,7 +9,7 @@ import { PLAY_FILL_ORDER, slotOutlineAccent } from '../mosaic/constants.js';
 import { fetchStoredFramesForMosaic, resolveStoredFrameDataUrl, collectFrameLookupKeys } from '../mosaic/frameLookup.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { applyMarquee, marqueeInnerHtml } from './marquee.js';
-import { tvLabelAccentChars, chanNumberAccentHtml, buildChannelIndex } from '../channelNav.js';
+import { tvLabelAccentChars, chanNumberAccentHtml, channelIndexForScope, bindScopeCacheKey } from '../channelNav.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { RemoteModule } from './remoteModule.js';
 
@@ -95,10 +95,10 @@ function renderList(tiles, posterMap = new Map()) {
     /** @type {Map<string, Map<string, number>>} */
     const numbersByScope = new Map();
     const numbersForScope = (scope) => {
-        const scopeKey = scope?.mode === 'folder' ? `folder:${scope.folderId}` : 'favorites';
+        const scopeKey = bindScopeCacheKey(scope);
         let map = numbersByScope.get(scopeKey);
         if (!map) {
-            map = buildChannelIndex(scope || { mode: 'favorites' }).numberByKey;
+            map = channelIndexForScope(scope || { mode: 'favorites' }).numberByKey;
             numbersByScope.set(scopeKey, map);
         }
         return map;

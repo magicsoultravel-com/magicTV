@@ -1065,6 +1065,82 @@
     left: auto;
     transform: translateY(-50%);
     z-index: 9000;
+    min-width: 11rem;
+    max-width: 15rem;
+    max-height: min(22rem, 70vh);
+    overflow-y: auto;
+}
+
+.chan-bind-menu__empty {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.68rem;
+    color: color-mix(in srgb, var(--tv-text-primary) 55%, transparent);
+}
+
+.chan-bind-menu__item--nav,
+.chan-bind-menu__item--back {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
+.chan-bind-menu__item--back {
+    margin-bottom: 0.15rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--tv-border) 45%, transparent);
+    border-radius: 5px 5px 0 0;
+    font-weight: 600;
+}
+
+.chan-bind-menu__nav-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chan-bind-menu__chevron {
+    flex: 0 0 auto;
+    opacity: 0.7;
+    font-size: 0.95em;
+    line-height: 1;
+}
+
+.chan-bind-menu__item--country {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+.chan-bind-menu__flag {
+    flex: 0 0 auto;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.chan-bind-menu__country-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.45rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.chan-bind-menu__country-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chan-bind-menu__country-count {
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    opacity: 0.65;
+}
+
+.tv-player-tile__chan-bind-btn.is-bound-country,
+.tv-player-tile__chan-bind-btn.is-bound-folder {
+    color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
 }
 
 .tv-player-tile__hover {

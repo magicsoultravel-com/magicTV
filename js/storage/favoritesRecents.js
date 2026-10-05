@@ -474,6 +474,9 @@ export const FavoritesRecents = {
         if (scope?.mode === 'folder' && scope.folderId) {
             return { mode: 'folder', folderId: scope.folderId };
         }
+        if (scope?.mode === 'country' && scope.countryCode) {
+            return { mode: 'country', countryCode: String(scope.countryCode).toUpperCase() };
+        }
         return { mode: 'favorites' };
     },
 
@@ -483,10 +486,10 @@ export const FavoritesRecents = {
         const normalized = normalizeChanBindScope(scope, state.favoriteFolders);
         const map = { ...(state.chanBindScopeBySlot || {}) };
         const current = map[id] || { mode: 'favorites' };
-        if (current.mode === normalized.mode
-            && (normalized.mode !== 'folder' || current.folderId === normalized.folderId)) {
-            return false;
-        }
+        const same = current.mode === normalized.mode
+            && (normalized.mode !== 'folder' || current.folderId === normalized.folderId)
+            && (normalized.mode !== 'country' || current.countryCode === normalized.countryCode);
+        if (same) return false;
         map[id] = normalized;
         savePlayerState({ chanBindScopeBySlot: map });
         return true;

@@ -2,12 +2,25 @@
  * Unit tests for channel bind index + digit tune (navigateToChannelNumber).
  * Do not require a browser DOM.
  */
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildChannelIndex, navigateToChannelNumber, chanNumberAccentDigits, tvLabelAccentChars } from '../js/channelNav.js';
+import {
+    buildChannelIndex,
+    buildCountryChannelIndex,
+    clearCountryChannelIndexCache,
+    channelIndexForScope,
+    peekCountryChannelIndex,
+    resolveAdjacentChannelKey,
+    navigateToChannelNumber,
+    navigateChannel,
+    chanNumberAccentDigits,
+    tvLabelAccentChars,
+    bindScopeCacheKey
+} from '../js/channelNav.js';
 import { FavoritesRecents } from '../js/storage/favoritesRecents.js';
 import { TvProviderRegistry } from '../js/tvProviders/registry.js';
 import { MultiView } from '../js/multiView.js';
+import { normalizeChanBindScope } from '../js/storage/playerState.js';
 
 function stubMethod(obj, key, impl) {
     const prev = obj[key];
@@ -16,6 +29,31 @@ function stubMethod(obj, key, impl) {
         obj[key] = prev;
     };
 }
+
+beforeEach(() => {
+    clearCountryChannelIndexCache();
+});
+
+test('normalizeChanBindScope accepts country and uppercases code', () => {
+    assert.deepEqual(
+        normalizeChanBindScope({ mode: 'country', countryCode: 'gb' }, []),
+        { mode: 'country', countryCode: 'GB' }
+    );
+    assert.deepEqual(
+        normalizeChanBindScope({ mode: 'country', countryCode: '' }, []),
+        { mode: 'favorites' }
+    );
+    assert.deepEqual(
+        normalizeChanBindScope({ mode: 'country' }, []),
+        { mode: 'favorites' }
+    );
+});
+
+test('bindScopeCacheKey distinguishes country / folder / favorites', () => {
+    assert.equal(bindScopeCacheKey({ mode: 'favorites' }), 'favorites');
+    assert.equal(bindScopeCacheKey({ mode: 'folder', folderId: 'f1' }), 'folder:f1');
+    assert.equal(bindScopeCacheKey({ mode: 'country', countryCode: 'PL' }), 'country:PL');
+});
 
 test('chanNumberAccentDigits prefers digit accents and avoids repeats within 2–3 digits', () => {
     assert.deepEqual(chanNumberAccentDigits(1), [{ digit: '1', accent: 1 }]);
@@ -76,6 +114,98 @@ test('buildChannelIndex folder scope uses folder items only', () => {
         assert.equal(numberByKey.get('iptv-org:Y.us'), 2);
     } finally {
         restoreFolders();
+    }
+});
+
+test('buildChannelIndex country scope is empty sync (use async index)', () => {
+    const { keys } = buildChannelIndex({ mode: 'country', countryCode: 'PL' });
+    assert.deepEqual(keys, []);
+});
+
+test('buildCountryChannelIndex numbers keys and peeks from cache', async () => {
+    const restoreList = stubMethod(
+        TvProviderRegistry,
+        'listCountryChannelKeys',
+        async (code) => {
+            assert.equal(code, 'PL');
+            return ['iptv-org:A.pl', 'iptv-org:B.pl'];
+        }
+    );
+    const restoreStamp = stubMethod(TvProviderRegistry, 'getLastRefreshed', () => 1);
+    try {
+        assert.equal(peekCountryChannelIndex('PL'), null);
+        const { keys, numberByKey } = await buildCountryChannelIndex('pl');
+        assert.deepEqual(keys, ['iptv-org:A.pl', 'iptv-org:B.pl']);
+        assert.equal(numberByKey.get('iptv-org:A.pl'), 1);
+        assert.equal(peekCountryChannelIndex('PL')?.keys.length, 2);
+        assert.equal(channelIndexForScope({ mode: 'country', countryCode: 'PL' }).keys[1], 'iptv-org:B.pl');
+    } finally {
+        restoreList();
+        restoreStamp();
+    }
+});
+
+test('resolveAdjacentChannelKey walks country cache', async () => {
+    const restoreList = stubMethod(
+        TvProviderRegistry,
+        'listCountryChannelKeys',
+        async () => ['iptv-org:A.pl', 'iptv-org:B.pl', 'iptv-org:C.pl']
+    );
+    const restoreStamp = stubMethod(TvProviderRegistry, 'getLastRefreshed', () => 2);
+
+    try {
+        await buildCountryChannelIndex('PL');
+        const result = resolveAdjacentChannelKey({
+            slotId: 'center',
+            direction: 'up',
+            bindScope: { mode: 'country', countryCode: 'PL' }
+        });
+        // No current key → startIdx -1 for up → first step lands on index 0
+        assert.equal(result?.key, 'iptv-org:A.pl');
+        assert.equal(result?.number, 1);
+    } finally {
+        restoreList();
+        restoreStamp();
+    }
+});
+
+test('navigateChannel uses country index', async () => {
+    const restoreScope = stubMethod(
+        FavoritesRecents,
+        'getChanBindScope',
+        () => ({ mode: 'country', countryCode: 'PL' })
+    );
+    const restoreList = stubMethod(
+        TvProviderRegistry,
+        'listCountryChannelKeys',
+        async () => ['iptv-org:A.pl', 'iptv-org:B.pl']
+    );
+    const restoreStamp = stubMethod(TvProviderRegistry, 'getLastRefreshed', () => 3);
+    const restoreGet = stubMethod(TvProviderRegistry, 'getChannel', async (parsed) => {
+        if (parsed?.channelId === 'A.pl') {
+            return { name: 'A', url_resolved: 'https://example.test/a.m3u8', id: 'A.pl' };
+        }
+        if (parsed?.channelId === 'B.pl') {
+            return { name: 'B', url_resolved: 'https://example.test/b.m3u8', id: 'B.pl' };
+        }
+        return null;
+    });
+    const played = [];
+    const restorePlay = stubMethod(MultiView, 'playOnSlot', async (slotId, channel) => {
+        played.push({ slotId, channel });
+    });
+
+    try {
+        const ok = await navigateChannel('center', 'up');
+        assert.equal(ok, true);
+        assert.equal(played.length, 1);
+        assert.equal(played[0].channel.id, 'A.pl');
+    } finally {
+        restoreScope();
+        restoreList();
+        restoreStamp();
+        restoreGet();
+        restorePlay();
     }
 });
 
@@ -144,6 +274,41 @@ test('navigateToChannelNumber plays bind-scope channel by number', async () => {
         restoreScope();
         restoreFolders();
         restoreRoot();
+        restoreGet();
+        restorePlay();
+    }
+});
+
+test('navigateToChannelNumber plays country-bound channel by number', async () => {
+    const restoreScope = stubMethod(
+        FavoritesRecents,
+        'getChanBindScope',
+        () => ({ mode: 'country', countryCode: 'PL' })
+    );
+    const restoreList = stubMethod(
+        TvProviderRegistry,
+        'listCountryChannelKeys',
+        async () => ['iptv-org:A.pl', 'iptv-org:B.pl']
+    );
+    const restoreStamp = stubMethod(TvProviderRegistry, 'getLastRefreshed', () => 4);
+    const channelB = { name: 'B', url_resolved: 'https://example.test/b.m3u8', id: 'B.pl' };
+    const restoreGet = stubMethod(TvProviderRegistry, 'getChannel', async (parsed) => {
+        if (parsed?.channelId === 'B.pl') return channelB;
+        return null;
+    });
+    const played = [];
+    const restorePlay = stubMethod(MultiView, 'playOnSlot', async (slotId, channel) => {
+        played.push({ slotId, channel });
+    });
+
+    try {
+        const ok = await navigateToChannelNumber('center', 2);
+        assert.equal(ok, true);
+        assert.equal(played[0].channel, channelB);
+    } finally {
+        restoreScope();
+        restoreList();
+        restoreStamp();
         restoreGet();
         restorePlay();
     }
