@@ -1457,17 +1457,25 @@
             </div>
             <div class="radio-module__body">
                 <div class="radio-module__cassette" aria-hidden="true">
-                    <svg viewBox="0 0 120 44" focusable="false">
+                    <svg viewBox="0 0 120 44" focusable="false" preserveAspectRatio="none">
                         <rect class="radio-module__cassette-body" x="4" y="6" width="112" height="32" rx="4" fill="none" stroke-width="1.2"/>
                         <rect class="radio-module__cassette-label" x="18" y="10" width="84" height="12" rx="2" fill="none" stroke-width="1"/>
                         <rect class="radio-module__cassette-window" x="28" y="26" width="64" height="8" rx="2" fill="none" stroke-width="1"/>
-                        <g class="radio-module__cassette-reel" transform-origin="40px 30px">
-                            <circle cx="40" cy="30" r="5.5" fill="none" stroke-width="1.1"/>
-                            <circle cx="40" cy="30" r="1.4" fill="currentColor" stroke="none"/>
+                        <g class="radio-module__cassette-reel">
+                            <circle class="radio-module__cassette-reel-disc" cx="40" cy="30" r="6.2"/>
+                            <path class="radio-module__cassette-reel-teeth" d="M40 23.6v2.4M45.5 25.5l-1.7 1.7M46.4 30h-2.4M45.5 34.5l-1.7-1.7M40 36.4v-2.4M34.5 34.5l1.7-1.7M33.6 30h2.4M34.5 25.5l1.7 1.7"/>
+                            <circle class="radio-module__cassette-reel-hub-shade" cx="40.7" cy="30.7" r="2.55"/>
+                            <circle class="radio-module__cassette-reel-hub" cx="40" cy="30" r="2.35"/>
+                            <circle class="radio-module__cassette-reel-hub-shine" cx="39.2" cy="29.2" r="1.15"/>
+                            <circle class="radio-module__cassette-reel-bolt" cx="40" cy="30" r="0.85"/>
                         </g>
-                        <g class="radio-module__cassette-reel radio-module__cassette-reel--right" transform-origin="80px 30px">
-                            <circle cx="80" cy="30" r="5.5" fill="none" stroke-width="1.1"/>
-                            <circle cx="80" cy="30" r="1.4" fill="currentColor" stroke="none"/>
+                        <g class="radio-module__cassette-reel radio-module__cassette-reel--right">
+                            <circle class="radio-module__cassette-reel-disc" cx="80" cy="30" r="6.2"/>
+                            <path class="radio-module__cassette-reel-teeth" d="M80 23.6v2.4M85.5 25.5l-1.7 1.7M86.4 30h-2.4M85.5 34.5l-1.7-1.7M80 36.4v-2.4M74.5 34.5l1.7-1.7M73.6 30h2.4M74.5 25.5l1.7 1.7"/>
+                            <circle class="radio-module__cassette-reel-hub-shade" cx="80.7" cy="30.7" r="2.55"/>
+                            <circle class="radio-module__cassette-reel-hub" cx="80" cy="30" r="2.35"/>
+                            <circle class="radio-module__cassette-reel-hub-shine" cx="79.2" cy="29.2" r="1.15"/>
+                            <circle class="radio-module__cassette-reel-bolt" cx="80" cy="30" r="0.85"/>
                         </g>
                     </svg>
                 </div>

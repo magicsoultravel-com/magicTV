@@ -61,6 +61,7 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__body {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: calc(10px * var(--radio-scale, 1));
@@ -70,77 +71,86 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     background: var(--tv-bg-secondary, #141829);
 }
 
+/* Large decorative cassette — sits behind now-playing / transport */
 .radio-module__cassette {
-    position: relative;
+    position: absolute;
+    left: 50%;
+    top: calc(2px * var(--radio-scale, 1));
+    transform: translateX(-50%);
+    z-index: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: calc(52px * var(--radio-scale, 1));
-    border-radius: calc(8px * var(--radio-scale, 1));
-    border: 1px solid var(--tv-border, #2A2E3A);
-    background:
-        linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--tv-bg-primary, #0b0e18) 55%, transparent),
-            color-mix(in srgb, var(--tv-bg-secondary, #141829) 80%, transparent)
-        );
+    width: calc(280px * var(--radio-scale, 1));
+    height: calc(156px * var(--radio-scale, 1));
+    pointer-events: none;
     color: var(--tv-text-secondary, #9aa3b5);
-    overflow: hidden;
+    opacity: 0.55;
 }
 
 .radio-module__cassette svg {
-    position: relative;
-    z-index: 1;
-    width: calc(120px * var(--radio-scale, 1));
-    height: calc(44px * var(--radio-scale, 1));
+    width: 100%;
+    height: 100%;
     display: block;
 }
 
-.radio-module.is-playing .radio-module__cassette::before,
-.radio-module.is-playing .radio-module__cassette::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    bottom: calc(2px * var(--radio-scale, 1));
-    height: calc(16px * var(--radio-scale, 1));
-    width: calc(100% + var(--active-tile-wave-period, 40px));
-    pointer-events: none;
-    z-index: 0;
-    -webkit-mask-image: var(--active-tile-wave-mask);
-    mask-image: var(--active-tile-wave-mask);
-    -webkit-mask-repeat: repeat-x;
-    mask-repeat: repeat-x;
-    -webkit-mask-size: var(--active-tile-wave-period, 40px) calc(16px * var(--radio-scale, 1));
-    mask-size: var(--active-tile-wave-period, 40px) calc(16px * var(--radio-scale, 1));
-    -webkit-mask-position: 0 50%;
-    mask-position: 0 50%;
-    transform-origin: 50% 50%;
-    will-change: transform, opacity;
-    animation: active-tile-wave-live 2s linear infinite;
-}
-
-.radio-module.is-playing .radio-module__cassette::before {
-    background-color: var(--tv-primary);
-}
-
-.radio-module.is-playing .radio-module__cassette::after {
-    background-color: var(--tv-secondary);
-    -webkit-mask-position: calc(var(--active-tile-wave-period, 40px) / 2) 50%;
-    mask-position: calc(var(--active-tile-wave-period, 40px) / 2) 50%;
-    animation-delay: -1s;
-}
-
 .radio-module__cassette-reel {
-    fill: color-mix(in srgb, var(--tv-primary) 35%, var(--tv-bg-primary, #0b0e18));
-    stroke: var(--tv-border, #2A2E3A);
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+.radio-module__cassette-reel-disc {
+    fill: color-mix(in srgb, var(--tv-primary) 28%, var(--tv-bg-primary, #0b0e18));
+    stroke: color-mix(in srgb, var(--tv-primary) 75%, var(--tv-text-primary, #fff));
+    stroke-width: 1.35;
+}
+
+.radio-module__cassette-reel-teeth {
+    fill: none;
+    stroke: var(--tv-primary);
+    stroke-width: 1.55;
+    stroke-linecap: round;
+    opacity: 0.95;
+}
+
+.radio-module__cassette-reel-hub-shade {
+    fill: color-mix(in srgb, var(--tv-bg-primary, #0b0e18) 80%, #000);
+    stroke: none;
+    opacity: 0.55;
+}
+
+.radio-module__cassette-reel-hub {
+    fill: color-mix(in srgb, var(--tv-text-secondary, #9aa3b5) 55%, var(--tv-bg-secondary, #141829));
+    stroke: color-mix(in srgb, var(--tv-primary) 55%, var(--tv-text-primary, #fff));
+    stroke-width: 0.85;
+}
+
+.radio-module__cassette-reel-hub-shine {
+    fill: color-mix(in srgb, var(--tv-text-primary, #fff) 55%, transparent);
+    stroke: none;
+    opacity: 0.55;
+}
+
+.radio-module__cassette-reel-bolt {
+    fill: color-mix(in srgb, var(--tv-bg-primary, #0b0e18) 70%, var(--tv-primary));
+    stroke: color-mix(in srgb, var(--tv-text-primary, #fff) 40%, var(--tv-primary));
+    stroke-width: 0.55;
+}
+
+.radio-module.is-playing .radio-module__cassette {
+    opacity: 0.72;
 }
 
 .radio-module.is-playing .radio-module__cassette-reel {
-    animation: radio-reel-spin 2.8s linear infinite;
+    animation: radio-reel-spin 2.2s linear infinite;
 }
 
 .radio-module.is-playing .radio-module__cassette-reel--right {
     animation-direction: reverse;
+}
+
+.radio-module.is-playing .radio-module__cassette-reel-teeth {
+    stroke: color-mix(in srgb, var(--tv-primary) 70%, var(--tv-text-primary, #fff));
 }
 
 @keyframes radio-reel-spin {
@@ -148,14 +158,6 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .radio-module.is-playing .radio-module__cassette::before,
-    .radio-module.is-playing .radio-module__cassette::after {
-        animation: none;
-        opacity: 0.45;
-        transform: none;
-        will-change: auto;
-    }
-
     .radio-module.is-playing .radio-module__cassette-reel,
     .radio-module.is-playing .radio-module__cassette-reel--right {
         animation: none;
@@ -178,6 +180,8 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__now {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: calc(10px * var(--radio-scale, 1));
@@ -230,12 +234,16 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__error {
+    position: relative;
+    z-index: 1;
     margin: 0;
     font-size: calc(0.75rem * var(--radio-scale, 1));
     color: var(--tv-danger, #ff6b6b);
 }
 
 .radio-module__transport {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -276,6 +284,8 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__cast-menu {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     gap: calc(8px * var(--radio-scale, 1));
