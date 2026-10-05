@@ -1201,13 +1201,15 @@
     border-color: color-mix(in srgb, var(--tv-accent, #7ecbff) 55%, transparent);
 }
 
-/* Chan-down → previous: slide inward (left of rocker). */
-.tv-controls__chan-prev-wrap {
+/* Chan-down → previous / chan-up → next: slide inward (left of rocker). */
+.tv-controls__chan-prev-wrap,
+.tv-controls__chan-next-wrap {
     position: relative;
     display: inline-flex;
 }
 
-.tv-controls__chan-prev-wrap::after {
+.tv-controls__chan-prev-wrap::after,
+.tv-controls__chan-next-wrap::after {
     content: '';
     position: absolute;
     top: -10px;
@@ -1216,7 +1218,8 @@
     width: 16px;
 }
 
-.tv-controls__chan-prev-popout {
+.tv-controls__chan-prev-popout,
+.tv-controls__chan-next-popout {
     position: absolute;
     right: calc(100% + 4px);
     top: 50%;
@@ -1240,7 +1243,9 @@
 }
 
 .tv-controls__chan-prev-wrap:hover .tv-controls__chan-prev-popout,
-.tv-controls__chan-prev-wrap:focus-within .tv-controls__chan-prev-popout {
+.tv-controls__chan-prev-wrap:focus-within .tv-controls__chan-prev-popout,
+.tv-controls__chan-next-wrap:hover .tv-controls__chan-next-popout,
+.tv-controls__chan-next-wrap:focus-within .tv-controls__chan-next-popout {
     transform: translateY(-50%) translateX(0);
     opacity: 1;
     visibility: visible;
@@ -1248,7 +1253,8 @@
     transition-delay: 0.06s;
 }
 
-.tv-controls__chan-prev-popout .tv-controls__btn {
+.tv-controls__chan-prev-popout .tv-controls__btn,
+.tv-controls__chan-next-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;
@@ -1256,6 +1262,7 @@
 }
 
 .tv-controls__chan-prev-popout .tv-controls__btn[hidden],
+.tv-controls__chan-next-popout .tv-controls__btn[hidden],
 .tv-controls__play-popout .tv-controls__btn[hidden],
 .tv-controls__stop-popout .tv-controls__btn[hidden],
 .tv-controls__play-popout .tv-controls__btn.is-hidden,

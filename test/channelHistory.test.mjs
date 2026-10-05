@@ -1,5 +1,5 @@
 /**
- * Unit tests for per-slot previous-channel history stacks.
+ * Unit tests for per-slot previous/next channel history stacks.
  */
 import { test, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,9 +26,12 @@ before(() => {
 });
 
 let pushSlotChannelHistory;
-let popSlotChannelHistory;
+let stepSlotChannelBack;
+let stepSlotChannelForward;
 let getSlotChannelHistory;
+let getSlotChannelForward;
 let hasSlotChannelHistory;
+let hasSlotChannelForward;
 let trimAllSlotChannelHistory;
 let SettingsStore;
 let savePlayerState;
@@ -36,9 +39,12 @@ let savePlayerState;
 before(async () => {
     ({
         pushSlotChannelHistory,
-        popSlotChannelHistory,
+        stepSlotChannelBack,
+        stepSlotChannelForward,
         getSlotChannelHistory,
+        getSlotChannelForward,
         hasSlotChannelHistory,
+        hasSlotChannelForward,
         trimAllSlotChannelHistory
     } = await import('../js/mosaic/channelHistory.js'));
     SettingsStore = (await import('../js/storage/settingsStore.js')).SettingsStore;
@@ -47,7 +53,7 @@ before(async () => {
 
 beforeEach(() => {
     store.clear();
-    savePlayerState({ mosaicChannelHistory: {} });
+    savePlayerState({ mosaicChannelHistory: {}, mosaicChannelForward: {} });
     SettingsStore.setRecentsCap(5);
 });
 
@@ -57,11 +63,23 @@ test('push skips same key and empty previous', () => {
     assert.equal(hasSlotChannelHistory('center'), false);
 });
 
-test('push stacks newest-first and dedupes to front', () => {
+test('push stacks newest-first and clears forward', () => {
+    pushSlotChannelHistory('center', 'iptv-org:A', 'iptv-org:B');
+    stepSlotChannelBack('center', 'iptv-org:B');
+    assert.equal(hasSlotChannelForward('center'), true);
+    pushSlotChannelHistory('center', 'iptv-org:A', 'iptv-org:C');
+    assert.deepEqual(getSlotChannelForward('center'), []);
+    assert.ok(getSlotChannelHistory('center').includes('iptv-org:A'));
+});
+
+test('back then forward restores the left channel', () => {
     pushSlotChannelHistory('center', 'iptv-org:A', 'iptv-org:B');
     pushSlotChannelHistory('center', 'iptv-org:B', 'iptv-org:C');
-    pushSlotChannelHistory('center', 'iptv-org:A', 'iptv-org:D');
-    assert.deepEqual(getSlotChannelHistory('center'), ['iptv-org:A', 'iptv-org:B']);
+    assert.equal(stepSlotChannelBack('center', 'iptv-org:C'), 'iptv-org:B');
+    assert.deepEqual(getSlotChannelForward('center'), ['iptv-org:C']);
+    assert.equal(stepSlotChannelForward('center', 'iptv-org:B'), 'iptv-org:C');
+    assert.deepEqual(getSlotChannelForward('center'), []);
+    assert.deepEqual(getSlotChannelHistory('center'), ['iptv-org:B', 'iptv-org:A']);
 });
 
 test('finite cap trims per-slot history', () => {
@@ -80,15 +98,6 @@ test('unlimited cap does not trim slot history', () => {
     assert.equal(getSlotChannelHistory('center').length, 8);
 });
 
-test('pop returns newest previous and removes it', () => {
-    pushSlotChannelHistory('topLeft', 'iptv-org:A', 'iptv-org:B');
-    pushSlotChannelHistory('topLeft', 'iptv-org:B', 'iptv-org:C');
-    assert.equal(popSlotChannelHistory('topLeft'), 'iptv-org:B');
-    assert.deepEqual(getSlotChannelHistory('topLeft'), ['iptv-org:A']);
-    assert.equal(popSlotChannelHistory('topLeft'), 'iptv-org:A');
-    assert.equal(popSlotChannelHistory('topLeft'), null);
-});
-
 test('slots keep independent stacks', () => {
     pushSlotChannelHistory('center', 'iptv-org:C1', 'iptv-org:C2');
     pushSlotChannelHistory('topLeft', 'iptv-org:L1', 'iptv-org:L2');
@@ -96,13 +105,16 @@ test('slots keep independent stacks', () => {
     assert.deepEqual(getSlotChannelHistory('topLeft'), ['iptv-org:L1']);
 });
 
-test('lowering cap trims all slot stacks', () => {
+test('lowering cap trims back and forward stacks', () => {
     SettingsStore.setRecentsCap(10);
     pushSlotChannelHistory('center', 'iptv-org:1', 'iptv-org:2');
     pushSlotChannelHistory('center', 'iptv-org:2', 'iptv-org:3');
     pushSlotChannelHistory('center', 'iptv-org:3', 'iptv-org:4');
+    stepSlotChannelBack('center', 'iptv-org:4');
+    stepSlotChannelBack('center', 'iptv-org:3');
+    assert.ok(hasSlotChannelForward('center'));
     SettingsStore.setRecentsCap(1);
-    // setRecentsCap trims async via dynamic import — call trim directly to assert
     trimAllSlotChannelHistory();
-    assert.deepEqual(getSlotChannelHistory('center'), ['iptv-org:3']);
+    assert.equal(getSlotChannelHistory('center').length, 1);
+    assert.equal(getSlotChannelForward('center').length, 1);
 });

@@ -504,6 +504,7 @@ function emptyPlayerState() {
         reattempts: DEFAULT_REATTEMPTS,
         mosaicSlots: {},
         mosaicChannelHistory: Object.fromEntries(MOSAIC_SLOT_IDS.map((id) => [id, []])),
+        mosaicChannelForward: Object.fromEntries(MOSAIC_SLOT_IDS.map((id) => [id, []])),
         mosaicPlacement: {},
         mosaicLayoutMode: 'grid-h',
         remoteModule: null,
@@ -585,6 +586,7 @@ export function loadPlayerStateFrom(raw) {
             reattempts: clampReattempts(src.reattempts),
             mosaicSlots: normalizeMosaicSlots(src.mosaicSlots),
             mosaicChannelHistory: normalizeMosaicChannelHistory(src.mosaicChannelHistory),
+            mosaicChannelForward: normalizeMosaicChannelHistory(src.mosaicChannelForward),
             mosaicPlacement: normalizeMosaicPlacement(src.mosaicPlacement),
             mosaicLayoutMode: normalizeMosaicLayoutMode(src.mosaicLayoutMode),
             remoteModule: normalizeRemoteModule(src.remoteModule, src.channelPicker),
@@ -630,6 +632,7 @@ const KNOWN_PLAYER_PATCH_KEYS = new Set([
     'reattempts',
     'mosaicSlots',
     'mosaicChannelHistory',
+    'mosaicChannelForward',
     'mosaicPlacement',
     'mosaicLayoutMode',
     'remoteModule',
@@ -759,6 +762,9 @@ export function savePlayerState(patch) {
     if ('mosaicSlots' in patch) payload.mosaicSlots = merged.mosaicSlots || {};
     if ('mosaicChannelHistory' in patch) {
         payload.mosaicChannelHistory = normalizeMosaicChannelHistory(merged.mosaicChannelHistory);
+    }
+    if ('mosaicChannelForward' in patch) {
+        payload.mosaicChannelForward = normalizeMosaicChannelHistory(merged.mosaicChannelForward);
     }
     if ('mosaicPlacement' in patch) payload.mosaicPlacement = merged.mosaicPlacement || {};
     if ('mosaicLayoutMode' in patch) {

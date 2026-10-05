@@ -12,7 +12,7 @@ import { computeMosaicLaunchDelay } from '../player/loadBudget.js';
 import { tvDebug } from '../player/tvDebug.js';
 import { ChromecastManager } from '../cast/chromecastManager.js';
 import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from '../ui/tileHoverControls.js';
-import { pushSlotChannelHistory, hasSlotChannelHistory } from './channelHistory.js';
+import { pushSlotChannelHistory, hasSlotChannelHistory, hasSlotChannelForward } from './channelHistory.js';
 import {
     CORNER_IDS,
     SLOT_IDS,
@@ -335,7 +335,12 @@ export const playbackMethods = {
         const muteAllActive = this.isMuteAllActive();
         app.classList.toggle('is-mute-all-active', muteAllActive);
 
-        const muteAllBtns = [el('remote-mute-all-btn')].filter(Boolean);
+        const muteAllBtns = [
+            el('remote-mute-all-btn'),
+            ...Array.from(document.querySelectorAll(
+                '#player-mosaic .tv-controls__mute-popout [data-tile-action="mute-all"]'
+            ))
+        ].filter(Boolean);
         muteAllBtns.forEach((btn) => {
             const label = muteAllActive ? 'Unmute all' : 'Mute all';
             btn.title = label;
@@ -385,11 +390,19 @@ export const playbackMethods = {
 
         mosaic?.querySelectorAll('.tv-player-tile').forEach((tile) => {
             const slotId = tile.getAttribute('data-slot');
+            if (!slotId) return;
             const prevBtn = tile.querySelector('[data-tile-action="chan-prev"]');
-            if (!prevBtn || !slotId) return;
-            const hasPrev = hasSlotChannelHistory(slotId);
-            prevBtn.hidden = !hasPrev;
-            prevBtn.classList.toggle('is-hidden', !hasPrev);
+            if (prevBtn) {
+                const hasPrev = hasSlotChannelHistory(slotId);
+                prevBtn.hidden = !hasPrev;
+                prevBtn.classList.toggle('is-hidden', !hasPrev);
+            }
+            const nextBtn = tile.querySelector('[data-tile-action="chan-next"]');
+            if (nextBtn) {
+                const hasNext = hasSlotChannelForward(slotId);
+                nextBtn.hidden = !hasNext;
+                nextBtn.classList.toggle('is-hidden', !hasNext);
+            }
         });
 
         if (typeof document !== 'undefined') {

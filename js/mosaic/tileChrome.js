@@ -108,20 +108,29 @@ export const tileChromeMethods = {
             return;
         }
 
-        if (action === 'chan-prev') {
-            const { popSlotChannelHistory } = await import('./channelHistory.js');
-            const prevKey = popSlotChannelHistory(slotId);
-            if (!prevKey) {
-                showAppToast('No previous channel');
+        if (action === 'chan-prev' || action === 'chan-next') {
+            const {
+                stepSlotChannelBack,
+                stepSlotChannelForward
+            } = await import('./channelHistory.js');
+            const player = this.slots[slotId]?.player;
+            const currentKey = player?.channel ? channelKey(player.channel) : null;
+            const targetKey = action === 'chan-prev'
+                ? stepSlotChannelBack(slotId, currentKey)
+                : stepSlotChannelForward(slotId, currentKey);
+            if (!targetKey) {
+                showAppToast(action === 'chan-prev' ? 'No previous channel' : 'No next channel');
                 this.syncMosaicChrome();
                 return;
             }
             const { parseChannelKey } = await import('../tvProviders/channelShape.js');
             const { TvProviderRegistry } = await import('../tvProviders/registry.js');
-            const parsed = parseChannelKey(prevKey);
+            const parsed = parseChannelKey(targetKey);
             const channel = await TvProviderRegistry.getChannel(parsed);
             if (!channel?.url_resolved) {
-                showAppToast('Previous channel unavailable');
+                showAppToast(action === 'chan-prev'
+                    ? 'Previous channel unavailable'
+                    : 'Next channel unavailable');
                 this.syncMosaicChrome();
                 return;
             }

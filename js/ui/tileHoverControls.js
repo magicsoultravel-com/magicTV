@@ -30,6 +30,9 @@ export const STOP_PLAY_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" fo
 /** Previous channel — curved back arrow. */
 export const CHAN_PREV_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M4.2 3.2 2 5.4l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.2 5.4h4.6a3.2 3.2 0 0 1 0 6.4H5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
+/** Next channel in history — curved forward arrow. */
+export const CHAN_NEXT_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M7.8 3.2 10 5.4 7.8 7.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.8 5.4H5.2a3.2 3.2 0 0 0 0 6.4H6.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
 export const VOL_DOWN_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
 export const VOL_UP_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
@@ -64,6 +67,7 @@ function muteWrap(target) {
         ${muteBtn(target)}
         <div class="tv-controls__mute-popout" aria-hidden="true">
             <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="mute-solo" data-controls-target="${target}" title="Mute other TVs" aria-label="Mute other TVs">${MUTE_SOLO_SVG}</button>
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-2" data-tile-action="mute-all" data-controls-target="${target}" title="Mute all" aria-label="Mute all" aria-pressed="false">${MUTE_ALL_SVG}</button>
         </div>
     </div>`;
 }
@@ -116,10 +120,19 @@ function chanDownWrap(target) {
     </div>`;
 }
 
+function chanUpWrap(target) {
+    return `<div class="tv-controls__chan-next-wrap">
+        <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-player-tile__rocker-btn" data-tile-action="chan-up" data-controls-target="${target}" title="Channel up" aria-label="Channel up">${CHAN_CHEVRON_UP}</button>
+        <div class="tv-controls__chan-next-popout" aria-hidden="true">
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="chan-next" data-controls-target="${target}" title="Next channel" aria-label="Next channel" hidden>${CHAN_NEXT_SVG}</button>
+        </div>
+    </div>`;
+}
+
 /** Vertical channel rocker — right mid-height of the tile. */
 export function buildTileChanRockerHtml(target = 'local') {
     return `<div class="tv-player-tile__rocker tv-player-tile__chan-rocker" data-tile-chan-rocker>
-        <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-player-tile__rocker-btn" data-tile-action="chan-up" data-controls-target="${target}" title="Channel up" aria-label="Channel up">${CHAN_CHEVRON_UP}</button>
+        ${chanUpWrap(target)}
         <div class="tv-player-tile__rocker-mid tv-player-tile__chan-bind-wrap">
             <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-player-tile__rocker-btn tv-player-tile__chan-bind-btn" data-tile-chan-bind-btn title="Bind channels" aria-label="Bind channels" aria-haspopup="menu" aria-expanded="false">${CHAN_BIND_SVG}</button>
             <div class="chan-bind-menu tv-player-tile__chan-bind-menu" role="menu" aria-label="Channel bind scope" hidden></div>
