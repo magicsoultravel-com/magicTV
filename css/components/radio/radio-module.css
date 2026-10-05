@@ -71,6 +71,7 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__cassette {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -84,12 +85,49 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
             color-mix(in srgb, var(--tv-bg-secondary, #141829) 80%, transparent)
         );
     color: var(--tv-text-secondary, #9aa3b5);
+    overflow: hidden;
 }
 
 .radio-module__cassette svg {
+    position: relative;
+    z-index: 1;
     width: calc(120px * var(--radio-scale, 1));
     height: calc(44px * var(--radio-scale, 1));
     display: block;
+}
+
+.radio-module.is-playing .radio-module__cassette::before,
+.radio-module.is-playing .radio-module__cassette::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: calc(2px * var(--radio-scale, 1));
+    height: calc(16px * var(--radio-scale, 1));
+    width: calc(100% + var(--active-tile-wave-period, 40px));
+    pointer-events: none;
+    z-index: 0;
+    -webkit-mask-image: var(--active-tile-wave-mask);
+    mask-image: var(--active-tile-wave-mask);
+    -webkit-mask-repeat: repeat-x;
+    mask-repeat: repeat-x;
+    -webkit-mask-size: var(--active-tile-wave-period, 40px) calc(16px * var(--radio-scale, 1));
+    mask-size: var(--active-tile-wave-period, 40px) calc(16px * var(--radio-scale, 1));
+    -webkit-mask-position: 0 50%;
+    mask-position: 0 50%;
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+    animation: active-tile-wave-live 2s linear infinite;
+}
+
+.radio-module.is-playing .radio-module__cassette::before {
+    background-color: var(--tv-primary);
+}
+
+.radio-module.is-playing .radio-module__cassette::after {
+    background-color: var(--tv-secondary);
+    -webkit-mask-position: calc(var(--active-tile-wave-period, 40px) / 2) 50%;
+    mask-position: calc(var(--active-tile-wave-period, 40px) / 2) 50%;
+    animation-delay: -1s;
 }
 
 .radio-module__cassette-reel {
@@ -107,6 +145,21 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 
 @keyframes radio-reel-spin {
     to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .radio-module.is-playing .radio-module__cassette::before,
+    .radio-module.is-playing .radio-module__cassette::after {
+        animation: none;
+        opacity: 0.45;
+        transform: none;
+        will-change: auto;
+    }
+
+    .radio-module.is-playing .radio-module__cassette-reel,
+    .radio-module.is-playing .radio-module__cassette-reel--right {
+        animation: none;
+    }
 }
 
 .radio-module__cassette-window {
