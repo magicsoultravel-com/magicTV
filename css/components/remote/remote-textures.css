@@ -1,12 +1,14 @@
 /** @css {part}: remote shell textures */
 /* --- Remote shell textures (theme supplies color) --- */
 
-.remote-module__shell {
+.remote-module__shell,
+.radio-module__dialog {
     position: relative;
     isolation: isolate;
 }
 
-.remote-module__shell::before {
+.remote-module__shell::before,
+.radio-module__dialog::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -20,11 +22,18 @@
     z-index: 1;
 }
 
-[data-remote-texture="none"] .remote-module__shell::before {
+.radio-module__dialog > * {
+    position: relative;
+    z-index: 1;
+}
+
+[data-remote-texture="none"] .remote-module__shell::before,
+[data-remote-texture="none"] .radio-module__dialog::before {
     display: none;
 }
 
-[data-remote-texture="carbon"] .remote-module__shell::before {
+[data-remote-texture="carbon"] .remote-module__shell::before,
+[data-remote-texture="carbon"] .radio-module__dialog::before {
     opacity: 0.16;
     background-image:
         repeating-linear-gradient(
@@ -39,7 +48,8 @@
         );
 }
 
-[data-remote-texture="brushed"] .remote-module__shell::before {
+[data-remote-texture="brushed"] .remote-module__shell::before,
+[data-remote-texture="brushed"] .radio-module__dialog::before {
     opacity: 0.12;
     background-image: repeating-linear-gradient(
         180deg,
@@ -48,7 +58,8 @@
     );
 }
 
-[data-remote-texture="noise"] .remote-module__shell::before {
+[data-remote-texture="noise"] .remote-module__shell::before,
+[data-remote-texture="noise"] .radio-module__dialog::before {
     opacity: 0.1;
     background-image:
         radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--tv-text-primary) 18%, transparent) 0 0.6px, transparent 0.7px),
@@ -57,7 +68,8 @@
     background-size: 4px 4px, 5px 5px, 6px 6px;
 }
 
-[data-remote-texture="grid"] .remote-module__shell::before {
+[data-remote-texture="grid"] .remote-module__shell::before,
+[data-remote-texture="grid"] .radio-module__dialog::before {
     opacity: 0.11;
     background-image:
         linear-gradient(color-mix(in srgb, var(--tv-text-primary) 16%, transparent) 1px, transparent 1px),
@@ -65,7 +77,8 @@
     background-size: 14px 14px;
 }
 
-[data-remote-texture="dots"] .remote-module__shell::before {
+[data-remote-texture="dots"] .remote-module__shell::before,
+[data-remote-texture="dots"] .radio-module__dialog::before {
     opacity: 0.13;
     background-image: radial-gradient(
         circle,
@@ -75,7 +88,8 @@
     background-size: 6px 6px;
 }
 
-[data-remote-texture="weave"] .remote-module__shell::before {
+[data-remote-texture="weave"] .remote-module__shell::before,
+[data-remote-texture="weave"] .radio-module__dialog::before {
     opacity: 0.12;
     background-image:
         repeating-linear-gradient(0deg, transparent 0 7px, color-mix(in srgb, var(--tv-text-primary) 12%, transparent) 7px 8px),
@@ -85,4 +99,3 @@
 .remote-popout-body .remote-module__shell::before {
     border-radius: 0;
 }
-

@@ -85,7 +85,7 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     padding: calc(2px * var(--radio-scale, 1)) calc(12px * var(--radio-scale, 1)) calc(6px * var(--radio-scale, 1));
     height: calc(100% - 36px * var(--radio-scale, 1));
     box-sizing: border-box;
-    background: var(--tv-bg-secondary, #141829);
+    background: transparent;
     cursor: grab;
     user-select: none;
     touch-action: none;
@@ -226,7 +226,7 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module.is-playing .radio-module__cassette-reel {
-    animation: radio-reel-spin 2.2s linear infinite;
+    animation: radio-reel-spin 3.2s linear infinite;
 }
 
 .radio-module.is-playing .radio-module__cassette-reel--right {
