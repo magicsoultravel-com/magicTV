@@ -1,12 +1,15 @@
 /**
- * Lightweight radio catalog inside the magic browser (countries → stations, favs, recents).
+ * Radio catalog inside magic browser — same country/channel tile chrome as TV.
  */
-import { el, countryFlagEmoji } from '../tvUtils.js';
+import { el, countryFlagEmoji, escapeHtml } from '../tvUtils.js';
 import { RadioPlayer } from '../radio/radioPlayer.js';
 import { RadioProviderRegistry } from '../radio/radioProviders/registry.js';
 import { stationKey } from '../radio/stationShape.js';
 import { loadRadioState } from '../radio/radioState.js';
 import { showAppToast } from '../ui/toast.js';
+import { CARD_ICONS } from '../ui/icons.js';
+import { Appearance } from '../ui/appearance.js';
+import { marqueeInnerHtml } from '../ui/marquee.js';
 
 const PAGE_SIZE = 60;
 
@@ -28,13 +31,7 @@ let filterText = '';
 /** @type {IntersectionObserver | null} */
 let sentinelObserver = null;
 
-function escapeHtml(s) {
-    return String(s || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
+const ART_CASSETTE = `<span class="radio-module__art-cassette"><svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="8" width="14" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="16" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>`;
 
 function setVisible(node, show) {
     if (!node) return;
@@ -50,34 +47,42 @@ function syncModeClasses() {
     if (brand) brand.textContent = catalogMode === 'radio' ? 'magic radio browser' : 'magic browser';
 }
 
-function countryRowHtml(c) {
-    const code = (c.iso_3166_1 || c.name || '').toUpperCase();
-    const flag = countryFlagEmoji(code) || '';
-    const count = Number(c.stationcount) || 0;
-    return `<button type="button" class="radio-browse__row" data-radio-country="${escapeHtml(code)}" role="listitem">
-        <span class="radio-browse__logo" aria-hidden="true">${flag}</span>
-        <span class="radio-browse__name">${escapeHtml(c.name || code)}</span>
-        <span class="radio-browse__meta">${count}</span>
-        <span></span>
-    </button>`;
+function countryTileHtml(c) {
+    const code = (c.iso_3166_1 || '').toUpperCase();
+    return `
+        <div class="country-tile" data-radio-country="${escapeHtml(code)}" role="button" tabindex="0">
+            <div class="country-tile__icon">${countryFlagEmoji(code)}</div>
+            <div class="country-tile__body">
+                <h3 class="country-tile__name">${marqueeInnerHtml(c.name || code)}</h3>
+                <div class="country-tile__count">${c.stationcount || 0} stations</div>
+            </div>
+        </div>
+    `;
 }
 
-function stationRowHtml(station) {
+function stationTileHtml(station) {
     const key = stationKey(station);
-    const playing = stationKey(RadioPlayer.station) === key && (RadioPlayer.playing || RadioPlayer.hasActiveStation());
-    const fav = RadioPlayer.isFavorite(key);
-    const flag = countryFlagEmoji(station.countrycode || '') || '';
-    const logo = station.favicon
-        ? `<img class="radio-browse__logo" src="${escapeHtml(station.favicon)}" alt="" loading="lazy">`
-        : `<span class="radio-browse__logo" aria-hidden="true"></span>`;
-    return `<div class="radio-browse__row${playing ? ' is-playing' : ''}" data-radio-station="${escapeHtml(key)}" role="listitem" tabindex="0">
-        ${logo}
-        <span class="radio-browse__name">${escapeHtml(station.name || 'Unknown')}</span>
-        <span class="radio-browse__meta">${flag}</span>
-        <button type="button" class="radio-browse__star${fav ? ' is-active' : ''}" data-radio-star="${escapeHtml(key)}" title="Favorite" aria-label="Favorite" aria-pressed="${fav}">
-            <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M6 9.6S2.4 7.2 2.4 4.7A1.95 1.95 0 0 1 6 3.6a1.95 1.95 0 0 1 3.6 1.1C9.6 7.2 6 9.6 6 9.6z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-        </button>
-    </div>`;
+    const initial = (station.name || '?')[0].toUpperCase();
+    const isFav = RadioPlayer.isFavorite(key);
+    const playingKey = stationKey(RadioPlayer.station);
+    const isPlaying = key && key === playingKey;
+    const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
+    const logo = station.favicon || station.logo || '';
+    return `
+        <div class="channel-tile${isPlaying ? ' is-playing is-playing-radio' : ''}" data-radio-station="${escapeHtml(key)}" role="button" tabindex="0" data-logo="${escapeHtml(logo)}">
+            <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" data-radio-star="${escapeHtml(key)}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
+            <div class="channel-tile__icon">
+                <div class="channel-tile__capture-frame" data-frame-state="waiting">
+                    <div class="channel-tile__letter-avatar">${escapeHtml(initial)}</div>
+                    ${logo ? `<img class="channel-tile__logo-img" src="${escapeHtml(logo)}" alt="" decoding="async" loading="lazy" onerror="this.classList.add('is-hidden')">` : '<img class="channel-tile__logo-img is-hidden" alt="" decoding="async">'}
+                </div>
+            </div>
+            <div class="channel-tile__body">
+                <h3 class="channel-tile__name">${marqueeInnerHtml(station.name || 'Unknown')}</h3>
+                <span class="channel-tile__flag">${countryFlagEmoji(station.countrycode)}</span>
+            </div>
+        </div>
+    `;
 }
 
 function setStatus(text) {
@@ -112,13 +117,28 @@ function filteredCountries() {
     return list;
 }
 
-function renderCountries() {
-    const list = el('radio-browse-list');
+function showCountriesLevel() {
+    setVisible(el('radio-countries-grid'), true);
+    setVisible(el('radio-stations-grid'), false);
     const back = el('radio-browse-back');
     if (back) back.hidden = true;
-    if (!list) return;
+}
+
+function showStationsLevel() {
+    setVisible(el('radio-countries-grid'), false);
+    setVisible(el('radio-stations-grid'), true);
+    const back = el('radio-browse-back');
+    if (back) back.hidden = false;
+}
+
+function renderCountries() {
+    const container = el('radio-countries-grid');
+    if (!container) return;
+    showCountriesLevel();
     const rows = filteredCountries();
-    list.innerHTML = rows.map(countryRowHtml).join('') || '<p class="radio-browse__status">No countries</p>';
+    container.innerHTML = rows.map(countryTileHtml).join('')
+        || '<div class="empty-state"><p class="empty-state__text">No countries found</p></div>';
+    Appearance.applyToTiles?.(container);
     setStatus(rows.length ? `${rows.length} countries` : '');
 }
 
@@ -157,10 +177,11 @@ async function loadMoreStations() {
         stationsCache = stationsCache.concat(filtered);
         stationOffset += batch.length;
         if (batch.length < PAGE_SIZE) stationsDone = true;
-        const list = el('radio-browse-list');
+        const list = el('radio-stations-grid');
         if (list) {
-            list.innerHTML = stationsCache.map(stationRowHtml).join('')
-                || '<p class="radio-browse__status">No stations</p>';
+            list.innerHTML = stationsCache.map(stationTileHtml).join('')
+                || '<div class="empty-state"><p class="empty-state__text">No stations</p></div>';
+            Appearance.applyToTiles?.(list);
         }
         setStatus(stationsDone
             ? `${stationsCache.length} stations`
@@ -178,9 +199,8 @@ async function openCountry(code) {
     stationsCache = [];
     stationOffset = 0;
     stationsDone = false;
-    const back = el('radio-browse-back');
-    if (back) back.hidden = false;
-    const list = el('radio-browse-list');
+    showStationsLevel();
+    const list = el('radio-stations-grid');
     if (list) list.innerHTML = '';
     syncSortControlsForLevel();
     await loadMoreStations();
@@ -208,14 +228,14 @@ function syncSortControlsForLevel() {
 }
 
 async function renderFavorites() {
-    const list = el('radio-favorites-list');
+    const list = el('radio-favorites-grid');
     if (!list) return;
     const keys = RadioPlayer.getFavorites();
     if (!keys.length) {
-        list.innerHTML = '<p class="radio-browse__status">No radio favorites</p>';
+        list.innerHTML = '<div class="empty-state"><p class="empty-state__text">No radio favorites</p></div>';
         return;
     }
-    list.innerHTML = '<p class="radio-browse__status">Loading…</p>';
+    list.innerHTML = '<div class="catalog-status" role="status"><p class="catalog-status__text">Loading…</p></div>';
     try {
         const provider = RadioProviderRegistry.getActive();
         const ids = keys.map((k) => {
@@ -226,27 +246,29 @@ async function renderFavorites() {
         const byKey = new Map(stations.map((s) => [stationKey(s), s]));
         list.innerHTML = keys.map((k) => {
             const s = byKey.get(k) || { stationuuid: k, name: k, favicon: '', countrycode: '' };
-            return stationRowHtml(s);
+            return stationTileHtml(s);
         }).join('');
+        Appearance.applyToTiles?.(list);
     } catch (e) {
-        list.innerHTML = `<p class="radio-browse__status">${escapeHtml(e?.message || 'Failed')}</p>`;
+        list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed')}</p></div>`;
     }
 }
 
 async function renderRecents() {
-    const list = el('radio-recents-list');
+    const list = el('radio-recents-grid');
     if (!list) return;
     const meta = RadioPlayer.getRecentsMeta();
     if (!meta.length) {
-        list.innerHTML = '<p class="radio-browse__status">No radio recents</p>';
+        list.innerHTML = '<div class="empty-state"><p class="empty-state__text">No radio recents</p></div>';
         return;
     }
-    list.innerHTML = meta.map((m) => stationRowHtml({
+    list.innerHTML = meta.map((m) => stationTileHtml({
         stationuuid: m.key,
         name: m.name || m.key,
         favicon: m.favicon || '',
         countrycode: m.countrycode || ''
     })).join('');
+    Appearance.applyToTiles?.(list);
 }
 
 function ensureSentinel() {
@@ -256,7 +278,7 @@ function ensureSentinel() {
         if (entries.some((e) => e.isIntersecting) && browseLevel === 'stations') {
             loadMoreStations();
         }
-    }, { root: el('radio-browse-root'), rootMargin: '80px' });
+    }, { root: el('browse-panel') || el('radio-browse-root'), rootMargin: '80px' });
     sentinelObserver.observe(sentinel);
 }
 
@@ -336,19 +358,40 @@ function bindOnce() {
         }
     });
 
+    document.addEventListener('keydown', (e) => {
+        if (catalogMode !== 'radio') return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const country = e.target.closest?.('[data-radio-country]');
+        if (country) {
+            e.preventDefault();
+            openCountry(country.getAttribute('data-radio-country'));
+            return;
+        }
+        const row = e.target.closest?.('[data-radio-station]');
+        if (row) {
+            e.preventDefault();
+            RadioPlayer.playStation(row.getAttribute('data-radio-station')).catch((err) => {
+                showAppToast(err?.message || 'Playback failed');
+            });
+        }
+    });
+
     window.addEventListener('radio:state_changed', () => {
         if (catalogMode === 'radio') refreshActiveLists({ soft: true });
     });
 }
 
 function refreshActiveLists({ soft = false } = {}) {
-    const tab = document.querySelector('.tv-panel.is-active')?.id;
-    if (tab === 'favorites-panel' || soft) renderFavorites();
-    if (tab === 'recents-panel' || soft) renderRecents();
+    if (catalogMode !== 'radio') return;
+    const fav = el('radio-favorites-grid');
+    const rec = el('radio-recents-grid');
+    if (fav) renderFavorites();
+    if (rec) renderRecents();
     if (!soft && browseLevel === 'stations') {
-        const list = el('radio-browse-list');
+        const list = el('radio-stations-grid');
         if (list && stationsCache.length) {
-            list.innerHTML = stationsCache.map(stationRowHtml).join('');
+            list.innerHTML = stationsCache.map(stationTileHtml).join('');
+            Appearance.applyToTiles?.(list);
         }
     } else if (!soft && browseLevel === 'countries') {
         renderCountries();
@@ -393,5 +436,8 @@ export const RadioBrowseView = {
     refresh() {
         if (catalogMode !== 'radio') return;
         refreshActiveLists();
-    }
+    },
+
+    /** Shared cassette markup for the floating radio art slot. */
+    artCassetteHtml: ART_CASSETTE
 };

@@ -125,10 +125,11 @@ function syncTransportUi() {
 
     const art = el('radio-now-art');
     if (art) {
+        const cassette = `<span class="radio-module__art-cassette" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="8" width="14" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="16" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>`;
         if (station?.favicon) {
-            art.innerHTML = `<img src="${station.favicon.replace(/"/g, '')}" alt="" loading="lazy">`;
+            art.innerHTML = `${cassette}<img src="${station.favicon.replace(/"/g, '')}" alt="" loading="lazy">`;
         } else {
-            art.innerHTML = '';
+            art.innerHTML = cassette;
         }
     }
 
@@ -179,15 +180,18 @@ function syncTransportUi() {
         castBtn.title = casting ? 'Stop casting' : 'Cast';
     }
 
+    const castMenu = el('radio-cast-menu');
+    if (castMenu) {
+        castMenu.hidden = !casting;
+        castMenu.classList.toggle('is-hidden', !casting);
+        castMenu.setAttribute('aria-hidden', String(!casting));
+    }
+
     const hostAudioBtn = el('radio-host-audio-btn');
     if (hostAudioBtn) {
-        hostAudioBtn.hidden = !casting;
         hostAudioBtn.classList.toggle('is-active', hostAudio);
         hostAudioBtn.setAttribute('aria-pressed', String(hostAudio));
     }
-
-    const castRow = el('radio-cast-controls');
-    if (castRow) castRow.hidden = !casting;
 
     const castVol = el('radio-cast-volume-slider');
     if (castVol) {
