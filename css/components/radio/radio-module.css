@@ -47,6 +47,11 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     touch-action: none;
 }
 
+.radio-module__header.is-dragging,
+.radio-module .radio-module__dialog.is-dragging {
+    cursor: grabbing;
+}
+
 .radio-module__brand {
     background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
     -webkit-background-clip: text;
@@ -69,6 +74,24 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     height: calc(100% - 36px * var(--radio-scale, 1));
     box-sizing: border-box;
     background: var(--tv-bg-secondary, #141829);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.radio-module__body button,
+.radio-module__body input,
+.radio-module__body select,
+.radio-module__body textarea,
+.radio-module__body a,
+.radio-module__body label {
+    cursor: pointer;
+    user-select: auto;
+    touch-action: auto;
+}
+
+.radio-module__body input[type="range"] {
+    cursor: pointer;
 }
 
 /* Large decorative cassette — sits behind now-playing / transport */
@@ -241,13 +264,22 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     color: var(--tv-danger, #ff6b6b);
 }
 
-.radio-module__transport {
+.radio-module__controls {
     position: relative;
     z-index: 1;
+    margin-top: auto;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: calc(8px * var(--radio-scale, 1));
+}
+
+.radio-module__transport {
+    display: grid;
+    grid-template-columns: repeat(5, auto);
+    justify-content: center;
     align-items: center;
-    gap: calc(6px * var(--radio-scale, 1));
+    column-gap: calc(6px * var(--radio-scale, 1));
+    row-gap: calc(8px * var(--radio-scale, 1));
 }
 
 .radio-module__transport .tv-controls__btn {
@@ -258,15 +290,19 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 }
 
 .radio-module__vol {
+    grid-column: 1 / span 3;
     display: inline-flex;
     align-items: center;
     gap: calc(4px * var(--radio-scale, 1));
-    min-width: calc(90px * var(--radio-scale, 1));
+    min-width: 0;
+    justify-self: stretch;
     color: var(--tv-text-secondary, #9aa3b5);
 }
 
 .radio-module__vol input[type="range"] {
-    width: calc(72px * var(--radio-scale, 1));
+    flex: 1;
+    min-width: 0;
+    width: auto;
     accent-color: var(--tv-primary);
 }
 
@@ -281,6 +317,17 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     align-items: center;
     gap: calc(6px * var(--radio-scale, 1));
     flex-wrap: wrap;
+}
+
+.radio-module__cast-row .radio-module__vol {
+    grid-column: auto;
+    justify-self: auto;
+    min-width: calc(90px * var(--radio-scale, 1));
+}
+
+.radio-module__cast-row .radio-module__vol input[type="range"] {
+    width: calc(72px * var(--radio-scale, 1));
+    flex: none;
 }
 
 .radio-module__cast-menu {

@@ -11,6 +11,7 @@ import { RadioPlayer } from '../radio/radioPlayer.js';
 import { RadioCast } from '../radio/radioCast.js';
 import { stationKey } from '../radio/stationShape.js';
 import { setMarqueeText } from './marquee.js';
+import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import {
     RADIO_BASE_W,
     RADIO_BASE_H,
@@ -175,10 +176,7 @@ function syncTransportUi() {
         playBtn.setAttribute('aria-pressed', String(playing));
         playBtn.title = playing ? 'Pause' : 'Play';
         playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
-        const playIcon = playBtn.querySelector('[data-radio-icon="play"]');
-        const pauseIcon = playBtn.querySelector('[data-radio-icon="pause"]');
-        if (playIcon) playIcon.hidden = playing;
-        if (pauseIcon) pauseIcon.hidden = !playing;
+        playBtn.innerHTML = playing ? ACTION_ICONS.pause : ACTION_ICONS.play;
     }
 
     const muteBtn = el('radio-mute-btn');
@@ -186,6 +184,11 @@ function syncTransportUi() {
         muteBtn.classList.toggle('is-muted', muted);
         muteBtn.setAttribute('aria-pressed', String(muted));
         muteBtn.title = muted ? 'Unmute' : 'Mute';
+        muteBtn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+        const wave = muteBtn.querySelector('.tile-mute-wave');
+        const slash = muteBtn.querySelector('.tile-mute-slash');
+        if (wave) wave.style.opacity = muted ? '0' : '1';
+        if (slash) slash.style.opacity = muted ? '1' : '0';
     }
 
     const favBtn = el('radio-fav-btn');
@@ -193,6 +196,7 @@ function syncTransportUi() {
         favBtn.classList.toggle('is-active', fav);
         favBtn.setAttribute('aria-pressed', String(fav));
         favBtn.disabled = !key;
+        favBtn.innerHTML = fav ? CARD_ICONS.starFilled : CARD_ICONS.star;
     }
 
     const vol = el('radio-volume-slider');
@@ -235,6 +239,11 @@ function syncTransportUi() {
         const cm = RadioCast.isCastMuted();
         castMuteBtn.classList.toggle('is-muted', cm);
         castMuteBtn.setAttribute('aria-pressed', String(cm));
+        castMuteBtn.title = cm ? 'Unmute cast' : 'Mute cast';
+        const wave = castMuteBtn.querySelector('.tile-mute-wave');
+        const slash = castMuteBtn.querySelector('.tile-mute-slash');
+        if (wave) wave.style.opacity = cm ? '0' : '1';
+        if (slash) slash.style.opacity = cm ? '1' : '0';
     }
 
     const err = el('radio-error');
@@ -261,7 +270,10 @@ function beginGesture(mode, pointerId, clientX, clientY, edge) {
         originH: geom.height,
         originScale: scale
     };
-    dialogEl()?.setPointerCapture?.(pointerId);
+    const dialog = dialogEl();
+    dialog?.setPointerCapture?.(pointerId);
+    dialog?.classList.toggle('is-dragging', mode === 'drag');
+    dialog?.querySelector('[data-radio-module-drag]')?.classList.toggle('is-dragging', mode === 'drag');
     bringOverlayToFront('radio');
 }
 
@@ -298,6 +310,9 @@ function onPointerMove(e) {
 function endGesture(e) {
     if (!gesture || (e && e.pointerId !== gesture.pointerId)) return;
     gesture = null;
+    const dialog = dialogEl();
+    dialog?.classList.remove('is-dragging');
+    dialog?.querySelector('[data-radio-module-drag]')?.classList.remove('is-dragging');
     persistState();
 }
 
@@ -367,14 +382,17 @@ function bindOnce() {
 
     modal.addEventListener('pointerdown', (e) => {
         bringOverlayToFront('radio');
-        const drag = e.target.closest?.('[data-radio-module-drag]');
         const resize = e.target.closest?.('[data-radio-resize]');
         if (resize) {
             e.preventDefault();
             beginGesture('resize', e.pointerId, e.clientX, e.clientY, resize.getAttribute('data-radio-resize'));
             return;
         }
-        if (drag && !e.target.closest('button, input, a, select')) {
+        // Drag anywhere grab-cursor shows (dialog/body/header), except interactive controls
+        if (e.target.closest?.('button, input, select, textarea, a, label, [data-radio-resize]')) {
+            return;
+        }
+        if (e.target.closest?.('.radio-module__dialog, [data-radio-module-drag]')) {
             e.preventDefault();
             beginGesture('drag', e.pointerId, e.clientX, e.clientY);
         }
