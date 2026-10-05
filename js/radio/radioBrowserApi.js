@@ -170,14 +170,27 @@ async function writeCachedBucket(bucket, key, data, ttlBucket) {
     return data;
 }
 
+let countriesMemory = null;
+let countriesMemoryAt = 0;
+
 export const RadioBrowserApi = {
     async getCountries({ refresh = false } = {}) {
+        if (!refresh && countriesMemory && isFresh({ cachedAt: countriesMemoryAt }, TTL.countries)) {
+            return countriesMemory;
+        }
         if (!refresh) {
             const cached = await readCachedBucket('countries', null, TTL.countries);
-            if (cached) return cached;
+            if (cached) {
+                countriesMemory = cached;
+                countriesMemoryAt = Date.now();
+                return cached;
+            }
         }
         const data = await apiFetch('/countries', { skipCache: refresh });
-        return writeCachedBucket('countries', null, data, TTL.countries);
+        const written = await writeCachedBucket('countries', null, data, TTL.countries);
+        countriesMemory = written;
+        countriesMemoryAt = Date.now();
+        return written;
     },
 
     async getTags({ refresh = false } = {}) {

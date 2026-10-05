@@ -21,6 +21,8 @@ let browseLevel = 'countries';
 let activeCountry = null;
 /** @type {any[]} */
 let countriesCache = [];
+/** @type {Promise<any[]>|null} */
+let countriesLoadPromise = null;
 /** @type {any[]} */
 let stationsCache = [];
 let stationOffset = 0;
@@ -143,14 +145,50 @@ function renderCountries() {
 }
 
 async function loadCountries({ refresh = false } = {}) {
-    setStatus('Loading countries…');
-    try {
-        const provider = RadioProviderRegistry.getActive();
-        countriesCache = await provider.getCountries({ refresh });
+    if (!refresh && countriesCache.length) {
         renderCountries();
+        return countriesCache;
+    }
+    if (!refresh && countriesLoadPromise) {
+        setStatus('Loading countries…');
+        try {
+            await countriesLoadPromise;
+            renderCountries();
+        } catch (e) {
+            setStatus(e?.message || 'Failed to load countries');
+        }
+        return countriesCache;
+    }
+
+    setStatus(countriesCache.length ? `${countriesCache.length} countries` : 'Loading countries…');
+    countriesLoadPromise = (async () => {
+        const provider = RadioProviderRegistry.getActive();
+        return provider.getCountries({ refresh });
+    })();
+
+    try {
+        countriesCache = await countriesLoadPromise;
+        renderCountries();
+        return countriesCache;
     } catch (e) {
         setStatus(e?.message || 'Failed to load countries');
+        return countriesCache;
+    } finally {
+        countriesLoadPromise = null;
     }
+}
+
+/** Warm Radio Browser countries/API base in the background (mirrors TV catalog prefetch). */
+function prefetchCountries() {
+    if (countriesCache.length || countriesLoadPromise) return countriesLoadPromise || Promise.resolve(countriesCache);
+    countriesLoadPromise = (async () => {
+        const provider = RadioProviderRegistry.getActive();
+        countriesCache = await provider.getCountries({ refresh: false });
+        return countriesCache;
+    })().finally(() => {
+        countriesLoadPromise = null;
+    });
+    return countriesLoadPromise;
 }
 
 async function loadMoreStations() {
@@ -383,10 +421,14 @@ function bindOnce() {
 
 function refreshActiveLists({ soft = false } = {}) {
     if (catalogMode !== 'radio') return;
-    const fav = el('radio-favorites-grid');
-    const rec = el('radio-recents-grid');
-    if (fav) renderFavorites();
-    if (rec) renderRecents();
+    const tab = typeof document !== 'undefined'
+        ? document.querySelector('.tv-panel.is-active')?.id
+        : '';
+    // Favorites hit N station-by-uuid fetches — only when that panel is active.
+    if (tab === 'favorites-panel' || el('favorites-panel')?.classList.contains('is-active')) {
+        renderFavorites();
+    }
+    renderRecents();
     if (!soft && browseLevel === 'stations') {
         const list = el('radio-stations-grid');
         if (list && stationsCache.length) {
@@ -417,9 +459,10 @@ export const RadioBrowseView = {
         if (catalogMode === 'radio') {
             ensureSentinel();
             syncSortControlsForLevel();
-            if (!countriesCache.length) loadCountries();
-            else renderCountries();
-            renderFavorites();
+            // Paint countries immediately when warm; otherwise kick a single fetch.
+            // Defer favorites UUID storm until favorites tab refresh.
+            if (countriesCache.length) renderCountries();
+            else loadCountries();
             renderRecents();
         }
         return catalogMode;
@@ -430,7 +473,17 @@ export const RadioBrowseView = {
         browseLevel = 'countries';
         activeCountry = null;
         syncSortControlsForLevel();
+        // Warm cache: sync paint. Cold: await the in-flight/prefetch load once.
+        if (countriesCache.length) {
+            renderCountries();
+            return;
+        }
         await loadCountries();
+    },
+
+    /** Boot-time warm of Radio Browser countries (same role as BrowseView.refreshCountries). */
+    prefetch() {
+        return prefetchCountries().catch(() => []);
     },
 
     refresh() {

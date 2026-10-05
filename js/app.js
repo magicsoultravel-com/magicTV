@@ -561,11 +561,13 @@ function setCatalogMode(mode) {
 function openRadioCatalog({ tab = 'browse' } = {}) {
     setCatalogMode('radio');
     if (!RemoteModule.isOpen?.()) {
-        RemoteModule.open?.({ tab: 'browse' });
+        RemoteModule.open?.({ tab: BROWSER_TABS.includes(tab) ? tab : 'browse' });
     }
     ensureBrowserCatalogVisible();
-    switchTab(BROWSER_TABS.includes(tab) ? tab : 'browse');
-    if (tab === 'browse') RadioBrowseView.openBrowse();
+    const nextTab = BROWSER_TABS.includes(tab) ? tab : 'browse';
+    if (appState.activeTab !== nextTab) switchTab(nextTab);
+    else if (nextTab === 'browse') RadioBrowseView.openBrowse();
+    else RadioBrowseView.refresh();
 }
 
 function switchTabFromRemote(tabName) {
@@ -683,8 +685,11 @@ function switchTab(tabName) {
         else ChannelGrid.syncPlayingTiles();
         restoreActiveTabScroll('recents');
     } else if (tabName === 'browse') {
-        BrowseView.restoreView();
-    } else if (tabName === 'settings') {
+        if (appState.catalogMode === 'radio') {
+            // Radio paints its own grid; skip TV browse restore/rebuild.
+        } else {
+            BrowseView.restoreView();
+        } else if (tabName === 'settings') {
         Appearance.refreshWatchStats();
         Appearance.updateStorageStats();
         HiddenChannelsSettings.refresh();
@@ -896,6 +901,8 @@ async function init() {
 
         // Mosaic stubs already painted in MultiView.init; streams attach on user play.
         const countriesPromise = BrowseView.refreshCountries().catch(() => {});
+        // Warm Radio Browser countries/API base so first "Browse radios" is not a cold fetch.
+        const radioCountriesPromise = RadioBrowseView.prefetch().catch(() => {});
 
         bindRemoteExternalPopoutBtn();
         RemoteExternalPopout.syncBtn();
@@ -926,6 +933,7 @@ async function init() {
         await playSharedDeepLink();
 
         await countriesPromise;
+        await radioCountriesPromise;
         warmGuideIndex().catch(() => {});
     } catch (err) {
         console.warn('[magicTV] Boot failed; revealing UI with safe defaults:', err);
