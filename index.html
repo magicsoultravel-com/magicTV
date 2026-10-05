@@ -1429,8 +1429,8 @@
                 </div>
             </div>
             <div class="radio-module__body">
-                <div class="radio-module__cassette" aria-hidden="true">
-                    <svg viewBox="0 0 120 44" focusable="false" preserveAspectRatio="none">
+                <div class="radio-module__cassette">
+                    <svg viewBox="0 0 120 44" focusable="false" preserveAspectRatio="none" aria-hidden="true">
                         <rect class="radio-module__cassette-body" x="4" y="6" width="112" height="32" rx="4" fill="none" stroke-width="1.2"/>
                         <rect class="radio-module__cassette-label" x="18" y="10" width="84" height="12" rx="2" fill="none" stroke-width="1"/>
                         <rect class="radio-module__cassette-window" x="28" y="26" width="64" height="8" rx="2" fill="none" stroke-width="1"/>
@@ -1451,19 +1451,14 @@
                             <circle class="radio-module__cassette-reel-bolt" cx="80" cy="30" r="0.85"/>
                         </g>
                     </svg>
-                </div>
-                <div class="radio-module__now">
-                    <div id="radio-now-art" class="radio-module__art" aria-hidden="true">
-                        <span class="radio-module__art-cassette">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
-                                <rect x="5" y="8" width="14" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                                <circle cx="8" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                                <circle cx="16" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                            </svg>
-                        </span>
+                    <div class="radio-module__label-slot">
+                        <div class="radio-module__label-leading">
+                            <span id="radio-now-country" class="tv-header-channel-flag" aria-hidden="true"></span>
+                            <div id="radio-now-art" class="radio-module__art" aria-hidden="true"></div>
+                        </div>
+                        <div id="radio-now-title" class="tv-header-now-playing marquee" title="No station">No station</div>
+                        <div class="radio-module__label-balance" aria-hidden="true"></div>
                     </div>
-                    <div id="radio-now-title" class="radio-module__title marquee" title="No station">No station</div>
                 </div>
                 <p id="radio-error" class="radio-module__error" hidden></p>
                 <div class="radio-module__controls">

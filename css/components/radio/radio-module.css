@@ -106,27 +106,75 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     cursor: pointer;
 }
 
-/* Large decorative cassette — sits behind now-playing / transport */
+/* Large decorative cassette — label slot overlays the SVG strip */
 .radio-module__cassette {
     position: absolute;
     left: 50%;
     top: calc(2px * var(--radio-scale, 1));
     transform: translateX(-50%);
     z-index: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: calc(280px * var(--radio-scale, 1));
     height: calc(156px * var(--radio-scale, 1));
-    pointer-events: none;
     color: var(--tv-text-secondary, #9aa3b5);
-    opacity: 0.55;
 }
 
-.radio-module__cassette svg {
+.radio-module__cassette > svg {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     display: block;
+    pointer-events: none;
+    opacity: 0.55;
+}
+
+/* Label rect in viewBox: 18,10,84,12 → ~15% / 23% / 70% / 27% */
+.radio-module__label-slot {
+    position: absolute;
+    left: 15%;
+    top: 23%;
+    width: 70%;
+    height: 27%;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: calc(4px * var(--radio-scale, 1));
+    padding: 0 calc(4px * var(--radio-scale, 1));
+    box-sizing: border-box;
+    opacity: 1;
+    min-width: 0;
+}
+
+.radio-module__label-leading {
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: calc(4px * var(--radio-scale, 1));
+    min-width: 0;
+}
+
+.radio-module__label-balance {
+    justify-self: end;
+    width: var(--radio-label-leading, 0px);
+    height: 1px;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.radio-module__label-slot .tv-header-channel-flag {
+    flex-shrink: 0;
+    font-size: calc(11px * var(--radio-scale, 1));
+    line-height: 1;
+    font-weight: 300;
+    letter-spacing: 0.03em;
+    color: color-mix(in srgb, var(--tv-text-secondary) 82%, transparent);
+    filter: none;
+    opacity: 0.9;
+}
+
+.radio-module__label-slot .tv-header-channel-flag:empty {
+    display: none;
 }
 
 .radio-module__cassette-reel {
@@ -172,7 +220,7 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     stroke-width: 0.55;
 }
 
-.radio-module.is-playing .radio-module__cassette {
+.radio-module.is-playing .radio-module__cassette > svg {
     opacity: 0.72;
 }
 
@@ -214,58 +262,52 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     stroke: color-mix(in srgb, var(--tv-primary) 45%, var(--tv-border, #2A2E3A));
 }
 
-.radio-module__now {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    gap: calc(10px * var(--radio-scale, 1));
-    min-height: calc(44px * var(--radio-scale, 1));
-}
-
 .radio-module__art {
-    position: relative;
-    width: calc(44px * var(--radio-scale, 1));
-    height: calc(44px * var(--radio-scale, 1));
-    border-radius: calc(8px * var(--radio-scale, 1));
-    border: 1px solid var(--tv-border, #2A2E3A);
-    background: color-mix(in srgb, var(--tv-bg-primary, #0b0e18) 80%, transparent);
-    overflow: hidden;
+    width: calc(28px * var(--radio-scale, 1));
+    height: calc(28px * var(--radio-scale, 1));
     flex-shrink: 0;
     color: var(--tv-text-secondary, #9aa3b5);
-}
-
-.radio-module__art-cassette {
-    position: absolute;
-    inset: 0;
     display: grid;
     place-items: center;
-    opacity: 0.9;
-}
-
-.radio-module__art-cassette svg {
-    width: calc(34px * var(--radio-scale, 1));
-    height: calc(34px * var(--radio-scale, 1));
 }
 
 .radio-module__art img {
-    position: relative;
-    z-index: 1;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
 }
 
-.radio-module__art:has(img) .radio-module__art-cassette {
-    opacity: 0.22;
+.radio-module__art-fallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    opacity: 0.85;
 }
 
-.radio-module__title {
-    flex: 1;
+.radio-module__art-fallback svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.radio-module__label-slot .tv-header-now-playing {
+    justify-self: center;
     min-width: 0;
-    color: var(--tv-text-primary);
-    font-size: calc(0.95rem * var(--radio-scale, 1));
+    max-width: 100%;
+    font-weight: 300;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+    font-size: calc(10px * var(--radio-scale, 1));
+    color: color-mix(in srgb, var(--tv-text-secondary) 82%, transparent);
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    text-transform: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
 }
 
 .radio-module__error {

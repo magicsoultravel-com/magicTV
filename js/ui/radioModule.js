@@ -2,7 +2,7 @@
  * Float-only Magic Radio shell — cassette-style transport overlay.
  * Uniform scale 0.5–1.5 (same model as Magic Remote undocked); independent of browser/remote CSS.
  */
-import { el } from '../tvUtils.js';
+import { el, countryFlagEmoji } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore } from '../storage/settingsStore.js';
@@ -171,15 +171,30 @@ function syncTransportUi() {
     const key = stationKey(station);
     const fav = key ? RadioPlayer.isFavorite(key) : false;
 
+    const syncLabelLeadingWidth = () => {
+        const leading = el('radio-now-art')?.closest('.radio-module__label-leading');
+        const slot = leading?.closest('.radio-module__label-slot');
+        if (slot && leading) {
+            slot.style.setProperty('--radio-label-leading', `${Math.ceil(leading.getBoundingClientRect().width)}px`);
+        }
+    };
+
     const art = el('radio-now-art');
     if (art) {
-        const cassette = `<span class="radio-module__art-cassette" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="8" width="14" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="16" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>`;
         if (station?.favicon) {
-            art.innerHTML = `${cassette}<img src="${station.favicon.replace(/"/g, '')}" alt="" loading="lazy">`;
+            art.innerHTML = `<img src="${station.favicon.replace(/"/g, '')}" alt="" loading="lazy">`;
+            art.querySelector('img')?.addEventListener('load', syncLabelLeadingWidth, { once: true });
         } else {
-            art.innerHTML = cassette;
+            art.innerHTML = `<span class="radio-module__art-fallback" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="8" width="14" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="16" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>`;
         }
     }
+
+    const countryEl = el('radio-now-country');
+    if (countryEl) {
+        countryEl.textContent = station?.countrycode ? countryFlagEmoji(station.countrycode) : '';
+    }
+
+    syncLabelLeadingWidth();
 
     const title = el('radio-now-title');
     if (title) {

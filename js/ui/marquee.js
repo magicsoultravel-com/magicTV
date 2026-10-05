@@ -14,7 +14,7 @@ const HOSTS = [
     '.guide-screen__channel',
     '.resume-session__tile-name-text',
     '.watch-stats-row__name',
-    '.radio-module__title'
+    '#radio-now-title'
 ].join(', ');
 
 export function marqueeInnerHtml(text) {

@@ -55,7 +55,8 @@ export const RadioPlayer = {
                     stationId: parsed.stationId,
                     stationuuid: saved.lastStationKey,
                     name: saved.lastStationName || 'Last station',
-                    favicon: saved.lastStationFavicon || ''
+                    favicon: saved.lastStationFavicon || '',
+                    countrycode: saved.lastStationCountrycode || ''
                 };
                 this.emitState();
             }
@@ -74,7 +75,8 @@ export const RadioPlayer = {
                 stationId: parsed.stationId,
                 stationuuid: saved.lastStationKey,
                 name: saved.lastStationName || 'Last station',
-                favicon: saved.lastStationFavicon || ''
+                favicon: saved.lastStationFavicon || '',
+                countrycode: saved.lastStationCountrycode || ''
             };
             this.emitState();
         }
@@ -361,7 +363,8 @@ export const RadioPlayer = {
         patchRadioState({
             lastStationKey: key,
             lastStationName: station.name || '',
-            lastStationFavicon: station.favicon || ''
+            lastStationFavicon: station.favicon || '',
+            lastStationCountrycode: station.countrycode || ''
         });
 
         try {
