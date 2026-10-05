@@ -275,10 +275,12 @@ body.remote-dock-side-right .browser-module .remote-module__dialog {
 #remote-collapse-header-btn,
 #remote-dock-side-btn,
 #remote-dock-toggle,
+#remote-scale-reset-btn,
 #remote-split-browser-btn,
 #browser-split-browser-btn,
 #browser-dock-toggle,
 #browser-dock-side-btn,
+#browser-scale-reset-btn,
 #browser-collapse-header-btn {
     display: none;
 }
@@ -289,6 +291,8 @@ body.remote-dock-side-right .browser-module .remote-module__dialog {
 .remote-dock-sheet__inner #remote-dock-side-btn,
 .remote-module__host #remote-dock-toggle,
 .remote-dock-sheet__inner #remote-dock-toggle,
+.remote-module__host #remote-scale-reset-btn:not(.is-hidden),
+.remote-dock-sheet__inner #remote-scale-reset-btn:not(.is-hidden),
 .remote-module__host #remote-split-browser-btn,
 .remote-dock-sheet__inner #remote-split-browser-btn {
     display: inline-flex;
@@ -304,6 +308,10 @@ body.remote-dock-side-right .browser-module .remote-module__dialog {
 .remote-dock-sheet__inner #browser-dock-side-btn,
 .browser-module .remote-module__host #browser-dock-side-btn,
 .browser-dock-sheet__inner #browser-dock-side-btn,
+.remote-module__host #browser-scale-reset-btn:not(.is-hidden),
+.remote-dock-sheet__inner #browser-scale-reset-btn:not(.is-hidden),
+.browser-module .remote-module__host #browser-scale-reset-btn:not(.is-hidden),
+.browser-dock-sheet__inner #browser-scale-reset-btn:not(.is-hidden),
 .remote-module__host #browser-collapse-header-btn,
 .remote-dock-sheet__inner #browser-collapse-header-btn,
 .browser-module .remote-module__host #browser-collapse-header-btn,
@@ -434,9 +442,8 @@ body.remote-dock-expanded #remote-module .remote-module__dialog {
 .browser-dock-sheet .remote-module__resize {
     position: absolute;
     z-index: 6;
-    width: 18px;
-    height: 18px;
-    pointer-events: auto;
+    width: 16px;
+    height: 16px;
     touch-action: none;
 }
 

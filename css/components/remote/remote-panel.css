@@ -289,22 +289,97 @@
     overflow: auto;
 }
 
+/* Corner scale grips — L brackets, hover-only, idle-fade with UI */
 .remote-module__resize {
     position: absolute;
-    width: 10px;
-    height: 10px;
+    width: 16px;
+    height: 16px;
     z-index: 12;
     touch-action: none;
     display: block;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--tv-main-1) 40%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tv-main-1) 55%, transparent);
-    opacity: 0.42;
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
 }
 
-.remote-module__resize:hover {
-    opacity: 0.85;
+.remote-module__resize::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    border: 2px solid color-mix(in srgb, var(--tv-text-primary, #e8ecf4) 72%, transparent);
+    background: transparent;
+    pointer-events: none;
+}
+
+.remote-module__resize[data-remote-resize="nw"]::after,
+.remote-module__resize[data-browser-resize="nw"]::after,
+.remote-module__resize[data-radio-resize="nw"]::after,
+.remote-module__resize[data-remote-dock-resize="nw"]::after,
+.remote-module__resize[data-browser-dock-resize="nw"]::after {
+    top: 2px;
+    left: 2px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.remote-module__resize[data-remote-resize="ne"]::after,
+.remote-module__resize[data-browser-resize="ne"]::after,
+.remote-module__resize[data-radio-resize="ne"]::after,
+.remote-module__resize[data-remote-dock-resize="ne"]::after,
+.remote-module__resize[data-browser-dock-resize="ne"]::after {
+    top: 2px;
+    right: 2px;
+    border-left: none;
+    border-bottom: none;
+}
+
+.remote-module__resize[data-remote-resize="sw"]::after,
+.remote-module__resize[data-browser-resize="sw"]::after,
+.remote-module__resize[data-radio-resize="sw"]::after,
+.remote-module__resize[data-remote-dock-resize="sw"]::after,
+.remote-module__resize[data-browser-dock-resize="sw"]::after {
+    bottom: 2px;
+    left: 2px;
+    border-right: none;
+    border-top: none;
+}
+
+.remote-module__resize[data-remote-resize="se"]::after,
+.remote-module__resize[data-browser-resize="se"]::after,
+.remote-module__resize[data-radio-resize="se"]::after,
+.remote-module__resize[data-remote-dock-resize="se"]::after,
+.remote-module__resize[data-browser-dock-resize="se"]::after {
+    bottom: 2px;
+    right: 2px;
+    border-left: none;
+    border-top: none;
+}
+
+#remote-module:hover .remote-module__resize,
+#remote-module:focus-within .remote-module__resize,
+#remote-module.is-resizing .remote-module__resize,
+#remote-dock-sheet:hover .remote-module__resize,
+#remote-dock-sheet:focus-within .remote-module__resize,
+#remote-dock-sheet.is-resizing .remote-module__resize,
+#browser-module:hover .remote-module__resize,
+#browser-module:focus-within .remote-module__resize,
+#browser-module.is-resizing .remote-module__resize,
+#browser-dock-sheet:hover .remote-module__resize,
+#browser-dock-sheet:focus-within .remote-module__resize,
+#browser-dock-sheet.is-resizing .remote-module__resize,
+#radio-module:hover .remote-module__resize,
+#radio-module:focus-within .remote-module__resize,
+#radio-module.is-resizing .remote-module__resize {
+    opacity: var(--ui-idle-opacity-mult, 1);
+    pointer-events: auto;
 }
 
 .remote-module__resize[data-remote-resize="nw"],

@@ -394,6 +394,8 @@ function onPointerUp(e) {
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
     dialogEl()?.classList.remove('is-dragging');
+    moduleEl()?.classList.remove('is-resizing');
+    dockSheetEl()?.classList.remove('is-resizing');
 
     const wasDock = gesture.mode === 'dock-resize';
     gesture = null;
@@ -408,11 +410,13 @@ function onPointerUp(e) {
             }, { reconcile: false });
         }
         applyDockGeometry(dockSizeOverride);
+        syncScaleResetBtn();
         return;
     }
     if (uiMode === 'undocked') {
         patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
     }
+    syncScaleResetBtn();
 }
 
 function beginGesture(e, mode, edge = '') {
@@ -432,6 +436,7 @@ function beginGesture(e, mode, edge = '') {
             originW: rect?.width ?? MIN_W * 2,
             originH: rect?.height ?? MIN_H
         };
+        sheet?.classList.add('is-resizing');
     } else {
         const dialog = dialogEl();
         if (!dialog || uiMode !== 'undocked') return;
@@ -448,6 +453,7 @@ function beginGesture(e, mode, edge = '') {
             originH: geom.height
         };
         if (mode === 'drag') dialog.classList.add('is-dragging');
+        if (mode === 'resize') moduleEl()?.classList.add('is-resizing');
     }
 
     try {
@@ -495,6 +501,43 @@ function syncCollapseHeaderBtn() {
     collapseBtn.setAttribute('aria-label', label);
 }
 
+function browserSizeIsDirty() {
+    if (dockSizeOverride) return true;
+    if (uiMode !== 'undocked') return false;
+    const geom = readDialogGeometry();
+    return Math.abs(geom.width - BROWSER_BASE_W) > 2 || Math.abs(geom.height - BROWSER_BASE_H) > 2;
+}
+
+function syncScaleResetBtn() {
+    const btn = el('browser-scale-reset-btn');
+    if (!btn) return;
+    const dirty = browserSizeIsDirty();
+    btn.innerHTML = ACTION_ICONS.scaleReset;
+    btn.title = 'Reset size';
+    btn.setAttribute('aria-label', 'Reset size');
+    btn.hidden = !dirty;
+    btn.classList.toggle('is-hidden', !dirty);
+}
+
+function resetSize() {
+    dockSizeOverride = null;
+    if (uiMode === 'undocked') {
+        const geom = readDialogGeometry();
+        const next = {
+            left: geom.left,
+            top: geom.top,
+            width: BROWSER_BASE_W,
+            height: BROWSER_BASE_H,
+            pinned
+        };
+        applyGeometry(next, { pinned });
+        patchLayout({ browser: next }, { reconcile: false });
+    } else if (uiMode === 'docked') {
+        applyDockGeometry();
+    }
+    syncScaleResetBtn();
+}
+
 function syncActionButtons() {
     const popBtn = el('browser-external-popout-btn');
     const split = isSplit();
@@ -507,6 +550,7 @@ function syncActionButtons() {
     syncDockToggleBtn();
     syncDockSideBtn();
     syncCollapseHeaderBtn();
+    syncScaleResetBtn();
     syncRemoteScreenFooter();
 }
 
@@ -592,6 +636,12 @@ function bindOnce() {
     });
 
     el('browser-dock-side-btn')?.addEventListener('click', () => RemoteModule.toggleDockSide());
+
+    el('browser-scale-reset-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetSize();
+    });
 
     document.addEventListener('click', (e) => {
         const brand = e.target?.closest?.('#browser-shell > .module-shell__chrome > .remote-module__brand');
@@ -758,6 +808,8 @@ export const BrowserModule = {
     syncActionButtons,
     syncDockToggleBtn,
     syncCollapseHeaderBtn,
+    syncScaleResetBtn,
+    resetSize,
 
     persistGeometry() {
         if (uiMode !== 'undocked') return;

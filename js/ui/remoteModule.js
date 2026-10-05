@@ -194,6 +194,36 @@ function syncCollapseHeaderBtn() {
     btn.setAttribute('aria-label', 'Collapse remote');
 }
 
+function syncScaleResetBtn() {
+    const btn = el('remote-scale-reset-btn');
+    if (!btn) return;
+    const dirty = Math.abs(clampModuleScale(scale) - 1) > 0.01;
+    btn.innerHTML = ACTION_ICONS.scaleReset;
+    btn.title = 'Reset size';
+    btn.setAttribute('aria-label', 'Reset size');
+    btn.hidden = !dirty;
+    btn.classList.toggle('is-hidden', !dirty);
+}
+
+function resetScale() {
+    scale = 1;
+    if (mode === 'docked') {
+        applyDockScaleGeometry();
+    } else if (mode === 'undocked') {
+        const geom = readDialogGeometry();
+        applyGeometry({
+            left: geom.left,
+            top: geom.top,
+            width: baseWidthForScale(1),
+            height: baseHeightForScale(1)
+        });
+    } else {
+        applyRemoteScaleCss();
+    }
+    syncScaleResetBtn();
+    persistState({ scale: 1 });
+}
+
 function waitForSheetCollapseAnimation() {
     const sheet = dockSheetEl();
     if (!sheet || !sheetExpanded || mode !== 'docked') {
@@ -937,7 +967,10 @@ function endGesture() {
     if (!gesture) return;
     moduleEl()?.querySelector('[data-remote-module-drag]')?.classList.remove('is-dragging');
     dialogEl()?.classList.remove('is-dragging');
+    moduleEl()?.classList.remove('is-resizing');
+    dockSheetEl()?.classList.remove('is-resizing');
     gesture = null;
+    syncScaleResetBtn();
     persistState({ scale });
 }
 
@@ -1011,6 +1044,7 @@ function beginGesture(e, modeName, edge = '') {
             originH: rect?.height ?? baseHeightForScale(),
             originScale: scale
         };
+        sheet?.classList.add('is-resizing');
     } else {
         const dialog = dialogEl();
         if (!dialog) return;
@@ -1030,6 +1064,9 @@ function beginGesture(e, modeName, edge = '') {
         if (modeName === 'drag') {
             e.currentTarget?.classList?.add('is-dragging');
             dialogEl()?.classList.add('is-dragging');
+        }
+        if (modeName === 'resize') {
+            moduleEl()?.classList.add('is-resizing');
         }
     }
 
@@ -1055,6 +1092,11 @@ function bindOnce() {
         else RemoteModule.undock();
     });
     el('remote-dock-side-btn')?.addEventListener('click', () => toggleDockSide());
+    el('remote-scale-reset-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetScale();
+    });
     bindLayoutToggleButtons();
     modal?.querySelector('[data-remote-module-drag]')?.addEventListener('pointerdown', (e) => {
         if (e.target.closest?.('button')) return;
@@ -1171,11 +1213,13 @@ function restoreFromState() {
             height: baseHeightForScale()
         }, { pinned: saved.pinned === true });
         applyDockScaleGeometry();
+        syncScaleResetBtn();
         return;
     }
     scale = 1;
     applyGeometry(defaultGeometry(), { pinned: false });
     applyDockScaleGeometry();
+    syncScaleResetBtn();
 }
 
 function finishClose() {
@@ -1276,6 +1320,7 @@ export const RemoteModule = {
         syncDockSideBtn();
         syncCollapseHeaderBtn();
         syncDockToggleBtn();
+        syncScaleResetBtn();
     },
 
     getMode() {
@@ -1573,6 +1618,8 @@ export const RemoteModule = {
     syncCatalogChrome(tab) {
         syncCatalogChromeGeometry(tab ?? resolveActiveCatalogTab());
     },
+    resetScale,
+    syncScaleResetBtn,
     resetIdleFade: () => ModuleIdleFade.resetAll()
 };
 

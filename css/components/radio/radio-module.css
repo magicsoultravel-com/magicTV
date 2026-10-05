@@ -47,6 +47,18 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     touch-action: none;
 }
 
+.radio-module__header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(4px * var(--radio-scale, 1));
+}
+
+.radio-module__header-actions .tv-module__action.is-hidden,
+#radio-scale-reset-btn.is-hidden,
+#radio-scale-reset-btn[hidden] {
+    display: none !important;
+}
+
 .radio-module__header.is-dragging,
 .radio-module .radio-module__dialog.is-dragging {
     cursor: grabbing;

@@ -82,6 +82,8 @@ export const ACTION_ICONS = {
     random: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="4.6" cy="4.6" r="0.6" fill="currentColor"/><circle cx="7.4" cy="4.6" r="0.6" fill="currentColor"/><circle cx="4.6" cy="7.4" r="0.6" fill="currentColor"/><circle cx="7.4" cy="7.4" r="0.6" fill="currentColor"/></svg>',
     /** Bidirectional arrows — snap remote dock to the opposite side. */
     dockSide: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M1.8 6h8.4M3.6 3.8 1.8 6l1.8 2.2M8.4 3.8 10.2 6 8.4 8.2" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /** Reset module size/scale to 100% baseline. */
+    scaleReset: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.4 4.2V2.4h1.8M9.6 4.2V2.4H7.8M2.4 7.8v1.8h1.8M9.6 7.8v1.8H7.8" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/><rect x="3.6" y="3.6" width="4.8" height="4.8" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>',
     /** Trash — clear accumulated stats. */
     clearStats: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true" vector-effect="non-scaling-stroke"><path d="M3.2 3.2h5.6M4.4 3.2V2.4h3.2v.8M4.8 5.2v4M7.2 5.2v4M3.8 3.2l.4 6.4h3.6l.4-6.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     /** Up arrow icon for ascending sort direction */

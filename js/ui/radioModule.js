@@ -101,6 +101,24 @@ function applyScaleAndPosition() {
     dialog.style.top = `${geom.top}px`;
     dialog.style.width = `${geom.width}px`;
     dialog.style.height = `${geom.height}px`;
+    syncScaleResetBtn();
+}
+
+function syncScaleResetBtn() {
+    const btn = el('radio-scale-reset-btn');
+    if (!btn) return;
+    const dirty = Math.abs(clampModuleScale(scale) - 1) > 0.01;
+    btn.innerHTML = ACTION_ICONS.scaleReset;
+    btn.title = 'Reset size';
+    btn.setAttribute('aria-label', 'Reset size');
+    btn.hidden = !dirty;
+    btn.classList.toggle('is-hidden', !dirty);
+}
+
+function resetScale() {
+    scale = 1;
+    applyScaleAndPosition();
+    persistState();
 }
 
 function persistState() {
@@ -274,6 +292,7 @@ function beginGesture(mode, pointerId, clientX, clientY, edge) {
     dialog?.setPointerCapture?.(pointerId);
     dialog?.classList.toggle('is-dragging', mode === 'drag');
     dialog?.querySelector('[data-radio-module-drag]')?.classList.toggle('is-dragging', mode === 'drag');
+    moduleEl()?.classList.toggle('is-resizing', mode === 'resize');
     bringOverlayToFront('radio');
 }
 
@@ -313,6 +332,8 @@ function endGesture(e) {
     const dialog = dialogEl();
     dialog?.classList.remove('is-dragging');
     dialog?.querySelector('[data-radio-module-drag]')?.classList.remove('is-dragging');
+    moduleEl()?.classList.remove('is-resizing');
+    syncScaleResetBtn();
     persistState();
 }
 
@@ -401,6 +422,12 @@ function bindOnce() {
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endGesture);
     window.addEventListener('pointercancel', endGesture);
+
+    el('radio-scale-reset-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetScale();
+    });
 
     modal.addEventListener('click', (e) => {
         const dismiss = e.target.closest?.('[data-radio-module-dismiss]');
@@ -501,6 +528,7 @@ export const RadioModule = {
         showUI(true);
         persistState();
         syncTransportUi();
+        syncScaleResetBtn();
     },
 
     close() {
@@ -516,5 +544,7 @@ export const RadioModule = {
         else this.open();
     },
 
+    resetScale,
+    syncScaleResetBtn,
     syncTransportUi
 };
