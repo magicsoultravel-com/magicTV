@@ -3,6 +3,12 @@ import { TvPlayer } from '../tvPlayer.js';
 import { countryFlagEmoji, el } from '../tvUtils.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { UNLIMITED_RECENTS_CAP, isUnlimitedRecentsCap } from '../storage/playerState.js';
+import {
+    UNLIMITED_RADIO_RECENTS_CAP,
+    getRadioRecentsCap,
+    setRadioRecentsCap,
+    isUnlimitedRadioRecentsCap
+} from '../radio/radioState.js';
 import { clearWatchStats, formatWatchDuration, flushAllWatchAccruals, getTopWatched } from '../storage/watchStats.js';
 import { ACTION_ICONS } from './icons.js';
 import { copyThemeAttributes } from './popoutWindows.js';
@@ -276,6 +282,47 @@ export const Appearance = {
                 const { RadioModule } = await import('./radioModule.js');
                 RadioModule.syncEnabledUi();
             });
+        }
+
+        const radioRecentsCapInput = el('radio-recents-cap-input');
+        const radioRecentsUnlimited = el('radio-recents-cap-unlimited');
+        if (radioRecentsCapInput && radioRecentsCapInput.dataset.bound !== '1') {
+            radioRecentsCapInput.dataset.bound = '1';
+            const syncRadioUnlimitedUi = (cap) => {
+                const unlimited = isUnlimitedRadioRecentsCap(cap);
+                if (radioRecentsUnlimited) radioRecentsUnlimited.checked = unlimited;
+                radioRecentsCapInput.disabled = unlimited;
+                if (!unlimited) radioRecentsCapInput.value = String(cap);
+            };
+            radioRecentsCapInput.addEventListener('change', () => {
+                const cap = setRadioRecentsCap(Number(radioRecentsCapInput.value));
+                syncRadioUnlimitedUi(cap);
+                showAppToast(
+                    isUnlimitedRadioRecentsCap(cap)
+                        ? 'Radio recents: unlimited'
+                        : `Radio recents: ${cap}`
+                );
+            });
+            radioRecentsCapInput.addEventListener('blur', () => {
+                const cap = getRadioRecentsCap();
+                if (!isUnlimitedRadioRecentsCap(cap)) radioRecentsCapInput.value = String(cap);
+            });
+            if (radioRecentsUnlimited && radioRecentsUnlimited.dataset.bound !== '1') {
+                radioRecentsUnlimited.dataset.bound = '1';
+                radioRecentsUnlimited.addEventListener('change', () => {
+                    const cap = setRadioRecentsCap(
+                        radioRecentsUnlimited.checked
+                            ? UNLIMITED_RADIO_RECENTS_CAP
+                            : Number(radioRecentsCapInput.value) || 20
+                    );
+                    syncRadioUnlimitedUi(cap);
+                    showAppToast(
+                        isUnlimitedRadioRecentsCap(cap)
+                            ? 'Radio recents: unlimited'
+                            : `Radio recents: ${cap}`
+                    );
+                });
+            }
         }
 
         const showMosaicWatchSessionEl = el('show-mosaic-watch-session');
@@ -742,6 +789,16 @@ export const Appearance = {
 
         const radioEnabledEl = el('radio-enabled');
         if (radioEnabledEl) radioEnabledEl.checked = SettingsStore.getRadioEnabled();
+
+        const radioRecentsCap = getRadioRecentsCap();
+        const radioRecentsCapInputSync = el('radio-recents-cap-input');
+        const radioRecentsUnlimitedSync = el('radio-recents-cap-unlimited');
+        if (radioRecentsCapInputSync) {
+            const unlimited = isUnlimitedRadioRecentsCap(radioRecentsCap);
+            radioRecentsCapInputSync.disabled = unlimited;
+            if (!unlimited) radioRecentsCapInputSync.value = String(radioRecentsCap);
+            if (radioRecentsUnlimitedSync) radioRecentsUnlimitedSync.checked = unlimited;
+        }
 
         const showMosaicWatchSession = el('show-mosaic-watch-session');
         if (showMosaicWatchSession) {

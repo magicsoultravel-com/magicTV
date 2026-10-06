@@ -9,9 +9,11 @@ import { SettingsStore } from '../storage/settingsStore.js';
 import { bringOverlayToFront } from './moduleLayout.js';
 import { RadioPlayer } from '../radio/radioPlayer.js';
 import { RadioCast } from '../radio/radioCast.js';
+import { navigateStation } from '../radio/stationNav.js';
 import { stationKey } from '../radio/stationShape.js';
 import { setMarqueeText } from './marquee.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
+import { StationBindPicker } from './stationBindPicker.js';
 import {
     RADIO_BASE_W,
     RADIO_BASE_H,
@@ -379,6 +381,15 @@ async function handleAction(action) {
             case 'browse':
                 openRadioBrowser({ tab: 'browse' });
                 break;
+            case 'station-up':
+                await navigateStation('up');
+                break;
+            case 'station-down':
+                await navigateStation('down');
+                break;
+            case 'station-bind-toggle':
+                StationBindPicker.toggle();
+                break;
             case 'favorite':
                 if (RadioPlayer.station) RadioPlayer.toggleFavorite(RadioPlayer.station);
                 break;
@@ -443,7 +454,7 @@ function bindOnce() {
             return;
         }
         // Drag anywhere grab-cursor shows (dialog/body/header), except interactive controls
-        if (e.target.closest?.('button, input, select, textarea, a, label, [data-radio-resize]')) {
+        if (e.target.closest?.('button, input, select, textarea, a, label, [data-radio-resize], .chan-bind-menu, [data-radio-station-rocker]')) {
             return;
         }
         if (e.target.closest?.('.radio-module__dialog, [data-radio-module-drag]')) {
@@ -466,6 +477,13 @@ function bindOnce() {
         const dismiss = e.target.closest?.('[data-radio-module-dismiss]');
         if (dismiss && !pinned) {
             RadioModule.close();
+            return;
+        }
+        const bindBtn = e.target.closest?.('[data-radio-action="station-bind-toggle"]');
+        if (bindBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAction('station-bind-toggle');
             return;
         }
         const btn = e.target.closest?.('[data-radio-action]');
@@ -503,6 +521,7 @@ export const RadioModule = {
         if (typeof openBrowser === 'function') openRadioBrowser = openBrowser;
         if (typeof onClose === 'function') onCloseCb = onClose;
         bindOnce();
+        StationBindPicker.bind();
         RadioPlayer.init({
             getSharedVolume: () => multiViewRef?.sharedVolume ?? 1
         });
@@ -512,6 +531,7 @@ export const RadioModule = {
         RadioCast.init().catch(() => {});
         this.syncEnabledUi();
         syncTransportUi();
+        StationBindPicker.syncBindButtons();
     },
 
     isOpen() {

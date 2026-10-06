@@ -137,6 +137,59 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     cursor: pointer;
 }
 
+/* Station rocker — left gutter of cassette; always visible (unlike tile hover rockers) */
+.radio-module__station-rocker.tv-player-tile__rocker {
+    position: absolute;
+    left: calc(2px * var(--radio-scale, 1));
+    top: calc(48px * var(--radio-scale, 1));
+    right: auto;
+    transform: none;
+    z-index: 2;
+    opacity: 1;
+    pointer-events: auto;
+    grid-template-rows: repeat(3, calc(22px * var(--radio-scale, 1)));
+    gap: calc(0.1rem * var(--radio-scale, 1));
+    padding: calc(0.2rem * var(--radio-scale, 1)) calc(0.14rem * var(--radio-scale, 1));
+    border-radius: calc(8px * var(--radio-scale, 1));
+    cursor: default;
+}
+
+.radio-module__station-rocker .tv-player-tile__rocker-btn.tv-controls__btn {
+    width: calc(24px * var(--radio-scale, 1));
+    height: calc(22px * var(--radio-scale, 1));
+    min-width: calc(24px * var(--radio-scale, 1));
+    min-height: calc(22px * var(--radio-scale, 1));
+}
+
+.radio-module__station-rocker .tv-player-tile__rocker-mid {
+    width: calc(24px * var(--radio-scale, 1));
+    height: calc(22px * var(--radio-scale, 1));
+    position: relative;
+}
+
+.radio-module__station-bind-wrap {
+    position: relative;
+}
+
+.chan-bind-menu.radio-module__station-bind-menu {
+    position: absolute;
+    top: 50%;
+    bottom: auto;
+    left: calc(100% + 0.35rem);
+    right: auto;
+    transform: translateY(-50%);
+    z-index: 9000;
+    min-width: 11rem;
+    max-width: 15rem;
+    max-height: min(18rem, 60vh);
+    overflow-y: auto;
+}
+
+.radio-module__station-bind-btn.is-bound-country,
+.radio-module__station-bind-btn.is-bound-folder {
+    color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
+}
+
 /* Large decorative cassette — label slot overlays the SVG strip */
 .radio-module__cassette {
     position: absolute;

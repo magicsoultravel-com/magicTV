@@ -7,10 +7,11 @@ import {
     parseStationKey
 } from './stationShape.js';
 import {
-    RADIO_RECENTS_CAP,
     DEFAULT_BROWSE_SORT,
     DEFAULT_BROWSE_SORT_DIR,
     DEFAULT_COUNTRY_SORT,
+    getRadioRecentsCap,
+    isUnlimitedRadioRecentsCap,
     loadRadioState,
     patchRadioState
 } from './radioState.js';
@@ -273,7 +274,10 @@ export const RadioPlayer = {
             countrycode: station?.countrycode || '',
             at: Date.now()
         });
-        patchRadioState({ recentsMeta: meta.slice(0, RADIO_RECENTS_CAP) });
+        const cap = getRadioRecentsCap();
+        patchRadioState({
+            recentsMeta: isUnlimitedRadioRecentsCap(cap) ? meta : meta.slice(0, cap)
+        });
     },
 
     clearRecents() {
