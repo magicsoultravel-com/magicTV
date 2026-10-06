@@ -115,6 +115,21 @@ function syncScaleResetBtn() {
     btn.classList.toggle('is-hidden', !dirty);
 }
 
+function setPinned(next, { persist = true } = {}) {
+    pinned = next === true;
+    moduleEl()?.classList.toggle('is-pinned', pinned);
+    const pinBtn = el('radio-module-pin');
+    if (pinBtn) {
+        pinBtn.classList.toggle('is-active', pinned);
+        pinBtn.setAttribute('aria-pressed', String(pinned));
+        pinBtn.title = pinned ? 'Unpin window' : 'Pin window';
+        pinBtn.setAttribute('aria-label', pinBtn.title);
+    }
+    const dialog = dialogEl();
+    if (dialog) dialog.setAttribute('aria-modal', pinned ? 'false' : 'true');
+    if (persist) persistState();
+}
+
 function resetScale() {
     scale = 1;
     applyScaleAndPosition();
@@ -397,6 +412,9 @@ async function handleAction(action) {
             case 'cast-mute':
                 RadioCast.toggleCastMute();
                 break;
+            case 'pin':
+                setPinned(!pinned);
+                break;
             case 'close':
                 RadioModule.close();
                 break;
@@ -539,10 +557,7 @@ export const RadioModule = {
         }).catch(() => {});
         const saved = loadPlayerState().radioModule;
         restoreFromSaved(saved);
-        if (saved?.pinned) {
-            pinned = true;
-            moduleEl()?.classList.toggle('is-pinned', true);
-        }
+        setPinned(saved?.pinned === true, { persist: false });
         open = true;
         showUI(true);
         persistState();

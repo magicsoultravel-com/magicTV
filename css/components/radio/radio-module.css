@@ -5,6 +5,10 @@
     transition: opacity 0.15s ease;
 }
 
+.radio-module.is-pinned {
+    opacity: var(--remote-module-opacity, 1);
+}
+
 /* Fully independent float — never inherit remote dock/wing geometry */
 .radio-module .radio-module__dialog {
     position: fixed;
@@ -62,6 +66,20 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
 #radio-scale-reset-btn.is-hidden,
 #radio-scale-reset-btn[hidden] {
     display: none !important;
+}
+
+/* Pin: hover suite only — stay hidden when latched unless hovering */
+@media (hover: hover) {
+    .radio-module__pin {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+
+    #radio-module:is(:hover, :focus-within, .is-resizing) .radio-module__pin {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .radio-module__header.is-dragging,
