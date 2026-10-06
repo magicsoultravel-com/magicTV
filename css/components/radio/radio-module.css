@@ -68,16 +68,20 @@ body.remote-dock-side-right .radio-module .radio-module__dialog {
     display: none !important;
 }
 
-/* Pin: hover suite only — stay hidden when latched unless hovering */
+/* Pin: hover suite only — never stay visible just because latched */
 @media (hover: hover) {
-    .radio-module__pin {
-        opacity: 0;
+    #radio-module .radio-module__pin,
+    #radio-module .radio-module__pin.is-active,
+    #radio-module .radio-module__pin[aria-pressed="true"] {
+        opacity: 0 !important;
         pointer-events: none;
         transition: opacity 0.15s ease;
     }
 
-    #radio-module:is(:hover, :focus-within, .is-resizing) .radio-module__pin {
-        opacity: 1;
+    #radio-module:is(:hover, :focus-within, .is-resizing) .radio-module__pin,
+    #radio-module:is(:hover, :focus-within, .is-resizing) .radio-module__pin.is-active,
+    #radio-module:is(:hover, :focus-within, .is-resizing) .radio-module__pin[aria-pressed="true"] {
+        opacity: 0.88 !important;
         pointer-events: auto;
     }
 }
