@@ -591,7 +591,10 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--remote-grid-gap, 0.4rem) var(--tv-spacing-md) var(--tv-spacing-md);
+    padding:
+        var(--remote-grid-gap, 0.4rem)
+        var(--remote-space-md, var(--tv-spacing-md, 1rem))
+        var(--remote-space-md, var(--tv-spacing-md, 1rem));
     box-sizing: border-box;
 }
 

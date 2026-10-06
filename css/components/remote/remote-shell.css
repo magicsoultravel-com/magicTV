@@ -5,14 +5,15 @@
     --remote-grid-cols: 5;
     --remote-scale: 1;
     --remote-btn-size: calc(40px * var(--remote-scale, 1));
-    --remote-grid-gap: 0.4rem;
+    --remote-grid-gap: calc(0.4rem * var(--remote-scale, 1));
+    --remote-space-md: calc(var(--tv-spacing-md, 1rem) * var(--remote-scale, 1));
     --remote-edge-inset: 1.5rem;
     --browser-tile-scale: 1;
     --radio-scale: 1;
     --remote-min-width: calc(
         var(--remote-grid-cols) * var(--remote-btn-size)
         + (var(--remote-grid-cols) - 1) * var(--remote-grid-gap)
-        + 2 * var(--tv-spacing-md, 1rem)
+        + 2 * var(--remote-space-md)
     );
     --guide-slide-duration: 0.55s;
     --guide-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -217,7 +218,6 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
     width: var(--remote-min-width, 260px);
     height: auto;
     min-width: var(--remote-min-width, 260px);
-    min-height: 320px;
     max-width: calc(100vw - 0.5rem);
     max-height: calc(100vh - 0.5rem);
     box-sizing: border-box;
@@ -237,6 +237,15 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
         min-width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1));
     cursor: grab;
+}
+
+/* Remote float min-height tracks scale so shrink does not fight a fixed 320px floor */
+#remote-module .remote-module__dialog {
+    min-height: calc(320px * var(--remote-scale, 1));
+}
+
+.browser-module .remote-module__dialog {
+    min-height: 320px;
 }
 
 /* Dock / remote on the right — extrude bottom-left instead */
@@ -482,15 +491,18 @@ body.browser-shell-split #remote-shell {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
-    padding: 2.2rem var(--tv-spacing-md, 1rem) 0.4rem;
+    gap: calc(0.25rem * var(--remote-scale, 1));
+    padding:
+        calc(2.2rem * var(--remote-scale, 1))
+        var(--remote-space-md, var(--tv-spacing-md, 1rem))
+        calc(0.4rem * var(--remote-scale, 1));
     text-align: center;
 }
 
 .remote-module__chrome-row {
     position: absolute;
-    top: -0.75rem;
-    left: var(--tv-spacing-md, 1rem);
+    top: calc(-0.75rem * var(--remote-scale, 1));
+    left: var(--remote-space-md, var(--tv-spacing-md, 1rem));
     display: flex;
     justify-content: flex-start;
     z-index: 5;
@@ -616,6 +628,17 @@ body.browser-shell-split #remote-shell {
     overflow: auto;
     display: flex;
     flex-direction: column;
+}
+
+/* Keypad only — hide spurious X scroll from unscaled rem vs scaled box; Y still if needed */
+#remote-shell > .remote-module__scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#remote-shell #remote-panel.is-active {
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .remote-module__footer {
