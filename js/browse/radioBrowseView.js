@@ -263,7 +263,8 @@ async function loadMoreStations() {
     if (stationsLoading || stationsDone || !activeCountry || catalogMode !== 'radio') return;
     stationsLoading = true;
     const list = el('channels-container');
-    if (list && !stationsCache.length) {
+    const isFirstPage = !stationsCache.length;
+    if (list && isFirstPage) {
         list.innerHTML = '<div class="catalog-status" role="status"><p class="catalog-status__text">Loading stations…</p></div>';
     }
     try {
@@ -283,18 +284,45 @@ async function loadMoreStations() {
         const filtered = q
             ? batch.filter((s) => String(s.name || '').toLowerCase().includes(q))
             : batch;
-        stationsCache = stationsCache.concat(filtered);
-        rememberStations(filtered);
         stationOffset += batch.length;
         if (batch.length < PAGE_SIZE) stationsDone = true;
-        if (list) {
-            const favs = favoritesSet();
-            list.innerHTML = stationsCache.map((s) => stationTileHtml(s, favs)).join('')
-                || '<div class="empty-state"><p class="empty-state__text">No stations</p></div>';
-            Appearance.applyToTiles?.(list);
+
+        if (!list) {
+            stationsCache = stationsCache.concat(filtered);
+            rememberStations(filtered);
+            return;
         }
+
+        // Later page with nothing new — leave existing tiles; never leave Loading….
+        if (!isFirstPage && !filtered.length) {
+            return;
+        }
+
+        const favs = favoritesSet();
+        const html = filtered.map((s) => stationTileHtml(s, favs)).join('');
+
+        if (isFirstPage) {
+            stationsCache = filtered;
+            rememberStations(filtered);
+            list.innerHTML = html
+                || '<div class="empty-state"><p class="empty-state__text">No stations</p></div>';
+            if (html) Appearance.applyToTiles?.(list);
+            return;
+        }
+
+        stationsCache = stationsCache.concat(filtered);
+        rememberStations(filtered);
+        if (!html) return;
+
+        // Append only — preserves scrollTop; marquee only new tiles.
+        const batchRoot = document.createElement('div');
+        batchRoot.className = 'radio-station-batch';
+        batchRoot.style.display = 'contents';
+        batchRoot.innerHTML = html;
+        list.appendChild(batchRoot);
+        Appearance.applyToTiles?.(batchRoot);
     } catch (e) {
-        if (list) {
+        if (list && isFirstPage) {
             list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed to load stations')}</p></div>`;
         }
     } finally {
@@ -573,22 +601,24 @@ export const RadioBrowseView = {
         return browseLevel;
     },
 
-    setMode(mode) {
+    setMode(mode, { paint = true } = {}) {
         catalogMode = mode === 'radio' ? 'radio' : 'tv';
         syncModeClasses();
         if (catalogMode === 'radio') {
             ensureScrollBind();
-            if (browseLevel === 'stations' && activeCountry) showStationsLevel();
-            else if (countriesCache.length) renderCountries();
-            else loadCountries();
             ListSort.syncSortControls();
             syncBackButton();
+            if (paint) {
+                if (browseLevel === 'stations' && activeCountry) showStationsLevel();
+                else if (countriesCache.length) renderCountries();
+                else loadCountries();
+            }
         }
         return catalogMode;
     },
 
     async openBrowse() {
-        this.setMode('radio');
+        this.setMode('radio', { paint: false });
         activeCountry = null;
         stationsCache = [];
         stationOffset = 0;

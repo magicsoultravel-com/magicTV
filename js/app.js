@@ -578,11 +578,11 @@ function syncRemoteTabChrome() {
 
 const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
 
-function setCatalogMode(mode) {
+function setCatalogMode(mode, { paint = true } = {}) {
     const next = mode === 'radio' ? 'radio' : 'tv';
     const prev = appState.catalogMode;
     appState.catalogMode = next;
-    RadioBrowseView.setMode(appState.catalogMode);
+    RadioBrowseView.setMode(appState.catalogMode, { paint });
     ListSort.syncSortControls();
     if (prev === 'radio' && next === 'tv' && BROWSER_TABS.includes(appState.activeTab)) {
         if (appState.activeTab === 'browse') BrowseView.restoreView();
@@ -592,11 +592,12 @@ function setCatalogMode(mode) {
 }
 
 function openRadioCatalog({ tab = 'browse' } = {}) {
-    setCatalogMode('radio');
+    // Paint once via switchTab / openBrowse / refresh — not in setMode.
+    setCatalogMode('radio', { paint: false });
     if (!RemoteModule.isOpen?.()) {
         RemoteModule.open?.({ tab: BROWSER_TABS.includes(tab) ? tab : 'browse' });
     }
-    ensureBrowserCatalogVisible();
+    ensureBrowserCatalogVisible({ refreshRadio: false });
     const nextTab = BROWSER_TABS.includes(tab) ? tab : 'browse';
     if (appState.activeTab !== nextTab) switchTab(nextTab);
     else if (nextTab === 'browse') RadioBrowseView.openBrowse();
@@ -634,7 +635,7 @@ function restoreActiveTabScroll(tabName) {
 }
 
 /** When split, Browser window must show a catalog tab — never leave panels blank. */
-function ensureBrowserCatalogVisible() {
+function ensureBrowserCatalogVisible({ refreshRadio = true } = {}) {
     if (!isSplit()) return;
     let tab = appState.activeTab;
     if (tab === 'remote' || !BROWSER_TABS.includes(tab)) {
@@ -646,7 +647,7 @@ function ensureBrowserCatalogVisible() {
     }
     activateTabPanels(tab);
     if (appState.catalogMode === 'radio') {
-        RadioBrowseView.refresh();
+        if (refreshRadio) RadioBrowseView.refresh();
         return;
     }
     if (tab === 'browse') {
@@ -683,9 +684,7 @@ function switchTab(tabName) {
 
     activateTabPanels(tabName);
 
-    if (tabName === 'browse' || tabName === 'favorites' || tabName === 'recents') {
-        RadioBrowseView.refresh();
-    }
+    // Radio paints once in the catalogMode === 'radio' branch below — do not refresh here.
 
     const backBtn = el('back-btn');
     if (backBtn) {

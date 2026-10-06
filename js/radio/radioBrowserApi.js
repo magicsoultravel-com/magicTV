@@ -129,7 +129,7 @@ function attemptSignal(external, timeoutMs) {
     };
 }
 
-async function apiFetch(path, { method = 'GET', signal } = {}) {
+async function apiFetch(path, { method = 'GET', signal, body } = {}) {
     if (signal?.aborted) {
         const err = new Error('Aborted');
         err.name = 'AbortError';
@@ -161,9 +161,12 @@ async function apiFetch(path, { method = 'GET', signal } = {}) {
         }
         const attempt = attemptSignal(signal, FETCH_TIMEOUT_MS);
         try {
+            const headers = { 'User-Agent': USER_AGENT };
+            if (body != null) headers['Content-Type'] = 'application/x-www-form-urlencoded';
             const res = await fetch(`${base}${path}`, {
                 method,
-                headers: { 'User-Agent': USER_AGENT },
+                headers,
+                body: body != null ? body : undefined,
                 signal: attempt.signal
             });
             if (!res.ok) throw new Error(`Radio API ${res.status}`);
@@ -314,11 +317,57 @@ export const RadioBrowserApi = {
         return Number.isFinite(entry?.cachedAt) ? entry.cachedAt : null;
     },
 
+    /**
+     * Resolve many station UUIDs: IDB hits + one bulk POST for misses.
+     * API returns matches only — missing UUIDs are omitted (not tombstoned).
+     */
+    async getStationsByUuidsBulk(uuids, { refresh = false, signal } = {}) {
+        const list = [...new Set((uuids || []).map((u) => String(u || '').trim()).filter(Boolean))];
+        if (!list.length) return [];
+
+        const cache = await loadCache();
+        if (!cache.stations) cache.stations = {};
+
+        const hits = [];
+        const missing = [];
+        for (const uuid of list) {
+            if (!refresh) {
+                const entry = cache.stations[uuid];
+                if (isFresh(entry, TTL.stations)) {
+                    hits.push(entry.data);
+                    continue;
+                }
+            }
+            missing.push(uuid);
+        }
+
+        if (!missing.length) return hits;
+
+        const data = await apiFetch('/stations/byuuid', {
+            method: 'POST',
+            body: `uuids=${encodeURIComponent(missing.join(','))}`,
+            signal
+        });
+        const returned = Array.isArray(data) ? data : (data ? [data] : []);
+
+        if (returned.length) {
+            const next = await loadCache();
+            if (!next.stations) next.stations = {};
+            const now = Date.now();
+            for (const station of returned) {
+                const id = station?.stationuuid;
+                if (!id) continue;
+                next.stations[id] = { cachedAt: now, data: station };
+            }
+            await saveCache(next);
+        }
+
+        // Partial responses: only returned stations are included (no placeholders here).
+        return hits.concat(returned);
+    },
+
     async getStationsByUuids(uuids, { refresh = false, signal } = {}) {
-        const results = await Promise.all(
-            uuids.map((uuid) => this.getStationByUuid(uuid, { refresh, signal }))
-        );
-        return results.filter(Boolean);
+        return this.getStationsByUuidsBulk(uuids, { refresh, signal });
     },
 
     async reportClick(uuid) {

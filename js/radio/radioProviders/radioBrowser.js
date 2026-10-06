@@ -47,12 +47,9 @@ export const RadioBrowserProvider = {
     },
 
     async getStationsByIds(ids, opts = {}) {
-        const results = await Promise.allSettled(
-            ids.map((id) => this.getStationById(id, opts))
-        );
-        return results
-            .filter((r) => r.status === 'fulfilled')
-            .map((r) => r.value)
+        const raw = await RadioBrowserApi.getStationsByUuidsBulk(ids, opts);
+        return (Array.isArray(raw) ? raw : [])
+            .map((s) => normalizeStation(s, PROVIDER_RADIO_BROWSER))
             .filter(Boolean);
     },
 
