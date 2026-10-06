@@ -332,7 +332,6 @@ function onPointerMove(e) {
     const dx = e.clientX - gesture.startX;
     const dy = e.clientY - gesture.startY;
     if (gesture.mode === 'drag') {
-        if (pinned) return;
         position = {
             left: gesture.originLeft + dx,
             top: gesture.originTop + dy
