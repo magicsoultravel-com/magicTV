@@ -25,9 +25,14 @@ export function dragFloatOffset(tileRect, fixedOriginRect) {
 
 let deps = {
     getAppState: () => null,
+    getLibrary: () => TvPlayer,
     isReorderEnabled: () => true,
     onReordered: () => {}
 };
+
+function library() {
+    return deps.getLibrary?.() || TvPlayer;
+}
 
 let session = null;
 let suppressClick = false;
@@ -261,13 +266,13 @@ function commitDrag(s, clientX, clientY) {
     const channelKeyRef = tile.dataset.channel;
 
     if (channelKeyRef && folderTarget && !folderId) {
-        TvPlayer.moveFavoriteToFolder(channelKeyRef, folderTarget.dataset.folderId);
+        library().moveFavoriteToFolder(channelKeyRef, folderTarget.dataset.folderId);
         deps.onReordered();
         return true;
     }
 
     if (channelKeyRef && parentTarget && folderId) {
-        TvPlayer.moveFavoriteToRoot(channelKeyRef);
+        library().moveFavoriteToRoot(channelKeyRef);
         deps.onReordered();
         return true;
     }
@@ -276,10 +281,10 @@ function commitDrag(s, clientX, clientY) {
         const visibleKeys = tilesOf(grid)
             .map((t) => t.dataset.channel)
             .filter(Boolean);
-        const folder = TvPlayer.getFavoriteFolder(folderId);
+        const folder = library().getFavoriteFolder(folderId);
         if (!folder) return false;
         const merged = mergeVisibleFolderItems(folder.items, visibleKeys);
-        const changed = TvPlayer.reorderFavoriteFolderItems(folderId, merged);
+        const changed = library().reorderFavoriteFolderItems(folderId, merged);
         if (changed) deps.onReordered();
         return changed;
     }
@@ -287,9 +292,9 @@ function commitDrag(s, clientX, clientY) {
     const visibleKeys = tilesOf(grid)
         .map((t) => t.dataset.channel)
         .filter(Boolean);
-    const fullKeys = TvPlayer.getFavoritesRootOrder();
+    const fullKeys = library().getFavoritesRootOrder();
     const merged = mergeVisibleFavoriteOrder(fullKeys, visibleKeys);
-    const changed = TvPlayer.reorderFavoritesRoot(merged);
+    const changed = library().reorderFavoritesRoot(merged);
     if (changed) deps.onReordered();
     return changed;
 }
@@ -404,9 +409,10 @@ function onClickCapture(e) {
 }
 
 export const FavoritesReorder = {
-    init({ getAppState, isReorderEnabled, onReordered } = {}) {
+    init({ getAppState, getLibrary, isReorderEnabled, onReordered } = {}) {
         deps = {
             getAppState: getAppState || (() => null),
+            getLibrary: getLibrary || (() => TvPlayer),
             isReorderEnabled: isReorderEnabled || (() => true),
             onReordered: onReordered || (() => {})
         };

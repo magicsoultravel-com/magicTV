@@ -6,8 +6,13 @@ import { marqueeInnerHtml } from './marquee.js';
 
 let deps = {
     getAppState: () => null,
+    getLibrary: () => TvPlayer,
     onChanged: () => {}
 };
+
+function library() {
+    return deps.getLibrary?.() || TvPlayer;
+}
 
 function promptFolderName(defaultName = '', title = 'Folder name') {
     if (typeof window === 'undefined' || typeof window.prompt !== 'function') {
@@ -76,7 +81,7 @@ export function syncFavoritesBackButton() {
 export function openFavoriteFolder(folderId) {
     const appState = deps.getAppState();
     if (!appState || !folderId) return false;
-    const folder = TvPlayer.getFavoriteFolder(folderId);
+    const folder = library().getFavoriteFolder(folderId);
     if (!folder) return false;
     appState.favoritesFolderId = folderId;
     syncFavoritesBackButton();
@@ -94,21 +99,21 @@ export function closeFavoriteFolder() {
 }
 
 export function createFavoriteFolder() {
-    const defaultName = TvPlayer.suggestFolderName();
+    const defaultName = library().suggestFolderName();
     const name = promptFolderName(defaultName, 'New folder name');
     if (name == null) return null;
-    const folder = TvPlayer.createFavoriteFolder(name);
+    const folder = library().createFavoriteFolder(name);
     showAppToast(`Created ${folder.name}`);
     deps.onChanged();
     return folder;
 }
 
 export function renameFavoriteFolder(folderId) {
-    const folder = TvPlayer.getFavoriteFolder(folderId);
+    const folder = library().getFavoriteFolder(folderId);
     if (!folder) return false;
     const name = promptFolderName(folder.name, 'Rename folder');
     if (name == null || name === folder.name) return false;
-    const changed = TvPlayer.renameFavoriteFolder(folderId, name);
+    const changed = library().renameFavoriteFolder(folderId, name);
     if (changed) {
         showAppToast(`Renamed to ${name}`);
         deps.onChanged();
@@ -117,7 +122,7 @@ export function renameFavoriteFolder(folderId) {
 }
 
 export function deleteFavoriteFolder(folderId) {
-    const folder = TvPlayer.getFavoriteFolder(folderId);
+    const folder = library().getFavoriteFolder(folderId);
     if (!folder) return false;
     if (folder.items.length > 0) {
         showAppToast('Move channels out before deleting folder');
@@ -128,7 +133,7 @@ export function deleteFavoriteFolder(folderId) {
         appState.favoritesFolderId = null;
         syncFavoritesBackButton();
     }
-    const removed = TvPlayer.deleteFavoriteFolder(folderId);
+    const removed = library().deleteFavoriteFolder(folderId);
     if (removed) {
         showAppToast('Folder deleted');
         deps.onChanged();
@@ -225,9 +230,10 @@ function wireFolderViewTiles(container) {
 }
 
 export const FavoritesFolders = {
-    init({ getAppState, onChanged } = {}) {
+    init({ getAppState, getLibrary, onChanged } = {}) {
         deps = {
             getAppState: getAppState || (() => null),
+            getLibrary: getLibrary || (() => TvPlayer),
             onChanged: onChanged || (() => {})
         };
     },

@@ -1,11 +1,18 @@
-/** @module Visited channels browser inside settings. */
+/** @module Visited channels/stations browser inside settings. */
 import { TvPlayer } from '../tvPlayer.js';
+import { RadioPlayer } from '../radio/radioPlayer.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import { countryFlagEmoji, escapeHtml } from '../tvUtils.js';
 import { CARD_ICONS } from './icons.js';
 import { ChannelGrid } from './channelGrid.js';
 import { createSettingsListBrowser } from './settingsListBrowser.js';
 import { marqueeInnerHtml } from './marquee.js';
+import { RadioBrowseView } from '../browse/radioBrowseView.js';
+
+function isRadioCatalog() {
+    return typeof document !== 'undefined'
+        && document.body.classList.contains('catalog-mode-radio');
+}
 
 function visitedSettingsTileHtml(ch) {
     const initial = (ch.name || '?')[0].toUpperCase();
@@ -33,11 +40,14 @@ export const VisitedChannelsSettings = createSettingsListBrowser({
     countriesId: 'visited-countries-container',
     channelsId: 'visited-channels-container',
     summaryCountId: 'visited-channels-summary-count',
-    getMeta: () => TvPlayer.getVisitedMeta(),
+    getMeta: () => (isRadioCatalog() ? RadioPlayer.getVisitedMeta() : TvPlayer.getVisitedMeta()),
     emptyLabel: 'visited',
     tileHtml: visitedSettingsTileHtml,
     actionBtnSelector: '.channel-tile__unvisit-btn',
-    onRemove: (ch) => TvPlayer.unvisitChannel(ch),
+    onRemove: (ch) => (isRadioCatalog() ? RadioPlayer.unvisitChannel(ch) : TvPlayer.unvisitChannel(ch)),
     removeToast: 'Removed from visited',
-    afterRemove: () => ChannelGrid.syncVisitedTiles()
+    afterRemove: () => {
+        if (isRadioCatalog()) RadioBrowseView.syncVisitedTiles();
+        else ChannelGrid.syncVisitedTiles();
+    }
 });

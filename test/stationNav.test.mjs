@@ -99,7 +99,7 @@ test('buildStationIndex assigns 1-based numbers from favorites order', () => {
 
 test('buildStationIndex folder mode walks folder items when present', () => {
     globalThis.localStorage.setItem(RADIO_STATE_KEY, JSON.stringify({
-        favorites: ['radio-browser:root'],
+        favorites: ['radio-browser:root', 'radio-browser:J1', 'radio-browser:J2'],
         favoriteFolders: [{ id: 'f1', name: 'Jazz', items: ['radio-browser:J1', 'radio-browser:J2'] }],
         stationBindScope: { mode: 'folder', folderId: 'f1' }
     }));

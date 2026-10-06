@@ -10,11 +10,14 @@ import {
     DEFAULT_BROWSE_SORT,
     DEFAULT_BROWSE_SORT_DIR,
     DEFAULT_COUNTRY_SORT,
+    getHideOfflineStations,
     getRadioRecentsCap,
     isUnlimitedRadioRecentsCap,
     loadRadioState,
-    patchRadioState
+    patchRadioState,
+    setHideOfflineStations
 } from './radioState.js';
+import { RadioLibrary } from './radioLibrary.js';
 import { RadioCast } from './radioCast.js';
 
 /** @type {(() => number) | null} */
@@ -52,6 +55,7 @@ export const RadioPlayer = {
     _streamRetryKey: null,
 
     init({ getSharedVolume } = {}) {
+        RadioLibrary.reconcileVisitedStations();
         if (typeof getSharedVolume === 'function') {
             getMasterVolume = getSharedVolume;
         }
@@ -149,6 +153,7 @@ export const RadioPlayer = {
             if (key && this.recentRecordedForKey !== key) {
                 this.recentRecordedForKey = key;
                 this.pushRecent(key, this.station);
+                this.markVisited(key, this.station);
             }
             this.emitState();
         });
@@ -253,15 +258,9 @@ export const RadioPlayer = {
     },
 
     toggleFavorite(keyOrStation) {
-        const key = typeof keyOrStation === 'string' ? keyOrStation : stationKey(keyOrStation);
-        if (!key) return false;
-        const favorites = this.getFavorites();
-        const idx = favorites.indexOf(key);
-        if (idx >= 0) favorites.splice(idx, 1);
-        else favorites.unshift(key);
-        patchRadioState({ favorites });
+        const nowFav = RadioLibrary.toggleFavorite(keyOrStation);
         this.emitState();
-        return idx < 0;
+        return nowFav;
     },
 
     pushRecent(key, station) {
@@ -284,6 +283,136 @@ export const RadioPlayer = {
         patchRadioState({ recentsMeta: [], recents: [] });
         this.emitState();
     },
+
+    /* Favorites folders (TV FavoritesFolders / FavoritesReorder API surface) */
+
+    getFavoriteFolders() {
+        return RadioLibrary.getFavoriteFolders();
+    },
+
+    getFavoritesRootOrder() {
+        return RadioLibrary.getFavoritesRootOrder();
+    },
+
+    getFavoriteFolder(id) {
+        return RadioLibrary.getFavoriteFolder(id);
+    },
+
+    suggestFolderName() {
+        return RadioLibrary.suggestFolderName();
+    },
+
+    createFavoriteFolder(name) {
+        const folder = RadioLibrary.createFavoriteFolder(name);
+        this.emitState();
+        return folder;
+    },
+
+    renameFavoriteFolder(id, name) {
+        const changed = RadioLibrary.renameFavoriteFolder(id, name);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    deleteFavoriteFolder(id) {
+        const removed = RadioLibrary.deleteFavoriteFolder(id);
+        if (removed) this.emitState();
+        return removed;
+    },
+
+    reorderFavoritesRoot(orderedKeys) {
+        const changed = RadioLibrary.reorderFavoritesRoot(orderedKeys);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    reorderFavoriteFolderItems(folderId, orderedKeys) {
+        const changed = RadioLibrary.reorderFavoriteFolderItems(folderId, orderedKeys);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    moveFavoriteToFolder(stationKeyRef, folderId, opts) {
+        const changed = RadioLibrary.moveFavoriteToFolder(stationKeyRef, folderId, opts);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    moveFavoriteToRoot(stationKeyRef, opts) {
+        const changed = RadioLibrary.moveFavoriteToRoot(stationKeyRef, opts);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    /* Visited */
+
+    markVisited(keyOrStation, station = null) {
+        return RadioLibrary.markVisited(keyOrStation, station);
+    },
+
+    unvisitChannel(keyOrStation) {
+        const changed = RadioLibrary.unvisitStation(keyOrStation);
+        if (changed) this.emitState();
+        return changed;
+    },
+
+    /** Alias matching TV FavoritesFolders naming for shared settings. */
+    unvisitStation(keyOrStation) {
+        return this.unvisitChannel(keyOrStation);
+    },
+
+    isVisited(keyOrStation) {
+        return RadioLibrary.isVisited(keyOrStation);
+    },
+
+    getVisitedMeta() {
+        return RadioLibrary.getVisitedMeta();
+    },
+
+    getVisitedKeys() {
+        return RadioLibrary.getVisitedKeys();
+    },
+
+    reconcileVisitedStations() {
+        RadioLibrary.reconcileVisitedStations();
+    },
+
+    /* Hidden */
+
+    hideChannel(stationOrKey) {
+        const hidden = RadioLibrary.hideStation(stationOrKey);
+        if (hidden) this.emitState();
+        return hidden;
+    },
+
+    unhideChannel(keyOrStation) {
+        const shown = RadioLibrary.unhideStation(keyOrStation);
+        if (shown) this.emitState();
+        return shown;
+    },
+
+    getHiddenMeta() {
+        return RadioLibrary.getHiddenMeta();
+    },
+
+    isHidden(keyOrStation) {
+        return RadioLibrary.isHidden(keyOrStation);
+    },
+
+    filterVisibleStations(stations) {
+        return RadioLibrary.filterVisible(stations);
+    },
+
+    getHideOfflineStations() {
+        return getHideOfflineStations();
+    },
+
+    setHideOfflineStations(value) {
+        const next = setHideOfflineStations(value);
+        this.emitState();
+        return next;
+    },
+
 
     setVolume(value) {
         const clamped = Math.min(1, Math.max(0, Number(value) || 0));

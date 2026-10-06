@@ -13,6 +13,10 @@ import {
 import { canonicalizePersistedState, CORRUPT_BACKUP_KEY } from './stateMigration.js';
 import { IndexedDBStore } from './indexedDbStore.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
+import {
+    RADIO_STATE_KEY,
+    loadRadioState
+} from '../radio/radioState.js';
 
 export const EXPORT_FORMAT = 'magictv-user-data';
 export const EXPORT_VERSION = 1;
@@ -139,6 +143,17 @@ function importedRecentsMeta(imported) {
         })).filter((e) => e.key);
     }
     return [];
+}
+
+/** Map radio recents (favicon) into the TV-shaped logo field used by mergeRecentsMetaList. */
+function radioRecentsForMerge(meta) {
+    return (Array.isArray(meta) ? meta : []).map((e) => ({
+        key: migrateFavoriteRef(e?.key),
+        name: e?.name || '',
+        logo: e?.favicon || e?.logo || '',
+        countrycode: e?.countrycode || '',
+        at: Number.isFinite(e?.at) ? e.at : 0
+    })).filter((e) => e.key);
 }
 
 function mergeRecentsMetaList(localMeta, importedMeta, cap) {
@@ -269,6 +284,7 @@ export function buildUserDataExport() {
         exportedAt: new Date().toISOString(),
         appVersion: APP_VERSION,
         state: canonicalizePersistedState(readPersistedState()),
+        radioState: loadRadioState(),
         extras: {
             clockStyle: extras.clockStyle,
             clockHidden: extras.clockHidden === true,
@@ -302,12 +318,18 @@ export function parseUserDataImport(text) {
 
 export function summarizeUserData(payload) {
     const state = payload?.state || {};
+    const radio = payload?.radioState || {};
     const favorites = Array.isArray(state.favorites) ? state.favorites.length : 0;
     const folders = Array.isArray(state.favoriteFolders) ? state.favoriteFolders.length : 0;
     const rootOrder = Array.isArray(state.favoritesRootOrder) ? state.favoritesRootOrder.length : 0;
     const recentsLen = Array.isArray(state.recentsMeta)
         ? state.recentsMeta.length
         : (Array.isArray(state.recents) ? state.recents.length : 0);
+    const radioFavorites = Array.isArray(radio.favorites) ? radio.favorites.length : 0;
+    const radioFolders = Array.isArray(radio.favoriteFolders) ? radio.favoriteFolders.length : 0;
+    const radioRecents = Array.isArray(radio.recentsMeta)
+        ? radio.recentsMeta.length
+        : (Array.isArray(radio.recents) ? radio.recents.length : 0);
     const warnings = [];
     if (favorites > 0 && folders === 0) {
         warnings.push('Favorites present but no folders — replace will leave a flat library.');
@@ -325,6 +347,11 @@ export function summarizeUserData(payload) {
         hidden: Array.isArray(state.hiddenChannels) ? state.hiddenChannels.length : 0,
         visited: Array.isArray(state.visitedChannels) ? state.visitedChannels.length : 0,
         watchStats: Array.isArray(state.watchStatsMeta) ? state.watchStatsMeta.length : 0,
+        radioFavorites,
+        radioFolders,
+        radioRecents,
+        radioVisited: Array.isArray(radio.visitedStations) ? radio.visitedStations.length : 0,
+        radioHidden: Array.isArray(radio.hiddenStations) ? radio.hiddenStations.length : 0,
         exportedAt: payload?.exportedAt || null,
         appVersion: payload?.appVersion || null,
         sparse: warnings.length > 0,
@@ -335,6 +362,11 @@ export function summarizeUserData(payload) {
 export function applyUserDataReplace(payload) {
     const next = canonicalizePersistedState(payload.state);
     writePersistedState(next, { force: true });
+    if (payload.radioState && typeof payload.radioState === 'object') {
+        try {
+            localStorage.setItem(RADIO_STATE_KEY, JSON.stringify(payload.radioState));
+        } catch { /* ignore quota */ }
+    }
     const extras = payload.extras || {};
     if (extras.clockStyle != null) writeExtra(CLOCK_STYLE_KEY, extras.clockStyle);
     if (extras.clockHidden != null) writeBoolExtra(CLOCK_HIDDEN_KEY, extras.clockHidden);
@@ -397,6 +429,58 @@ export function applyUserDataMergeLibrary(payload) {
         watchStatsMeta,
         chanBindScopeBySlot
     });
+
+    const importedRadio = payload.radioState;
+    if (importedRadio && typeof importedRadio === 'object') {
+        const localRadio = loadRadioState();
+        const radioFavorites = unionKeys(localRadio.favorites, importedRadio.favorites);
+        const radioFavKeys = new Set(radioFavorites);
+        const radioFolders = mergeFavoriteFoldersList(
+            localRadio.favoriteFolders,
+            importedRadio.favoriteFolders,
+            radioFavKeys
+        );
+        const radioRootOrder = mergeRootOrderList(
+            localRadio.favoritesRootOrder,
+            importedRadio.favoritesRootOrder,
+            radioFolders,
+            radioFavorites
+        );
+        const radioRecentsMeta = mergeRecentsMetaList(
+            radioRecentsForMerge(localRadio.recentsMeta),
+            radioRecentsForMerge(importedRadio.recentsMeta),
+            localRadio.radioRecentsCap
+        ).map((e) => ({
+            key: e.key,
+            name: e.name || '',
+            favicon: e.logo || '',
+            countrycode: e.countrycode || '',
+            at: e.at || 0
+        }));
+        const visitedStations = unionKeys(localRadio.visitedStations, importedRadio.visitedStations);
+        const visitedStationsMeta = mergeChannelMetaList(
+            localRadio.visitedStationsMeta,
+            importedRadio.visitedStationsMeta
+        );
+        const hiddenStations = unionKeys(localRadio.hiddenStations, importedRadio.hiddenStations);
+        const hiddenStationsMeta = mergeChannelMetaList(
+            localRadio.hiddenStationsMeta,
+            importedRadio.hiddenStationsMeta
+        );
+        try {
+            localStorage.setItem(RADIO_STATE_KEY, JSON.stringify({
+                ...localRadio,
+                favorites: radioFavorites,
+                favoriteFolders: radioFolders,
+                favoritesRootOrder: radioRootOrder,
+                recentsMeta: radioRecentsMeta,
+                visitedStations,
+                visitedStationsMeta,
+                hiddenStations,
+                hiddenStationsMeta
+            }));
+        } catch { /* ignore quota */ }
+    }
 }
 
 export function downloadUserDataExport() {
@@ -419,6 +503,9 @@ export function downloadUserDataExport() {
 export function clearAllUserData() {
     try {
         localStorage.removeItem(STATE_KEY);
+    } catch { /* ignore */ }
+    try {
+        localStorage.removeItem(RADIO_STATE_KEY);
     } catch { /* ignore */ }
     for (const key of USER_DATA_EXTRA_KEYS) {
         writeExtra(key, null);

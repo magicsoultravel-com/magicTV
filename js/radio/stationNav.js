@@ -4,6 +4,7 @@
 import { stationKey, parseStationKey } from './stationShape.js';
 import { RadioProviderRegistry } from './radioProviders/registry.js';
 import {
+    getHideOfflineStations,
     getStationBindScope,
     loadRadioState
 } from './radioState.js';
@@ -89,7 +90,7 @@ export async function buildCountryStationIndex(countryCode) {
     if (cached) return cached;
 
     const provider = RadioProviderRegistry.getActive();
-    const hideOffline = loadRadioState().hideOfflineStations !== false;
+    const hideOffline = getHideOfflineStations();
     const batch = await provider.searchStations({
         countrycode: code,
         limit: STATION_COUNTRY_BIND_LIMIT,

@@ -32,7 +32,7 @@ import { BROWSER_TABS, isBrowserCatalogTab } from './ui/catalogModeEntry.js';
 import { warmGuideIndex } from './epg/epgService.js';
 
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
-import { ListSort } from './ui/listSort.js';
+import { ListSort, setCategoryNameMap } from './ui/listSort.js';
 import { ChanBindPicker } from './ui/chanBindPicker.js';
 import { applyCatalogFilterInput } from './ui/catalogFilterState.js';
 import {
@@ -202,7 +202,10 @@ function handleSortChanged(context, opts = {}) {
 }
 
 function handleCategoryFilterChanged(context) {
-    if (appState.catalogMode === 'radio') return;
+    if (appState.catalogMode === 'radio') {
+        RadioBrowseView.onCategoryFilterChanged?.(context);
+        return;
+    }
     if (context === 'channels') {
         BrowseView.restartChannelList();
     } else if (context === 'favorites') {
@@ -235,7 +238,8 @@ function bindBackButton() {
         back.addEventListener('click', () => {
             if (back.dataset.tab === 'back-to-favorites-root') {
                 FavoritesFolders.closeFavoriteFolder();
-                ChannelGrid.renderFavorites();
+                if (appState.catalogMode === 'radio') RadioBrowseView.renderFavorites();
+                else ChannelGrid.renderFavorites();
                 syncCreateFavoriteFolderBtn();
                 return;
             }
@@ -378,9 +382,55 @@ function syncCreateFavoriteFolderBtn() {
     const btn = el('create-favorite-folder-btn');
     if (!btn) return;
     const visible = appState.activeTab === 'favorites'
-        && !appState.favoritesFolderId
-        && appState.catalogMode !== 'radio';
+        && !appState.favoritesFolderId;
     btn.classList.toggle('is-hidden', !visible);
+}
+
+function syncLibrarySettingsLabels() {
+    const radio = appState.catalogMode === 'radio';
+    const hiddenTitle = document.querySelector('#hidden-channels-section .settings-section__title');
+    const visitedTitle = document.querySelector('#visited-channels-section .settings-section__title');
+    const patchTitle = (node, label) => {
+        if (!node) return;
+        const count = node.querySelector('.settings-section__count');
+        const countHtml = count ? count.outerHTML : '';
+        const icon = node.querySelector('svg.ui-icon');
+        const iconHtml = icon ? icon.outerHTML : '';
+        node.innerHTML = `${iconHtml} ${label} ${countHtml}`;
+    };
+    patchTitle(hiddenTitle, radio ? 'Hidden Stations' : 'Hidden Channels');
+    patchTitle(visitedTitle, radio ? 'Visited Stations' : 'Visited Channels');
+}
+
+function syncHideOfflineStationsBtn() {
+    const btn = el('hide-offline-stations-btn');
+    if (!btn) return;
+    const visible = appState.catalogMode === 'radio';
+    btn.classList.toggle('is-hidden', !visible);
+    if (!visible) return;
+    const on = RadioPlayer.getHideOfflineStations();
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = on ? 'Showing online stations only — click to show offline too' : 'Hide offline stations';
+    btn.setAttribute('aria-label', btn.title);
+    if (!btn.innerHTML.trim()) {
+        btn.innerHTML = on ? CARD_ICONS.tileEyeOff : CARD_ICONS.tileEye;
+    } else {
+        btn.innerHTML = on ? CARD_ICONS.tileEyeOff : CARD_ICONS.tileEye;
+    }
+}
+
+function bindHideOfflineStationsBtn() {
+    const btn = el('hide-offline-stations-btn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+        const next = !RadioPlayer.getHideOfflineStations();
+        RadioPlayer.setHideOfflineStations(next);
+        syncHideOfflineStationsBtn();
+        showAppToast(next ? 'Hiding offline stations' : 'Showing offline stations');
+        RadioBrowseView.reloadStations?.();
+    });
 }
 
 function bindCreateFavoriteFolderBtn() {
@@ -580,13 +630,23 @@ function syncRemoteTabChrome() {
 function setCatalogMode(mode, { paint = true } = {}) {
     const next = mode === 'radio' ? 'radio' : 'tv';
     const prev = appState.catalogMode;
+    if (prev !== next) {
+        appState.favoritesFolderId = null;
+    }
     appState.catalogMode = next;
     RadioBrowseView.setMode(appState.catalogMode, { paint });
+    syncLibrarySettingsLabels();
+    syncHideOfflineStationsBtn();
     ListSort.syncSortControls();
-    if (prev === 'radio' && next === 'tv' && isBrowserCatalogTab(appState.activeTab)) {
-        if (appState.activeTab === 'browse') BrowseView.restoreView();
-        else if (appState.activeTab === 'favorites') ChannelGrid.refreshFavorites();
-        else if (appState.activeTab === 'recents') ChannelGrid.refreshRecents();
+    if (prev === 'radio' && next === 'tv') {
+        try {
+            setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
+        } catch { /* ignore */ }
+        if (isBrowserCatalogTab(appState.activeTab)) {
+            if (appState.activeTab === 'browse') BrowseView.restoreView();
+            else if (appState.activeTab === 'favorites') ChannelGrid.refreshFavorites();
+            else if (appState.activeTab === 'recents') ChannelGrid.refreshRecents();
+        }
     }
 }
 
@@ -914,8 +974,30 @@ async function init() {
             runBrowseTransition: withBrowseDrillTransition
         });
         PlayerChrome.init({ appState });
-        HiddenChannelsSettings.init({ appState, onPlay: startPlayback });
-        VisitedChannelsSettings.init({ appState, onPlay: startPlayback });
+        HiddenChannelsSettings.init({
+            appState,
+            onPlay: (ch) => {
+                if (appState.catalogMode === 'radio') {
+                    RadioPlayer.playStation(ch?.channeluuid || channelKey(ch)).catch((err) => {
+                        showAppToast(err?.message || 'Playback failed');
+                    });
+                    return;
+                }
+                startPlayback(ch);
+            }
+        });
+        VisitedChannelsSettings.init({
+            appState,
+            onPlay: (ch) => {
+                if (appState.catalogMode === 'radio') {
+                    RadioPlayer.playStation(ch?.channeluuid || channelKey(ch)).catch((err) => {
+                        showAppToast(err?.message || 'Playback failed');
+                    });
+                    return;
+                }
+                startPlayback(ch);
+            }
+        });
 
         MultiView._deferFullRestore = true;
         TvPlayer.init();
@@ -936,11 +1018,14 @@ async function init() {
         bindTabs();
         bindPlayFavoritesMosaic();
         bindCreateFavoriteFolderBtn();
+        bindHideOfflineStationsBtn();
         bindCatalogLayout();
         bindBrowserRefreshBtn();
         ChanBindPicker.bind();
         syncPlayFavoritesMosaicBtn();
         syncCreateFavoriteFolderBtn();
+        syncHideOfflineStationsBtn();
+        syncLibrarySettingsLabels();
         syncCatalogLayoutBtn();
         syncBrowserRefreshBtn();
         syncRemoteTabChrome();

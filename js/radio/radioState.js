@@ -64,7 +64,7 @@ function migrateRecentsMeta(raw) {
             return {
                 key: migrateFavoriteRef(entry.key),
                 name: entry.name || '',
-                favicon: entry.favicon || '',
+                favicon: entry.favicon || entry.logo || '',
                 countrycode: entry.countrycode || '',
                 at: Number.isFinite(entry.at) ? entry.at : 0
             };
@@ -82,6 +82,82 @@ function migrateRecentsMeta(raw) {
     return [];
 }
 
+function normalizeFavoriteFolderEntry(entry, favKeys) {
+    if (!entry || typeof entry !== 'object') return null;
+    const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+    if (!id) return null;
+    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+    const seen = new Set();
+    const items = (Array.isArray(entry.items) ? entry.items : [])
+        .map(migrateFavoriteRef)
+        .filter((k) => k && favKeys.has(k) && !seen.has(k) && (seen.add(k), true));
+    return { id, name: name || 'Folder', items };
+}
+
+export function normalizeFavoriteFolders(favorites, rawFolders) {
+    const favKeys = new Set(favorites);
+    const seen = new Set();
+    return (Array.isArray(rawFolders) ? rawFolders : [])
+        .map((e) => normalizeFavoriteFolderEntry(e, favKeys))
+        .filter((e) => e && !seen.has(e.id) && (seen.add(e.id), true));
+}
+
+/** Root-level station key order only; folders live in favoriteFolders (always shown first). */
+export function normalizeFavoritesRootOrder(favorites, favoriteFolders, rawRootOrder) {
+    const favKeys = new Set(favorites);
+    const folderIds = new Set(favoriteFolders.map((f) => f.id));
+    const keysInFolders = new Set(favoriteFolders.flatMap((f) => f.items));
+    const seen = new Set();
+    const out = [];
+
+    const pushStation = (ref) => {
+        const key = migrateFavoriteRef(ref);
+        if (!key || seen.has(key) || folderIds.has(key)) return;
+        if (favKeys.has(key) && !keysInFolders.has(key)) {
+            seen.add(key);
+            out.push(key);
+        }
+    };
+
+    if (Array.isArray(rawRootOrder) && rawRootOrder.length) {
+        rawRootOrder.forEach(pushStation);
+    } else {
+        favorites.forEach((k) => {
+            if (!keysInFolders.has(k)) pushStation(k);
+        });
+    }
+    favorites.forEach((k) => {
+        if (!keysInFolders.has(k)) pushStation(k);
+    });
+    return out;
+}
+
+function normalizeStationMetaList(keys, meta) {
+    const keySet = new Set(keys);
+    const seen = new Set();
+    return (Array.isArray(meta) ? meta : [])
+        .map((e) => ({
+            key: migrateFavoriteRef(typeof e === 'string' ? e : e?.key),
+            name: (e && e.name) || '',
+            logo: (e && (e.logo || e.favicon)) || '',
+            countrycode: (e && e.countrycode) || ''
+        }))
+        .filter((e) => e.key && keySet.has(e.key) && !seen.has(e.key) && (seen.add(e.key), true));
+}
+
+function normalizeKeyList(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const item of raw) {
+        const key = migrateFavoriteRef(typeof item === 'string' ? item : item?.key);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(key);
+    }
+    return out;
+}
+
 function emptyState() {
     return {
         favorites: [],
@@ -89,6 +165,13 @@ function emptyState() {
         recentsMeta: [],
         radioRecentsCap: DEFAULT_RADIO_RECENTS_CAP,
         stationBindScope: { ...DEFAULT_STATION_BIND_SCOPE },
+        favoriteFolders: [],
+        favoritesRootOrder: [],
+        visitedStations: [],
+        visitedStationsMeta: [],
+        visitedStationsReconciled: false,
+        hiddenStations: [],
+        hiddenStationsMeta: [],
         volume: 0.85,
         muted: false,
         lastStationKey: null,
@@ -98,7 +181,8 @@ function emptyState() {
         wasPlaying: false,
         catalogProvider: 'radio-browser',
         radioBrowserMirror: null,
-        hideOfflineStations: true,
+        // Radio Browser "offline" ≠ unreachable stream; default show all.
+        hideOfflineStations: false,
         browseSort: DEFAULT_BROWSE_SORT,
         browseSortDir: DEFAULT_BROWSE_SORT_DIR,
         countrySort: DEFAULT_COUNTRY_SORT,
@@ -119,9 +203,19 @@ export function loadRadioState() {
         const browseSortDir = raw.browseSortDir === 'asc' || raw.browseSortDir === 'desc'
             ? raw.browseSortDir
             : DEFAULT_BROWSE_SORT_DIR;
-        const favoriteFolders = Array.isArray(raw.favoriteFolders) ? raw.favoriteFolders : null;
 
-        const state = {
+        const favoriteFolders = normalizeFavoriteFolders(favorites, raw.favoriteFolders);
+        const favoritesRootOrder = normalizeFavoritesRootOrder(
+            favorites,
+            favoriteFolders,
+            raw.favoritesRootOrder
+        );
+        const visitedStations = normalizeKeyList(raw.visitedStations);
+        const visitedStationsMeta = normalizeStationMetaList(visitedStations, raw.visitedStationsMeta);
+        const hiddenStations = normalizeKeyList(raw.hiddenStations);
+        const hiddenStationsMeta = normalizeStationMetaList(hiddenStations, raw.hiddenStationsMeta);
+
+        return {
             favorites,
             recents,
             recentsMeta,
@@ -130,7 +224,14 @@ export function loadRadioState() {
                     ? DEFAULT_RADIO_RECENTS_CAP
                     : raw.radioRecentsCap
             ),
-            stationBindScope: normalizeStationBindScope(raw.stationBindScope, favoriteFolders || []),
+            stationBindScope: normalizeStationBindScope(raw.stationBindScope, favoriteFolders),
+            favoriteFolders,
+            favoritesRootOrder,
+            visitedStations,
+            visitedStationsMeta,
+            visitedStationsReconciled: raw.visitedStationsReconciled === true,
+            hiddenStations,
+            hiddenStationsMeta,
             volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : 0.85,
             muted: raw.muted === true,
             lastStationKey: lastKey || null,
@@ -140,15 +241,13 @@ export function loadRadioState() {
             wasPlaying: raw.wasPlaying === true,
             catalogProvider: raw.catalogProvider || 'radio-browser',
             radioBrowserMirror: raw.radioBrowserMirror || null,
-            hideOfflineStations: raw.hideOfflineStations !== false,
+            // Only honor explicit true (legacy default-true users keep hiding if they set it).
+            hideOfflineStations: raw.hideOfflineStations === true,
             browseSort: raw.browseSort || DEFAULT_BROWSE_SORT,
             browseSortDir,
             countrySort: raw.countrySort || DEFAULT_COUNTRY_SORT,
             castHostAudio: raw.castHostAudio === true
         };
-        // Pass-through for parallel folders work — do not invent schema here.
-        if (favoriteFolders) state.favoriteFolders = favoriteFolders;
-        return state;
     } catch {
         return emptyState();
     }
@@ -161,6 +260,28 @@ export function patchRadioState(patch) {
     if (next.recentsMeta) {
         next.recents = next.recentsMeta.map((e) => e.key);
     }
+    if ('favorites' in patch || 'favoriteFolders' in patch || 'favoritesRootOrder' in patch) {
+        next.favoriteFolders = normalizeFavoriteFolders(next.favorites, next.favoriteFolders);
+        next.favoritesRootOrder = normalizeFavoritesRootOrder(
+            next.favorites,
+            next.favoriteFolders,
+            next.favoritesRootOrder
+        );
+    }
+    if ('visitedStations' in patch || 'visitedStationsMeta' in patch) {
+        next.visitedStations = normalizeKeyList(next.visitedStations);
+        next.visitedStationsMeta = normalizeStationMetaList(
+            next.visitedStations,
+            next.visitedStationsMeta
+        );
+    }
+    if ('hiddenStations' in patch || 'hiddenStationsMeta' in patch) {
+        next.hiddenStations = normalizeKeyList(next.hiddenStations);
+        next.hiddenStationsMeta = normalizeStationMetaList(
+            next.hiddenStations,
+            next.hiddenStationsMeta
+        );
+    }
     if (patch.stationBindScope != null) {
         next.stationBindScope = normalizeStationBindScope(
             patch.stationBindScope,
@@ -169,6 +290,9 @@ export function patchRadioState(patch) {
     }
     if (patch.radioRecentsCap != null) {
         next.radioRecentsCap = clampRadioRecentsCap(patch.radioRecentsCap);
+    }
+    if ('hideOfflineStations' in patch) {
+        next.hideOfflineStations = patch.hideOfflineStations === true;
     }
     localStorage.setItem(RADIO_STATE_KEY, JSON.stringify(next));
     return next;
@@ -201,4 +325,13 @@ export function setRadioRecentsCap(value) {
     }
     patchRadioState(patch);
     return next;
+}
+
+export function getHideOfflineStations() {
+    return loadRadioState().hideOfflineStations === true;
+}
+
+export function setHideOfflineStations(value) {
+    patchRadioState({ hideOfflineStations: value === true });
+    return value === true;
 }

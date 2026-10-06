@@ -80,9 +80,21 @@ function syncBindButton(btn) {
 }
 
 function renderFavoritesOptions(current) {
-    const opt = { mode: 'favorites', label: 'All favorites' };
-    const active = isScopeActive(opt, current);
-    return `<button type="button" class="chan-bind-menu__item${active ? ' is-active' : ''}" role="menuitem"${active ? ' aria-current="true"' : ''} data-station-bind-favorites="1">${escapeHtml(opt.label)}</button>`;
+    const folders = loadRadioState().favoriteFolders || [];
+    const options = [{ mode: 'favorites', label: 'All favorites' }];
+    folders.forEach((folder) => {
+        if (folder?.id) {
+            options.push({ mode: 'folder', folderId: folder.id, label: folder.name || 'Folder' });
+        }
+    });
+
+    return options.map((opt) => {
+        const active = isScopeActive(opt, current);
+        const dataAttr = opt.mode === 'folder'
+            ? `data-station-bind-folder="${escapeHtml(opt.folderId)}"`
+            : 'data-station-bind-favorites="1"';
+        return `<button type="button" class="chan-bind-menu__item${active ? ' is-active' : ''}" role="menuitem"${active ? ' aria-current="true"' : ''} ${dataAttr}>${escapeHtml(opt.label)}</button>`;
+    }).join('');
 }
 
 function renderCountryNavItem(current) {
@@ -182,7 +194,7 @@ function wireMenu(menuEl) {
     menuEl.dataset.bound = '1';
     menuEl.addEventListener('click', (e) => {
         const item = e.target.closest(
-            '[data-station-bind-favorites], [data-station-bind-country], [data-station-bind-countries-nav], [data-station-bind-back]'
+            '[data-station-bind-favorites], [data-station-bind-folder], [data-station-bind-country], [data-station-bind-countries-nav], [data-station-bind-back]'
         );
         if (!item) return;
         e.stopPropagation();
@@ -196,6 +208,11 @@ function wireMenu(menuEl) {
         }
         if (item.hasAttribute('data-station-bind-favorites')) {
             void selectScope({ mode: 'favorites' });
+            return;
+        }
+        const folderId = item.getAttribute('data-station-bind-folder');
+        if (folderId) {
+            void selectScope({ mode: 'folder', folderId });
             return;
         }
         const countryCode = item.getAttribute('data-station-bind-country');

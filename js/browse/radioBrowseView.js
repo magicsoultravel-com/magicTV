@@ -5,12 +5,20 @@ import { el, countryFlagEmoji, escapeHtml } from '../tvUtils.js';
 import { RadioPlayer } from '../radio/radioPlayer.js';
 import { RadioProviderRegistry } from '../radio/radioProviders/registry.js';
 import { stationKey } from '../radio/stationShape.js';
-import { loadRadioState } from '../radio/radioState.js';
+import { getHideOfflineStations } from '../radio/radioState.js';
 import { showAppToast } from '../ui/toast.js';
 import { CARD_ICONS } from '../ui/icons.js';
 import { Appearance } from '../ui/appearance.js';
 import { marqueeInnerHtml } from '../ui/marquee.js';
-import { compareCountries, getSortPrefs, ListSort } from '../ui/listSort.js';
+import {
+    compareCountries,
+    channelHasCategory,
+    getCategoryFilterValue,
+    getSortPrefs,
+    ListSort,
+    setCategoryNameMap
+} from '../ui/listSort.js';
+import { FavoritesFolders } from '../ui/favoritesFolders.js';
 
 const PAGE_SIZE = 60;
 
@@ -83,6 +91,47 @@ function syncPlayingTiles() {
     });
 }
 
+/** Class toggles only — safe under frequent radio:state_changed. */
+function syncVisitedTiles() {
+    if (catalogMode !== 'radio') return;
+    const visited = new Set(RadioPlayer.getVisitedKeys());
+    document.querySelectorAll('[data-radio-station]').forEach((node) => {
+        const key = node.getAttribute('data-radio-station');
+        if (key) node.classList.toggle('is-visited', visited.has(key));
+    });
+}
+
+function matchesFolderFilter(folder, filter) {
+    const q = String(filter || '').trim().toLowerCase();
+    if (!q) return true;
+    return String(folder?.name || '').toLowerCase().includes(q);
+}
+
+function stationMatchesFilter(station, q) {
+    if (!q) return true;
+    const needle = q.toLowerCase();
+    return String(station.name || '').toLowerCase().includes(needle)
+        || String(station.countrycode || '').toLowerCase().includes(needle)
+        || String(stationKey(station) || '').toLowerCase().includes(needle);
+}
+
+async function hydrateRadioTags() {
+    try {
+        const provider = RadioProviderRegistry.getActive();
+        if (typeof provider.getTags !== 'function') return;
+        const tags = await provider.getTags();
+        const map = new Map();
+        for (const t of tags || []) {
+            const name = String(t?.name || '').trim();
+            if (name) map.set(name, name);
+        }
+        setCategoryNameMap(map);
+        ListSort.syncCategoryFilterControls();
+    } catch {
+        /* tags optional */
+    }
+}
+
 /** @type {{ appState?: any } | null} */
 let deps = null;
 
@@ -136,11 +185,16 @@ function stationTileHtml(station, favKeys = null) {
     const isFav = key ? favs.has(key) : false;
     const playingKey = stationKey(RadioPlayer.station);
     const isPlaying = key && key === playingKey;
+    const isVisited = key ? RadioPlayer.isVisited(key) : false;
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
+    const hideLabel = 'Hide station';
     const logo = station.favicon || station.logo || '';
+    const visitedClass = isVisited ? ' is-visited' : '';
+    const playingClass = isPlaying ? ' is-playing is-playing-radio' : '';
     return `
-        <div class="channel-tile${isPlaying ? ' is-playing is-playing-radio' : ''}" data-radio-station="${escapeHtml(key)}" role="button" tabindex="0" data-logo="${escapeHtml(logo)}">
+        <div class="channel-tile${playingClass}${visitedClass}" data-radio-station="${escapeHtml(key)}" data-channel="${escapeHtml(key)}" role="button" tabindex="0" data-logo="${escapeHtml(logo)}">
             <button type="button" class="channel-tile__fav-btn${isFav ? ' is-active' : ''}" data-radio-star="${escapeHtml(key)}" title="${favLabel}" aria-label="${favLabel}" aria-pressed="${isFav}">${isFav ? CARD_ICONS.tileStarFilled : CARD_ICONS.tileStar}</button>
+            <button type="button" class="channel-tile__hide-btn" data-radio-hide="${escapeHtml(key)}" title="${hideLabel}" aria-label="${hideLabel}">${CARD_ICONS.tileEye}</button>
             <div class="channel-tile__icon">
                 <div class="channel-tile__capture-frame" data-frame-state="waiting">
                     <div class="channel-tile__letter-avatar">${escapeHtml(initial)}</div>
@@ -271,19 +325,22 @@ async function loadMoreStations() {
         const provider = RadioProviderRegistry.getActive();
         const { order, reverse } = stationApiOrder();
         const { sortDir } = getSortPrefs(deps?.appState || undefined);
-        const hideOffline = loadRadioState().hideOfflineStations !== false;
+        const hideOffline = getHideOfflineStations();
+        const tag = getCategoryFilterValue(deps?.appState || undefined) || undefined;
         const batch = await provider.searchStations({
             countrycode: activeCountry,
             limit: PAGE_SIZE,
             offset: stationOffset,
             order,
             reverse: sortDir === 'desc' ? !reverse : reverse,
-            hideOffline
+            hideOffline,
+            tag: tag || undefined
         });
         const q = filterText.trim().toLowerCase();
-        const filtered = q
+        let filtered = q
             ? batch.filter((s) => String(s.name || '').toLowerCase().includes(q))
             : batch;
+        filtered = RadioPlayer.filterVisibleStations(filtered);
         stationOffset += batch.length;
         if (batch.length < PAGE_SIZE) stationsDone = true;
 
@@ -307,6 +364,7 @@ async function loadMoreStations() {
             list.innerHTML = html
                 || '<div class="empty-state"><p class="empty-state__text">No stations</p></div>';
             if (html) Appearance.applyToTiles?.(list);
+            syncVisitedTiles();
             return;
         }
 
@@ -321,6 +379,7 @@ async function loadMoreStations() {
         batchRoot.innerHTML = html;
         list.appendChild(batchRoot);
         Appearance.applyToTiles?.(batchRoot);
+        syncVisitedTiles();
     } catch (e) {
         if (list && isFirstPage) {
             list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed to load stations')}</p></div>`;
@@ -355,8 +414,119 @@ function backToCountries() {
 function filterStationsClient(list) {
     const q = filterText.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((s) => String(s.name || '').toLowerCase().includes(q)
-        || String(s.countrycode || '').toLowerCase().includes(q));
+    return list.filter((s) => stationMatchesFilter(s, q));
+}
+
+function sortStationRows(rows, sortBy, sortDir) {
+    if (!sortBy || sortBy === 'custom') return rows;
+    const m = sortDir === 'asc' ? 1 : -1;
+    return rows.slice().sort((a, b) => {
+        if (sortBy === 'recent') {
+            const d = (a.at || 0) - (b.at || 0);
+            if (d) return d * m;
+        } else if (sortBy === 'country') {
+            const c = String(a.countrycode || '').localeCompare(String(b.countrycode || ''));
+            if (c) return c * m;
+        } else if (sortBy === 'category') {
+            const ta = String(a.tags || a.categories?.[0] || '');
+            const tb = String(b.tags || b.categories?.[0] || '');
+            const c = ta.localeCompare(tb);
+            if (c) return c * m;
+        }
+        return String(a.name || '').localeCompare(String(b.name || '')) * m;
+    });
+}
+
+function stubFromKey(key) {
+    return { stationuuid: key, name: key, favicon: '', countrycode: '', tags: '' };
+}
+
+async function resolveFavoriteStations(keys) {
+    if (!keys.length) return new Map();
+    const provider = RadioProviderRegistry.getActive();
+    const ids = keys.map((k) => {
+        const idx = k.indexOf(':');
+        return idx >= 0 ? k.slice(idx + 1) : k;
+    });
+    const stations = await provider.getStationsByIds(ids);
+    rememberStations(stations);
+    return new Map(stations.map((s) => [stationKey(s), s]));
+}
+
+function syncRadioFavoritesReorder(enabled) {
+    const grid = el('favorites-grid');
+    if (!grid) return;
+    grid.classList.toggle('is-reorder-enabled', Boolean(enabled));
+}
+
+async function renderFavoritesRoot(list, empty, byKey, filter, sortBy, sortDir, categoryId) {
+    const folders = RadioPlayer.getFavoriteFolders().filter((folder) => matchesFolderFilter(folder, filter));
+    let rootKeys = RadioPlayer.getFavoritesRootOrder();
+    if (sortBy && sortBy !== 'custom') {
+        const sortable = rootKeys.map((k) => byKey.get(k) || stubFromKey(k));
+        rootKeys = sortStationRows(sortable, sortBy, sortDir).map((s) => stationKey(s) || s.stationuuid);
+    }
+
+    const parts = folders.map((folder) => ({ type: 'folder', folder }));
+    const stationRows = [];
+    for (const ref of rootKeys) {
+        const s = byKey.get(ref) || stubFromKey(ref);
+        if (!stationMatchesFilter(s, filter) || !channelHasCategory(s, categoryId)) continue;
+        if (RadioPlayer.isHidden(ref)) continue;
+        parts.push({ type: 'station', station: s });
+        stationRows.push(s);
+    }
+
+    if (!parts.length) {
+        favoritesRows = [];
+        list.innerHTML = '<div class="empty-state"><p class="empty-state__text">No favorites found</p></div>';
+        setVisible(empty, false);
+        setVisible(list, true);
+        syncRadioFavoritesReorder(false);
+        return;
+    }
+
+    favoritesRows = stationRows;
+    const favs = favoritesSet();
+    list.innerHTML = parts.map((part) => (
+        part.type === 'folder'
+            ? FavoritesFolders.folderTileHtml(part.folder)
+            : stationTileHtml(part.station, favs)
+    )).join('');
+    setVisible(empty, false);
+    setVisible(list, true);
+    FavoritesFolders.wireFolderTiles(list);
+    Appearance.applyToTiles?.(list);
+    syncVisitedTiles();
+    syncRadioFavoritesReorder(sortBy === 'custom');
+}
+
+async function renderFavoritesFolder(list, empty, folderId, byKey, filter, sortBy, sortDir, categoryId) {
+    const folder = RadioPlayer.getFavoriteFolder(folderId);
+    const appState = deps?.appState;
+    if (!folder) {
+        if (appState) appState.favoritesFolderId = null;
+        FavoritesFolders.syncBackButton();
+        return renderFavoritesRoot(list, empty, byKey, filter, sortBy, sortDir, categoryId);
+    }
+
+    let rows = (folder.items || [])
+        .map((k) => byKey.get(k) || stubFromKey(k))
+        .filter((s) => stationMatchesFilter(s, filter) && channelHasCategory(s, categoryId))
+        .filter((s) => !RadioPlayer.isHidden(stationKey(s) || s.stationuuid));
+    rows = sortStationRows(rows, sortBy === 'custom' ? 'custom' : sortBy, sortDir);
+
+    favoritesRows = rows;
+    const favs = favoritesSet();
+    const stationHtml = rows.map((s) => stationTileHtml(s, favs)).join('');
+    list.innerHTML = FavoritesFolders.folderParentTileHtml() + (stationHtml
+        || '<div class="empty-state"><p class="empty-state__text">No stations in folder</p></div>');
+    setVisible(empty, false);
+    setVisible(list, true);
+    FavoritesFolders.wireFolderViewTiles(list);
+    Appearance.applyToTiles?.(list);
+    syncVisitedTiles();
+    syncRadioFavoritesReorder(sortBy === 'custom');
 }
 
 async function renderFavorites() {
@@ -364,44 +534,36 @@ async function renderFavorites() {
     const empty = el('favorites-empty');
     if (!list || catalogMode !== 'radio') return;
     const keys = RadioPlayer.getFavorites();
-    const q = filterText.trim().toLowerCase();
-    if (!keys.length) {
+    const folders = RadioPlayer.getFavoriteFolders();
+    const filter = filterText.trim();
+    const appState = deps?.appState;
+    const { sortBy, sortDir } = getSortPrefs(appState || undefined);
+    const categoryId = getCategoryFilterValue(appState || undefined) || '';
+
+    if (!keys.length && !folders.length) {
         favoritesRows = [];
         list.innerHTML = '';
         setVisible(empty, true);
         setVisible(list, false);
+        if (appState) appState.favoritesFolderId = null;
+        FavoritesFolders.syncBackButton();
+        syncRadioFavoritesReorder(false);
         return;
     }
+
     setVisible(empty, false);
     setVisible(list, true);
     list.innerHTML = '<div class="catalog-status" role="status"><p class="catalog-status__text">Loading…</p></div>';
     try {
-        const provider = RadioProviderRegistry.getActive();
-        const ids = keys.map((k) => {
-            const idx = k.indexOf(':');
-            return idx >= 0 ? k.slice(idx + 1) : k;
-        });
-        const stations = await provider.getStationsByIds(ids);
-        rememberStations(stations);
-        const byKey = new Map(stations.map((s) => [stationKey(s), s]));
-        let rows = keys.map((k) => byKey.get(k) || { stationuuid: k, name: k, favicon: '', countrycode: '' });
-        rows = filterStationsClient(rows);
-        const { sortBy, sortDir } = getSortPrefs(deps?.appState || undefined);
-        if (sortBy === 'name' || sortBy === 'country') {
-            const m = sortDir === 'asc' ? 1 : -1;
-            rows = rows.slice().sort((a, b) => {
-                if (sortBy === 'country') {
-                    const c = String(a.countrycode || '').localeCompare(String(b.countrycode || ''));
-                    if (c) return c * m;
-                }
-                return String(a.name || '').localeCompare(String(b.name || '')) * m;
-            });
+        const byKey = await resolveFavoriteStations(keys);
+        FavoritesFolders.syncBackButton();
+        if (appState?.favoritesFolderId) {
+            await renderFavoritesFolder(
+                list, empty, appState.favoritesFolderId, byKey, filter, sortBy, sortDir, categoryId
+            );
+        } else {
+            await renderFavoritesRoot(list, empty, byKey, filter, sortBy, sortDir, categoryId);
         }
-        favoritesRows = rows;
-        const favs = favoritesSet();
-        list.innerHTML = rows.map((s) => stationTileHtml(s, favs)).join('')
-            || '<div class="empty-state"><p class="empty-state__text">No favorites found</p></div>';
-        Appearance.applyToTiles?.(list);
     } catch (e) {
         favoritesRows = [];
         list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed')}</p></div>`;
@@ -421,26 +583,24 @@ function renderRecents() {
     }
     setVisible(empty, false);
     setVisible(list, true);
+    const categoryId = getCategoryFilterValue(deps?.appState || undefined) || '';
     let rows = meta.map((m) => ({
         stationuuid: m.key,
         name: m.name || m.key,
         favicon: m.favicon || '',
         countrycode: m.countrycode || '',
-        at: m.at || 0
+        at: m.at || 0,
+        tags: ''
     }));
-    rows = filterStationsClient(rows);
+    rows = filterStationsClient(rows)
+        .filter((s) => !RadioPlayer.isHidden(stationKey(s) || s.stationuuid))
+        .filter((s) => {
+            const key = stationKey(s) || s.stationuuid;
+            const enriched = (key && knownStationsByKey.get(key)) || s;
+            return channelHasCategory(enriched, categoryId);
+        });
     const { sortBy, sortDir } = getSortPrefs(deps?.appState || undefined);
-    const m = sortDir === 'asc' ? 1 : -1;
-    rows = rows.slice().sort((a, b) => {
-        if (sortBy === 'recent') {
-            const d = (a.at || 0) - (b.at || 0);
-            if (d) return d * m;
-        } else if (sortBy === 'country') {
-            const c = String(a.countrycode || '').localeCompare(String(b.countrycode || ''));
-            if (c) return c * m;
-        }
-        return String(a.name || '').localeCompare(String(b.name || '')) * m;
-    });
+    rows = sortStationRows(rows, sortBy, sortDir);
     const favs = favoritesSet();
     list.innerHTML = rows.map((s) => {
         const key = stationKey(s) || s.stationuuid;
@@ -449,6 +609,7 @@ function renderRecents() {
     }).join('')
         || '<div class="empty-state"><p class="empty-state__text">No recents found</p></div>';
     Appearance.applyToTiles?.(list);
+    syncVisitedTiles();
 }
 
 function ensureScrollBind() {
@@ -518,6 +679,19 @@ function bindOnce() {
 
     document.addEventListener('click', (e) => {
         if (catalogMode !== 'radio') return;
+        const hideBtn = e.target.closest?.('[data-radio-hide]');
+        if (hideBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const key = hideBtn.getAttribute('data-radio-hide');
+            const known = knownStationsByKey.get(key) || { stationuuid: key };
+            if (RadioPlayer.hideChannel(known)) {
+                showAppToast('Station hidden');
+                document.querySelectorAll(`[data-radio-station="${CSS.escape(key)}"]`).forEach((n) => n.remove());
+                refreshActiveLists({ soft: true });
+            }
+            return;
+        }
         const star = e.target.closest?.('[data-radio-star]');
         if (star) {
             e.preventDefault();
@@ -533,6 +707,7 @@ function bindOnce() {
         }
         const row = e.target.closest?.('[data-radio-station]');
         if (row) {
+            if (e.target.closest?.('.channel-tile__fav-btn, .channel-tile__hide-btn')) return;
             playStationFromCatalog(row.getAttribute('data-radio-station'));
         }
     });
@@ -540,6 +715,7 @@ function bindOnce() {
     document.addEventListener('keydown', (e) => {
         if (catalogMode !== 'radio') return;
         if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target.closest?.('.channel-tile__fav-btn, .channel-tile__hide-btn')) return;
         const country = e.target.closest?.('[data-radio-country]');
         if (country) {
             e.preventDefault();
@@ -554,7 +730,10 @@ function bindOnce() {
     });
 
     window.addEventListener('radio:state_changed', () => {
-        if (catalogMode === 'radio') syncPlayingTiles();
+        if (catalogMode === 'radio') {
+            syncPlayingTiles();
+            syncVisitedTiles();
+        }
     });
 }
 
@@ -606,8 +785,10 @@ export const RadioBrowseView = {
         syncModeClasses();
         if (catalogMode === 'radio') {
             ensureScrollBind();
+            void hydrateRadioTags();
             ListSort.syncSortControls();
             syncBackButton();
+            FavoritesFolders.syncBackButton();
             if (paint) {
                 if (browseLevel === 'stations' && activeCountry) showStationsLevel();
                 else if (countriesCache.length) renderCountries();
@@ -633,8 +814,17 @@ export const RadioBrowseView = {
     backToCountries,
     applyFilter,
     onSortChanged,
+    onCategoryFilterChanged: onSortChanged,
     renderFavorites,
     renderRecents,
+    syncVisitedTiles,
+    reloadStations() {
+        if (catalogMode !== 'radio' || browseLevel !== 'stations') return;
+        stationsCache = [];
+        stationOffset = 0;
+        stationsDone = false;
+        return loadMoreStations();
+    },
 
     prefetch() {
         return prefetchCountries().catch(() => []);

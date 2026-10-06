@@ -1,4 +1,5 @@
 import { TvPlayer } from '../tvPlayer.js';
+import { RadioPlayer } from '../radio/radioPlayer.js';
 import { MultiView } from '../multiView.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
 import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
@@ -14,6 +15,7 @@ import { SettingsStore } from '../storage/settingsStore.js';
 import { ListSort, getSortPrefs, matchesCategoryFilter, channelHasCategory, sortChannelList, setCategoryNameMap } from './listSort.js';
 import { channelIndexForScope, chanNumberAccentHtml } from '../channelNav.js';
 import { marqueeInnerHtml } from './marquee.js';
+import { RadioBrowseView } from '../browse/radioBrowseView.js';
 
 const wiredTiles = new WeakSet();
 
@@ -396,14 +398,26 @@ function renderTabGrid(tab) {
 export const ChannelGrid = {
     init({ appState, getRefreshKey, onPlay }) {
         deps = { appState, getRefreshKey, onPlay };
+        const catalogLibrary = () => (
+            deps.appState?.catalogMode === 'radio' ? RadioPlayer : TvPlayer
+        );
+        const refreshFavorites = () => {
+            if (deps.appState?.catalogMode === 'radio') {
+                RadioBrowseView.renderFavorites();
+            } else {
+                ChannelGrid.renderFavorites();
+            }
+        };
         FavoritesReorder.init({
             getAppState: () => deps.appState,
+            getLibrary: catalogLibrary,
             isReorderEnabled: () => getSortPrefs(deps.appState).sortBy === 'custom',
-            onReordered: () => ChannelGrid.renderFavorites()
+            onReordered: refreshFavorites
         });
         FavoritesFolders.init({
             getAppState: () => deps.appState,
-            onChanged: () => ChannelGrid.renderFavorites()
+            getLibrary: catalogLibrary,
+            onChanged: refreshFavorites
         });
     },
 

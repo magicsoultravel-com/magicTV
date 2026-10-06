@@ -111,7 +111,13 @@ export function matchesCategoryFilter(ch, q) {
 export function channelHasCategory(ch, categoryId) {
     if (!categoryId) return true;
     const cats = Array.isArray(ch?.categories) ? ch.categories : [];
-    return cats.some((c) => String(c) === categoryId);
+    if (cats.some((c) => String(c) === categoryId)) return true;
+    // Radio stations expose tags as a comma-separated string
+    if (typeof ch?.tags === 'string' && ch.tags) {
+        const needle = String(categoryId).toLowerCase();
+        return ch.tags.split(',').some((t) => t.trim().toLowerCase() === needle);
+    }
+    return false;
 }
 
 export function currentSortContext(appState = deps.appState) {
@@ -347,13 +353,15 @@ export const ListSort = {
         const radioMode = deps.appState?.catalogMode === 'radio';
         let options = SORT_OPTIONS[context] || [];
         if (radioMode) {
-            // No IPTV category sort in radio; favorites stay flat (no custom order).
+            // Radio owns tag category map via setCategoryNameMap; keep TV option builders intact.
             if (context === 'channels') {
-                options = options.filter((o) => o.value === 'name');
+                options = options.filter((o) => o.value === 'name' || o.value === 'category');
             } else if (context === 'favorites') {
-                options = options.filter((o) => o.value === 'name' || o.value === 'country');
+                options = options.filter((o) => (
+                    o.value === 'custom' || o.value === 'name' || o.value === 'country' || o.value === 'category'
+                ));
             } else if (context === 'recents') {
-                options = options.filter((o) => o.value !== 'category');
+                // keep all including category
             }
         }
         const html = options.map((o) =>
@@ -377,8 +385,7 @@ export const ListSort = {
         const catPopup = catBtn?.closest('.tv-tab-popup') || catMenu?.closest('.tv-tab-popup');
         if (!catMenu) return;
         const ctx = currentSortContext();
-        const radioMode = deps.appState?.catalogMode === 'radio';
-        if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx) || radioMode) {
+        if (!ctx || !CATEGORY_FILTER_CONTEXTS.has(ctx)) {
             catMenu.classList.add('is-hidden');
             catMenu.classList.remove('is-visible');
             if (catBtn) {

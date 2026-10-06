@@ -16,7 +16,8 @@ export const RadioBrowserProvider = {
         order = 'clickcount',
         reverse = true,
         refresh = false,
-        hideOffline = true,
+        hideOffline = false,
+        tag = '',
         signal
     } = {}) {
         const data = await RadioBrowserApi.searchStations({
@@ -27,11 +28,16 @@ export const RadioBrowserProvider = {
             reverse,
             refresh,
             hideOffline,
+            tag,
             signal
         });
         return (Array.isArray(data) ? data : [])
             .map((s) => normalizeStation(s, PROVIDER_RADIO_BROWSER))
             .filter(Boolean);
+    },
+
+    async getTags(opts = {}) {
+        return RadioBrowserApi.getTags(opts);
     },
 
     async getStationById(stationId, { refresh = false, signal } = {}) {
