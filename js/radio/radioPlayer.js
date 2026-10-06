@@ -19,8 +19,15 @@ import { RadioCast } from './radioCast.js';
 /** @type {(() => number) | null} */
 let getMasterVolume = null;
 
+/** Only refresh Radio Browser after stream error when IDB station cache is this old. */
+const STREAM_ERROR_REFRESH_MIN_AGE_MS = 60 * 60 * 1000;
+
 function dispatchState(detail) {
     window.dispatchEvent(new CustomEvent('radio:state_changed', { detail }));
+}
+
+function isAbortError(e) {
+    return e?.name === 'AbortError';
 }
 
 export const RadioPlayer = {
@@ -36,6 +43,12 @@ export const RadioPlayer = {
     streamUrl: null,
     /** True while casting and host audio is off (local intentionally silent). */
     castLocalSuppressed: false,
+    /** Bumped on each playStation; stale generations must not touch player state. */
+    playGeneration: 0,
+    /** @type {AbortController|null} */
+    _playAbort: null,
+    /** Key we already attempted a stale-cache refresh for (avoid loops). */
+    _streamRetryKey: null,
 
     init({ getSharedVolume } = {}) {
         if (typeof getSharedVolume === 'function') {
@@ -148,11 +161,7 @@ export const RadioPlayer = {
             this.emitState();
         });
         audio.addEventListener('error', () => {
-            this.loading = false;
-            this.loadPhase = 'idle';
-            this.playing = false;
-            this.error = 'Stream unavailable';
-            this.emitState();
+            this.onStreamError();
         });
         audio.addEventListener('ended', () => {
             this.playing = false;
@@ -312,49 +321,134 @@ export const RadioPlayer = {
         this.emitState();
     },
 
-    async playStation(keyOrStation) {
+    /**
+     * Resolve a key or partial station to a full record with url_resolved.
+     * Uses cache by default (no mirror rediscovery).
+     */
+    async resolveStation(keyOrStation, { refresh = false, signal } = {}) {
+        if (keyOrStation && typeof keyOrStation !== 'string' && keyOrStation.url_resolved && !refresh) {
+            return keyOrStation;
+        }
+        const key = typeof keyOrStation === 'string'
+            ? keyOrStation
+            : stationKey(keyOrStation);
+        const parsed = parseStationKey(key);
+        if (!parsed?.stationId) return null;
+        const provider = RadioProviderRegistry.get(parsed.providerId);
+        return provider.getStationById(parsed.stationId, { refresh, signal });
+    },
+
+    /** True when IDB station cache is old enough to justify a refresh after stream failure. */
+    async shouldRefreshOnStreamError(station) {
+        const provider = RadioProviderRegistry.get(station?.providerId);
+        if (typeof provider?.getStationCacheAge !== 'function') return false;
+        const age = await provider.getStationCacheAge(station.stationId);
+        return age != null && age >= STREAM_ERROR_REFRESH_MIN_AGE_MS;
+    },
+
+    failPlay(message, err) {
+        this.loading = false;
+        this.loadPhase = 'idle';
+        this.playing = false;
+        this.error = message;
+        this.emitState();
+        if (err) throw err;
+        throw new Error(message);
+    },
+
+    async onStreamError() {
+        const generation = this.playGeneration;
+        const station = this.station;
+        const key = stationKey(station);
+        if (!station || !key) {
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.playing = false;
+            this.error = 'Stream unavailable';
+            this.emitState();
+            return;
+        }
+        if (this._streamRetryKey === key) {
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.playing = false;
+            this.error = 'Stream unavailable';
+            this.emitState();
+            return;
+        }
+        let shouldRefresh = false;
+        try {
+            shouldRefresh = await this.shouldRefreshOnStreamError(station);
+        } catch {
+            shouldRefresh = false;
+        }
+        if (generation !== this.playGeneration) return;
+        if (!shouldRefresh) {
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.playing = false;
+            this.error = 'Stream unavailable';
+            this.emitState();
+            return;
+        }
+        this._streamRetryKey = key;
+        try {
+            await this.playStation(station, { forceRefresh: true, fromStreamError: true });
+        } catch {
+            /* playStation emits state */
+        }
+    },
+
+    /**
+     * @param {string|object} keyOrStation
+     * @param {{ forceRefresh?: boolean, fromStreamError?: boolean }} [opts]
+     */
+    async playStation(keyOrStation, opts = {}) {
         this.init();
         this.ensureAudio();
+
+        const generation = ++this.playGeneration;
+        if (this._playAbort) {
+            try { this._playAbort.abort(); } catch { /* ignore */ }
+        }
+        this._playAbort = new AbortController();
+        const { signal } = this._playAbort;
+
+        if (!opts.fromStreamError) this._streamRetryKey = null;
+
         this.loading = true;
         this.loadPhase = 'connecting';
         this.error = null;
         this.emitState();
 
+        const stale = () => generation !== this.playGeneration;
+
         let station = null;
         try {
-            if (typeof keyOrStation === 'string') {
-                const parsed = parseStationKey(keyOrStation);
-                const provider = RadioProviderRegistry.get(parsed.providerId);
-                station = await provider.getStationById(parsed.stationId, { forPlay: true });
-            } else if (keyOrStation?.url_resolved) {
-                station = keyOrStation;
-            } else if (keyOrStation) {
-                const key = stationKey(keyOrStation);
-                const parsed = parseStationKey(key);
-                const provider = RadioProviderRegistry.get(parsed.providerId);
-                station = await provider.getStationById(parsed.stationId, { forPlay: true });
-            }
+            station = await this.resolveStation(keyOrStation, {
+                refresh: opts.forceRefresh === true,
+                signal
+            });
         } catch (e) {
-            this.loading = false;
-            this.loadPhase = 'idle';
-            this.error = e?.message || 'Station unavailable';
-            this.emitState();
-            throw e;
+            if (stale() || isAbortError(e) || signal.aborted) return;
+            this.failPlay(e?.message || 'Station unavailable', e);
         }
 
+        if (stale()) return;
+
         if (!station?.url_resolved) {
-            this.loading = false;
-            this.loadPhase = 'idle';
-            this.error = 'No stream URL';
-            this.emitState();
-            throw new Error('No stream URL');
+            this.failPlay('No stream URL');
         }
         if (station.lastcheckok === 0) {
-            this.loading = false;
-            this.loadPhase = 'idle';
-            this.error = 'Station offline';
-            this.emitState();
-            throw new Error('Station offline');
+            this.failPlay('Station offline');
+        }
+
+        // After force refresh, same URL will not recover a dead stream.
+        if (opts.forceRefresh && opts.fromStreamError
+            && typeof keyOrStation !== 'string'
+            && keyOrStation?.url_resolved
+            && station.url_resolved === keyOrStation.url_resolved) {
+            this.failPlay('Stream unavailable');
         }
 
         this.station = station;
@@ -371,12 +465,15 @@ export const RadioPlayer = {
             RadioProviderRegistry.get(station.providerId)?.reportClick?.(station.stationId);
         } catch { /* non-critical */ }
 
+        if (stale()) return;
+
         this.audio.src = station.url_resolved;
         this.streamUrl = station.url_resolved;
         this.applyAudioGain();
 
         try {
             await this.audio.play();
+            if (stale()) return;
             this.playing = true;
             this.loading = false;
             this.loadPhase = 'idle';
@@ -384,20 +481,33 @@ export const RadioPlayer = {
             patchRadioState({ wasPlaying: true });
             this.emitState();
 
-            // If casting, reload cast with new station
             if (RadioCast.isCasting()) {
                 try {
                     await RadioCast.castStation(station.url_resolved, station.name);
+                    if (stale()) return;
                     this.syncCastLocal();
                 } catch { /* ignore cast reload errors */ }
             }
         } catch (e) {
-            this.loading = false;
-            this.loadPhase = 'idle';
-            this.playing = false;
-            this.error = e?.name === 'NotAllowedError' ? 'Tap play to start' : 'Playback failed';
-            this.emitState();
-            throw e;
+            if (stale() || isAbortError(e) || signal.aborted) return;
+            if (e?.name === 'NotAllowedError') {
+                this.failPlay('Tap play to start', e);
+            }
+            // Immediate play() failure — optional one refresh if cache is stale.
+            if (!opts.forceRefresh && !opts.fromStreamError) {
+                let shouldRefresh = false;
+                try {
+                    shouldRefresh = await this.shouldRefreshOnStreamError(station);
+                } catch {
+                    shouldRefresh = false;
+                }
+                if (stale()) return;
+                if (shouldRefresh) {
+                    this._streamRetryKey = key;
+                    return this.playStation(station, { forceRefresh: true, fromStreamError: true });
+                }
+            }
+            this.failPlay('Playback failed', e);
         }
     },
 
@@ -434,6 +544,12 @@ export const RadioPlayer = {
     },
 
     stop() {
+        this.playGeneration += 1;
+        if (this._playAbort) {
+            try { this._playAbort.abort(); } catch { /* ignore */ }
+            this._playAbort = null;
+        }
+        this._streamRetryKey = null;
         if (this.audio) {
             this.audio.pause();
             this.audio.removeAttribute('src');

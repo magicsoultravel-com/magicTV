@@ -4,6 +4,11 @@ const CACHE_KEY = 'magictv_radio_cache';
 const API_BASE_SESSION_KEY = 'magictv_radio_api_base';
 const USER_AGENT = 'magictv/1.0';
 
+/** Per-mirror fetch timeout (ms). */
+const FETCH_TIMEOUT_MS = 4000;
+/** Cap sequential mirror failover attempts. */
+const MAX_MIRROR_ATTEMPTS = 3;
+
 const TTL = {
     countries: 7 * 24 * 60 * 60 * 1000,
     tags: 24 * 60 * 60 * 1000,
@@ -103,33 +108,63 @@ async function resolveApiBase(force = false) {
     return base;
 }
 
-async function apiFetch(path, { method = 'GET', skipCache = false } = {}) {
+/**
+ * Merge an optional external AbortSignal with a per-attempt timeout.
+ * @returns {{ signal: AbortSignal, cleanup: () => void }}
+ */
+function attemptSignal(external, timeoutMs) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const onExternalAbort = () => ctrl.abort();
+    if (external) {
+        if (external.aborted) ctrl.abort();
+        else external.addEventListener('abort', onExternalAbort, { once: true });
+    }
+    return {
+        signal: ctrl.signal,
+        cleanup() {
+            clearTimeout(timer);
+            external?.removeEventListener?.('abort', onExternalAbort);
+        }
+    };
+}
+
+async function apiFetch(path, { method = 'GET', signal } = {}) {
+    if (signal?.aborted) {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        throw err;
+    }
+
     let lastError = null;
     const bases = [];
 
     try {
-        bases.push(await resolveApiBase(skipCache));
+        bases.push(await resolveApiBase(false));
     } catch (e) {
         lastError = e;
     }
 
-    if (skipCache) {
-        try {
-            const servers = await discoverServers();
-            servers.forEach((name) => bases.push(`https://${name}/json`));
-        } catch (e) {
-            lastError = e;
-        }
+    // Failover only — never rediscover/enumerate every mirror on each request.
+    for (const name of FALLBACK_SERVERS) {
+        bases.push(`https://${name}/json`);
     }
 
-    const uniqueBases = [...new Set(bases)];
+    const uniqueBases = [...new Set(bases)].slice(0, MAX_MIRROR_ATTEMPTS);
     if (!uniqueBases.length) throw lastError || new Error('No radio API base available');
 
     for (const base of uniqueBases) {
+        if (signal?.aborted) {
+            const err = new Error('Aborted');
+            err.name = 'AbortError';
+            throw err;
+        }
+        const attempt = attemptSignal(signal, FETCH_TIMEOUT_MS);
         try {
             const res = await fetch(`${base}${path}`, {
                 method,
-                headers: { 'User-Agent': USER_AGENT }
+                headers: { 'User-Agent': USER_AGENT },
+                signal: attempt.signal
             });
             if (!res.ok) throw new Error(`Radio API ${res.status}`);
             const data = await res.json();
@@ -139,8 +174,11 @@ async function apiFetch(path, { method = 'GET', skipCache = false } = {}) {
                 cache.apiBase = { cachedAt: Date.now(), data: base };
                 await saveCache(cache);
             }
+            attempt.cleanup();
             return data;
         } catch (e) {
+            attempt.cleanup();
+            if (e?.name === 'AbortError' && signal?.aborted) throw e;
             lastError = e;
         }
     }
@@ -174,7 +212,10 @@ let countriesMemory = null;
 let countriesMemoryAt = 0;
 
 export const RadioBrowserApi = {
-    async getCountries({ refresh = false } = {}) {
+    FETCH_TIMEOUT_MS,
+    MAX_MIRROR_ATTEMPTS,
+
+    async getCountries({ refresh = false, signal } = {}) {
         if (!refresh && countriesMemory && isFresh({ cachedAt: countriesMemoryAt }, TTL.countries)) {
             return countriesMemory;
         }
@@ -186,19 +227,19 @@ export const RadioBrowserApi = {
                 return cached;
             }
         }
-        const data = await apiFetch('/countries', { skipCache: refresh });
+        const data = await apiFetch('/countries', { signal });
         const written = await writeCachedBucket('countries', null, data, TTL.countries);
         countriesMemory = written;
         countriesMemoryAt = Date.now();
         return written;
     },
 
-    async getTags({ refresh = false } = {}) {
+    async getTags({ refresh = false, signal } = {}) {
         if (!refresh) {
             const cached = await readCachedBucket('tags', null, TTL.tags);
             if (cached) return cached;
         }
-        const data = await apiFetch('/tags?limit=80&order=stationcount&reverse=true', { skipCache: refresh });
+        const data = await apiFetch('/tags?limit=80&order=stationcount&reverse=true', { signal });
         return writeCachedBucket('tags', null, data, TTL.tags);
     },
 
@@ -211,7 +252,8 @@ export const RadioBrowserApi = {
         order = 'clickcount',
         reverse = true,
         refresh = false,
-        hideOffline = true
+        hideOffline = true,
+        signal
     } = {}) {
         const params = { name: name.trim(), countrycode, tag };
         const key = hashQuery({ ...params, hideOffline, offset, order, reverse });
@@ -239,7 +281,7 @@ export const RadioBrowserApi = {
             path = `/stations/search?${qs.toString()}`;
         }
 
-        const data = await apiFetch(path, { skipCache: refresh });
+        const data = await apiFetch(path, { signal });
         const cache = await loadCache();
         if (!cache.queries) cache.queries = {};
         cache.queries[key] = { cachedAt: Date.now(), data };
@@ -248,15 +290,15 @@ export const RadioBrowserApi = {
         return data;
     },
 
-    async getStationByUuid(uuid, { refresh = false, forPlay = false } = {}) {
+    async getStationByUuid(uuid, { refresh = false, signal } = {}) {
         if (!uuid) return null;
 
-        if (!forPlay && !refresh) {
+        if (!refresh) {
             const cached = await readCachedBucket('stations', uuid, TTL.stations);
             if (cached) return cached;
         }
 
-        const data = await apiFetch(`/stations/byuuid/${encodeURIComponent(uuid)}`, { skipCache: refresh || forPlay });
+        const data = await apiFetch(`/stations/byuuid/${encodeURIComponent(uuid)}`, { signal });
         const station = Array.isArray(data) ? data[0] : data;
         if (station) {
             await writeCachedBucket('stations', uuid, station, TTL.stations);
@@ -264,9 +306,17 @@ export const RadioBrowserApi = {
         return station || null;
     },
 
-    async getStationsByUuids(uuids, { refresh = false } = {}) {
+    /** @returns {Promise<number|null>} cachedAt ms, or null if not in IDB */
+    async getStationCachedAt(uuid) {
+        if (!uuid) return null;
+        const cache = await loadCache();
+        const entry = cache.stations?.[uuid];
+        return Number.isFinite(entry?.cachedAt) ? entry.cachedAt : null;
+    },
+
+    async getStationsByUuids(uuids, { refresh = false, signal } = {}) {
         const results = await Promise.all(
-            uuids.map((uuid) => this.getStationByUuid(uuid, { refresh }))
+            uuids.map((uuid) => this.getStationByUuid(uuid, { refresh, signal }))
         );
         return results.filter(Boolean);
     },
@@ -293,6 +343,8 @@ export const RadioBrowserApi = {
     async clearCache() {
         await IndexedDBStore.remove(CACHE_KEY);
         sessionStorage.removeItem(API_BASE_SESSION_KEY);
+        countriesMemory = null;
+        countriesMemoryAt = 0;
     },
 
     async setMirrorHost(hostname) {

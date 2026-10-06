@@ -5,8 +5,8 @@ export const RadioBrowserProvider = {
     id: PROVIDER_RADIO_BROWSER,
     label: 'Radio Browser',
 
-    async getCountries({ refresh = false } = {}) {
-        return RadioBrowserApi.getCountries({ refresh });
+    async getCountries({ refresh = false, signal } = {}) {
+        return RadioBrowserApi.getCountries({ refresh, signal });
     },
 
     async searchStations({
@@ -16,7 +16,8 @@ export const RadioBrowserProvider = {
         order = 'clickcount',
         reverse = true,
         refresh = false,
-        hideOffline = true
+        hideOffline = true,
+        signal
     } = {}) {
         const data = await RadioBrowserApi.searchStations({
             countrycode,
@@ -25,16 +26,24 @@ export const RadioBrowserProvider = {
             order,
             reverse,
             refresh,
-            hideOffline
+            hideOffline,
+            signal
         });
         return (Array.isArray(data) ? data : [])
             .map((s) => normalizeStation(s, PROVIDER_RADIO_BROWSER))
             .filter(Boolean);
     },
 
-    async getStationById(stationId, { refresh = false, forPlay = false } = {}) {
-        const raw = await RadioBrowserApi.getStationByUuid(stationId, { refresh, forPlay });
+    async getStationById(stationId, { refresh = false, signal } = {}) {
+        const raw = await RadioBrowserApi.getStationByUuid(stationId, { refresh, signal });
         return normalizeStation(raw, PROVIDER_RADIO_BROWSER);
+    },
+
+    /** Age of IDB station cache entry in ms, or null if missing. */
+    async getStationCacheAge(stationId) {
+        const cachedAt = await RadioBrowserApi.getStationCachedAt(stationId);
+        if (cachedAt == null) return null;
+        return Date.now() - cachedAt;
     },
 
     async getStationsByIds(ids, opts = {}) {

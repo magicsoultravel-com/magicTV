@@ -26,12 +26,62 @@ let countriesCache = [];
 let countriesLoadPromise = null;
 /** @type {any[]} */
 let stationsCache = [];
+/** Favorites rows last painted (may include url_resolved). */
+let favoritesRows = [];
+/** Stations with url_resolved seen from browse/favorites/play. */
+const knownStationsByKey = new Map();
 let stationOffset = 0;
 let stationsLoading = false;
 let stationsDone = false;
 let bound = false;
 let filterText = '';
 let scrollBound = false;
+
+function rememberStations(list) {
+    if (!Array.isArray(list)) return;
+    for (const s of list) {
+        const key = stationKey(s);
+        if (key && s?.url_resolved) knownStationsByKey.set(key, s);
+    }
+}
+
+function favoritesSet() {
+    return new Set(RadioPlayer.getFavorites());
+}
+
+function resolvePlayTarget(key) {
+    if (!key) return key;
+    const known = knownStationsByKey.get(key);
+    if (known?.url_resolved) return known;
+    const fromBrowse = stationsCache.find((s) => stationKey(s) === key);
+    if (fromBrowse?.url_resolved) return fromBrowse;
+    const fromFav = favoritesRows.find((s) => stationKey(s) === key);
+    if (fromFav?.url_resolved) return fromFav;
+    return key;
+}
+
+function playStationFromCatalog(key) {
+    const target = resolvePlayTarget(key);
+    if (target && typeof target !== 'string' && target.url_resolved) {
+        rememberStations([target]);
+    }
+    return RadioPlayer.playStation(target).catch((err) => {
+        showAppToast(err?.message || 'Playback failed');
+    });
+}
+
+/** Toggle playing classes only — never rebuild HTML or call applyToTiles. */
+function syncPlayingTiles() {
+    if (catalogMode !== 'radio') return;
+    if (RadioPlayer.station?.url_resolved) rememberStations([RadioPlayer.station]);
+    const playingKey = stationKey(RadioPlayer.station);
+    document.querySelectorAll('[data-radio-station]').forEach((node) => {
+        const key = node.getAttribute('data-radio-station');
+        const on = Boolean(key && key === playingKey);
+        node.classList.toggle('is-playing', on);
+        node.classList.toggle('is-playing-radio', on);
+    });
+}
 
 /** @type {{ appState?: any } | null} */
 let deps = null;
@@ -79,10 +129,11 @@ function countryTileHtml(c) {
     `;
 }
 
-function stationTileHtml(station) {
+function stationTileHtml(station, favKeys = null) {
     const key = stationKey(station);
     const initial = (station.name || '?')[0].toUpperCase();
-    const isFav = RadioPlayer.isFavorite(key);
+    const favs = favKeys || favoritesSet();
+    const isFav = key ? favs.has(key) : false;
     const playingKey = stationKey(RadioPlayer.station);
     const isPlaying = key && key === playingKey;
     const favLabel = isFav ? 'Remove from favorites' : 'Add to favorites';
@@ -233,10 +284,12 @@ async function loadMoreStations() {
             ? batch.filter((s) => String(s.name || '').toLowerCase().includes(q))
             : batch;
         stationsCache = stationsCache.concat(filtered);
+        rememberStations(filtered);
         stationOffset += batch.length;
         if (batch.length < PAGE_SIZE) stationsDone = true;
         if (list) {
-            list.innerHTML = stationsCache.map(stationTileHtml).join('')
+            const favs = favoritesSet();
+            list.innerHTML = stationsCache.map((s) => stationTileHtml(s, favs)).join('')
                 || '<div class="empty-state"><p class="empty-state__text">No stations</p></div>';
             Appearance.applyToTiles?.(list);
         }
@@ -285,6 +338,7 @@ async function renderFavorites() {
     const keys = RadioPlayer.getFavorites();
     const q = filterText.trim().toLowerCase();
     if (!keys.length) {
+        favoritesRows = [];
         list.innerHTML = '';
         setVisible(empty, true);
         setVisible(list, false);
@@ -300,6 +354,7 @@ async function renderFavorites() {
             return idx >= 0 ? k.slice(idx + 1) : k;
         });
         const stations = await provider.getStationsByIds(ids);
+        rememberStations(stations);
         const byKey = new Map(stations.map((s) => [stationKey(s), s]));
         let rows = keys.map((k) => byKey.get(k) || { stationuuid: k, name: k, favicon: '', countrycode: '' });
         rows = filterStationsClient(rows);
@@ -314,10 +369,13 @@ async function renderFavorites() {
                 return String(a.name || '').localeCompare(String(b.name || '')) * m;
             });
         }
-        list.innerHTML = rows.map(stationTileHtml).join('')
+        favoritesRows = rows;
+        const favs = favoritesSet();
+        list.innerHTML = rows.map((s) => stationTileHtml(s, favs)).join('')
             || '<div class="empty-state"><p class="empty-state__text">No favorites found</p></div>';
         Appearance.applyToTiles?.(list);
     } catch (e) {
+        favoritesRows = [];
         list.innerHTML = `<div class="empty-state"><p class="empty-state__text">${escapeHtml(e?.message || 'Failed')}</p></div>`;
     }
 }
@@ -355,7 +413,12 @@ function renderRecents() {
         }
         return String(a.name || '').localeCompare(String(b.name || '')) * m;
     });
-    list.innerHTML = rows.map(stationTileHtml).join('')
+    const favs = favoritesSet();
+    list.innerHTML = rows.map((s) => {
+        const key = stationKey(s) || s.stationuuid;
+        const enriched = (key && knownStationsByKey.get(key)) || s;
+        return stationTileHtml(enriched, favs);
+    }).join('')
         || '<div class="empty-state"><p class="empty-state__text">No recents found</p></div>';
     Appearance.applyToTiles?.(list);
 }
@@ -442,10 +505,7 @@ function bindOnce() {
         }
         const row = e.target.closest?.('[data-radio-station]');
         if (row) {
-            const key = row.getAttribute('data-radio-station');
-            RadioPlayer.playStation(key).catch((err) => {
-                showAppToast(err?.message || 'Playback failed');
-            });
+            playStationFromCatalog(row.getAttribute('data-radio-station'));
         }
     });
 
@@ -461,14 +521,12 @@ function bindOnce() {
         const row = e.target.closest?.('[data-radio-station]');
         if (row) {
             e.preventDefault();
-            RadioPlayer.playStation(row.getAttribute('data-radio-station')).catch((err) => {
-                showAppToast(err?.message || 'Playback failed');
-            });
+            playStationFromCatalog(row.getAttribute('data-radio-station'));
         }
     });
 
     window.addEventListener('radio:state_changed', () => {
-        if (catalogMode === 'radio') refreshActiveLists({ soft: true });
+        if (catalogMode === 'radio') syncPlayingTiles();
     });
 }
 
@@ -483,20 +541,16 @@ function refreshActiveLists({ soft = false } = {}) {
         renderRecents();
     }
     if (tab === 'browse-panel' || el('browse-panel')?.classList.contains('is-active')) {
-        if (!soft && browseLevel === 'stations') {
+        if (browseLevel === 'stations' && stationsCache.length) {
             const list = el('channels-container');
-            if (list && stationsCache.length) {
-                list.innerHTML = stationsCache.map(stationTileHtml).join('');
+            if (list) {
+                const favs = favoritesSet();
+                list.innerHTML = stationsCache.map((s) => stationTileHtml(s, favs)).join('');
+                // Soft refresh after fav toggle still needs marquee measure; play-state uses syncPlayingTiles.
                 Appearance.applyToTiles?.(list);
             }
         } else if (!soft && browseLevel === 'countries') {
             renderCountries();
-        } else if (soft && browseLevel === 'stations' && stationsCache.length) {
-            const list = el('channels-container');
-            if (list) {
-                list.innerHTML = stationsCache.map(stationTileHtml).join('');
-                Appearance.applyToTiles?.(list);
-            }
         } else if (soft && browseLevel === 'countries') {
             renderCountries();
         }
