@@ -252,6 +252,7 @@ export const freeLayoutMethods = {
         if (e.target.closest?.('.tv-controls__mute-wrap')) return;
         if (e.target.closest?.('.tv-controls__play-wrap')) return;
         if (e.target.closest?.('.tv-controls__stop-wrap')) return;
+        if (e.target.closest?.('.tv-controls__swap-wrap')) return;
         if (e.target.closest?.('.tv-controls__chan-prev-wrap')) return;
         if (e.target.closest?.('.tv-controls__chan-next-wrap')) return;
         if (e.target.closest?.('.tv-player-tile__hover')) return;

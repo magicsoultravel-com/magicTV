@@ -1196,7 +1196,8 @@
 .tv-controls__cast-wrap,
 .tv-controls__mute-wrap,
 .tv-controls__play-wrap,
-.tv-controls__stop-wrap {
+.tv-controls__stop-wrap,
+.tv-controls__swap-wrap {
     position: relative;
     display: inline-flex;
 }
@@ -1204,7 +1205,8 @@
 .tv-controls__cast-wrap::after,
 .tv-controls__mute-wrap::after,
 .tv-controls__play-wrap::after,
-.tv-controls__stop-wrap::after {
+.tv-controls__stop-wrap::after,
+.tv-controls__swap-wrap::after {
     content: '';
     position: absolute;
     left: -10px;
@@ -1222,7 +1224,8 @@
 .tv-controls__cast-popout,
 .tv-controls__mute-popout,
 .tv-controls__play-popout,
-.tv-controls__stop-popout {
+.tv-controls__stop-popout,
+.tv-controls__swap-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
     bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
@@ -1253,7 +1256,9 @@
 .tv-controls__play-wrap:hover .tv-controls__play-popout,
 .tv-controls__play-wrap:focus-within .tv-controls__play-popout,
 .tv-controls__stop-wrap:hover .tv-controls__stop-popout,
-.tv-controls__stop-wrap:focus-within .tv-controls__stop-popout {
+.tv-controls__stop-wrap:focus-within .tv-controls__stop-popout,
+.tv-controls__swap-wrap:hover .tv-controls__swap-popout,
+.tv-controls__swap-wrap:focus-within .tv-controls__swap-popout {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
     visibility: visible;
@@ -1264,7 +1269,8 @@
 .tv-controls__cast-popout .tv-controls__btn,
 .tv-controls__mute-popout .tv-controls__btn,
 .tv-controls__play-popout .tv-controls__btn,
-.tv-controls__stop-popout .tv-controls__btn {
+.tv-controls__stop-popout .tv-controls__btn,
+.tv-controls__swap-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;

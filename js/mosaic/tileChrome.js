@@ -139,7 +139,7 @@ export const tileChromeMethods = {
             return;
         }
 
-        if (slotId === 'center' && (action === 'dismiss' || action === 'swap')) return;
+        if (slotId === 'center' && (action === 'dismiss' || action === 'swap' || action === 'swap-unmute')) return;
 
         if (action === 'dismiss') {
             if (this.statusSlotId === slotId) this.setStatusSlot('center');
@@ -234,7 +234,19 @@ export const tileChromeMethods = {
                 break;
             }
             case 'swap':
+            case 'swap-unmute':
                 this.swapWithCenter(slotId);
+                if (action === 'swap-unmute') {
+                    if (this.sharedVolume <= 0) {
+                        const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
+                        this.setSharedVolume(restored);
+                    }
+                    const centerPlayer = this.slots.center?.player;
+                    if (centerPlayer?.channel) centerPlayer.unmute();
+                    this.persistSlots();
+                    this.getPrimary()?.emitState();
+                    this.syncMosaicChrome();
+                }
                 if (ChromecastManager.isCasting()) {
                     const activeSlot = ChromecastManager.getActiveSlot();
                     const activePlayer = activeSlot ? this.slots[activeSlot]?.player : null;
