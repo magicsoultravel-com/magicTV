@@ -153,7 +153,7 @@ export const tileChromeMethods = {
 
         if (action === 'browse') {
             const { RemoteModule } = await import('../ui/remoteModule.js');
-            RemoteModule.toggle(slotId, { tab: 'browse' });
+            RemoteModule.openTvCatalog({ slotId, tab: 'browse' });
             return;
         }
 

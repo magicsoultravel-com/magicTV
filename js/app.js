@@ -28,6 +28,7 @@ import { VisitedChannelsSettings } from './ui/visitedChannelsSettings.js';
 import { GuidePanel } from './ui/guidePanel.js';
 import { WingPanel } from './ui/wingPanel.js';
 import { isSplit } from './ui/moduleLayout.js';
+import { BROWSER_TABS, isBrowserCatalogTab } from './ui/catalogModeEntry.js';
 import { warmGuideIndex } from './epg/epgService.js';
 
 import { ACTION_ICONS, CARD_ICONS } from './ui/icons.js';
@@ -576,15 +577,13 @@ function syncRemoteTabChrome() {
     RemoteModule.syncCatalogChrome?.(tab);
 }
 
-const BROWSER_TABS = ['browse', 'favorites', 'recents', 'settings'];
-
 function setCatalogMode(mode, { paint = true } = {}) {
     const next = mode === 'radio' ? 'radio' : 'tv';
     const prev = appState.catalogMode;
     appState.catalogMode = next;
     RadioBrowseView.setMode(appState.catalogMode, { paint });
     ListSort.syncSortControls();
-    if (prev === 'radio' && next === 'tv' && BROWSER_TABS.includes(appState.activeTab)) {
+    if (prev === 'radio' && next === 'tv' && isBrowserCatalogTab(appState.activeTab)) {
         if (appState.activeTab === 'browse') BrowseView.restoreView();
         else if (appState.activeTab === 'favorites') ChannelGrid.refreshFavorites();
         else if (appState.activeTab === 'recents') ChannelGrid.refreshRecents();
@@ -594,18 +593,41 @@ function setCatalogMode(mode, { paint = true } = {}) {
 function openRadioCatalog({ tab = 'browse' } = {}) {
     // Paint once via switchTab / openBrowse / refresh — not in setMode.
     setCatalogMode('radio', { paint: false });
+    const nextTab = isBrowserCatalogTab(tab) ? tab : 'browse';
     if (!RemoteModule.isOpen?.()) {
-        RemoteModule.open?.({ tab: BROWSER_TABS.includes(tab) ? tab : 'browse' });
+        RemoteModule.open?.({ tab: nextTab });
     }
     ensureBrowserCatalogVisible({ refreshRadio: false });
-    const nextTab = BROWSER_TABS.includes(tab) ? tab : 'browse';
     if (appState.activeTab !== nextTab) switchTab(nextTab);
     else if (nextTab === 'browse') RadioBrowseView.openBrowse();
     else RadioBrowseView.refresh();
 }
 
+/** TV entry points (remote shell, chrome tile, welcome) always force TV catalog. */
+function openTvCatalog({ tab = 'browse' } = {}) {
+    setCatalogMode('tv', { paint: false });
+    const nextTab = isBrowserCatalogTab(tab) ? tab : 'browse';
+    if (!RemoteModule.isOpen?.()) {
+        RemoteModule.open?.({ tab: nextTab });
+        return;
+    }
+    ensureBrowserCatalogVisible();
+    if (appState.activeTab !== nextTab) {
+        switchTab(nextTab);
+        return;
+    }
+    activateTabPanels(nextTab);
+    if (nextTab === 'browse') BrowseView.restoreView();
+    else if (nextTab === 'favorites') ChannelGrid.refreshFavorites();
+    else if (nextTab === 'recents') ChannelGrid.refreshRecents();
+}
+
 function switchTabFromRemote(tabName) {
-    // Sticky catalog mode: do not force TV when navigating Browse/Favorites/Recents.
+    // Browser-shell nav: keep current catalog mode (radio session stays radio).
+    // Leaving browser for Remote keypad resets to TV so the split pane cannot linger.
+    if (tabName === 'remote' && appState.catalogMode === 'radio') {
+        setCatalogMode('tv');
+    }
     switchTabAnimated(tabName);
 }
 
@@ -774,7 +796,7 @@ function switchTabAnimated(tabName) {
     switchTab(tabName);
 }
 
-export { switchTab, ensureBrowserCatalogVisible };
+export { switchTab, ensureBrowserCatalogVisible, openTvCatalog, openRadioCatalog };
 
 /**
  * Apply a welcome-screen shortcut after restoreOpenIfNeeded so it is not
@@ -786,12 +808,13 @@ async function applyResumeWelcomeShortcut() {
 
     try {
         if (intent.kind === 'tab' && intent.tab) {
+            if (isBrowserCatalogTab(intent.tab)) {
+                openTvCatalog({ tab: intent.tab });
+                if (isSplit()) RemoteModule.focusBrowserWindow?.();
+                return;
+            }
             if (RemoteModule.isOpen?.()) {
                 switchTab(intent.tab);
-                if (BROWSER_TABS.includes(intent.tab) && isSplit()) {
-                    ensureBrowserCatalogVisible();
-                    RemoteModule.focusBrowserWindow?.();
-                }
             } else {
                 RemoteModule.open({ tab: intent.tab, focusClose: false });
             }
@@ -871,7 +894,8 @@ async function init() {
             getDefaultOnPlay: () => startPlayback,
             switchTab,
             switchTabNav: switchTabFromRemote,
-            ensureBrowserCatalog: ensureBrowserCatalogVisible
+            ensureBrowserCatalog: ensureBrowserCatalogVisible,
+            openTvCatalog
         });
         RadioBrowseView.init({ appState });
         RadioBridge.register({ player: RadioPlayer, module: RadioModule });

@@ -75,7 +75,8 @@ let deps = {
     getDefaultOnPlay: () => () => {},
     switchTab: () => {},
     switchTabNav: null,
-    ensureBrowserCatalog: () => {}
+    ensureBrowserCatalog: () => {},
+    openTvCatalog: null
 };
 
 /** @type {'hidden'|'docked'|'undocked'} */
@@ -1290,11 +1291,12 @@ function finishHideSplit() {
 }
 
 export const RemoteModule = {
-    init({ getDefaultOnPlay, switchTab, switchTabNav, ensureBrowserCatalog } = {}) {
+    init({ getDefaultOnPlay, switchTab, switchTabNav, ensureBrowserCatalog, openTvCatalog } = {}) {
         if (typeof getDefaultOnPlay === 'function') deps.getDefaultOnPlay = getDefaultOnPlay;
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
         if (typeof switchTabNav === 'function') deps.switchTabNav = switchTabNav;
         if (typeof ensureBrowserCatalog === 'function') deps.ensureBrowserCatalog = ensureBrowserCatalog;
+        if (typeof openTvCatalog === 'function') deps.openTvCatalog = openTvCatalog;
         hydrateLayoutFromPlayerState();
         setReconcileHandler(() => {
             reconcileShells();
@@ -1305,6 +1307,7 @@ export const RemoteModule = {
         });
         RemotePanel.init({
             switchTab: deps.switchTabNav || deps.switchTab,
+            openTvCatalog: deps.openTvCatalog,
             getRemoteModule: () => RemoteModule
         });
         BrowserModule.init({
@@ -1355,6 +1358,26 @@ export const RemoteModule = {
         const id = slotId || 'center';
         if (this.isOpen() && targetSlotId === id && (!tab || tab === 'remote')) {
             this.close();
+            return;
+        }
+        this.open({ slotId: id, tab });
+    },
+
+    /**
+     * Chrome / TV surfaces: open the shared browser in TV catalog mode.
+     * Avoids sticky radio mode left by Radio Browse.
+     */
+    openTvCatalog({ slotId = 'center', tab = 'browse' } = {}) {
+        const id = slotId || 'center';
+        targetSlotId = id;
+        MultiView.setStatusSlot(id);
+        if (typeof deps.openTvCatalog === 'function') {
+            deps.openTvCatalog({ tab });
+            if (mode !== 'hidden') {
+                persistState({ open: true, mode, targetSlotId });
+                syncTargetHighlight();
+                syncBrowseButtons();
+            }
             return;
         }
         this.open({ slotId: id, tab });

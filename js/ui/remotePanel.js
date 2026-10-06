@@ -19,9 +19,11 @@ import {
     runShutdownTransition,
     isShutdownTransitionBusy
 } from './powerStyleTransition.js';
+import { isBrowserCatalogTab } from './catalogModeEntry.js';
 
 let deps = {
     switchTab: () => {},
+    openTvCatalog: null,
     getRemoteModule: () => null
 };
 
@@ -522,13 +524,19 @@ export function syncRemotePanel() {
     syncLayoutPicker();
 }
 
-function bindRemoteActions(root) {
+function bindRemoteActions(root, { forceTvCatalog = false } = {}) {
     root?.querySelectorAll('[data-remote-nav]').forEach((btn) => {
         if (btn.dataset.navBound === '1') return;
         btn.dataset.navBound = '1';
         btn.addEventListener('click', () => {
             const tab = btn.getAttribute('data-remote-nav');
-            if (tab) deps.switchTab(tab);
+            if (!tab) return;
+            // Remote keypad / remote-shell: always open TV catalog for browser tabs.
+            if (forceTvCatalog && isBrowserCatalogTab(tab) && typeof deps.openTvCatalog === 'function') {
+                deps.openTvCatalog({ tab });
+                return;
+            }
+            deps.switchTab(tab);
         });
     });
 
@@ -547,8 +555,9 @@ function bindRemoteActions(root) {
 }
 
 export const RemotePanel = {
-    init({ switchTab, getRemoteModule } = {}) {
+    init({ switchTab, openTvCatalog, getRemoteModule } = {}) {
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
+        if (typeof openTvCatalog === 'function') deps.openTvCatalog = openTvCatalog;
         if (typeof getRemoteModule === 'function') deps.getRemoteModule = getRemoteModule;
         if (typeof window !== 'undefined' && !window.__remoteGuideVisBound) {
             window.__remoteGuideVisBound = true;
@@ -560,12 +569,13 @@ export const RemotePanel = {
         const remote = el('remote-shell') || el('tv-catalog-body');
         if (remote && remote.dataset.remoteBound !== '1') {
             remote.dataset.remoteBound = '1';
-            bindRemoteActions(remote);
+            bindRemoteActions(remote, { forceTvCatalog: true });
         }
         const browser = el('browser-shell');
         if (browser && browser.dataset.remoteBound !== '1') {
             browser.dataset.remoteBound = '1';
-            bindRemoteActions(browser);
+            // Browser-shell nav stays sticky (radio session keeps radio).
+            bindRemoteActions(browser, { forceTvCatalog: false });
         }
         bindLayoutPicker();
         syncRemotePanel();
