@@ -11,6 +11,7 @@ import {
 } from '../js/mosaic/swapPlayback.js';
 import { clearSwapClasses } from '../js/mosaic/constants.js';
 import { TILE_SWAP_DURATIONS } from '../js/ui/viewTransitions.js';
+import { swapMethods } from '../js/mosaic/swap.js';
 
 test('shouldResumeAfterSwap only when was playing and not stopped', () => {
     assert.equal(shouldResumeAfterSwap({ wasPlaying: true, stopped: false }), true);
@@ -136,4 +137,77 @@ test('clearSwapClasses removes every TILE_SWAP_DURATIONS mode class', () => {
     for (const mode of ['glitch', 'slideleft', 'slideright', 'spiralin', 'spiralout']) {
         assert.ok(Object.hasOwn(TILE_SWAP_DURATIONS, mode));
     }
+});
+
+function withWindowStub(fn) {
+    const prev = globalThis.window;
+    globalThis.window = {
+        dispatchEvent() { return true; }
+    };
+    try {
+        return fn();
+    } finally {
+        if (prev) globalThis.window = prev;
+        else delete globalThis.window;
+    }
+}
+
+function makeSwapHost(oldCenter, oldSide) {
+    return {
+        slots: {
+            center: { enabled: true, player: oldCenter },
+            topLeft: { enabled: true, player: oldSide }
+        },
+        relocateOwnedSlotVideos() {},
+        mountAll() {},
+        persistSlots() {}
+    };
+}
+
+test('commitSwap unmuteCenter unmutes the post-swap center player', () => {
+    withWindowStub(() => {
+        const unmuteCalls = [];
+        const oldCenter = {
+            id: 'center',
+            channel: { name: 'Main' },
+            playing: true,
+            stopped: false,
+            unmute() { unmuteCalls.push(this); },
+            emitState() {}
+        };
+        const oldSide = {
+            id: 'topLeft',
+            channel: { name: 'Corner' },
+            playing: true,
+            stopped: false,
+            unmute() { unmuteCalls.push(this); },
+            emitState() {}
+        };
+        const host = makeSwapHost(oldCenter, oldSide);
+
+        swapMethods.commitSwap.call(host, 'topLeft', { unmuteCenter: true });
+
+        assert.equal(host.slots.center.player, oldSide);
+        assert.equal(host.slots.topLeft.player, oldCenter);
+        assert.deepEqual(unmuteCalls, [oldSide]);
+        assert.equal(host.slots.center.player.id, 'center');
+    });
+});
+
+test('commitSwap without unmuteCenter does not unmute', () => {
+    withWindowStub(() => {
+        const unmuteCalls = [];
+        const makePlayer = (id, name) => ({
+            id,
+            channel: { name },
+            playing: true,
+            stopped: false,
+            unmute() { unmuteCalls.push(id); },
+            emitState() {}
+        });
+        const host = makeSwapHost(makePlayer('center', 'Main'), makePlayer('topLeft', 'Corner'));
+
+        swapMethods.commitSwap.call(host, 'topLeft');
+        assert.deepEqual(unmuteCalls, []);
+    });
 });

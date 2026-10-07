@@ -258,15 +258,14 @@ export const tileChromeMethods = {
                 break;
             }
             case 'swap':
-            case 'swap-unmute':
-                this.swapWithCenter(slotId);
-                if (action === 'swap-unmute') {
-                    if (this.sharedVolume <= 0) {
-                        const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
-                        this.setSharedVolume(restored);
-                    }
-                    const centerPlayer = this.slots.center?.player;
-                    if (centerPlayer?.channel) centerPlayer.unmute();
+            case 'swap-unmute': {
+                const unmuteCenter = action === 'swap-unmute';
+                if (unmuteCenter && this.sharedVolume <= 0) {
+                    const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
+                    this.setSharedVolume(restored);
+                }
+                const swapped = await this.swapWithCenter(slotId, { unmuteCenter });
+                if (swapped && unmuteCenter) {
                     this.persistSlots();
                     this.getPrimary()?.emitState();
                     this.syncMosaicChrome();
@@ -279,6 +278,7 @@ export const tileChromeMethods = {
                     }
                 }
                 break;
+            }
             case 'fav':
                 if (player.channel) {
                     FavoritesRecents.toggleFavorite(player.channel);

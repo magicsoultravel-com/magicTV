@@ -110,12 +110,17 @@ export const swapMethods = {
         }
     },
 
-    swapWithCenter(sideId) {
-        if (!CORNER_IDS.includes(sideId)) return;
-        if (this.swapBusy) return;
+    /**
+     * @param {string} sideId
+     * @param {{ unmuteCenter?: boolean }} [opts]
+     * @returns {Promise<boolean>} true when a swap was committed
+     */
+    async swapWithCenter(sideId, opts = {}) {
+        if (!CORNER_IDS.includes(sideId)) return false;
+        if (this.swapBusy) return false;
         const side = this.slots[sideId];
         const center = this.slots.center;
-        if (!side.enabled || !side.player || !center.player) return;
+        if (!side.enabled || !side.player || !center.player) return false;
 
         let mode = resolveViewTransition(SettingsStore.getSwapTransition(), 'swap');
         // Absolute free-layout tiles fight scale/flip transforms — keep opacity only.
@@ -123,27 +128,32 @@ export const swapMethods = {
             mode = 'crossfade';
         }
         if (mode === 'instant' || prefersReducedMotion()) {
-            this.commitSwap(sideId);
-            return;
+            this.commitSwap(sideId, opts);
+            return true;
         }
         if (mode === 'dissolve' || mode === 'grain' || mode === 'matrix') {
-            this.animateSwapWipe(sideId, mode);
-            return;
+            await this.animateSwapWipe(sideId, mode, opts);
+            return true;
         }
         if (POWER_STYLE_TRANSITIONS.has(mode)) {
-            this.animateSwapPowerStyle(sideId, mode);
-            return;
+            await this.animateSwapPowerStyle(sideId, mode, opts);
+            return true;
         }
         // fade shares tile CSS with crossfade naming when needed
         const tileMode = mode === 'fade' ? 'fade' : mode;
         if (!SWAP_DURATIONS[tileMode] && !SWAP_DURATIONS[mode]) {
-            this.commitSwap(sideId);
-            return;
+            this.commitSwap(sideId, opts);
+            return true;
         }
-        this.animateSwap(sideId, tileMode);
+        await this.animateSwap(sideId, tileMode, opts);
+        return true;
     },
 
-    commitSwap(sideId) {
+    /**
+     * @param {string} sideId
+     * @param {{ unmuteCenter?: boolean }} [opts]
+     */
+    commitSwap(sideId, opts = {}) {
         const side = this.slots[sideId];
         const center = this.slots.center;
         if (!side?.player || !center?.player) return;
@@ -173,6 +183,11 @@ export const swapMethods = {
         applySwapPlaybackContinuity(centerBefore, centerPlayer);
         applySwapPlaybackContinuity(sideBefore, sidePlayer);
 
+        // Unmute after pointers flip so the promoted side stream becomes audible.
+        if (opts.unmuteCenter && center.player?.channel) {
+            center.player.unmute?.();
+        }
+
         center.player.emitState();
         this.persistSlots();
         window.dispatchEvent(new CustomEvent('tv:multiview_changed', {
@@ -180,17 +195,17 @@ export const swapMethods = {
         }));
     },
 
-    async animateSwapWipe(sideId, mode) {
+    async animateSwapWipe(sideId, mode, opts = {}) {
         const centerTile = el('player-tile-center');
         const sideTile = el(`player-tile-${sideId}`);
         if (!centerTile || !sideTile) {
-            this.commitSwap(sideId);
+            this.commitSwap(sideId, opts);
             return;
         }
         this.swapBusy = true;
         try {
             // Grain/dissolve/matrix only the two tiles in the swap — leave the rest of the mosaic alone.
-            await runWipeTransition(mode, () => this.commitSwap(sideId), {
+            await runWipeTransition(mode, () => this.commitSwap(sideId, opts), {
                 scope: 'tiles',
                 fadeTargets: [centerTile, sideTile],
                 grainHosts: [centerTile, sideTile]
@@ -200,11 +215,11 @@ export const swapMethods = {
         }
     },
 
-    async animateSwapPowerStyle(sideId, mode) {
+    async animateSwapPowerStyle(sideId, mode, opts = {}) {
         const centerTile = el('player-tile-center');
         const sideTile = el(`player-tile-${sideId}`);
         if (!centerTile || !sideTile) {
-            this.commitSwap(sideId);
+            this.commitSwap(sideId, opts);
             return;
         }
         this.swapBusy = true;
@@ -212,18 +227,18 @@ export const swapMethods = {
             await runPowerStyleTransition(mode, {
                 phase: 'both',
                 hosts: [centerTile, sideTile],
-                onMidpoint: () => this.commitSwap(sideId)
+                onMidpoint: () => this.commitSwap(sideId, opts)
             });
         } finally {
             this.swapBusy = false;
         }
     },
 
-    async animateSwap(sideId, mode) {
+    async animateSwap(sideId, mode, opts = {}) {
         const centerTile = el('player-tile-center');
         const sideTile = el(`player-tile-${sideId}`);
         if (!centerTile || !sideTile) {
-            this.commitSwap(sideId);
+            this.commitSwap(sideId, opts);
             return;
         }
 
@@ -238,7 +253,7 @@ export const swapMethods = {
             void centerTile.offsetWidth;
             await waitMs(duration);
 
-            this.commitSwap(sideId);
+            this.commitSwap(sideId, opts);
 
             clearSwapClasses(centerTile);
             clearSwapClasses(sideTile);
