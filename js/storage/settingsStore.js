@@ -72,6 +72,27 @@ const REMOTE_IDLE_DELAY_MIN = 0;
 const REMOTE_IDLE_DELAY_MAX = 300;
 const REMOTE_IDLE_FADE_MIN = 1;
 const REMOTE_IDLE_FADE_MAX = 120;
+const DEFAULT_TV_TRAVEL_TICK_SEC = 15;
+const TV_TRAVEL_TICK_MIN = 5;
+const TV_TRAVEL_TICK_MAX = 300;
+export const TV_TRAVEL_STYLES = ['quick', 'slow', 'random'];
+export const DEFAULT_TV_TRAVEL_STYLE = 'quick';
+
+function clampTvTravelTickSec(value) {
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n)) return DEFAULT_TV_TRAVEL_TICK_SEC;
+    return Math.min(TV_TRAVEL_TICK_MAX, Math.max(TV_TRAVEL_TICK_MIN, n));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {'quick' | 'slow' | 'random'}
+ */
+export function normalizeTvTravelStyle(value) {
+    return TV_TRAVEL_STYLES.includes(/** @type {string} */ (value))
+        ? /** @type {'quick' | 'slow' | 'random'} */ (value)
+        : DEFAULT_TV_TRAVEL_STYLE;
+}
 const DEFAULT_REMOTE_TEXTURE = 'none';
 const CATALOG_LAYOUTS = ['tiles', 'list'];
 export const CATALOG_CHROMES = ['wing', 'bar'];
@@ -632,6 +653,42 @@ export const SettingsStore = {
             Math.max(1, Math.round(Number(value) || DEFAULT_MAX_MOSAIC_SLOTS))
         );
         patchPersistedState({ maxMosaicSlots: next });
+        return next;
+    },
+
+    /**
+     * Quick-style dwell between TV Travel hops (seconds).
+     * @returns {number}
+     */
+    getTvTravelTickSec() {
+        return clampTvTravelTickSec(readPersistedState().tvTravelTickSec);
+    },
+
+    /**
+     * @param {number} value
+     * @returns {number}
+     */
+    setTvTravelTickSec(value) {
+        const next = clampTvTravelTickSec(value);
+        patchPersistedState({ tvTravelTickSec: next });
+        return next;
+    },
+
+    /**
+     * Last selected TV Travel style (not whether it is running).
+     * @returns {'quick' | 'slow' | 'random'}
+     */
+    getTvTravelStyle() {
+        return normalizeTvTravelStyle(readPersistedState().tvTravelStyle ?? DEFAULT_TV_TRAVEL_STYLE);
+    },
+
+    /**
+     * @param {string} value
+     * @returns {'quick' | 'slow' | 'random'}
+     */
+    setTvTravelStyle(value) {
+        const next = normalizeTvTravelStyle(value);
+        patchPersistedState({ tvTravelStyle: next });
         return next;
     },
 

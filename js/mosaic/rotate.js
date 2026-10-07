@@ -195,8 +195,11 @@ export const rotateMethods = {
     /**
      * Rotate every TV's channel to the next screen with travelling tiles.
      * Skips animation for the `instant` transition setting and
-     * prefers-reduced-motion.
-     * @param {{ animate?: boolean }} [opts]
+     * prefers-reduced-motion (unless caller forces animate + travel opts).
+     * @param {{
+     *   animate?: boolean,
+     *   travel?: { durationMs?: number, staggerMs?: number, easing?: string, settleMs?: number }
+     * }} [opts]
      * @returns {Promise<boolean>}
      */
     async rotateScreens(opts = {}) {
@@ -204,7 +207,12 @@ export const rotateMethods = {
         const moves = buildRotationMoves(ring);
         if (!moves.length || this.swapBusy) return false;
 
-        const animate = opts.animate !== false && travelAnimationsEnabled();
+        const travel = opts.travel && typeof opts.travel === 'object' ? opts.travel : null;
+        const animate = opts.animate === false
+            ? false
+            : opts.animate === true
+                ? true
+                : travelAnimationsEnabled();
         const firstRects = animate ? captureTileRects(ring) : null;
 
         this.swapBusy = true;
@@ -212,7 +220,7 @@ export const rotateMethods = {
             const committed = this.commitRotation();
             if (!committed) return false;
             if (firstRects) {
-                await flipContentMoves(moves, firstRects);
+                await flipContentMoves(moves, firstRects, travel || {});
             }
             return true;
         } finally {

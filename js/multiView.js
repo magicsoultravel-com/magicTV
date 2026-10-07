@@ -41,6 +41,7 @@ import { freeLayoutMethods } from './mosaic/freeLayout.js';
 import { RadioBridge } from './radio/radioBridge.js';
 import { swapMethods } from './mosaic/swap.js';
 import { rotateMethods } from './mosaic/rotate.js';
+import { tvTravelMethods } from './mosaic/tvTravel.js';
 import { persistMethods } from './mosaic/persist.js';
 import { focusChromeMethods } from './mosaic/focusChrome.js';
 import { playbackMethods } from './mosaic/playback.js';
@@ -84,6 +85,7 @@ export const MultiView = {
     ...freeLayoutMethods,
     ...swapMethods,
     ...rotateMethods,
+    ...tvTravelMethods,
     ...focusChromeMethods,
     ...playbackMethods,
     ...tileChromeMethods,
@@ -222,6 +224,7 @@ export const MultiView = {
         }
         this.ensureLayoutModeOnInit();
         window.addEventListener('tv:popout_changed', () => this.scheduleRefreshTiles());
+        this.ensureTvTravelWatch?.();
 
         if (!this._deferFullRestore) {
             this.syncScreenControls();
@@ -855,6 +858,10 @@ export const MultiView = {
             maxTvsInput.value = String(this.getMaxMosaicSlots());
             maxTvsInput.max = String(MAX_MOSAIC_SLOTS);
         }
+        const travelTickInput = el('tv-travel-tick-input');
+        if (travelTickInput) {
+            travelTickInput.value = String(SettingsStore.getTvTravelTickSec());
+        }
         this.syncScreenControls();
     },
 
@@ -909,6 +916,20 @@ export const MultiView = {
             });
             maxTvsInput.addEventListener('blur', () => {
                 maxTvsInput.value = String(this.getMaxMosaicSlots());
+            });
+        }
+        const travelTickInput = el('tv-travel-tick-input');
+        if (travelTickInput && travelTickInput.dataset.bound !== '1') {
+            travelTickInput.dataset.bound = '1';
+            travelTickInput.value = String(SettingsStore.getTvTravelTickSec());
+            travelTickInput.addEventListener('change', () => {
+                const next = SettingsStore.setTvTravelTickSec(Number(travelTickInput.value));
+                travelTickInput.value = String(next);
+                this.rescheduleTvTravelTick?.();
+                showAppToast(`TV Travel tick: ${next}s`);
+            });
+            travelTickInput.addEventListener('blur', () => {
+                travelTickInput.value = String(SettingsStore.getTvTravelTickSec());
             });
         }
         this.syncSettingsToggles();

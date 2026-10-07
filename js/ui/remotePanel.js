@@ -212,6 +212,38 @@ function closeLayoutPicker() {
     popout?.setAttribute('aria-hidden', 'true');
 }
 
+function closeTvTravelPicker() {
+    const wrap = el('remote-tv-travel-wrap');
+    const btn = el('remote-tv-travel-btn');
+    const popout = el('remote-tv-travel-popout');
+    wrap?.classList.remove('is-open');
+    wrap?.style.removeProperty('--layout-popout-shift');
+    btn?.setAttribute('aria-expanded', 'false');
+    popout?.setAttribute('aria-hidden', 'true');
+}
+
+function syncTvTravelPicker() {
+    const active = MultiView.isTvTravelActive?.() === true;
+    const style = MultiView.getTvTravelStyle?.() || null;
+    const wrap = el('remote-tv-travel-wrap');
+    const btn = el('remote-tv-travel-btn');
+    if (btn) {
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', String(active));
+        const label = active && style
+            ? `TV Travel (${style})`
+            : 'TV Travel';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+    }
+    wrap?.querySelectorAll('[data-tv-travel]').forEach((opt) => {
+        const key = opt.getAttribute('data-tv-travel');
+        const isOn = key === 'off' ? !active : (active && key === style);
+        opt.classList.toggle('is-active', isOn);
+        opt.setAttribute('aria-pressed', String(isOn));
+    });
+}
+
 const LAYOUT_POPOUT_INSET_PX = 8;
 
 /** Shift centered layout popout so it stays inside the remote dialog/panel. */
@@ -275,6 +307,7 @@ function bindLayoutPicker() {
 
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        closeTvTravelPicker();
         if (wrap.classList.contains('is-open')) {
             closeLayoutPicker();
             btn.blur();
@@ -301,11 +334,58 @@ function bindLayoutPicker() {
         window.__remoteLayoutPickerDismissBound = true;
         document.addEventListener('pointerdown', (e) => {
             if (e.target.closest?.('#remote-layout-picker-wrap')) return;
+            if (e.target.closest?.('#remote-tv-travel-wrap')) return;
             closeLayoutPicker();
+            closeTvTravelPicker();
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeLayoutPicker();
+            if (e.key === 'Escape') {
+                closeLayoutPicker();
+                closeTvTravelPicker();
+            }
         });
+    }
+}
+
+function bindTvTravelPicker() {
+    const wrap = el('remote-tv-travel-wrap');
+    const btn = el('remote-tv-travel-btn');
+    if (!wrap || !btn || wrap.dataset.tvTravelBound === '1') return;
+    wrap.dataset.tvTravelBound = '1';
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeLayoutPicker();
+        if (wrap.classList.contains('is-open')) {
+            closeTvTravelPicker();
+            btn.blur();
+            return;
+        }
+        wrap.classList.add('is-open');
+        btn.setAttribute('aria-expanded', 'true');
+        const popout = el('remote-tv-travel-popout');
+        popout?.setAttribute('aria-hidden', 'false');
+        clampLayoutPopout(wrap, popout);
+        syncTvTravelPicker();
+    });
+
+    wrap.querySelectorAll('[data-tv-travel]').forEach((opt) => {
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = opt.getAttribute('data-tv-travel');
+            if (key === 'off') {
+                MultiView.stopTvTravel?.();
+            } else if (key) {
+                MultiView.startTvTravel?.(key);
+            }
+            closeTvTravelPicker();
+            syncRemotePanel();
+        });
+    });
+
+    if (typeof window !== 'undefined' && !window.__remoteTvTravelSyncBound) {
+        window.__remoteTvTravelSyncBound = true;
+        window.addEventListener('tv:tv_travel_changed', () => syncRemotePanel());
     }
 }
 
@@ -500,14 +580,23 @@ export function syncRemotePanel() {
         stopAllBtn.setAttribute('aria-pressed', String(anyPlaying));
     }
 
-    // Rotate TVs — only meaningful (and only visible) with 2+ screens.
+    // Rotate / TV Travel — only meaningful (and only visible) with 2+ screens.
+    const tvCount = MultiView.getRotationRing?.().length
+        ?? Object.values(MultiView.slots || {}).filter((slot) => slot?.enabled).length;
+    const showMultiTravel = tvCount > 1;
     const rotateBtn = el('remote-rotate-btn');
     if (rotateBtn) {
-        const tvCount = MultiView.getRotationRing?.().length
-            ?? Object.values(MultiView.slots || {}).filter((slot) => slot?.enabled).length;
-        const showRotate = tvCount > 1;
-        rotateBtn.classList.toggle('is-hidden', !showRotate);
+        rotateBtn.classList.toggle('is-hidden', !showMultiTravel);
     }
+    const travelWrap = el('remote-tv-travel-wrap');
+    if (travelWrap) {
+        travelWrap.classList.toggle('is-hidden', !showMultiTravel);
+        if (!showMultiTravel) {
+            closeTvTravelPicker();
+            MultiView.stopTvTravel?.();
+        }
+    }
+    syncTvTravelPicker();
 
     const guideBtn = el('remote-guide-toggle');
     if (guideBtn) {
@@ -578,6 +667,7 @@ export const RemotePanel = {
             bindRemoteActions(browser, { forceTvCatalog: false });
         }
         bindLayoutPicker();
+        bindTvTravelPicker();
         syncRemotePanel();
     },
 
