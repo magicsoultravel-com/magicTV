@@ -126,25 +126,3 @@
     background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
 }
-
-/* TV Travel — same popout chrome as layout picker; shares cell with Rotate */
-.remote-panel__cell--rotate-travel {
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-}
-
-.remote-panel__travel-popout .remote-panel__layout-option {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-}
-
-#remote-tv-travel-btn.is-active,
-#remote-tv-travel-btn[aria-pressed="true"]:not([aria-pressed="false"]) {
-    background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
-    border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
-}

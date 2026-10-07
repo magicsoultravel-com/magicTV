@@ -71,6 +71,30 @@ export const tileChromeMethods = {
             return;
         }
 
+        if (action === 'tv-travel') {
+            // Host button: stop if running, else start last persisted style.
+            if (this.isTvTravelActive?.()) this.stopTvTravel?.();
+            else {
+                const { SettingsStore } = await import('../storage/settingsStore.js');
+                this.startTvTravel?.(SettingsStore.getTvTravelStyle());
+            }
+            this.syncMosaicChrome();
+            return;
+        }
+
+        if (action === 'tv-travel-off') {
+            this.stopTvTravel?.();
+            this.syncMosaicChrome();
+            return;
+        }
+
+        if (action === 'tv-travel-quick' || action === 'tv-travel-slow' || action === 'tv-travel-random') {
+            const style = action.slice('tv-travel-'.length);
+            this.startTvTravel?.(style);
+            this.syncMosaicChrome();
+            return;
+        }
+
         if (action === 'play-all') {
             // Chrome popout only shows when something is paused — always playAll.
             // Remote morphs to pause-all via sync; still ok to toggle when all playing.

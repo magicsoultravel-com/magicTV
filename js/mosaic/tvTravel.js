@@ -3,8 +3,8 @@
  * Methods mix into MultiView (this === MultiView).
  *
  * Styles:
- *   quick  — FLIP hop, then wait tvTravelTickSec
- *   slow   — long FLIP, immediately next (constant motion)
+ *   quick  — short FLIP hop, then wait tvTravelTickSec
+ *   slow   — FLIP spans the full tick (continuous crawl between hops)
  *   random — timing from Channel switch setting; tick dwell like quick
  */
 import {
@@ -22,26 +22,28 @@ import { TILE_TRAVEL_MS, TILE_TRAVEL_STAGGER_MS } from './tileTravel.js';
 
 export { normalizeTvTravelStyle, DEFAULT_TV_TRAVEL_STYLE };
 
-/** Long FLIP so Slow feels continuously in motion. */
-export const SLOW_TRAVEL_MS = 1100;
 export const QUICK_TRAVEL_MS = TILE_TRAVEL_MS;
 
 /**
  * Resolve rotateScreens opts for a travel style.
  * @param {'quick' | 'slow' | 'random'} style
- * @returns {{ animate?: boolean, travel?: { durationMs: number, staggerMs?: number, easing?: string } }}
+ * @returns {{ animate?: boolean, travel?: { durationMs: number, staggerMs?: number, easing?: string, settleMs?: number } }}
  */
 export function resolveTvTravelRotateOpts(style) {
     if (prefersReducedMotion()) {
         return { animate: false };
     }
+    const tickMs = Math.max(1000, SettingsStore.getTvTravelTickSec() * 1000);
+
     if (style === 'slow') {
+        // Whole hop lasts the tick — next step starts as soon as travel settles.
         return {
             animate: true,
             travel: {
-                durationMs: SLOW_TRAVEL_MS,
-                staggerMs: Math.round(TILE_TRAVEL_STAGGER_MS * 1.4),
-                easing: 'cubic-bezier(0.22, 1, 0.36, 1)'
+                durationMs: tickMs,
+                staggerMs: 0,
+                settleMs: 40,
+                easing: 'linear'
             }
         };
     }
@@ -147,11 +149,12 @@ export const tvTravelMethods = {
         this._notifyTvTravelChanged();
     },
 
-    /** Re-read Quick tick while dwelling (settings change). */
+    /** Wake Quick/Random dwell so the next loop uses the new tick. */
     rescheduleTvTravelTick() {
-        if (!this.isTvTravelActive() || this._tvTravel.style !== 'quick') return;
+        if (!this.isTvTravelActive()) return;
+        const style = this._tvTravel.style;
+        if (style !== 'quick' && style !== 'random') return;
         if (!this._tvTravel.waitTimer) return;
-        // Wake the wait early so the loop picks up the new interval.
         this._cancelTvTravelWait();
     },
 
@@ -163,6 +166,10 @@ export const tvTravelMethods = {
             if ((this.getRotationRing?.() || []).length < 2) {
                 this.stopTvTravel();
             }
+            this.syncMosaicChrome?.();
+        });
+        window.addEventListener('tv:tv_travel_changed', () => {
+            this.syncMosaicChrome?.();
         });
     },
 
@@ -225,7 +232,6 @@ export const tvTravelMethods = {
             const style = this._tvTravel.style || 'quick';
             const opts = resolveTvTravelRotateOpts(style);
 
-            // Wait out an in-flight swap/rotate rather than dropping a step.
             while (this.swapBusy && this._tvTravel?.active && this._tvTravel.gen === gen) {
                 await waitMs(40);
             }
@@ -236,11 +242,10 @@ export const tvTravelMethods = {
             if (!this._tvTravel?.active || this._tvTravel.gen !== gen) break;
 
             if (style === 'slow') {
-                // Constant motion — no dwell.
+                // Animation already consumed the tick — hop again immediately.
                 continue;
             }
 
-            // quick + random: dwell on the settings tick
             const tickSec = SettingsStore.getTvTravelTickSec();
             await this._tvTravelWait(tickSec * 1000, gen);
         }

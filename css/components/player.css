@@ -1197,7 +1197,8 @@
 .tv-controls__mute-wrap,
 .tv-controls__play-wrap,
 .tv-controls__stop-wrap,
-.tv-controls__swap-wrap {
+.tv-controls__swap-wrap,
+.tv-controls__travel-wrap {
     position: relative;
     display: inline-flex;
 }
@@ -1206,7 +1207,8 @@
 .tv-controls__mute-wrap::after,
 .tv-controls__play-wrap::after,
 .tv-controls__stop-wrap::after,
-.tv-controls__swap-wrap::after {
+.tv-controls__swap-wrap::after,
+.tv-controls__travel-wrap::after {
     content: '';
     position: absolute;
     left: -10px;
@@ -1225,7 +1227,8 @@
 .tv-controls__mute-popout,
 .tv-controls__play-popout,
 .tv-controls__stop-popout,
-.tv-controls__swap-popout {
+.tv-controls__swap-popout,
+.tv-controls__travel-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
     bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
@@ -1258,7 +1261,9 @@
 .tv-controls__stop-wrap:hover .tv-controls__stop-popout,
 .tv-controls__stop-wrap:focus-within .tv-controls__stop-popout,
 .tv-controls__swap-wrap:hover .tv-controls__swap-popout,
-.tv-controls__swap-wrap:focus-within .tv-controls__swap-popout {
+.tv-controls__swap-wrap:focus-within .tv-controls__swap-popout,
+.tv-controls__travel-wrap:hover .tv-controls__travel-popout,
+.tv-controls__travel-wrap:focus-within .tv-controls__travel-popout {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
     visibility: visible;
@@ -1270,11 +1275,32 @@
 .tv-controls__mute-popout .tv-controls__btn,
 .tv-controls__play-popout .tv-controls__btn,
 .tv-controls__stop-popout .tv-controls__btn,
-.tv-controls__swap-popout .tv-controls__btn {
+.tv-controls__swap-popout .tv-controls__btn,
+.tv-controls__travel-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;
     padding: 0;
+}
+
+.tv-controls__travel-popout .tv-controls__travel-opt {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.tv-controls__travel-popout .tv-controls__btn[data-tile-action="tv-travel-off"] {
+    width: auto;
+    min-width: 28px;
+    padding: 0 0.35rem;
+}
+
+.tv-controls__travel-btn.is-active,
+.tv-controls__travel-btn[aria-pressed='true']:not([aria-pressed='false']),
+.tv-controls__travel-popout .tv-controls__btn.is-active,
+.tv-controls__travel-popout .tv-controls__btn[aria-pressed='true']:not([aria-pressed='false']) {
+    color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
+    border-color: color-mix(in srgb, var(--tv-accent, #7ecbff) 55%, transparent);
 }
 
 .tv-controls__play-popout .tv-controls__btn[aria-pressed='true'],

@@ -461,6 +461,34 @@ export const playbackMethods = {
             btn.hidden = hide;
         });
 
+        const tvCount = this.getRotationRing?.().length
+            ?? Object.values(this.slots || {}).filter((slot) => slot?.enabled && slot?.player).length;
+        const showTravel = tvCount > 1;
+        const travelActive = this.isTvTravelActive?.() === true;
+        const travelStyle = this.getTvTravelStyle?.() || null;
+        if (!showTravel && travelActive) this.stopTvTravel?.();
+        mosaic?.querySelectorAll('.tv-controls__travel-wrap').forEach((wrap) => {
+            wrap.classList.toggle('is-hidden', !showTravel);
+            const mainBtn = wrap.querySelector('.tv-controls__travel-btn');
+            if (mainBtn) {
+                const label = travelActive && travelStyle
+                    ? `TV Travel (${travelStyle})`
+                    : 'TV Travel';
+                mainBtn.classList.toggle('is-active', travelActive);
+                mainBtn.setAttribute('aria-pressed', String(travelActive));
+                mainBtn.title = label;
+                mainBtn.setAttribute('aria-label', label);
+            }
+            wrap.querySelectorAll('[data-tile-action^="tv-travel"]').forEach((opt) => {
+                const action = opt.getAttribute('data-tile-action');
+                if (!action || action === 'tv-travel') return;
+                const key = action.slice('tv-travel-'.length);
+                const isOn = key === 'off' ? !travelActive : (travelActive && key === travelStyle);
+                opt.classList.toggle('is-active', isOn);
+                opt.setAttribute('aria-pressed', String(isOn));
+            });
+        });
+
         mosaic?.querySelectorAll('.tv-player-tile').forEach((tile) => {
             const slotId = tile.getAttribute('data-slot');
             if (!slotId) return;
