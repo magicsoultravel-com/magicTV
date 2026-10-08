@@ -259,17 +259,10 @@ export const tileChromeMethods = {
             }
             case 'swap':
             case 'swap-unmute': {
-                const unmuteCenter = action === 'swap-unmute';
-                if (unmuteCenter && this.sharedVolume <= 0) {
-                    const restored = this.lastVolume > 0 ? this.lastVolume : 0.85;
-                    this.setSharedVolume(restored);
-                }
-                const swapped = await this.swapWithCenter(slotId, { unmuteCenter });
-                if (swapped && unmuteCenter) {
-                    this.persistSlots();
-                    this.getPrimary()?.emitState();
-                    this.syncMosaicChrome();
-                }
+                // swap-unmute: commitSwap → muteSolo('center') (unmute main, mute others + radio)
+                await this.swapWithCenter(slotId, {
+                    unmuteCenter: action === 'swap-unmute'
+                });
                 if (ChromecastManager.isCasting()) {
                     const activeSlot = ChromecastManager.getActiveSlot();
                     const activePlayer = activeSlot ? this.slots[activeSlot]?.player : null;

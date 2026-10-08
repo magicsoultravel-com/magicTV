@@ -183,13 +183,13 @@ export const swapMethods = {
         applySwapPlaybackContinuity(centerBefore, centerPlayer);
         applySwapPlaybackContinuity(sideBefore, sidePlayer);
 
-        // Unmute after pointers flip so the promoted side stream becomes audible.
-        if (opts.unmuteCenter && center.player?.channel) {
-            center.player.unmute?.();
+        // After pointers flip: unmute main and mute every other TV (+ radio).
+        if (opts.unmuteCenter) {
+            this.muteSolo('center');
+        } else {
+            center.player.emitState();
+            this.persistSlots();
         }
-
-        center.player.emitState();
-        this.persistSlots();
         window.dispatchEvent(new CustomEvent('tv:multiview_changed', {
             detail: { primary: 'center', swapped: sideId }
         }));

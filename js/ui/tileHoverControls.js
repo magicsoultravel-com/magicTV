@@ -6,7 +6,7 @@ const BROWSE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="f
 
 const SWAP_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M1.5 4h7M6.2 2.2 9.5 4 6.2 5.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 8h-7M5.8 6.2 2.5 8 5.8 9.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-/** Swap arrows + speaker — swap onto main and unmute main. */
+/** Swap arrows + speaker — swap onto main, unmute main, mute other TVs. */
 export const SWAP_UNMUTE_SVG = `<svg viewBox="0 0 18 12" width="18" height="14" focusable="false" aria-hidden="true"><path d="M1.2 3.2h5.2M4.6 1.6 7 3.2 4.6 4.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.2 8.8H2M4.6 7.2 2.2 8.8 4.6 10.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.2 4.2H11.8l3-3v9.6l-3-3H9.2a.5.5 0 0 1-.5-.5V4.7a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path d="M14.2 5.1c.5.5.5 1.5 0 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
 export const CAST_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2 16.1V7.9c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v8.2c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 12.5a5 5 0 0 1 10 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 12.5a2 2 0 0 1 4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
@@ -210,7 +210,7 @@ function cornerExtras(target) {
     return `<div class="tv-controls__swap-wrap">
         ${controlBtn('swap', 'Swap with main', SWAP_SVG, target, 'tv-controls__btn--main-1')}
         <div class="tv-controls__swap-popout" aria-hidden="true">
-            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="swap-unmute" data-controls-target="${target}" title="Swap &amp; unmute" aria-label="Swap and unmute">${SWAP_UNMUTE_SVG}</button>
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-tile-action="swap-unmute" data-controls-target="${target}" title="Swap &amp; unmute (mute others)" aria-label="Swap and unmute, mute other TVs">${SWAP_UNMUTE_SVG}</button>
         </div>
     </div>`;
 }

@@ -164,15 +164,14 @@ function makeSwapHost(oldCenter, oldSide) {
     };
 }
 
-test('commitSwap unmuteCenter unmutes the post-swap center player', () => {
+test('commitSwap unmuteCenter muteSolos the post-swap center', () => {
     withWindowStub(() => {
-        const unmuteCalls = [];
+        const muteSoloCalls = [];
         const oldCenter = {
             id: 'center',
             channel: { name: 'Main' },
             playing: true,
             stopped: false,
-            unmute() { unmuteCalls.push(this); },
             emitState() {}
         };
         const oldSide = {
@@ -180,34 +179,34 @@ test('commitSwap unmuteCenter unmutes the post-swap center player', () => {
             channel: { name: 'Corner' },
             playing: true,
             stopped: false,
-            unmute() { unmuteCalls.push(this); },
             emitState() {}
         };
         const host = makeSwapHost(oldCenter, oldSide);
+        host.muteSolo = (slotId) => { muteSoloCalls.push(slotId); };
 
         swapMethods.commitSwap.call(host, 'topLeft', { unmuteCenter: true });
 
         assert.equal(host.slots.center.player, oldSide);
         assert.equal(host.slots.topLeft.player, oldCenter);
-        assert.deepEqual(unmuteCalls, [oldSide]);
+        assert.deepEqual(muteSoloCalls, ['center']);
         assert.equal(host.slots.center.player.id, 'center');
     });
 });
 
-test('commitSwap without unmuteCenter does not unmute', () => {
+test('commitSwap without unmuteCenter does not muteSolo', () => {
     withWindowStub(() => {
-        const unmuteCalls = [];
+        const muteSoloCalls = [];
         const makePlayer = (id, name) => ({
             id,
             channel: { name },
             playing: true,
             stopped: false,
-            unmute() { unmuteCalls.push(id); },
             emitState() {}
         });
         const host = makeSwapHost(makePlayer('center', 'Main'), makePlayer('topLeft', 'Corner'));
+        host.muteSolo = (slotId) => { muteSoloCalls.push(slotId); };
 
         swapMethods.commitSwap.call(host, 'topLeft');
-        assert.deepEqual(unmuteCalls, []);
+        assert.deepEqual(muteSoloCalls, []);
     });
 });
