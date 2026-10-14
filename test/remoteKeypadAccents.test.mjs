@@ -107,3 +107,37 @@ test('accent flip includes aria-pressed for all main-N variants', () => {
         assert.ok(flip, `missing main-${n} flip rule with aria-pressed`);
     }
 });
+
+
+test('mini-floating keypad markup + CSS hooks exist', () => {
+    // Tray action next to the pop-out button.
+    assert.match(html, /id="remote-external-popout-btn"[^>]*>/);
+    assert.match(html, /id="remote-mini-float-btn"/);
+
+    // The 16 kept mini cells are tagged; radio has a dedicated mini key.
+    assert.match(html, /data-mini-slot="radio"/);
+    assert.match(html, /id="remote-radio-btn-mini"/);
+    assert.match(html, /data-mini-slot="chanup"/);
+    assert.match(html, /data-mini-slot="favorites"/);
+    assert.match(html, /data-mini-slot="volup"/);
+    assert.match(html, /data-mini-slot="bind"/);
+    assert.match(html, /data-mini-slot="play"/);
+    assert.match(html, /data-mini-slot="stop"/);
+    assert.match(html, /data-mini-slot="mute"/);
+    assert.match(html, /data-mini-slot="chandown"/);
+    assert.match(html, /data-mini-slot="browse"/);
+    assert.match(html, /data-mini-slot="settings"/);
+    assert.match(html, /data-mini-slot="voldown"/);
+    assert.match(html, /data-mini-slot="layout"/);
+    assert.match(html, /data-mini-slot="playall"/);
+    assert.match(html, /data-mini-slot="stopall"/);
+    assert.match(html, /data-mini-slot="muteall"/);
+    const slots = (html.match(/data-mini-slot="[a-zA-Z]+"/g) || []);
+    assert.equal(new Set(slots).size, 16, 'exactly the 16 mini keys are tagged');
+
+    const css = readCssWithImports(join(root, 'css/components/remote.css'));
+    assert.match(css, /body\.remote-mini-floating/);
+    assert.match(css, /remote-mini-float-btn/);
+    assert.match(css, /remote-radio-btn-mini/);
+    assert.match(css, /\.remote-panel__cell--mini-only\s*\{\s*display:\s*none/s);
+});

@@ -48,6 +48,9 @@ import {
 
 const MIN_W = REMOTE_BASE_W;
 const MIN_H = REMOTE_BASE_H;
+/** Mini-floating keypad design size (CSS px) at scale 1. */
+const MINI_BASE_W = 240;
+const MINI_BASE_H = 250;
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
@@ -56,19 +59,28 @@ const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * (3 / 8);
 const SHEET_TRANSITION_MS = 280;
 
 function wingMultiplier() {
+    if (miniFloating) return 1;
     return WingPanel.isOpen?.() ? 2 : 1;
 }
 
+/** Scale governing the current presentation (full-float vs mini keypad). */
+function activeScale() {
+    return miniFloating ? miniScale : scale;
+}
+
 function minDialogWidth() {
+    if (miniFloating) return Math.round(MINI_BASE_W * clampModuleScale(miniScale));
     return Math.round(MIN_W * scale * wingMultiplier());
 }
 
-function baseWidthForScale(s = scale) {
+function baseWidthForScale(s = activeScale()) {
+    if (miniFloating) return Math.round(MINI_BASE_W * clampModuleScale(s));
     return Math.round(MIN_W * clampModuleScale(s) * wingMultiplier());
 }
 
-function baseHeightForScale(s = scale) {
-    return Math.round(MIN_H * clampModuleScale(s));
+function baseHeightForScale(s = activeScale()) {
+    const base = miniFloating ? MINI_BASE_H : MIN_H;
+    return Math.round(base * clampModuleScale(s));
 }
 
 let deps = {
@@ -100,6 +112,12 @@ let externalHost = null;
 let idleActivityBound = false;
 /** Uniform content/window scale (0.5–1.5). */
 let scale = 1;
+/** Mini-floating keypad scale (0.5–1.5, independent of full-float `scale`). */
+let miniScale = 1;
+/** Mini-floating compact keypad mode — always undocked. */
+let miniFloating = false;
+/** Full-float geometry snapshot taken on enterMiniFloating, restored on exit. */
+let miniSavedFull = null;
 
 /** @type {{ mode: 'drag'|'resize'|'dock-resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originScale?: number } | null} */
 let gesture = null;
@@ -164,7 +182,7 @@ function defaultGeometry() {
 }
 
 function applyRemoteScaleCss() {
-    const s = String(clampModuleScale(scale));
+    const s = String(clampModuleScale(activeScale()));
     const dialog = dialogEl();
     const sheet = dockSheetEl();
     const tab = dockTabEl();
@@ -198,7 +216,7 @@ function syncCollapseHeaderBtn() {
 function syncScaleResetBtn() {
     const btn = el('remote-scale-reset-btn');
     if (!btn) return;
-    const dirty = Math.abs(clampModuleScale(scale) - 1) > 0.01;
+    const dirty = Math.abs(clampModuleScale(activeScale()) - 1) > 0.01;
     btn.innerHTML = ACTION_ICONS.scaleReset;
     btn.title = 'Reset size';
     btn.setAttribute('aria-label', 'Reset size');
@@ -207,6 +225,13 @@ function syncScaleResetBtn() {
 }
 
 function resetScale() {
+    if (miniFloating) {
+        miniScale = 1;
+        applyGeometry(readDialogGeometry());
+        syncScaleResetBtn();
+        persistState({ miniScale: 1 });
+        return;
+    }
     scale = 1;
     if (mode === 'docked') {
         applyDockScaleGeometry();
@@ -283,6 +308,85 @@ function syncDockToggleBtn() {
     btn.innerHTML = undocked ? ACTION_ICONS.dock : ACTION_ICONS.undock;
     btn.title = undocked ? 'Dock remote' : 'Undock remote';
     btn.setAttribute('aria-label', btn.title);
+}
+
+function syncMiniFloatBtn() {
+    const btn = el('remote-mini-float-btn');
+    if (!btn) return;
+    const active = miniFloating;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', String(active));
+    btn.innerHTML = active ? ACTION_ICONS.miniFloatExit : ACTION_ICONS.miniFloat;
+    btn.title = active ? 'Exit mini remote' : 'Mini remote';
+    btn.setAttribute('aria-label', btn.title);
+}
+
+/** Compact keypad placement: bottom-right corner of the viewport. */
+function defaultMiniGeometry() {
+    const { w: vw, h: vh } = viewportSize();
+    return clampGeometry({
+        left: Math.round(vw - baseWidthForScale() - EDGE_INSET),
+        top: Math.round(vh - baseHeightForScale() - EDGE_INSET)
+    });
+}
+
+/**
+ * Enter the compact "mini-floating" keypad. Always undocks first; snapshots the
+ * full-float geometry so exiting restores it. Blocks while popped out to an OS
+ * window (mini chrome is body-scoped and must stay in the main document).
+ */
+function enterMiniFloating() {
+    if (miniFloating) return;
+    if (RemoteExternalPopout.isPoppedOut?.()) {
+        showAppToast('Pop the remote back in before using mini');
+        return;
+    }
+    if (mode === 'hidden') RemoteModule.open({ mode: 'undocked' });
+    else if (mode !== 'undocked') RemoteModule.undock();
+    if (mode !== 'undocked') return; // could not float — nothing to do
+
+    // Force the keypad panel so the compact dialog never presents a catalog.
+    if (deps.switchTab && resolveActiveCatalogTab() !== 'remote') deps.switchTab('remote');
+
+    const live = readDialogGeometry();
+    miniSavedFull = {
+        left: live.left,
+        top: live.top,
+        scale: clampModuleScale(scale)
+    };
+    const saved = getSavedState() || {};
+    miniScale = clampModuleScale(saved.miniScale ?? 1);
+    miniFloating = true;
+
+    const fallback = defaultMiniGeometry();
+    applyGeometry({
+        left: Number.isFinite(saved.miniLeft) ? saved.miniLeft : fallback.left,
+        top: Number.isFinite(saved.miniTop) ? saved.miniTop : fallback.top
+    });
+
+    updateBodyClasses();
+    syncMiniFloatBtn();
+    syncScaleResetBtn();
+    RemotePanel.syncRemotePanel();
+    persistState({ miniFloating: true });
+}
+
+/** Exit to the full-size floating remote (stays undocked). */
+function exitMiniFloating() {
+    if (!miniFloating) return;
+    const full = miniSavedFull;
+    miniSavedFull = null;
+    miniFloating = false;
+    scale = clampModuleScale(full?.scale ?? getSavedState()?.scale ?? 1);
+    applyGeometry({
+        left: Number.isFinite(full?.left) ? full.left : defaultGeometry().left,
+        top: Number.isFinite(full?.top) ? full.top : defaultGeometry().top
+    });
+    updateBodyClasses();
+    syncMiniFloatBtn();
+    syncScaleResetBtn();
+    persistState({ miniFloating: false, scale });
+    RemotePanel.syncRemotePanel();
 }
 
 function syncDockSideBtn() {
@@ -387,14 +491,26 @@ function getSavedState() {
 function persistState(overrides = {}) {
     const prev = getSavedState() || {};
     const wasUndocked = mode === 'undocked';
-    const geom = wasUndocked
-        ? readDialogGeometry()
-        : {
-            left: overrides.left != null ? overrides.left : (prev.left ?? defaultGeometry().left),
-            top: overrides.top != null ? overrides.top : (prev.top ?? defaultGeometry().top),
-            width: overrides.width != null ? overrides.width : (prev.width ?? defaultGeometry().width),
-            height: overrides.height != null ? overrides.height : (prev.height ?? defaultGeometry().height)
+    let geom;
+    if (wasUndocked && miniFloating && miniSavedFull) {
+        // While mini, keep the full-float geometry authoritative in state so a
+        // later exit restores the exact pre-mini footprint.
+        geom = {
+            left: overrides.left != null ? overrides.left : miniSavedFull.left,
+            top: overrides.top != null ? overrides.top : miniSavedFull.top,
+            width: Math.round(MIN_W * miniSavedFull.scale * wingMultiplier()),
+            height: Math.round(MIN_H * miniSavedFull.scale)
         };
+    } else {
+        geom = wasUndocked
+            ? readDialogGeometry()
+            : {
+                left: overrides.left != null ? overrides.left : (prev.left ?? defaultGeometry().left),
+                top: overrides.top != null ? overrides.top : (prev.top ?? defaultGeometry().top),
+                width: overrides.width != null ? overrides.width : (prev.width ?? defaultGeometry().width),
+                height: overrides.height != null ? overrides.height : (prev.height ?? defaultGeometry().height)
+            };
+    }
 
     const nextMode = overrides.mode != null ? overrides.mode : mode;
     const nextOpen = overrides.open != null ? overrides.open === true : (nextMode !== 'hidden');
@@ -404,6 +520,15 @@ function persistState(overrides = {}) {
     const nextDockSide = overrides.dockSide != null
         ? normalizeDockSide(overrides.dockSide)
         : dockSide;
+
+    // Mini position lives in the live dialog rect while mini is active.
+    let miniLeft = prev.miniLeft ?? null;
+    let miniTop = prev.miniTop ?? null;
+    if (nextMode === 'undocked' && miniFloating) {
+        const live = readDialogGeometry();
+        miniLeft = overrides.miniLeft != null ? overrides.miniLeft : live.left;
+        miniTop = overrides.miniTop != null ? overrides.miniTop : live.top;
+    }
 
     const sheet = dockSheetEl();
     const sheetHeight = overrides.sheetHeight != null
@@ -418,7 +543,11 @@ function persistState(overrides = {}) {
     savePlayerState({
         remoteModule: {
             ...geom,
-            scale: clampModuleScale(overrides.scale != null ? overrides.scale : scale),
+            scale: clampModuleScale(overrides.scale != null ? overrides.scale : (miniFloating && miniSavedFull ? miniSavedFull.scale : scale)),
+            miniFloating: overrides.miniFloating != null ? overrides.miniFloating === true : miniFloating,
+            miniScale: clampModuleScale(overrides.miniScale != null ? overrides.miniScale : miniScale),
+            miniLeft,
+            miniTop,
             mode: nextMode,
             open: nextOpen,
             pinned: nextPinned,
@@ -896,7 +1025,10 @@ function syncCatalogChromeGeometry(tab = resolveActiveCatalogTab()) {
             applyDockScaleGeometry();
         }
     } else if (mode === 'undocked') {
-        if (bar) {
+        if (miniFloating) {
+            // Mini keeps its own compact geometry — never re-apply full geometry.
+            clearBarSheetInline();
+        } else if (bar) {
             applyBarSheetGeometry();
         } else {
             clearBarSheetInline();
@@ -950,6 +1082,7 @@ function updateBodyClasses() {
     document.body.classList.toggle('remote-docked-expanded', mode === 'docked' && sheetExpanded);
     document.body.classList.toggle('remote-hidden-tab', mode === 'hidden');
     document.body.classList.toggle('remote-undocked-open', mode === 'undocked');
+    document.body.classList.toggle('remote-mini-floating', miniFloating);
     document.body.classList.toggle('remote-dock-side-right', dockSide === 'right');
     document.body.classList.toggle('browser-dock-side-left', dockSide === 'right');
 }
@@ -958,6 +1091,10 @@ function onKeydown(e) {
     if (e.key === 'Escape' && mode !== 'hidden') {
         if (RemoteExternalPopout.isPoppedOut()) return;
         e.preventDefault();
+        if (miniFloating) {
+            exitMiniFloating();
+            return;
+        }
         if (mode === 'undocked' && !pinned) RemoteModule.close();
         else if (mode === 'docked' && sheetExpanded) RemoteModule.toggleDockedSheet();
         else RemoteModule.close();
@@ -972,7 +1109,7 @@ function endGesture() {
     dockSheetEl()?.classList.remove('is-resizing');
     gesture = null;
     syncScaleResetBtn();
-    persistState({ scale });
+    persistState(miniFloating ? { miniScale } : { scale });
 }
 
 function onPointerMove(e) {
@@ -996,16 +1133,17 @@ function onPointerMove(e) {
         originTop: gesture.originTop,
         originW: gesture.originW,
         originH: gesture.originH,
-        originScale: gesture.originScale ?? scale,
-        baseW: MIN_W * wingMultiplier(),
-        baseH: MIN_H,
+        originScale: gesture.originScale ?? activeScale(),
+        baseW: miniFloating ? MINI_BASE_W : MIN_W * wingMultiplier(),
+        baseH: miniFloating ? MINI_BASE_H : MIN_H,
         dx,
         dy,
         edge,
         minScale: SCALE_MIN,
         maxScale: SCALE_MAX
     });
-    scale = next.scale;
+    if (miniFloating) miniScale = next.scale;
+    else scale = next.scale;
     if (gesture.mode === 'dock-resize') {
         applyDockScaleGeometry();
         return;
@@ -1060,7 +1198,7 @@ function beginGesture(e, modeName, edge = '') {
             originTop: geom.top,
             originW: geom.width,
             originH: geom.height,
-            originScale: scale
+            originScale: activeScale()
         };
         if (modeName === 'drag') {
             e.currentTarget?.classList?.add('is-dragging');
@@ -1088,6 +1226,7 @@ function bindOnce() {
     dockTabEl()?.addEventListener('pointerdown', () => bringModuleToFront(SHELL_REMOTE), true);
 
     el('remote-collapse-header-btn')?.addEventListener('click', () => RemoteModule.hide());
+    el('remote-mini-float-btn')?.addEventListener('click', () => RemoteModule.toggleMiniFloating());
     el('remote-dock-toggle')?.addEventListener('click', () => {
         if (mode === 'undocked') RemoteModule.dock();
         else RemoteModule.undock();
@@ -1239,6 +1378,8 @@ function finishClose() {
 
     mode = 'hidden';
     targetSlotId = null;
+    miniFloating = false;
+    miniSavedFull = null;
     endClusterDockParent = null;
     endClusterNextSibling = null;
 
@@ -1260,6 +1401,8 @@ function finishHideSplit() {
     externalHost = null;
     showUndockedUI(false);
     setSheetExpanded(false, { persist: false });
+    miniFloating = false;
+    miniSavedFull = null;
 
     const body = catalogBody();
     const guide = guidePanelEl();
@@ -1332,6 +1475,23 @@ export const RemoteModule = {
 
     getDockSide() {
         return dockSide;
+    },
+
+    isMiniFloating() {
+        return miniFloating;
+    },
+
+    enterMiniFloating() {
+        enterMiniFloating();
+    },
+
+    exitMiniFloating() {
+        exitMiniFloating();
+    },
+
+    toggleMiniFloating() {
+        if (miniFloating) exitMiniFloating();
+        else enterMiniFloating();
     },
 
     toggleDockSide() {
@@ -1430,10 +1590,16 @@ export const RemoteModule = {
         syncSplitChromeButtons();
         RemoteExternalPopout.syncBtn();
         syncDockToggleBtn();
+        syncMiniFloatBtn();
 
         const finishChrome = () => {
             if (deferTab) deps.switchTab(tab);
             RemotePanel.syncRemotePanel();
+            // Restore a persisted mini-floating session once the float is mounted.
+            if (openMode === 'undocked' && mode === 'undocked' && !miniFloating
+                && getSavedState()?.miniFloating === true) {
+                enterMiniFloating();
+            }
         };
         if (DockOpenGate.isOpening()) {
             DockOpenGate.afterOpen(finishChrome);
@@ -1471,6 +1637,7 @@ export const RemoteModule = {
 
     dock() {
         if (mode !== 'undocked') return;
+        if (miniFloating) exitMiniFloating();
         showUndockedUI(false);
         mode = 'docked';
         // While external, only update the return host; remount happens on pop-in.

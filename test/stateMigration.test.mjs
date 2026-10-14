@@ -174,6 +174,27 @@ test('migrate preserves remoteButtonShape', () => {
     assert.equal(raw.stateSchemaVersion, STATE_SCHEMA_VERSION);
 });
 
+test('loadPlayerState keeps mini-floating remote state alongside full geometry', () => {
+    store.set(STATE_KEY, JSON.stringify({
+        remoteModule: {
+            left: 10, top: 20, width: 300, height: 400,
+            mode: 'undocked', open: true, pinned: false, targetSlotId: 'center',
+            miniFloating: true, miniScale: 1.2,
+            miniLeft: 900, miniTop: 720
+        },
+        volume: 0.5
+    }));
+
+    const state = loadPlayerState();
+    assert.equal(state.remoteModule.miniFloating, true);
+    assert.equal(state.remoteModule.miniScale, 1.2);
+    assert.equal(state.remoteModule.miniLeft, 900);
+    assert.equal(state.remoteModule.miniTop, 720);
+    // Full-float geometry is preserved alongside the mini footprint.
+    assert.equal(state.remoteModule.left, 10);
+    assert.equal(state.remoteModule.width, 300);
+});
+
 test('null hole in recentsMeta does not wipe favorites on load', () => {
     store.set(STATE_KEY, JSON.stringify({
         favorites: ['iptv-org:A.us'],

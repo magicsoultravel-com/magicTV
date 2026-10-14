@@ -531,6 +531,9 @@ function bindRemoteActions(root, { forceTvCatalog = false } = {}) {
         btn.addEventListener('click', () => {
             const tab = btn.getAttribute('data-remote-nav');
             if (!tab) return;
+            // Mini-floating nav keys expand back to the full remote first — the
+            // compact dialog cannot present a catalog.
+            deps.getRemoteModule?.()?.exitMiniFloating?.();
             // Remote keypad / remote-shell: always open TV catalog for browser tabs.
             if (forceTvCatalog && isBrowserCatalogTab(tab) && typeof deps.openTvCatalog === 'function') {
                 deps.openTvCatalog({ tab });

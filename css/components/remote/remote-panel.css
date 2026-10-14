@@ -633,6 +633,11 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     pointer-events: none;
 }
 
+/* Mini-floating only cells (e.g. radio key) because they stay out of the full keypad. */
+.remote-panel__cell--mini-only {
+    display: none;
+}
+
 .remote-panel__btn--digit {
     font-size: 0.95rem;
     font-weight: 600;

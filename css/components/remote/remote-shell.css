@@ -810,3 +810,98 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .remote
 html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__resize {
     display: none;
 }
+
+/* ===== Mini-floating compact keypad (body.remote-mini-floating) =====
+   A reduced 4×4 keypad suspended as a small float. Always undocked. Keeps only
+   the hover tray actions that matter (mini toggle + collapse) and hides all the
+   keypad fluff, header chrome, guide, and screens footer. */
+body.remote-mini-floating #remote-shell > .module-shell__chrome,
+body.remote-mini-floating #remote-shell .remote-module__channel-bar,
+body.remote-mini-floating #remote-shell .remote-module__chrome-row,
+body.remote-mini-floating #remote-shell .remote-module__footer,
+body.remote-mini-floating #remote-shell #remote-shell-screens-footer {
+    display: none !important;
+}
+
+/* Guide panel overlay is never wanted in the compact keypad. */
+body.remote-mini-floating #guide-panel {
+    display: none !important;
+}
+
+/* The dialog hugs the 4×4 grid — lift geometry floors so the compact size wins
+   over the 5-col min-width / 320px min-height used by the full float. */
+body.remote-mini-floating #remote-module .remote-module__dialog {
+    --remote-grid-cols: 4;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+body.remote-mini-floating #remote-module .remote-module__host > #tv-catalog-body {
+    flex-basis: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+body.remote-mini-floating #remote-shell > .remote-module__scroll,
+body.remote-mini-floating #remote-panel {
+    overflow: hidden;
+}
+
+/* Keypad becomes the 4-col mini grid. */
+body.remote-mini-floating #remote-panel .remote-panel__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--remote-grid-gap, 0.4rem);
+    width: 100%;
+    margin: 0;
+    padding: calc(var(--remote-space-md, 1rem) * 0.4);
+}
+
+/* Only the marked mini cells join the grid; everything else disappears
+   (covers both direct cells and those inside display:contents groups). */
+body.remote-mini-floating #remote-panel .remote-panel__grid .remote-panel__cell {
+    display: none;
+}
+body.remote-mini-floating #remote-panel .remote-panel__grid .remote-panel__cell[data-mini-slot] {
+    display: flex;
+}
+
+/* Mini 4×4 order (row-major):
+   Row1: chan-up fav radio vol-up
+   Row2: bind play stop mute
+   Row3: chan-down browse settings vol-down
+   Row4: layout play-all stop-all mute-all */
+body.remote-mini-floating #remote-panel [data-mini-slot="chanup"]   { order: 1; }
+body.remote-mini-floating #remote-panel [data-mini-slot="favorites"] { order: 2; }
+body.remote-mini-floating #remote-panel [data-mini-slot="radio"]    { order: 3; }
+body.remote-mini-floating #remote-panel [data-mini-slot="volup"]    { order: 4; }
+body.remote-mini-floating #remote-panel [data-mini-slot="bind"]     { order: 5; }
+body.remote-mini-floating #remote-panel [data-mini-slot="play"]     { order: 6; }
+body.remote-mini-floating #remote-panel [data-mini-slot="stop"]     { order: 7; }
+body.remote-mini-floating #remote-panel [data-mini-slot="mute"]     { order: 8; }
+body.remote-mini-floating #remote-panel [data-mini-slot="chandown"] { order: 9; }
+body.remote-mini-floating #remote-panel [data-mini-slot="browse"]   { order: 10; }
+body.remote-mini-floating #remote-panel [data-mini-slot="settings"] { order: 11; }
+body.remote-mini-floating #remote-panel [data-mini-slot="voldown"]  { order: 12; }
+body.remote-mini-floating #remote-panel [data-mini-slot="layout"]   { order: 13; }
+body.remote-mini-floating #remote-panel [data-mini-slot="playall"]  { order: 14; }
+body.remote-mini-floating #remote-panel [data-mini-slot="stopall"]  { order: 15; }
+body.remote-mini-floating #remote-panel [data-mini-slot="muteall"]  { order: 16; }
+
+/* Split/sync may have hidden nav cells and the radio key may be disabled — force
+   the kept mini keys visible regardless (.is-hidden / [hidden] carry !important). */
+body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn.is-hidden,
+body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn[hidden] {
+    display: flex !important;
+}
+body.remote-mini-floating #remote-panel #remote-radio-btn-mini {
+    display: flex !important;
+}
+
+/* Hover tray — only the mini toggle + collapse remain in mini mode. */
+body.remote-mini-floating .remote-module__host .tv-module__actions--remote-end .tv-module__action:not(#remote-mini-float-btn):not(#remote-collapse-header-btn),
+body.remote-mini-floating .remote-dock-sheet__inner .tv-module__actions--remote-end .tv-module__action:not(#remote-mini-float-btn):not(#remote-collapse-header-btn) {
+    display: none !important;
+}
+

@@ -544,14 +544,15 @@ export const RadioModule = {
 
     syncEnabledUi() {
         const enabled = this.isEnabled();
-        const btn = el('remote-radio-btn');
-        if (btn) {
+        const active = enabled && open;
+        ['remote-radio-btn', 'remote-radio-btn-mini'].forEach((id) => {
+            const btn = el(id);
+            if (!btn) return;
             btn.hidden = !enabled;
             btn.classList.toggle('is-hidden', !enabled);
-            const active = enabled && open;
             btn.classList.toggle('is-active', active);
             btn.setAttribute('aria-pressed', String(active));
-        }
+        });
         document.body.classList.toggle('radio-enabled', enabled);
         if (!enabled && open) this.close();
     },

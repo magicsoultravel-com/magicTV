@@ -448,6 +448,12 @@ function normalizeRemoteModule(raw, legacyPicker) {
         sheetHeight,
         sheetExpanded: src.sheetExpanded !== false,
         dockSide: src.dockSide === 'right' ? 'right' : 'left',
+        miniFloating: src.miniFloating === true,
+        miniScale: Number.isFinite(Number(src.miniScale))
+            ? Math.min(1.5, Math.max(0.5, Number(src.miniScale)))
+            : null,
+        miniLeft: Number(src.miniLeft),
+        miniTop: Number(src.miniTop),
         ...(layout ? { layout } : {})
     };
 }
