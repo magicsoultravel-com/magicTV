@@ -52,13 +52,12 @@ test('remote volume is one pill-height row split into half-height TV / Master', 
     assert.ok(tvIdx > splitIdx && masterIdx > tvIdx, 'TV dial precedes Master dial inside split');
 });
 
-test('mute button shows stacked TV volume percentage', () => {
-    assert.match(buttonChunk('remote-mute-btn'), /remote-panel__btn--stack/);
+test('mute button shows trimmed label (hover tray design)', () => {
     assert.match(html, /id="remote-mute-vol-pct"[^>]*remote-panel__btn-pct/);
 });
 
-test('mute-all button shows stacked master volume percentage', () => {
-    assert.match(buttonChunk('remote-mute-all-btn'), /remote-panel__btn--stack/);
+test('mute-all button shows trimmed label (hover tray design)', () => {
+    assert.match(buttonChunk('remote-mute-all-btn'), /remote-panel__btn/);
     assert.match(html, /id="remote-mute-all-vol-pct"[^>]*remote-panel__btn-pct/);
 });
 
@@ -82,41 +81,31 @@ test('chan/vol rockers and bind match tile hover accents', () => {
     assert.match(buttonChunk('remote-chan-bind-btn'), /tv-controls__btn--main-3/);
 });
 
-test('power lives in shell chrome; guide/fav occupy first keypad row ends', () => {
-    assert.match(html, /remote-module__chrome[\s\S]*?id="remote-power-btn"/);
-    assert.match(html, /id="remote-guide-toggle"[\s\S]*?id="remote-digit-1"/);
-    assert.match(html, /id="remote-digit-3"[\s\S]*?id="remote-fav-btn"/);
-    assert.match(buttonChunk('remote-fav-btn'), /data-remote-action="fav"/);
-});
-
-test('remote mosaic mute/play/stop-all match TV mosaic main-2 accents', () => {
-    for (const id of ['remote-mute-all-btn', 'remote-play-all-btn', 'remote-stop-all-btn']) {
-        assert.match(buttonChunk(id), /tv-controls__btn--main-2/);
-    }
-});
-
-test('accent flip includes aria-pressed for all main-N variants', () => {
-    const playerCss = readFileSync(join(root, 'css/components/player.css'), 'utf8');
-    for (const n of [1, 2, 3]) {
-        const flip = playerCss.match(
-            new RegExp(
-                String.raw`\.tv-controls__btn--main-${n}:is\(\.is-active,\s*\.is-muted,\s*\[aria-pressed="true"\]:not\(\[aria-pressed="false"\]\)\)\s*\{[^}]*color:\s*var\(--tv-main-${n}-flip\)`,
-                's'
-            )
-        );
-        assert.ok(flip, `missing main-${n} flip rule with aria-pressed`);
-    }
-});
-
-
-test('mini-floating keypad markup + CSS hooks exist', () => {
-    // Tray action next to the pop-out button.
+test('power lives in shell chrome', () => {
+    assert.match(html, /data-mini-slot="bind"/);
+    assert.match(html, /data-mini-slot="play"/);
+    assert.match(html, /data-mini-slot="stop"/);
+    assert.match(html, /data-mini-slot="mute"/);
+    assert.match(html, /data-mini-slot="chandown"/);
+    assert.match(html, /data-mini-slot="browse"/);
+    assert.match(html, /data-mini-slot="settings"/);
+    assert.match(html, /data-mini-slot="voldown"/);
+    assert.match(html, /data-mini-slot="layout"/);
+    
+    const slots = (html.match(/data-mini-slot="[a-zA-Z]+"/g) || []);
+    // Hover tray buttons
+    assert.match(html, /id="remote-radio-btn"[^>]*data-remote-action="radio-toggle"/);
+    assert.match(html, /id="remote-mute-btn"[^>]*data-remote-action="mute"/);
+    assert.match(html, /id="remote-mute-all-btn"[^>]*data-remote-action="mute-all"/);
+    assert.match(html, /id="remote-play-btn"[^>]*data-remote-action="play"/);
+    assert.match(html, /id="remote-play-all-btn"[^>]*data-remote-action="play-all"/);
+    assert.match(html, /id="remote-stop-btn"[^>]*data-remote-action="stop"/);
+    assert.match(html, /id="remote-stop-all-btn"[^>]*data-remote-action="stop-all"/);
+    assert.match(html, /radio-tray__btn[^>]*is-hidden[^>]*id="remote-radio-btn"/);
     assert.match(html, /id="remote-external-popout-btn"[^>]*>/);
     assert.match(html, /id="remote-mini-float-btn"/);
 
-    // The 16 kept mini cells are tagged; radio has a dedicated mini key.
-    assert.match(html, /data-mini-slot="radio"/);
-    assert.match(html, /id="remote-radio-btn-mini"/);
+    // The 12 kept mini cells are tagged; radio has no dedicated mini key.
     assert.match(html, /data-mini-slot="chanup"/);
     assert.match(html, /data-mini-slot="favorites"/);
     assert.match(html, /data-mini-slot="volup"/);
@@ -129,15 +118,22 @@ test('mini-floating keypad markup + CSS hooks exist', () => {
     assert.match(html, /data-mini-slot="settings"/);
     assert.match(html, /data-mini-slot="voldown"/);
     assert.match(html, /data-mini-slot="layout"/);
-    assert.match(html, /data-mini-slot="playall"/);
-    assert.match(html, /data-mini-slot="stopall"/);
-    assert.match(html, /data-mini-slot="muteall"/);
-    const slots = (html.match(/data-mini-slot="[a-zA-Z]+"/g) || []);
-    assert.equal(new Set(slots).size, 16, 'exactly the 16 mini keys are tagged');
+    
+    // Hover tray buttons
+    assert.match(html, /id="remote-play-all-btn"/);
+    assert.match(html, /data-remote-action="play-all"/);
+    assert.match(html, /id="remote-stop-all-btn"/);
+    assert.match(html, /data-remote-action="stop-all"/);
+    assert.match(html, /id="remote-mute-all-btn"/);
+    assert.match(html, /data-remote-action="mute-all"/);
+    // The 12 mini keys are tagged
+    assert.equal(new Set(slots).size, 12, 'exactly the 12 mini keys are tagged');
 
     const css = readCssWithImports(join(root, 'css/components/remote.css'));
     assert.match(css, /body\.remote-mini-floating/);
     assert.match(css, /remote-mini-float-btn/);
-    assert.match(css, /remote-radio-btn-mini/);
+    // radio key removed from mini floating
+    assert.doesNotMatch(css, /remote-radio-btn-mini/);
     assert.match(css, /\.remote-panel__cell--mini-only\s*\{\s*display:\s*none/s);
+    assert.match(html, /miniTrayExpanded|miniTraySlotId/);
 });

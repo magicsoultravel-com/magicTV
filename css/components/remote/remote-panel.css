@@ -655,6 +655,100 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     min-height: var(--remote-btn-size, 40px);
 }
 
+/* Radio tray — hidden by default, slides out on hover */
+.radio-tray {
+    position: relative;
+    display: none;
+    min-height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    flex: 0 0 var(--remote-btn-size, 40px);
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.radio-tray__btn {
+    pointer-events: auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 48%;
+    border: 1px solid color-mix(in srgb, currentColor var(--btn-ring), transparent);
+    background: color-mix(in srgb, currentColor var(--btn-tint), var(--remote-btn-face));
+    font-size: 0.85rem;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+    transform: scale(1);
+    color: var(--tv-text-primary);
+    opacity: 0.5;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.radio-tray__btn.is-hidden {
+    display: none !important;
+}
+
+.radio-tray__btn:hover,
+.radio-tray__btn:focus-visible {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor var(--btn-tint-hover, 18%), transparent);
+    color: var(--tv-main-1);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-hover, 35%), transparent);
+}
+
+.radio-tray__btn.is-active,
+.radio-tray__btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    opacity: 0.88;
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    transform: scale(var(--btn-press-scale, 1.04));
+}
+
+/* Hide the tray when hovering the remote panel overall (keeps it compact) */
+.remote-panel:hover .radio-tray {
+    display: flex;
+}
+
+.remote-panel:hover .radio-tray__btn {
+    opacity: 1;
+    color: var(--tv-text-primary);
+}
+
+.remote-panel:hover .radio-tray__btn.is-muted {
+    color: var(--tv-text-secondary);
+    opacity: 1;
+}
+
+.remote-panel:hover .radio-tray__btn[aria-pressed="true"]:not([aria-pressed="false"]) {
+    color: var(--tv-main-1);
+    opacity: 0.88;
+    background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
+    transform: scale(var(--btn-press-scale, 1.04));
+}
+
+.remote-panel:hover .radio-tray__btn+.radio-tray__btn {
+    opacity: 0.7;
+}
+
+.remote-panel:hover .radio-tray__btn:only-child {
+    opacity: 1;
+    color: var(--tv-text-primary);
+}
+
+.remote-panel:hover .radio-tray__btn + .radio-tray__btn:only-child {
+    opacity: 1;
+    color: var(--tv-text-primary);
+}
+
 .remote-panel__volume-split {
     position: relative;
     display: flex;

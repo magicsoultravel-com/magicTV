@@ -122,6 +122,10 @@ let miniSavedFull = null;
 /** @type {{ mode: 'drag'|'resize'|'dock-resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originScale?: number } | null} */
 let gesture = null;
 
+// Hover-tray persistence state
+let miniTrayExpanded = false;   // floating remote hover-tray expanded state
+let miniTraySlotId = null;      // slot the hover tray is bound to
+
 function moduleEl() {
     return el('remote-module');
 }
@@ -556,6 +560,8 @@ function persistState(overrides = {}) {
             sheetHeight: parseFloat(sheetHeight) || DEFAULT_SHEET_HEIGHT,
             sheetExpanded: overrides.sheetExpanded != null ? overrides.sheetExpanded === true : sheetExpanded,
             guideOpen: overrides.guideOpen != null ? overrides.guideOpen === true : WingPanel.isGuidePreferred?.(),
+            miniTrayExpanded,
+            miniTraySlotId,
             layout: {
                 ...layoutState,
                 remoteHostKind
@@ -1346,6 +1352,8 @@ function restoreFromState() {
         } else {
             scale = 1;
         }
+        if (saved.miniTrayExpanded != null) { miniTrayExpanded = saved.miniTrayExpanded === true; }
+        if (saved.miniTraySlotId != null)   { miniTraySlotId = saved.miniTraySlotId; }
         applyGeometry({
             left: Number.isFinite(saved.left) ? saved.left : geom.left,
             top: Number.isFinite(saved.top) ? saved.top : geom.top,

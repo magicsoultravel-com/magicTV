@@ -846,7 +846,7 @@ body.remote-mini-floating #remote-module .remote-module__host > #tv-catalog-body
 
 body.remote-mini-floating #remote-shell > .remote-module__scroll,
 body.remote-mini-floating #remote-panel {
-    overflow: hidden;
+    /* Mini-floating keypad now scrolls naturally; no forced overflow:hidden */
 }
 
 /* Keypad becomes the 4-col mini grid. */
@@ -867,14 +867,13 @@ body.remote-mini-floating #remote-panel .remote-panel__grid .remote-panel__cell[
     display: flex;
 }
 
-/* Mini 4×4 order (row-major):
-   Row1: chan-up fav radio vol-up
+/* Mini 4×3 order (row-major):
+   Row1: chan-up fav layout vol-up
    Row2: bind play stop mute
-   Row3: chan-down browse settings vol-down
-   Row4: layout play-all stop-all mute-all */
+   Row3: chan-down browse settings vol-down */
 body.remote-mini-floating #remote-panel [data-mini-slot="chanup"]   { order: 1; }
 body.remote-mini-floating #remote-panel [data-mini-slot="favorites"] { order: 2; }
-body.remote-mini-floating #remote-panel [data-mini-slot="radio"]    { order: 3; }
+body.remote-mini-floating #remote-panel [data-mini-slot="layout"]   { order: 3; }
 body.remote-mini-floating #remote-panel [data-mini-slot="volup"]    { order: 4; }
 body.remote-mini-floating #remote-panel [data-mini-slot="bind"]     { order: 5; }
 body.remote-mini-floating #remote-panel [data-mini-slot="play"]     { order: 6; }
@@ -884,18 +883,11 @@ body.remote-mini-floating #remote-panel [data-mini-slot="chandown"] { order: 9; 
 body.remote-mini-floating #remote-panel [data-mini-slot="browse"]   { order: 10; }
 body.remote-mini-floating #remote-panel [data-mini-slot="settings"] { order: 11; }
 body.remote-mini-floating #remote-panel [data-mini-slot="voldown"]  { order: 12; }
-body.remote-mini-floating #remote-panel [data-mini-slot="layout"]   { order: 13; }
-body.remote-mini-floating #remote-panel [data-mini-slot="playall"]  { order: 14; }
-body.remote-mini-floating #remote-panel [data-mini-slot="stopall"]  { order: 15; }
-body.remote-mini-floating #remote-panel [data-mini-slot="muteall"]  { order: 16; }
 
 /* Split/sync may have hidden nav cells and the radio key may be disabled — force
    the kept mini keys visible regardless (.is-hidden / [hidden] carry !important). */
 body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn.is-hidden,
 body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn[hidden] {
-    display: flex !important;
-}
-body.remote-mini-floating #remote-panel #remote-radio-btn-mini {
     display: flex !important;
 }
 
