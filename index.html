@@ -1564,6 +1564,40 @@
             </nav>
         </div>
     </div>
+    <div id="youtube-picker" class="youtube-picker is-hidden" hidden aria-hidden="true">
+        <div class="youtube-picker__backdrop" data-youtube-picker-dismiss tabindex="-1"></div>
+        <div
+            id="youtube-picker-dialog"
+            class="youtube-picker__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="youtube-picker-title"
+            tabindex="-1"
+        >
+            <button type="button" class="youtube-picker__close" data-youtube-picker-dismiss aria-label="Close">
+                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <h2 id="youtube-picker-title" class="youtube-picker__title">YouTube on this TV</h2>
+            <p class="youtube-picker__subtitle">Paste a link or pick a saved clip.</p>
+            <form id="youtube-picker-form" class="youtube-picker__form">
+                <input
+                    id="youtube-picker-input"
+                    class="youtube-picker__input"
+                    type="text"
+                    inputmode="url"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="https://youtu.be/… · video id"
+                    aria-label="YouTube link or video id"
+                >
+                <button id="youtube-picker-add" class="youtube-picker__add" type="submit">Play</button>
+            </form>
+            <p id="youtube-picker-error" class="youtube-picker__error is-hidden" role="status"></p>
+            <ul id="youtube-picker-list" class="youtube-picker__list"></ul>
+            <p id="youtube-picker-empty" class="youtube-picker__empty">No clips yet — paste a link once and it stays in your library.</p>
+            <p class="youtube-picker__footnote">Embedded player: use its own controls for seek/quality. Turning YouTube mode off restores the TV channel.</p>
+        </div>
+    </div>
     <div id="toast-container"></div>
     <script type="module" src="./js/app.js"></script>
 </body>

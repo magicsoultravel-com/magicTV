@@ -72,6 +72,7 @@ export function compactNonEssentialPersistedState(state) {
             if (typeof entry !== 'object') continue;
             slots[id] = {
                 key: entry.key || '',
+                ...(entry.kind === 'youtube' ? { kind: 'youtube', videoId: entry.videoId || '' } : {}),
                 name: entry.name || '',
                 muted: entry.muted !== false,
                 volume: Number.isFinite(Number(entry.volume)) ? Number(entry.volume) : 1,

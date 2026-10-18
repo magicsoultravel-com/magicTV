@@ -51,6 +51,33 @@ test('buildTileHoverHtml includes cast and dual rows', () => {
     assert.doesNotMatch(localRow, /data-tile-vol-pct/);
 });
 
+test('buildTileHoverHtml puts the drag grab handle first in the local row', () => {
+    for (const variant of ['corner', 'center']) {
+        const html = buildTileHoverHtml(variant);
+        assert.equal((html.match(/data-tile-drag-handle/g) || []).length, 1,
+            `${variant}: exactly one grab handle`);
+
+        const castRow = html.slice(
+            html.indexOf('data-controls-row="cast"'),
+            html.indexOf('data-controls-row="local"')
+        );
+        assert.doesNotMatch(castRow, /data-tile-drag-handle/, `${variant}: handle is not in the cast row`);
+
+        const localRow = html.slice(html.indexOf('data-controls-row="local"'));
+        const handleIdx = localRow.indexOf('data-tile-drag-handle');
+        assert.ok(handleIdx !== -1, `${variant}: handle lives in the local row`);
+        assert.ok(handleIdx < localRow.indexOf('data-tile-action="browse"'),
+            `${variant}: handle sits left of the first control`);
+
+        const tag = localRow.slice(localRow.lastIndexOf('<button', handleIdx), localRow.indexOf('>', handleIdx) + 1);
+        assert.match(tag, /tv-controls__grab-btn/);
+        assert.match(tag, /aria-label="Drag this screen"/);
+        // The press has to fall through to the free-layout drag handler.
+        assert.doesNotMatch(tag, /data-tile-action/);
+        assert.doesNotMatch(tag, /data-controls-target/);
+    }
+});
+
 test('buildTileVolRockerHtml is outside the hover strip', () => {
     const html = buildTileVolRockerHtml('local');
     assert.match(html, /tv-player-tile__vol-rocker/);

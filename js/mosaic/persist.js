@@ -9,6 +9,7 @@ import {
 import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
 import { el } from '../tvUtils.js';
+import { isYouTubeEntry, youtubeEntryConfig } from '../youtube/youtubeLinks.js';
 import { CORNER_IDS, SLOT_IDS } from './constants.js';
 import { fetchStoredFramesForMosaic, applyStoredFramesToSlots } from './frameLookup.js';
 
@@ -65,7 +66,24 @@ export const persistMethods = {
         const keys = [];
         SLOT_IDS.forEach((id) => {
             const entry = mosaic[id];
-            if (!entry?.key) return;
+            if (!entry) return;
+            if (isYouTubeEntry(entry)) {
+                // YouTube tiles restore as CUED placeholders (no autoplay).
+                const config = youtubeEntryConfig(entry);
+                if (!config) return;
+                if (id !== 'center' && !this.slots[id]?.enabled) {
+                    this.setSideEnabled(id, true, { silent: true });
+                }
+                Promise.resolve(this.enterYouTubeMode?.(id, config.videoId, {
+                    autoplay: false,
+                    title: config.title,
+                    startAt: config.startAt,
+                    silent: true,
+                    persist: false
+                })).catch(() => {});
+                return;
+            }
+            if (!entry.key) return;
             this.rememberedSlotKeys[id] = entry.key;
             keys.push(entry.key);
 
@@ -120,6 +138,13 @@ export const persistMethods = {
                 return;
             }
 
+            // YouTube tiles persist their video id, never a TV channel key.
+            const ytEntry = slot.player?.kind === 'youtube' ? this.youTubeSlotEntry?.(id) : null;
+            if (ytEntry) {
+                mosaicSlots[id] = ytEntry;
+                return;
+            }
+
             if (!slot.player?.channel) {
                 // Before hydrate, empty players must not wipe saved satellites.
                 if (!this.slotsHydrated) return;
@@ -144,7 +169,8 @@ export const persistMethods = {
         });
 
         const primary = this.getPrimary();
-        const primaryKey = primary?.channel ? channelKey(primary.channel) : null;
+        const primaryIsYouTube = primary?.kind === 'youtube';
+        const primaryKey = !primaryIsYouTube && primary?.channel ? channelKey(primary.channel) : null;
         savePlayerState({
             mosaicSlots,
             ...(primaryKey && !primaryKey.endsWith(':')
@@ -167,7 +193,8 @@ export const persistMethods = {
         try {
             // Re-enable any satellite that has a saved channel so restore cannot skip it.
             CORNER_IDS.forEach((id) => {
-                if (!mosaic[id]?.key) return;
+                const entry = mosaic[id];
+                if (!entry || (!entry.key && !isYouTubeEntry(entry))) return;
                 if (!this.slots[id]?.enabled) {
                     this.setSideEnabled(id, true, { silent: true });
                 }
@@ -192,7 +219,21 @@ export const persistMethods = {
 
             const restoreOne = async (id) => {
                 const entry = mosaic[id];
-                if (!entry?.key) return;
+                if (!entry) return;
+                if (isYouTubeEntry(entry)) {
+                    const config = youtubeEntryConfig(entry);
+                    if (!config) return;
+                    if (id !== 'center' && !this.slots[id]?.enabled) return;
+                    await this.enterYouTubeMode?.(id, config.videoId, {
+                        autoplay: false,
+                        title: config.title,
+                        startAt: config.startAt,
+                        silent: true,
+                        persist: false
+                    });
+                    return;
+                }
+                if (!entry.key) return;
                 if (id !== 'center' && !this.slots[id]?.enabled) return;
 
                 const desiredMuted = entry.muted !== false;

@@ -17,6 +17,12 @@ import {
     RADIO_STATE_KEY,
     loadRadioState
 } from '../radio/radioState.js';
+import {
+    YOUTUBE_LIBRARY_KEY,
+    loadYouTubeLibrary,
+    normalizeYouTubeLibrary,
+    saveYouTubeLibrary
+} from '../youtube/youtubeLibrary.js';
 
 export const EXPORT_FORMAT = 'magictv-user-data';
 export const EXPORT_VERSION = 1;
@@ -35,7 +41,8 @@ const USER_DATA_EXTRA_KEYS = [
     CAST_HOST_AUDIO_KEY,
     CAST_HOST_VIDEO_KEY,
     CAST_STATE_KEY,
-    CORRUPT_BACKUP_KEY
+    CORRUPT_BACKUP_KEY,
+    YOUTUBE_LIBRARY_KEY
 ];
 
 function readExtra(key) {
@@ -272,8 +279,20 @@ function readExtras() {
         clockStyle: readExtra(CLOCK_STYLE_KEY),
         clockHidden: readBoolExtra(CLOCK_HIDDEN_KEY),
         castHostAudio: readBoolExtra(CAST_HOST_AUDIO_KEY),
-        castHostVideo: readBoolExtra(CAST_HOST_VIDEO_KEY)
+        castHostVideo: readBoolExtra(CAST_HOST_VIDEO_KEY),
+        youtubeLibrary: readYouTubeLibraryExtra()
     };
+}
+
+/** YouTube clip library as a normalized `{ clips }` object (null when absent). */
+function readYouTubeLibraryExtra() {
+    const raw = readExtra(YOUTUBE_LIBRARY_KEY);
+    if (!raw) return null;
+    try {
+        return normalizeYouTubeLibrary(JSON.parse(raw));
+    } catch {
+        return null;
+    }
 }
 
 export function buildUserDataExport() {
@@ -289,7 +308,8 @@ export function buildUserDataExport() {
             clockStyle: extras.clockStyle,
             clockHidden: extras.clockHidden === true,
             castHostAudio: extras.castHostAudio === true,
-            castHostVideo: extras.castHostVideo === true
+            castHostVideo: extras.castHostVideo === true,
+            youtubeLibrary: extras.youtubeLibrary || { clips: [] }
         }
     };
 }
@@ -372,6 +392,12 @@ export function applyUserDataReplace(payload) {
     if (extras.clockHidden != null) writeBoolExtra(CLOCK_HIDDEN_KEY, extras.clockHidden);
     if (extras.castHostAudio != null) writeCastBoolExtra(CAST_HOST_AUDIO_KEY, extras.castHostAudio);
     if (extras.castHostVideo != null) writeCastBoolExtra(CAST_HOST_VIDEO_KEY, extras.castHostVideo);
+    if (extras.youtubeLibrary != null) {
+        writeExtra(
+            YOUTUBE_LIBRARY_KEY,
+            JSON.stringify(normalizeYouTubeLibrary(extras.youtubeLibrary))
+        );
+    }
 }
 
 export function applyUserDataMergeLibrary(payload) {
@@ -480,6 +506,13 @@ export function applyUserDataMergeLibrary(payload) {
                 hiddenStationsMeta
             }));
         } catch { /* ignore quota */ }
+    }
+
+    // Merge keeps local clips first; normalize dedupes by video id.
+    const importedClips = payload.extras?.youtubeLibrary?.clips;
+    if (Array.isArray(importedClips) && importedClips.length) {
+        const localLibrary = loadYouTubeLibrary();
+        saveYouTubeLibrary({ clips: [...localLibrary.clips, ...importedClips] });
     }
 }
 

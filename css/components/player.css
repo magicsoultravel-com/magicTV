@@ -1397,6 +1397,11 @@
     pointer-events: auto;
 }
 
+/* Hold the strip (and its grab handle) on screen while a tile is dragged. */
+.tv-player-tile.is-dragging .tv-player-tile__hover {
+    opacity: var(--ui-idle-opacity-mult, 1);
+}
+
 @media (hover: none) {
     .tv-player-tile.is-primary .tv-player-tile__hover,
     .tv-player-tile.is-selected .tv-player-tile__hover,

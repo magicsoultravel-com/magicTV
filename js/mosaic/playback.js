@@ -139,6 +139,10 @@ async function finishSlotChannelSwitch(mv, id, channel, player, {
  */
 function prepareSlotForPlay(mv, id) {
     cancelSlotPrefetch(id);
+    // A TV tune always replaces YouTube mode on this tile (channel pick,
+    // prev/next, restore, popout). Detach before ensuring the real player and
+    // drop the YouTube return state — the new channel is the new identity.
+    if (mv.detachYouTubeModeSync?.(id)) mv.forgetYouTubeSlot?.(id);
     if (CORNER_IDS.includes(id) && !mv.slots[id]?.enabled) {
         mv.setSideEnabled(id, true);
     }
@@ -349,6 +353,10 @@ export const playbackMethods = {
                 if (player.wantPlaying === true || player.playing === true) continue;
                 jobs.push((async () => {
                     try {
+                        if (player.kind === 'youtube') {
+                            player.resume?.();
+                            return;
+                        }
                         if (player.channel.url_resolved && !player.stopped) {
                             await player.resume();
                             return;
@@ -687,6 +695,15 @@ export const playbackMethods = {
         const startMuted = id !== 'center';
         const player = this.ensurePlayer(id, { startMuted });
         if (!player?.channel) return;
+
+        // YouTube tiles resume their embed; there is no stream to attach.
+        if (player.kind === 'youtube') {
+            player.resume?.();
+            this.persistSlots();
+            this.scheduleRefreshTiles();
+            player.emitState?.();
+            return;
+        }
 
         TileFrames.setPlaybackBusy(true);
         if (player.playing) {

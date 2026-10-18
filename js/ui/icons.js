@@ -42,6 +42,8 @@ export const CARD_ICONS = {
 
 export const ACTION_ICONS = {
     play: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><path d="M3 2v8l6-4-6-4z" fill="currentColor"/></svg>',
+    /** YouTube mode marker (also used by the clip picker). */
+    youtube: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><rect x="1.2" y="2.6" width="9.6" height="6.8" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.1 4.4 8 6 5.1 7.6V4.4z" fill="currentColor"/></svg>',
     pause: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><rect x="2.5" y="2" width="1.5" height="8" fill="currentColor"/><rect x="8" y="2" width="1.5" height="8" fill="currentColor"/></svg>',
     stop: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><rect x="2" y="2" width="8" height="8" fill="currentColor"/></svg>',
     link: '<svg viewBox="0 0 12 12" width="12" height="12" focusable="false"><path d="M4.4 6.6c1.1-1.1 1.1-2.9 0-4M7.6 5.4c1.1 1.1 1.1 2.9 0 4" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><path d="M4.4 6.6L3.2 5.4M7.8 7.2 8.8 8.2" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/></svg>',

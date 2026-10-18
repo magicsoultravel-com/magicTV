@@ -191,3 +191,63 @@ test('explicit empty favoriteFolders patch still clears folders', () => {
     savePlayerState({ favoriteFolders: [] });
     assert.equal(loadPlayerState().favoriteFolders.length, 0);
 });
+
+test('mosaicSlots keep YouTube video ids and reject malformed entries', () => {
+    const ID = 'dQw4w9WgXcQ';
+    savePlayerState({
+        mosaicSlots: {
+            center: {
+                kind: 'youtube',
+                key: `youtube:${ID}`,
+                videoId: ID,
+                name: 'Clip',
+                muted: false,
+                volume: 0.5
+            },
+            topLeft: { kind: 'youtube', videoId: 'bad' },
+            topRight: { key: 'iptv-org:CNN.us', name: 'CNN', muted: true, volume: 1 }
+        }
+    });
+
+    const slots = loadPlayerState().mosaicSlots;
+    assert.equal(slots.center.kind, 'youtube');
+    assert.equal(slots.center.videoId, ID);
+    assert.equal(slots.center.key, `youtube:${ID}`);
+    assert.equal(slots.center.name, 'Clip');
+    assert.equal(slots.center.muted, false);
+    assert.equal(slots.center.volume, 0.5);
+    assert.match(slots.center.url, /i\.ytimg\.com/);
+    assert.equal(slots.topLeft, undefined, 'invalid video ids are dropped');
+    assert.equal(slots.topRight.kind, undefined);
+    assert.equal(slots.topRight.key, 'iptv-org:CNN.us');
+});
+
+test('YouTube slot with only kind+videoId is normalized to a canonical key', () => {
+    const ID = 'M7lc1UVf-VE';
+    savePlayerState({
+        mosaicSlots: {
+            center: { kind: 'youtube', videoId: ID }
+        }
+    });
+    const center = loadPlayerState().mosaicSlots.center;
+    assert.equal(center.key, `youtube:${ID}`);
+    assert.equal(center.videoId, ID);
+    assert.equal(center.volume, 1);
+    assert.equal(center.muted, true);
+});
+
+test('quota compaction preserves YouTube mode on a slot', async () => {
+    const ID = 'dQw4w9WgXcQ';
+    const { compactNonEssentialPersistedState } = await import('../js/storage/persistedState.js');
+    const compacted = compactNonEssentialPersistedState({
+        mosaicSlots: {
+            center: { kind: 'youtube', key: `youtube:${ID}`, videoId: ID, name: 'Clip', muted: true, volume: 1 }
+        },
+        mosaicPlacement: { center: { x: 0, y: 0, w: 1, h: 1, z: 1 } }
+    });
+    assert.equal(compacted.mosaicSlots.center.kind, 'youtube');
+    assert.equal(compacted.mosaicSlots.center.videoId, ID);
+    assert.equal(compacted.mosaicSlots.center.key, `youtube:${ID}`);
+});
+
+

@@ -123,8 +123,12 @@ export const swapMethods = {
         if (!side.enabled || !side.player || !center.player) return false;
 
         let mode = resolveViewTransition(SettingsStore.getSwapTransition(), 'swap');
-        // Absolute free-layout tiles fight scale/flip transforms — keep opacity only.
-        if (this.hasCustomPlacement() && (mode === 'smooth' || mode === 'flip' || mode === 'slide' || mode === 'spring')) {
+        if (this.involvesYouTubeSlot?.(sideId, 'center')) {
+            // A YouTube embed is torn down and rebuilt mid-swap — transform
+            // modes would animate a freshly reloading iframe. Fade instead.
+            mode = 'crossfade';
+        } else if (this.hasCustomPlacement() && (mode === 'smooth' || mode === 'flip' || mode === 'slide' || mode === 'spring')) {
+            // Absolute free-layout tiles fight scale/flip transforms — keep opacity only.
             mode = 'crossfade';
         }
         if (mode === 'instant' || prefersReducedMotion()) {
@@ -157,6 +161,16 @@ export const swapMethods = {
         const side = this.slots[sideId];
         const center = this.slots.center;
         if (!side?.player || !center?.player) return;
+
+        // A YouTube tile has no <video> to relocate: tear the embed down, move
+        // the TV player across and mount a fresh embed at the destination.
+        const ytSlot = this.isYouTubeSlot?.(sideId)
+            ? sideId
+            : (this.isYouTubeSlot?.('center') ? 'center' : null);
+        if (ytSlot) {
+            this.commitSwapWithYouTube?.(sideId, ytSlot, opts);
+            return;
+        }
 
         // Capture per-player state before swapping slot pointers (stream identity).
         const centerPlayer = center.player;

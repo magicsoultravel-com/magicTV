@@ -256,7 +256,10 @@ export const freeLayoutMethods = {
         if (e.target.closest?.('.tv-controls__travel-wrap')) return;
         if (e.target.closest?.('.tv-controls__chan-prev-wrap')) return;
         if (e.target.closest?.('.tv-controls__chan-next-wrap')) return;
-        if (e.target.closest?.('.tv-player-tile__hover')) return;
+        // Chrome presses are inert for dragging — except the grab handle, which
+        // exists because a YouTube iframe swallows the tile-body pointerdown.
+        const dragHandle = e.target.closest?.('[data-tile-drag-handle]');
+        if (!dragHandle && e.target.closest?.('.tv-player-tile__hover')) return;
         if (e.target.closest?.('.tv-player-tile__vol-rocker')) return;
         if (e.target.closest?.('.tv-player-tile__chan-rocker')) return;
 

@@ -30,7 +30,8 @@ export function computeRotationRing(slots) {
     if (!slots) return [];
     return PLAY_FILL_ORDER.filter((id) => {
         const slot = slots[id];
-        return Boolean(slot?.enabled && slot?.player);
+        // YouTube tiles never travel: the embed belongs to its slot.
+        return Boolean(slot?.enabled && slot?.player && slot.player.kind !== 'youtube');
     });
 }
 
@@ -135,6 +136,7 @@ export const rotateMethods = {
      */
     async swapSlotChannels(slotA, slotB, opts = {}) {
         if (!slotA || !slotB || slotA === slotB || this.swapBusy) return false;
+        if (this.involvesYouTubeSlot?.(slotA, slotB)) return false;
         const a = this.slots[slotA];
         const b = this.slots[slotB];
         if (!a?.enabled || !b?.enabled) return false;

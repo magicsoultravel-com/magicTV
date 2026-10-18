@@ -13,6 +13,12 @@ export const CAST_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" focusab
 
 export const RESET_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.2 6a3.8 3.8 0 0 1 6.5-2.6M9.8 6a3.8 3.8 0 0 1-6.5 2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.2 1.8v2.2H10.4M3.8 10.2V8H1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+/** YouTube mode — rounded screen + play glyph (per-tile hover button). */
+export const YOUTUBE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.2" y="2.6" width="9.6" height="6.8" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.1 4.4 8 6 5.1 7.6V4.4z" fill="currentColor"/></svg>`;
+
+/** Grab handle — 2×3 grip dots; drags the tile when the embed owns the pointer. */
+export const GRAB_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><circle cx="4.2" cy="3" r="1.1" fill="currentColor"/><circle cx="7.8" cy="3" r="1.1" fill="currentColor"/><circle cx="4.2" cy="6" r="1.1" fill="currentColor"/><circle cx="7.8" cy="6" r="1.1" fill="currentColor"/><circle cx="4.2" cy="9" r="1.1" fill="currentColor"/><circle cx="7.8" cy="9" r="1.1" fill="currentColor"/></svg>`;
+
 /** Σ on the left, middle chevron pointing right toward the action glyph. */
 const ACTION_ALL_SIGMA = 'M6 2H1L4.8 6 1 10H6';
 
@@ -193,13 +199,26 @@ function travelWrap(target) {
     </div>`;
 }
 
+/**
+ * Grab handle for an embedded (YouTube) tile: the cross-origin iframe swallows
+ * the body pointerdown that normally starts a mosaic drag, so the tile is
+ * dragged from its chrome instead. No `data-tile-action` on purpose — the press
+ * must fall through to the free-layout drag handler, not a tile control.
+ * Hidden unless the tile runs an embed (see youtube.css).
+ */
+function grabHandle() {
+    return `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__grab-btn" data-tile-drag-handle title="Drag screen" aria-label="Drag this screen">${GRAB_SVG}</button>`;
+}
+
 function coreRowButtons(target) {
     return [
+        grabHandle(),
         controlBtn('browse', 'Pick channel', BROWSE_SVG, target, 'tv-controls__btn--main-3'),
         playWrap(target),
         stopWrap(target),
         controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2'),
         controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),
+        controlBtn('youtube', 'YouTube mode', YOUTUBE_SVG, target, 'tv-controls__btn--main-2 tv-controls__youtube-btn'),
         controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
         muteWrap(target),
         travelWrap(target)

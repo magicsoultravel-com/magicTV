@@ -4,6 +4,11 @@
  */
 import { readPersistedState, patchPersistedState } from './persistedState.js';
 import { migrateFavoriteRef } from '../tvProviders/channelShape.js';
+import {
+    youtubeEntryConfig,
+    youtubeKey,
+    youtubeThumbUrl
+} from '../youtube/youtubeLinks.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
 
 function hasFavoriteFolders(folders) {
@@ -327,6 +332,22 @@ function normalizeMosaicSlots(raw) {
     MOSAIC_SLOT_IDS.forEach((id) => {
         const entry = raw[id];
         if (!entry) return;
+        // YouTube tiles keep only their video id — never a TV URL/key.
+        const ytConfig = youtubeEntryConfig(entry);
+        if (ytConfig) {
+            const rawYtVol = typeof entry === 'object' ? Number(entry.volume) : NaN;
+            out[id] = {
+                kind: 'youtube',
+                key: youtubeKey(ytConfig.videoId),
+                videoId: ytConfig.videoId,
+                name: (typeof entry === 'object' && entry.name) || '',
+                muted: typeof entry === 'object' ? entry.muted !== false : true,
+                volume: Number.isFinite(rawYtVol) ? Math.min(1, Math.max(0, rawYtVol)) : 1,
+                url: (typeof entry === 'object' && (entry.url || entry.url_resolved))
+                    || youtubeThumbUrl(ytConfig.videoId)
+            };
+            return;
+        }
         const key = migrateFavoriteRef(typeof entry === 'string' ? entry : entry.key);
         if (!key) return;
         const rawVol = typeof entry === 'object' ? Number(entry.volume) : NaN;

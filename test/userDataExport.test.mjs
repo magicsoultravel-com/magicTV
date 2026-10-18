@@ -293,3 +293,27 @@ test('factoryResetUserData clears magicTV keys but preserves magiclists matrix_t
     assert.equal(store.has('matrix_tv_epg_guides'), false);
     assert.equal(store.get('matrix_tv_state'), '{"favorites":["lists-only"]}');
 });
+
+test('YouTube clip library rides along in extras and is wiped by user-data flush', async () => {
+    const ID = 'dQw4w9WgXcQ';
+    seedLocalState();
+    store.set('magictv_youtube_library_v1', JSON.stringify({
+        clips: [{ videoId: ID, title: 'Clip', thumb: '', addedAt: 5 }]
+    }));
+
+    const payload = UserDataExport.buildUserDataExport();
+    assert.equal(payload.extras.youtubeLibrary.clips.length, 1);
+    assert.equal(payload.extras.youtubeLibrary.clips[0].videoId, ID);
+
+    // Replace-import writes the library back.
+    store.delete('magictv_youtube_library_v1');
+    UserDataExport.applyUserDataReplace(payload);
+    const raw = JSON.parse(store.get('magictv_youtube_library_v1'));
+    assert.equal(raw.clips[0].videoId, ID);
+    assert.match(raw.clips[0].thumb, /i\.ytimg\.com/);
+
+    UserDataExport.clearAllUserData();
+    assert.equal(store.has('magictv_youtube_library_v1'), false);
+});
+
+

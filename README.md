@@ -11,6 +11,7 @@
 - **📱 Responsive** — Works on mobile, tablet, TV browser, desktop
 - **🎨 Themes** — Preset themes with customizable accent, background, border, and text colors
 - **🔊 Full Controls** — Play, pause, volume, quality, Picture-in-Picture, fullscreen, Chromecast
+- **▶️ YouTube Mode** — Run an embedded YouTube clip on one TV tile; paste a link or pick a saved clip
 - **🔗 Share Channels** — Copy a raw stream link or a magicTV deep link that opens the channel on a TV screen
 - **💾 Persistent** — localStorage saves favorites, recents, settings
 - **🚀 No Build** — Pure JavaScript modules, runs directly in browser
@@ -72,6 +73,7 @@ magicTV/
 │       ├── player.css       # Player slots, playback surfaces, swap animations, controls
 │       ├── settings.css     # Settings panels, appearance controls, responsive tweaks
 │       ├── modals.css       # Channel picker modal, tab-bar popups
+│       ├── youtube.css      # YouTube tile embed + clip picker overlay
 │       ├── remote.css       # Aggregator → remote/*.css (shell, shapes, panel, textures, pickers)
 │       └── remote/          # Remote module parts (shell, shapes, panel, textures, pickers)
 ├── js/
@@ -83,6 +85,12 @@ magicTV/
 │   ├── toast.js           # Bridge re-export → ui/toast.js
 │   ├── icons.js           # Bridge re-export → ui/icons.js
 │   ├── clipboard.js       # Bridge re-export → ui/clipboard.js
+│   ├── mosaic/             # MultiView mixins (playback, persist, chrome, youtube)
+│   ├── youtube/
+│   │   ├── youtubeLinks.js    # URL/id/thumb helpers (pure)
+│   │   ├── youtubeApi.js      # Lazy IFrame API loader
+│   │   ├── youtubeLibrary.js  # Saved clips + oEmbed metadata
+│   │   └── youtubePlayer.js   # playerInstance-compatible embed adapter
 │   ├── tvProviders/
 │   │   ├── registry.js    # Provider abstraction
 │   │   ├── channelShape.js # Channel data model
@@ -112,6 +120,17 @@ magicTV/
 1. **Click Channel** — Inline video player appears
 2. **Controls** — Play/Pause, Volume, Quality (when available), PiP, Fullscreen
 3. **Resume** — "Now Playing" card shows last watched; click Resume to continue
+
+### YouTube mode (one tile)
+Hover a TV tile and press the **YouTube** button (rounded play glyph) to paste a `youtube.com` / `youtu.be` link or pick a saved clip. Clips are remembered in a local library (`magictv_youtube_library_v1`).
+
+- Only **one** tile can run YouTube at a time — choosing it on another tile moves the embed there and releases the previous tile back to its TV channel.
+- The embedded player keeps its own seek/volume/quality controls; the tile's ▶ / ⏹ / mute / volume / fullscreen buttons drive it too.
+- The embed is contain-fit like a TV `<video>`: the whole 16:9 player stays visible, so YouTube's own control bar is never cropped or magnified.
+- **Drag from the grab handle** — the embed swallows pointer events on its own surface, so a YouTube tile is moved by the grip icon at the left of its hover chrome (hover the tile to reveal it); the edge handles still resize it and a plain click raises the tile.
+- **Swap with main** works on a YouTube tile — the embed is re-created on the other screen at the same clip, playhead and mute/volume, while the TV stream moves across untouched (the iframe has to reload, so it buffers for a moment). The channel YouTube displaced follows the embed, and Rotate/TV Travel leave the embed on its own screen.
+- Cast, pop-out/PiP, favourite and Bank are unavailable on a YouTube tile (a cross-origin embed can't be captured or cast).
+- Press the button again (or pick a channel on that tile) to leave YouTube mode and return to the channel that was there before.
 
 ### Favorites & Recents
 - **Favorite Button** — Use ★ on the player controls while a channel is playing

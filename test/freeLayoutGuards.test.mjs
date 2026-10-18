@@ -74,6 +74,58 @@ test('pointerdown on the chan rocker bind button does not start a tile drag', ()
     }
 });
 
+test('pointerdown on the chrome grab handle starts a tile drag', () => {
+    // A YouTube tile's cross-origin iframe swallows the tile-body pointerdown,
+    // so the embed tile is dragged from the grab handle in its hover chrome.
+    // That press must bypass the chrome guard without becoming a tile control.
+    const origDoc = globalThis.document;
+    const origWin = globalThis.window;
+    globalThis.document = { getElementById: (id) => (id === 'player-mosaic' ? { dataset: {} } : null) };
+    globalThis.window = { addEventListener() {}, removeEventListener() {} };
+    try {
+        const ctx = { swapBusy: false, slots: { center: { enabled: true } }, dragSession: null };
+        const prevented = [];
+
+        const { target, tile } = makeTarget([
+            '[data-tile-drag-handle]',
+            '.tv-player-tile__hover',
+            '.tv-player-tile'
+        ]);
+        freeLayoutMethods.onTilePointerDown.call(ctx, {
+            button: 0,
+            pointerId: 9,
+            clientX: 20,
+            clientY: 20,
+            target,
+            preventDefault: () => prevented.push(true)
+        });
+
+        assert.equal(prevented.length, 1, 'grab-handle press must preventDefault');
+        assert.ok(ctx.dragSession, 'grab-handle press opens a drag session');
+        assert.equal(ctx.dragSession.mode, 'drag');
+        assert.equal(ctx.dragSession.slotId, 'center');
+        assert.equal(ctx.dragSession.dragged, false, 'drag starts only past DRAG_THRESHOLD_PX');
+        assert.equal(tile.captured.length, 1, 'the tile captures the pointer');
+
+        // The rest of the chrome still ignores presses, so buttons stay clickable.
+        ctx.dragSession = null;
+        const { target: chromeTarget } = makeTarget(['.tv-player-tile__hover', '.tv-player-tile']);
+        freeLayoutMethods.onTilePointerDown.call(ctx, {
+            button: 0,
+            pointerId: 10,
+            clientX: 20,
+            clientY: 20,
+            target: chromeTarget,
+            preventDefault: () => prevented.push(true)
+        });
+        assert.equal(prevented.length, 1, 'plain chrome press must not preventDefault');
+        assert.equal(ctx.dragSession, null, 'plain chrome press must not open a drag session');
+    } finally {
+        globalThis.document = origDoc;
+        globalThis.window = origWin;
+    }
+});
+
 test('tile chan-bind menu override out-specifies the shared .chan-bind-menu base', () => {
     // tv-landing.css imports remote.css (shared .chan-bind-menu base) AFTER
     // player.css, so the tile placement rule must win by specificity, not order.

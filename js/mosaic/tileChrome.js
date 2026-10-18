@@ -111,6 +111,13 @@ export const tileChromeMethods = {
         if (action === 'stop-play') {
             const player = this.slots[slotId]?.player;
             if (!player?.channel) return;
+            if (player.kind === 'youtube') {
+                await player.stop();
+                player.resume();
+                this.persistSlots();
+                this.scheduleRefreshTiles();
+                return;
+            }
             const channel = player.channel;
             const key = channelKey(channel);
             const gen = (player._stopPlayGeneration = (player._stopPlayGeneration || 0) + 1);
@@ -181,8 +188,29 @@ export const tileChromeMethods = {
             return;
         }
 
+        if (action === 'youtube') {
+            if (this.isYouTubeSlot(slotId)) {
+                await this.detachYouTubeMode(slotId);
+                this.syncMosaicChrome();
+                return;
+            }
+            const { YouTubePicker } = await import('../ui/youtubePicker.js');
+            YouTubePicker.open({
+                slotId,
+                start: (videoId, meta) => this.enterYouTubeMode(slotId, videoId, {
+                    title: meta?.title || '',
+                    autoplay: true
+                })
+            });
+            return;
+        }
+
         if (action === 'cast') {
             const player = this.slots[slotId]?.player;
+            if (player?.kind === 'youtube') {
+                showAppToast('YouTube tiles can’t be cast');
+                return;
+            }
             const channel = player?.channel;
             const url = channel?.url_resolved || channel?.url || '';
             if (!url) {
@@ -273,12 +301,25 @@ export const tileChromeMethods = {
                 break;
             }
             case 'fav':
-                if (player.channel) {
+                if (player.channel && player.kind !== 'youtube') {
                     FavoritesRecents.toggleFavorite(player.channel);
                     this.getPrimary()?.emitState();
                 }
                 break;
             case 'fullscreen': {
+                if (player.kind === 'youtube') {
+                    const frameWrap = player.videoHolder;
+                    if (!frameWrap?.requestFullscreen) {
+                        showAppToast('Fullscreen isn’t supported here');
+                        break;
+                    }
+                    try {
+                        await frameWrap.requestFullscreen();
+                    } catch {
+                        showAppToast('Fullscreen blocked');
+                    }
+                    break;
+                }
                 const video = player.video;
                 if (!video?.requestFullscreen) {
                     showAppToast('Fullscreen isn’t supported here');
@@ -292,6 +333,10 @@ export const tileChromeMethods = {
                 break;
             }
             case 'pip': {
+                if (player.kind === 'youtube') {
+                    showAppToast('Pop out isn’t available in YouTube mode');
+                    break;
+                }
                 if (slotId === 'center') {
                     const { TvPip } = await import('../tvPip.js');
                     await TvPip.toggle();
@@ -397,6 +442,7 @@ export const tileChromeMethods = {
             tile.classList.toggle('is-stopped', uiStopped);
             tile.classList.toggle('is-disconnected', uiDisconnected);
             tile.classList.toggle('is-banking', uiBanking);
+            tile.classList.toggle('is-youtube', player?.kind === 'youtube');
             const stateEl = tile.querySelector('.tv-player-tile__playback-state');
             const countdownEl = tile.querySelector('.tv-player-tile__retry-countdown');
             if (stateEl) {
@@ -718,6 +764,14 @@ export const tileChromeMethods = {
             const slash = btn.querySelector('.tile-mute-slash');
             if (wave) wave.style.opacity = isMuted ? '0' : '1';
             if (slash) slash.style.opacity = isMuted ? '1' : '0';
+            return;
+        }
+        if (action === 'youtube') {
+            const active = player?.kind === 'youtube';
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', String(active));
+            btn.title = active ? 'Exit YouTube mode' : 'YouTube mode';
+            btn.setAttribute('aria-label', btn.title);
             return;
         }
         if (action === 'fav') {

@@ -46,6 +46,7 @@ import { persistMethods } from './mosaic/persist.js';
 import { focusChromeMethods } from './mosaic/focusChrome.js';
 import { playbackMethods } from './mosaic/playback.js';
 import { tileChromeMethods } from './mosaic/tileChrome.js';
+import { youtubeMethods } from './mosaic/youtube.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
 import { hydrateTileHoverControls, syncTileRockers } from './ui/tileHoverControls.js';
 import { ChanBindPicker } from './ui/chanBindPicker.js';
@@ -89,6 +90,7 @@ export const MultiView = {
     ...focusChromeMethods,
     ...playbackMethods,
     ...tileChromeMethods,
+    ...youtubeMethods,
 
     initialized: false,
     sharedVolume: savedVolume(),
@@ -112,6 +114,13 @@ export const MultiView = {
     slotsHydrated: false,
     /** Channel keys remembered from mosaicSlots — used to hide “Pick a channel” before HLS. */
     rememberedSlotKeys: /** @type {Record<string, string>} */ ({}),
+
+    /** YouTube mode: one live tile at a time, plus the TV channel to restore. */
+    _ytLiveSlotId: null,
+    /** @type {Record<string, { channel: object|null, key: string, name: string, muted: boolean, volume: number }>} */
+    youtubeReturn: {},
+    _ytPendingReturn: {},
+    _ytErrorToastAt: 0,
 
     /** @type {Record<string, { x: number, y: number, w: number, h: number, z: number }>} */
     mosaicPlacement: {},
@@ -727,12 +736,17 @@ export const MultiView = {
         } else {
             if (slot.player) {
                 slot.player.stop({ clearChannel: true }).catch(() => {});
+                if (slot.player.kind === 'youtube') {
+                    this.forgetYouTubeSlot?.(sideId);
+                    this.detachYouTubeModeSync?.(sideId);
+                }
                 if (this.mosaicPlacement[sideId]) {
                     delete this.mosaicPlacement[sideId];
                     this.persistPlacement();
                 }
             }
             delete this.rememberedSlotKeys[sideId];
+            this.forgetYouTubeSlot?.(sideId);
             if (this.statusSlotId === sideId) this.setStatusSlot('center');
         }
 

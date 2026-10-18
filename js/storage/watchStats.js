@@ -149,6 +149,19 @@ export function getLiveWatchSeconds(player) {
         return { session: 0, total: 0, key: '' };
     }
 
+    // YouTube tiles keep a session-only counter: never pollute lifetime stats
+    // (and never write a bogus `youtube:<id>` row into watchStatsMeta).
+    if (player?.kind === 'youtube') {
+        if (typeof player.syncWatchAccrual === 'function') {
+            try { player.syncWatchAccrual(); } catch { /* ignore */ }
+        }
+        return {
+            key: migrated,
+            session: Math.max(0, Number(player.watchSessionSeconds) || 0),
+            total: 0
+        };
+    }
+
     let open = 0;
     if (player.watchAccrueKey === migrated && player.watchAccrueStartedAt) {
         const wall = Math.max(0, (Date.now() - player.watchAccrueStartedAt) / 1000);
