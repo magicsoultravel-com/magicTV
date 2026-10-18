@@ -884,10 +884,9 @@ body.remote-mini-floating #remote-panel [data-mini-slot="browse"]   { order: 10;
 body.remote-mini-floating #remote-panel [data-mini-slot="settings"] { order: 11; }
 body.remote-mini-floating #remote-panel [data-mini-slot="voldown"]  { order: 12; }
 
-/* Split/sync may have hidden nav cells and the radio key may be disabled — force
-   the kept mini keys visible regardless (.is-hidden / [hidden] carry !important). */
-body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn.is-hidden,
-body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn[hidden] {
+/* Split/sync may hide nav keys — force non-tray mini keys visible (.is-hidden / [hidden]). */
+body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn.is-hidden:not(.radio-tray__btn),
+body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn[hidden]:not(.radio-tray__btn) {
     display: flex !important;
 }
 

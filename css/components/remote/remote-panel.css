@@ -655,10 +655,9 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     min-height: var(--remote-btn-size, 40px);
 }
 
-/* Radio tray — hidden by default, slides out on hover */
+/* Radio tray — chrome-row tray hidden until panel hover; grid play/stop/mute cells stay visible. */
 .radio-tray {
     position: relative;
-    display: none;
     min-height: var(--remote-btn-size, 40px);
     min-width: var(--remote-btn-size, 40px);
     width: var(--remote-btn-size, 40px);
@@ -669,6 +668,10 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     gap: 0.25rem;
     overflow: hidden;
     pointer-events: none;
+}
+
+.remote-module__chrome-row .radio-tray {
+    display: none;
 }
 
 .radio-tray__btn {
