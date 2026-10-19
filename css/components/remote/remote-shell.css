@@ -814,7 +814,10 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__resi
 /* ===== Mini-floating compact keypad (body.remote-mini-floating) =====
    A reduced 4×4 keypad suspended as a small float. Always undocked. Keeps only
    the hover tray actions that matter (mini toggle + collapse) and hides all the
-   keypad fluff, header chrome, guide, and screens footer. */
+   keypad fluff, header chrome, guide, and screens footer. The dialog's empty
+   drag header is hidden too: the dialog itself is draggable, and leaving that
+   header in place steals ~10px from the keypad's content-exact height. */
+body.remote-mini-floating #remote-module .remote-module__header,
 body.remote-mini-floating #remote-shell > .module-shell__chrome,
 body.remote-mini-floating #remote-shell .remote-module__channel-bar,
 body.remote-mini-floating #remote-shell .remote-module__chrome-row,
@@ -846,7 +849,8 @@ body.remote-mini-floating #remote-module .remote-module__host > #tv-catalog-body
 
 body.remote-mini-floating #remote-shell > .remote-module__scroll,
 body.remote-mini-floating #remote-panel {
-    /* Mini-floating keypad now scrolls naturally; no forced overflow:hidden */
+    /* Dialog height is content-exact; clip subpixel rounding instead of scrolling. */
+    overflow: hidden;
 }
 
 /* Keypad becomes the 4-col mini grid. */
@@ -890,9 +894,9 @@ body.remote-mini-floating #remote-panel [data-mini-slot] .tv-controls__btn[hidde
     display: flex !important;
 }
 
-/* Hover tray — only the mini toggle + collapse remain in mini mode. */
-body.remote-mini-floating .remote-module__host .tv-module__actions--remote-end .tv-module__action:not(#remote-mini-float-btn):not(#remote-collapse-header-btn),
-body.remote-mini-floating .remote-dock-sheet__inner .tv-module__actions--remote-end .tv-module__action:not(#remote-mini-float-btn):not(#remote-collapse-header-btn) {
+/* Hover tray — only mini toggle, reset, and collapse remain in mini mode. */
+body.remote-mini-floating .remote-module__host .tv-module__actions--remote-end .tv-module__action:not(#remote-mini-float-btn):not(#remote-scale-reset-btn):not(#remote-collapse-header-btn),
+body.remote-mini-floating .remote-dock-sheet__inner .tv-module__actions--remote-end .tv-module__action:not(#remote-mini-float-btn):not(#remote-scale-reset-btn):not(#remote-collapse-header-btn) {
     display: none !important;
 }
 

@@ -137,3 +137,46 @@ test('power lives in shell chrome', () => {
     assert.match(css, /\.remote-panel__cell--mini-only\s*\{\s*display:\s*none/s);
     assert.match(html, /miniTrayExpanded|miniTraySlotId/);
 });
+
+test('keypad play/stop/mute hover popouts use a slide-out tray above the primary', () => {
+    // Always-available popouts must not ship permanently hidden.
+    assert.doesNotMatch(buttonChunk('remote-play-all-btn'), /\bis-hidden\b/);
+    assert.doesNotMatch(buttonChunk('remote-mute-all-btn'), /\bis-hidden\b/);
+    // Stop-all visibility is driven by playback sync, and radio by settings.
+    assert.match(buttonChunk('remote-stop-all-btn'), /\bis-hidden\b/);
+    assert.match(buttonChunk('remote-radio-btn'), /\bis-hidden\b/);
+
+    // Each "-all" key lives inside its own tile-style popout tray.
+    const popoutTrays = html.match(/<div class="radio-tray__popout">/g) || [];
+    assert.equal(popoutTrays.length, 3, 'play, stop and mute each get a popout tray');
+    for (const id of ['remote-play-all-btn', 'remote-stop-all-btn', 'remote-mute-all-btn']) {
+        const btnIdx = html.indexOf(`id="${id}"`);
+        const trayIdx = html.lastIndexOf('<div class="radio-tray__popout">', btnIdx);
+        assert.ok(trayIdx > 0 && trayIdx < btnIdx, `${id} is wrapped by a popout tray`);
+        assert.ok(html.indexOf('</div>', btnIdx) > btnIdx, `${id} popout tray is closed`);
+    }
+
+    const css = readCssWithImports(join(root, 'css/components/remote.css'));
+    // The tray is pointer-events:none for chrome collapsing; the primary key
+    // inside a keypad cell must restore hits or Play/Stop/Mute do nothing.
+    assert.match(css, /\.remote-panel__grid \.radio-tray > \.remote-panel__btn\s*\{[^}]*pointer-events:\s*auto/s);
+    // Popout tray floats fully above the key, with the same dark tray language
+    // and slide-up transition used by the player-tile hover controls.
+    assert.match(css, /\.remote-panel__grid \.radio-tray__popout\s*\{[^}]*position:\s*absolute[^}]*bottom:\s*100%/s);
+    assert.match(css, /\.remote-panel__grid \.radio-tray__popout\s*\{[^}]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.58\)/s);
+    assert.match(css, /\.remote-panel__grid \.radio-tray__popout\s*\{[^}]*transform:\s*translateX\(-50%\)\s*translateY\(calc\(100%\s*\+\s*6px\)\)/s);
+    assert.match(css, /\.remote-panel__grid \.radio-tray__popout\s*\{[^}]*transition:[^}]*transform\s+0\.22s/s);
+    // The tray animates from behind the primary (lower z-index), so its slide
+    // can never intercept a click meant for the primary key.
+    assert.match(css, /\.remote-panel__grid \.radio-tray > \.remote-panel__btn\s*\{[^}]*z-index:\s*2/s);
+    assert.match(css, /\.remote-panel__grid \.radio-tray__popout\s*\{[^}]*z-index:\s*1/s);
+    assert.match(css, /\.remote-panel__grid \.radio-tray:hover > \.radio-tray__popout,\s*\.remote-panel__grid \.radio-tray:focus-within > \.radio-tray__popout\s*\{[^}]*transform:\s*translateX\(-50%\)\s*translateY\(0\)[^}]*visibility:\s*visible/s);
+    // Hidden Stop all must not leave an empty dark tray on hover.
+    assert.match(css, /\.remote-panel__grid \.radio-tray__popout:has\(> \.radio-tray__btn\.is-hidden\)\s*\{[^}]*display:\s*none/s);
+    assert.match(css, /body\.remote-mini-floating #remote-panel\s*\{[^}]*overflow:\s*hidden/s);
+    // The empty dialog drag header must not consume keypad height in mini mode.
+    assert.match(css, /body\.remote-mini-floating #remote-module \.remote-module__header,/);
+    // Scale reset survives mini action pruning so a non-1× mini can recover.
+    assert.match(html, /id="remote-scale-reset-btn"/);
+    assert.match(css, /\.tv-module__action:not\(#remote-mini-float-btn\):not\(#remote-scale-reset-btn\):not\(#remote-collapse-header-btn\)/);
+});

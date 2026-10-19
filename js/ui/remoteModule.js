@@ -50,7 +50,10 @@ const MIN_W = REMOTE_BASE_W;
 const MIN_H = REMOTE_BASE_H;
 /** Mini-floating keypad design size (CSS px) at scale 1. */
 const MINI_BASE_W = 240;
-const MINI_BASE_H = 250;
+/** 4x3 keypad rows, gaps, panel padding, and mini grid padding at 1× (header hidden). */
+const MINI_CONTENT_H = 168;
+const MINI_BORDER = 2;
+const MINI_BASE_H = MINI_CONTENT_H + MINI_BORDER;
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
@@ -79,8 +82,12 @@ function baseWidthForScale(s = activeScale()) {
 }
 
 function baseHeightForScale(s = activeScale()) {
-    const base = miniFloating ? MINI_BASE_H : MIN_H;
-    return Math.round(base * clampModuleScale(s));
+    if (miniFloating) {
+        // Round the content up before adding the border so subpixel scaling can
+        // never leave the dialog shorter than the keypad (which causes scrollbars).
+        return Math.ceil(MINI_CONTENT_H * clampModuleScale(s)) + MINI_BORDER;
+    }
+    return Math.round(MIN_H * clampModuleScale(s));
 }
 
 let deps = {
@@ -528,7 +535,7 @@ function persistState(overrides = {}) {
     // Mini position lives in the live dialog rect while mini is active.
     let miniLeft = prev.miniLeft ?? null;
     let miniTop = prev.miniTop ?? null;
-    if (nextMode === 'undocked' && miniFloating) {
+    if (miniFloating) {
         const live = readDialogGeometry();
         miniLeft = overrides.miniLeft != null ? overrides.miniLeft : live.left;
         miniTop = overrides.miniTop != null ? overrides.miniTop : live.top;
@@ -1376,7 +1383,9 @@ function finishClose() {
     }
 
     DockOpenGate.cancel();
-    persistState({ open: false, mode: 'hidden' });
+    // Capture the live mini position, but never leave a stale active-mini flag
+    // behind while the remote is closed.
+    persistState({ open: false, mode: 'hidden', miniFloating: false });
 
     externalHost = null;
     restoreBodyToStaging();
@@ -1558,6 +1567,11 @@ export const RemoteModule = {
 
         const wasHidden = mode === 'hidden';
         const deferTab = wasHidden && openMode !== 'undocked' && tab != null;
+        // Read the saved mini flag before the persist below overwrites it with
+        // the current (not-yet-mini) in-memory state.
+        const restoreMini = wasHidden
+            && openMode === 'undocked'
+            && getSavedState()?.miniFloating === true;
 
         if (!deferTab && tab != null && tab !== undefined) deps.switchTab(tab);
 
@@ -1604,8 +1618,7 @@ export const RemoteModule = {
             if (deferTab) deps.switchTab(tab);
             RemotePanel.syncRemotePanel();
             // Restore a persisted mini-floating session once the float is mounted.
-            if (openMode === 'undocked' && mode === 'undocked' && !miniFloating
-                && getSavedState()?.miniFloating === true) {
+            if (restoreMini && mode === 'undocked' && !miniFloating) {
                 enterMiniFloating();
             }
         };

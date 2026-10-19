@@ -42,6 +42,7 @@ let migrateStateKeyNamespace;
 let canonicalizePersistedState;
 let loadPlayerState;
 let loadPlayerStateFrom;
+let savePlayerState;
 
 before(async () => {
     ({
@@ -59,7 +60,7 @@ before(async () => {
         STATE_SCHEMA_VERSION,
         CORRUPT_BACKUP_KEY
     } = await import('../js/storage/stateMigration.js'));
-    ({ loadPlayerState, loadPlayerStateFrom } = await import('../js/storage/playerState.js'));
+    ({ loadPlayerState, loadPlayerStateFrom, savePlayerState } = await import('../js/storage/playerState.js'));
 });
 beforeEach(() => {
     store.clear();
@@ -193,6 +194,27 @@ test('loadPlayerState keeps mini-floating remote state alongside full geometry',
     // Full-float geometry is preserved alongside the mini footprint.
     assert.equal(state.remoteModule.left, 10);
     assert.equal(state.remoteModule.width, 300);
+});
+
+test('absent mini-floating position stays null through a save round-trip', () => {
+    store.set(STATE_KEY, JSON.stringify({
+        remoteModule: {
+            left: 10, top: 20, width: 300, height: 400,
+            mode: 'undocked', open: true, pinned: false, targetSlotId: 'center',
+            miniFloating: true, miniScale: 1.2
+        },
+        volume: 0.5
+    }));
+
+    const state = loadPlayerState();
+    assert.equal(state.remoteModule.miniLeft, null);
+    assert.equal(state.remoteModule.miniTop, null);
+
+    savePlayerState({ remoteModule: state.remoteModule });
+    const raw = JSON.parse(store.get(STATE_KEY));
+    assert.equal(raw.remoteModule.miniLeft, null);
+    assert.equal(raw.remoteModule.miniTop, null);
+    assert.equal(loadPlayerState().remoteModule.miniTop, null);
 });
 
 test('null hole in recentsMeta does not wipe favorites on load', () => {

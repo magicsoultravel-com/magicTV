@@ -715,8 +715,8 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     transform: scale(var(--btn-press-scale, 1.04));
 }
 
-/* Hide the tray when hovering the remote panel overall (keeps it compact) */
-.remote-panel:hover .radio-tray {
+/* Chrome-row radio tray stays compact until the panel is hovered. */
+.remote-panel:hover .remote-module__chrome-row .radio-tray {
     display: flex;
 }
 
@@ -750,6 +750,75 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
 .remote-panel:hover .radio-tray__btn + .radio-tray__btn:only-child {
     opacity: 1;
     color: var(--tv-text-primary);
+}
+
+/* Keypad play/stop/mute cells: the tray disables pointer events for chrome
+   collapsing, so explicitly restore hits on the primary key. The "-all"
+   variant sits in a tile-style popout tray directly above the primary.
+   The tray slides out from behind the key (z-index below it), so it can
+   animate without ever stealing the primary's hits. */
+.remote-panel__grid .radio-tray {
+    overflow: visible;
+}
+
+.remote-panel__grid .radio-tray > .remote-panel__btn {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.remote-panel__grid .radio-tray__popout {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding:
+        calc(var(--remote-btn-size, 40px) * 0.1)
+        calc(var(--remote-grid-gap, 0.4rem) / 2 - 1px);
+    border-radius: calc(var(--remote-btn-size, 40px) * 0.25);
+    border: 1px solid color-mix(in srgb, var(--tv-border, rgba(255, 255, 255, 0.2)) 55%, transparent);
+    background: rgba(0, 0, 0, 0.58);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translateX(-50%) translateY(calc(100% + 6px));
+    transition:
+        transform 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.14s,
+        opacity 0.18s ease 0.14s,
+        visibility 0.22s ease 0.14s;
+}
+
+/* An empty tray would otherwise appear while Stop all has nothing to stop. */
+.remote-panel__grid .radio-tray__popout:has(> .radio-tray__btn.is-hidden) {
+    display: none;
+}
+
+.remote-panel__grid .radio-tray__popout > .radio-tray__btn {
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    flex: 0 0 var(--remote-btn-size, 40px);
+}
+
+.remote-panel__grid .radio-tray:hover > .radio-tray__popout,
+.remote-panel__grid .radio-tray:focus-within > .radio-tray__popout {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .remote-panel__grid .radio-tray__popout {
+        transition: none;
+    }
 }
 
 .remote-panel__volume-split {

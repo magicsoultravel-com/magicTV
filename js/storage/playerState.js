@@ -456,6 +456,10 @@ function normalizeRemoteModule(raw, legacyPicker) {
         ? Math.min(0.85, Math.max(0.25, Number(src.sheetHeight)))
         : 0.45;
     const layout = normalizeModuleLayout(src.layout);
+    const miniLeftN = Number(src.miniLeft);
+    const miniTopN = Number(src.miniTop);
+    const miniLeft = src.miniLeft == null ? null : (Number.isFinite(miniLeftN) ? miniLeftN : null);
+    const miniTop = src.miniTop == null ? null : (Number.isFinite(miniTopN) ? miniTopN : null);
     return {
         left,
         top,
@@ -473,8 +477,8 @@ function normalizeRemoteModule(raw, legacyPicker) {
         miniScale: Number.isFinite(Number(src.miniScale))
             ? Math.min(1.5, Math.max(0.5, Number(src.miniScale)))
             : null,
-        miniLeft: Number(src.miniLeft),
-        miniTop: Number(src.miniTop),
+        miniLeft,
+        miniTop,
         ...(layout ? { layout } : {})
     };
 }
