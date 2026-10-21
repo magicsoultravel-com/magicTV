@@ -17,6 +17,7 @@ import { setMarqueeText } from '../ui/marquee.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { formatWatchDuration, getLiveWatchSeconds } from '../storage/watchStats.js';
 import { shieldLabel } from '../webstream/webShield.js';
+import { buildYouTubeQueueTrayHtml } from '../ui/tileHoverControls.js';
 
 /** Shield popout actions → the exact level they pick (the glyph cycles instead). */
 const SHIELD_ACTION_LEVELS = {
@@ -62,7 +63,7 @@ export const tileChromeMethods = {
         TileFrames.notePlayingVideo(url, player.video, key);
     },
 
-    async handleTileAction(slotId, action, { target = 'local' } = {}) {
+    async handleTileAction(slotId, action, { target = 'local', triggerEl = null } = {}) {
         if (action === 'reset') {
             this.resetToSelectedLayout();
             return;
@@ -222,6 +223,24 @@ export const tileChromeMethods = {
                     autoplay: true
                 })
             });
+            return;
+        }
+
+        // YouTube queue controls — handled before the "player exists" gate
+        // because a stale click after leaving YouTube mode must not throw.
+        if (action === 'yt-prev' || action === 'yt-next') {
+            await this.stepYouTubeQueue?.(slotId, action === 'yt-next' ? 1 : -1);
+            return;
+        }
+
+        if (action === 'yt-queue') {
+            this.toggleYouTubeQueueTray?.(slotId);
+            return;
+        }
+
+        if (action === 'yt-play') {
+            const index = Number(triggerEl?.getAttribute?.('data-yt-index'));
+            if (Number.isFinite(index)) this.playYouTubeQueueIndex?.(slotId, index);
             return;
         }
 
@@ -658,6 +677,7 @@ export const tileChromeMethods = {
             }
 
             this.syncTileCastUi(tile, id, player);
+            this.syncYouTubeQueueChrome(tile, id, player);
             this.syncTileWatchEcho(tile, player);
         });
         this.syncMosaicChrome();
@@ -738,6 +758,65 @@ export const tileChromeMethods = {
             const tile = el(`player-tile-${id}`);
             if (tile) this.syncTileWatchEcho(tile, player);
         }
+    },
+
+    /**
+     * Keep the YouTube prev / next buttons and thumbnail tray in sync. The tray
+     * is only re-rendered when its structural key changes, because this runs on
+     * every playback-state tick.
+     * @param {HTMLElement} tile
+     * @param {string} slotId
+     * @param {object|null|undefined} player
+     */
+    syncYouTubeQueueChrome(tile, slotId, player) {
+        const wrap = tile?.querySelector?.('.tv-controls__ytqueue-wrap');
+        if (!wrap) return;
+        const active = player?.kind === 'youtube';
+        const state = active && typeof this.youtubeQueueState === 'function'
+            ? this.youtubeQueueState(slotId)
+            : null;
+
+        const prev = wrap.querySelector('[data-tile-action="yt-prev"]');
+        if (prev) {
+            const hasPrev = Boolean(state?.hasPrev);
+            prev.disabled = !hasPrev;
+            prev.setAttribute('aria-disabled', String(!hasPrev));
+            prev.title = hasPrev ? 'Previous video' : 'No previous video';
+            prev.setAttribute('aria-label', prev.title);
+        }
+
+        const next = wrap.querySelector('[data-tile-action="yt-next"]');
+        if (next) {
+            const hasNext = Boolean(state?.hasNext);
+            next.disabled = !hasNext;
+            next.setAttribute('aria-disabled', String(!hasNext));
+            const label = !hasNext && state?.relatedLoading
+                ? 'Finding more videos…'
+                : (hasNext ? 'Next video' : 'No next video');
+            next.title = label;
+            next.setAttribute('aria-label', label);
+        }
+
+        const open = Boolean(state?.open);
+        const toggle = wrap.querySelector('[data-tile-action="yt-queue"]');
+        if (toggle) {
+            toggle.classList.toggle('is-active', open);
+            toggle.setAttribute('aria-expanded', String(open));
+        }
+        wrap.classList.toggle('is-open', open);
+
+        const items = state?.items || [];
+        const tray = wrap.querySelector('[data-yt-queue-tray]');
+        if (tray) tray.setAttribute('aria-hidden', String(items.length === 0));
+
+        const strip = wrap.querySelector('[data-yt-queue-strip]');
+        if (!strip) return;
+        const index = state?.index ?? -1;
+        const loading = Boolean(state?.relatedLoading);
+        const key = `${index}|${loading ? 1 : 0}|${items.map((item) => item.videoId).join(',')}`;
+        if (strip.dataset.ytQueueKey === key) return;
+        strip.dataset.ytQueueKey = key;
+        strip.innerHTML = buildYouTubeQueueTrayHtml({ items, index, relatedLoading: loading });
     },
 
     syncTileCastUi(tile, slotId, player) {
@@ -828,6 +907,10 @@ export const tileChromeMethods = {
 
     syncTileControlButton(btn, player, slotId, { intentPlaying, isMuted, target, isBanking = false }) {
         const action = btn.getAttribute('data-tile-action');
+        if (action === 'yt-prev' || action === 'yt-next' || action === 'yt-queue' || action === 'yt-play') {
+            // Queue button states live in syncYouTubeQueueChrome().
+            return;
+        }
         if (action === 'play') {
             btn.classList.remove('is-hidden');
             // While banking, Pause demotes to stay-paused; label stays Pause.

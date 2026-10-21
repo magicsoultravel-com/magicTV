@@ -567,6 +567,19 @@ export const MultiView = {
         if (this._hoverBound || typeof document === 'undefined') return;
         this._hoverBound = true;
 
+        // Settings → Clear YouTube history: drop the live tile's in-memory queue
+        // too, so the tray rebuilds from the (now empty) history + library.
+        if (!this._youtubeHistoryBound) {
+            this._youtubeHistoryBound = true;
+            window.addEventListener('tv:youtube_history_cleared', () => {
+                this._ytQueue = null;
+                this._ytRelatedGen = (this._ytRelatedGen || 0) + 1;
+                this._ytRelatedPending = {};
+                this._ytRelatedTokens = {};
+                this.scheduleRefreshTiles();
+            });
+        }
+
         if (!this._fullscreenSyncBound) {
             this._fullscreenSyncBound = true;
             const syncFullscreenActive = () => {

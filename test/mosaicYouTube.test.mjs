@@ -89,6 +89,8 @@ function makeCtx() {
         youtubeReturn: {},
         _ytPendingReturn: {},
         _ytLiveSlotId: null,
+        // Test seam: related lookups never leave the process in unit tests.
+        _ytRelatedFetcher: async () => ({ items: [] }),
         mounted: 0,
         persisted: 0,
         restoreCalls: [],
@@ -422,6 +424,119 @@ test('swapWithCenter reaches commitSwap for a YouTube tile instead of refusing',
     const ok = await ctx.swapWithCenter('topLeft');
     assert.equal(ok, true);
     assert.deepEqual(commits, ['topLeft'], 'swap was not blocked by YouTube mode');
+});
+
+test('prev / next steps the local queue and appends related at the tail', async () => {
+    store.clear();
+    const { addYouTubeClip } = await import('../js/youtube/youtubeLibrary.js');
+    addYouTubeClip({ videoId: ID_B, title: 'Library B', author: 'Channel B' });
+
+    const ctx = makeCtx();
+    const relatedId = 'kJQP7kiw5Fk';
+    ctx._ytRelatedFetcher = async () => ({
+        items: [{ videoId: relatedId, title: 'Related D', author: 'Channel D' }]
+    });
+
+    await ctx.enterYouTubeMode('center', ID_B, { title: 'Clip B' });
+    // Prefetch is fire-and-forget; let it land.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const state = ctx.youtubeQueueState('center');
+    assert.deepEqual(state.items.map((item) => item.videoId), [ID_B, relatedId]);
+    assert.equal(state.index, 0);
+    assert.equal(state.hasPrev, false);
+    assert.equal(state.hasNext, true);
+
+    // Append while the cursor sits at the tail keeps both the order and index.
+    assert.equal(ctx.toggleYouTubeQueueTray('center', true), true);
+    assert.equal(ctx.youtubeQueueState('center').open, true);
+
+    const player = ctx.slots.center.player;
+    const mutedBefore = player.muted;
+    const volumeBefore = player.volume;
+
+    assert.equal(await ctx.stepYouTubeQueue('center', 1), true);
+    assert.equal(player.videoId, relatedId);
+    assert.equal(player.muted, mutedBefore, 'mute state carries across the swap');
+    assert.equal(player.volume, volumeBefore, 'volume carries across the swap');
+
+    const after = ctx.youtubeQueueState('center');
+    assert.equal(after.index, 1);
+    assert.equal(after.hasPrev, true);
+    assert.equal(after.hasNext, false);
+    assert.deepEqual(after.items.map((item) => item.videoId), [ID_B, relatedId], 'index never shifts');
+
+    assert.equal(ctx.toggleYouTubeQueueTray('center', false), false);
+    assert.equal(ctx.youtubeQueueState('center').open, false);
+
+    assert.equal(await ctx.stepYouTubeQueue('center', -1), true);
+    assert.equal(ctx.slots.center.player.videoId, ID_B);
+    assert.equal(await ctx.stepYouTubeQueue('center', -1), false, 'head of the queue stops');
+});
+
+test('jumping to a tray entry starts that clip and collapses the tray', async () => {
+    store.clear();
+    const { addYouTubeClip } = await import('../js/youtube/youtubeLibrary.js');
+    addYouTubeClip({ videoId: ID_B, title: 'Library B' });
+    const ctx = makeCtx();
+    ctx._ytRelatedFetcher = async () => ({
+        items: [{ videoId: 'kJQP7kiw5Fk', title: 'Related D', author: 'Channel D' }]
+    });
+    await ctx.enterYouTubeMode('center', ID_B, { title: 'Clip B' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // A related clip lands at index 1; the tray jump uses the same path.
+    const state = ctx.youtubeQueueState('center');
+    assert.equal(state.items.length, 2);
+    assert.equal(state.items[1].videoId, 'kJQP7kiw5Fk');
+    ctx.toggleYouTubeQueueTray('center', true);
+    assert.equal(ctx.playYouTubeQueueIndex('center', 1), true);
+    assert.equal(ctx.slots.center.player.videoId, 'kJQP7kiw5Fk');
+    assert.equal(ctx.youtubeQueueState('center').open, false);
+});
+
+test('a finished clip auto-plays the next queue entry once', async () => {
+    store.clear();
+    const { addYouTubeClip } = await import('../js/youtube/youtubeLibrary.js');
+    addYouTubeClip({ videoId: ID_A, title: 'Library A' });
+
+    const ctx = makeCtx();
+    await ctx.enterYouTubeMode('center', ID_B, { title: 'Clip B' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const player = ctx.slots.center.player;
+    // The adapter fires onEnded → the mosaic hops to the next entry.
+    player.ended = true;
+    ctx._ytMaybeAutoAdvance('center', player);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const state = ctx.youtubeQueueState('center');
+    assert.equal(state.index, 1);
+    assert.equal(ctx.slots.center.player.videoId, state.items[1].videoId);
+});
+
+test('auto-advance respects the setting', async () => {
+    store.clear();
+    const { SettingsStore } = await import('../js/storage/settingsStore.js');
+    const { addYouTubeClip } = await import('../js/youtube/youtubeLibrary.js');
+    addYouTubeClip({ videoId: ID_B, title: 'Library B' });
+
+    SettingsStore.setYouTubeQueueAutoAdvance(false);
+    try {
+        const ctx = makeCtx();
+        await ctx.enterYouTubeMode('center', ID_B, { title: 'Clip B' });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const player = ctx.slots.center.player;
+        player.ended = true;
+        ctx._ytMaybeAutoAdvance('center', player);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        assert.equal(player.videoId, ID_B, 'stayed on the finished clip');
+        assert.equal(ctx.youtubeQueueState('center').index, 0);
+    } finally {
+        SettingsStore.setYouTubeQueueAutoAdvance(true);
+    }
 });
 
 

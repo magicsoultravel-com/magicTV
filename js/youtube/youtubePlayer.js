@@ -107,7 +107,8 @@ export function captureYouTubeSwapState(player) {
  *   getSharedVolume?: () => number,
  *   getLastVolume?: () => number,
  *   onState?: (player: object) => void,
- *   onError?: (message: string, player: object) => void
+ *   onError?: (message: string, player: object) => void,
+ *   onEnded?: (player: object) => void
  * }} options
  */
 export function createYouTubePlayer({
@@ -121,7 +122,8 @@ export function createYouTubePlayer({
     getSharedVolume = () => 1,
     getLastVolume = () => 1,
     onState = null,
-    onError = null
+    onError = null,
+    onEnded = null
 }) {
     const normalizedId = normalizeYouTubeId(videoId);
     const player = {
@@ -374,6 +376,7 @@ export function createYouTubePlayer({
         _handleApiState(state) {
             if (this._destroyed) return;
             const S = YT_PLAYER_STATE;
+            let endedNow = false;
             switch (state) {
                 case S.PLAYING:
                     this.playing = true;
@@ -416,6 +419,7 @@ export function createYouTubePlayer({
                     this.pausePhase = 'idle';
                     this.stopped = true;
                     this.ended = true;
+                    endedNow = true;
                     break;
                 case S.CUED:
                     this._bankWatch();
@@ -434,6 +438,9 @@ export function createYouTubePlayer({
                     break;
             }
             this.emitState();
+            if (endedNow) {
+                try { onEnded?.(this); } catch { /* ignore */ }
+            }
         },
 
         // ---- watch accrual (session only) ---------------------------------
@@ -490,6 +497,80 @@ export function createYouTubePlayer({
             }
             this._command('playVideo');
             this.emitState();
+        },
+
+        /**
+         * Re-point the adapter (channel / poster / watch key / transport flags)
+         * at another clip while keeping the same iframe and audio state.
+         * @param {string} videoId
+         * @param {{ title?: string, startAt?: number }} [opts]
+         * @returns {boolean}
+         */
+        _applyClip(videoId, { title = '', startAt = 0 } = {}) {
+            const id = normalizeYouTubeId(videoId);
+            if (!id) return false;
+            this._bankWatch();
+            this.videoId = id;
+            this.startAt = Math.max(0, Math.round(Number(startAt) || 0));
+            this.channel = createYouTubeChannel(id, title);
+            this.posterDataUrl = youtubeThumbUrl(id);
+            this.watchSessionKey = youtubeKey(id);
+            this.watchSessionSeconds = 0;
+            this.playing = false;
+            this.wantPlaying = false;
+            this.loading = false;
+            this.loadPhase = 'idle';
+            this.pausePhase = 'idle';
+            this.stopped = true;
+            this.ended = false;
+            this.error = null;
+            this.resumeBlocked = false;
+            this.connection = 'idle';
+            return true;
+        },
+
+        /**
+         * Load another clip through the IFrame API — no iframe teardown, so the
+         * flip is instant and mute/volume carry over untouched.
+         * @param {string} videoId
+         * @param {number} [startAt]
+         * @param {{ title?: string, autoplay?: boolean }} [opts]
+         * @returns {boolean}
+         */
+        loadVideoById(videoId, startAt = 0, { title = '', autoplay = false } = {}) {
+            if (this._destroyed) return false;
+            if (!this._applyClip(videoId, { title, startAt })) return false;
+            if (autoplay) {
+                this.wantPlaying = true;
+                this.stopped = false;
+                this.loading = true;
+                this.loadPhase = 'connecting';
+            }
+            this._command('loadVideoById', [{
+                videoId: this.videoId,
+                startSeconds: this.startAt || 0
+            }]);
+            if (autoplay) this._command('playVideo');
+            this._applyAudio();
+            this.emitState();
+            return true;
+        },
+
+        /**
+         * Queue navigation entry point: same clip resumes, a new clip swaps in.
+         * @param {string} videoId
+         * @param {{ title?: string, startAt?: number, autoplay?: boolean }} [opts]
+         * @returns {boolean}
+         */
+        swapVideo(videoId, { title = '', startAt = 0, autoplay = true } = {}) {
+            if (this._destroyed) return false;
+            const id = normalizeYouTubeId(videoId);
+            if (!id) return false;
+            if (id === this.videoId) {
+                if (autoplay) this.resume();
+                return true;
+            }
+            return this.loadVideoById(id, startAt, { title, autoplay });
         },
 
         pause() {

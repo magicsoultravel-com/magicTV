@@ -24,6 +24,19 @@ import {
     youtubeKey
 } from '../youtube/youtubeLinks.js';
 import { createYouTubePlayer, captureYouTubeSwapState } from '../youtube/youtubePlayer.js';
+import {
+    buildYouTubeQueue,
+    appendYouTubeRelated,
+    listYouTubeHistory,
+    recordYouTubeHistory,
+    resolveYouTubeQueueStep,
+    selectYouTubeQueueIndex,
+    queueIndexOf,
+    saveYouTubeQueue
+} from '../youtube/youtubeQueue.js';
+import { fetchYouTubeRelated } from '../youtube/youtubeRelated.js';
+import { listYouTubeClips, touchYouTubeClip } from '../youtube/youtubeLibrary.js';
+import { SettingsStore } from '../storage/settingsStore.js';
 import { stubChannelFromEntry } from './persist.js';
 import { channelKey } from '../tvProviders/channelShape.js';
 import {
@@ -119,6 +132,25 @@ export const youtubeMethods = {
         if (this.rememberedSlotKeys) delete this.rememberedSlotKeys[slotId];
         if (this._ytPendingReturn) delete this._ytPendingReturn[slotId];
 
+        // Same tile, different clip (picker / tray): swap on the live iframe
+        // instead of tearing it down, so mute/volume and player readiness stay.
+        if (current?.kind === 'youtube' && typeof current.swapVideo === 'function') {
+            const swapped = current.swapVideo(videoId, { title, startAt, autoplay });
+            if (swapped) {
+                this._ytResetQueue(slotId, current);
+                recordYouTubeHistory({
+                    videoId,
+                    title: title || current.channel?.name || '',
+                    author: this._ytAuthors?.[videoId] || ''
+                });
+                if (autoplay) this._ytPrefetchRelated(slotId);
+                if (persist) this.persistSlots?.();
+                this.scheduleRefreshTiles?.();
+                this.syncStatusChrome?.();
+                return true;
+            }
+        }
+
         if (current && current.kind !== 'youtube') {
             cancelSlotPrefetch(slotId);
             try {
@@ -145,7 +177,17 @@ export const youtubeMethods = {
         });
         if (!player) return false;
 
-        if (autoplay) player.resume();
+        this._ytResetQueue(slotId, player);
+        recordYouTubeHistory({
+            videoId,
+            title: title || player.channel?.name || '',
+            author: this._ytAuthors?.[videoId] || ''
+        });
+        if (autoplay) {
+            player.resume();
+            // Fill the tray with next-up previews (local queue is already there).
+            this._ytPrefetchRelated(slotId);
+        }
         if (persist) this.persistSlots?.();
         this.scheduleRefreshTiles?.();
         this.syncStatusChrome?.();
@@ -176,6 +218,8 @@ export const youtubeMethods = {
 
         const ytState = captureYouTubeSwapState(ytPlayer);
         const tvBefore = captureSwapPlaybackState(tvPlayer);
+        // The queue survives the iframe rebuild so next/prev keeps its place.
+        const ytQueueBefore = this._ytQueue;
 
         // Tear the embed down first: its surface is about to host the TV player.
         this.detachYouTubeModeSync(ytSlot);
@@ -200,6 +244,7 @@ export const youtubeMethods = {
         applySwapPlaybackContinuity(tvBefore, tvPlayer);
 
         const player = this._ytCreateSlotPlayer(tvSlot, ytState);
+        if (player) this._ytAdoptQueue(tvSlot, player, ytQueueBefore);
         if (player && ytState.autoplay) player.resume();
 
         // The channel YouTube displaced follows the embed to its new tile, so
@@ -249,6 +294,7 @@ export const youtubeMethods = {
             getSharedVolume: () => this.sharedVolume,
             getLastVolume: () => this.lastVolume,
             onState: () => this.scheduleRefreshTiles?.(),
+            onEnded: (endedPlayer) => this._ytMaybeAutoAdvance(slotId, endedPlayer),
             onError: (message) => {
                 const now = Date.now();
                 if (now - (this._ytErrorToastAt || 0) < 4000) return;
@@ -280,6 +326,7 @@ export const youtubeMethods = {
         } catch { /* ignore */ }
         slot.player = null;
         if (this._ytLiveSlotId === slotId) this._ytLiveSlotId = null;
+        this._ytForgetQueue(slotId);
         if (returnState) {
             this._ytPendingReturn = this._ytPendingReturn || {};
             this._ytPendingReturn[slotId] = returnState;
@@ -381,6 +428,332 @@ export const youtubeMethods = {
         if (this._ytLiveSlotId === slotId) this._ytLiveSlotId = null;
         if (this.youtubeReturn) delete this.youtubeReturn[slotId];
         if (this._ytPendingReturn) delete this._ytPendingReturn[slotId];
+        this._ytForgetQueue(slotId);
+    },
+
+    // ---- play queue (prev / next / related tray) -------------------------
+
+    /** Remember the channel name that came with a related clip. */
+    _ytRememberAuthor(item) {
+        if (!item?.videoId || !item.author) return;
+        this._ytAuthors = this._ytAuthors || {};
+        this._ytAuthors[item.videoId] = item.author;
+    },
+
+    /**
+     * Build the queue for the clip a tile is running: current → same author →
+     * rest of the saved library → history. Remote related clips are appended
+     * later by `_ytPrefetchRelated()`.
+     * @param {string} slotId
+     * @param {object} player
+     */
+    _ytResetQueue(slotId, player) {
+        const videoId = normalizeYouTubeId(player?.videoId);
+        if (!videoId) return null;
+        const library = listYouTubeClips();
+        const author = this._ytAuthors?.[videoId]
+            || library.find((clip) => clip.videoId === videoId)?.author
+            || '';
+        const queue = buildYouTubeQueue({
+            current: { videoId, title: player?.channel?.name || '', author },
+            library,
+            history: listYouTubeHistory()
+        });
+        this._ytQueue = { slotId, queue, relatedFor: '' };
+        this._ytQueueOpen = { ...(this._ytQueueOpen || {}), [slotId]: false };
+        this._ytRelatedGen = (this._ytRelatedGen || 0) + 1;
+        this._ytClearRelatedPending(slotId);
+        saveYouTubeQueue(queue);
+        return queue;
+    },
+
+    /** Forget one slot's in-flight related lookup (its result is discarded). */
+    _ytClearRelatedPending(slotId) {
+        if (this._ytRelatedPending?.[slotId]) {
+            const pending = { ...this._ytRelatedPending };
+            delete pending[slotId];
+            this._ytRelatedPending = pending;
+        }
+        if (this._ytRelatedTokens?.[slotId]) {
+            const tokens = { ...this._ytRelatedTokens };
+            delete tokens[slotId];
+            this._ytRelatedTokens = tokens;
+        }
+    },
+
+    /**
+     * Re-point an existing queue at a (possibly moved) tile after a swap.
+     * Falls back to a fresh local queue when the clip is not in it.
+     */
+    _ytAdoptQueue(slotId, player, previous = null) {
+        const videoId = normalizeYouTubeId(player?.videoId);
+        if (!videoId) return null;
+        if (previous?.queue?.items?.some((item) => item.videoId === videoId)) {
+            const index = Math.max(0, queueIndexOf(previous.queue, videoId));
+            this._ytQueue = {
+                slotId,
+                queue: selectYouTubeQueueIndex(previous.queue, index),
+                relatedFor: previous.relatedFor || ''
+            };
+            const open = { ...(this._ytQueueOpen || {}) };
+            if (previous.slotId) delete open[previous.slotId];
+            open[slotId] = false;
+            this._ytQueueOpen = open;
+            return this._ytQueue.queue;
+        }
+        return this._ytResetQueue(slotId, player);
+    },
+
+    /** Drop queue + tray state for a tile that is leaving YouTube mode. */
+    _ytForgetQueue(slotId) {
+        if (this._ytQueue?.slotId === slotId) this._ytQueue = null;
+        this._ytRelatedGen = (this._ytRelatedGen || 0) + 1;
+        this._ytClearRelatedPending(slotId);
+        if (this._ytQueueOpen?.[slotId]) {
+            const open = { ...this._ytQueueOpen };
+            delete open[slotId];
+            this._ytQueueOpen = open;
+        }
+        if (this._ytEndedAt?.[slotId]) {
+            const endedAt = { ...this._ytEndedAt };
+            delete endedAt[slotId];
+            this._ytEndedAt = endedAt;
+        }
+    },
+
+    /**
+     * Queue for the tile, rebuilt when the player switched clip behind our back
+     * (picker, restore, TV tune).
+     * @param {string} slotId
+     */
+    ensureYouTubeQueue(slotId) {
+        const player = this.slots?.[slotId]?.player;
+        const videoId = normalizeYouTubeId(player?.videoId);
+        if (!videoId) return { videoId: '', index: -1, items: [], updatedAt: 0 };
+        const active = this._ytQueue;
+        if (active?.slotId === slotId && active.queue?.items?.length) {
+            const index = queueIndexOf(active.queue, videoId);
+            if (index < 0) return this._ytResetQueue(slotId, player) || active.queue;
+            if (index !== active.queue.index) active.queue = selectYouTubeQueueIndex(active.queue, index);
+            return active.queue;
+        }
+        return this._ytResetQueue(slotId, player) || { videoId: '', index: -1, items: [], updatedAt: 0 };
+    },
+
+    /**
+     * Snapshot for the chrome (prev/next disabled states + tray contents).
+     * @param {string} slotId
+     */
+    youtubeQueueState(slotId) {
+        const player = this.slots?.[slotId]?.player;
+        if (!player || player.kind !== 'youtube') {
+            return {
+                active: false,
+                videoId: '',
+                index: -1,
+                items: [],
+                hasPrev: false,
+                hasNext: false,
+                open: false,
+                relatedLoading: false
+            };
+        }
+        const queue = this.ensureYouTubeQueue(slotId);
+        return {
+            active: true,
+            videoId: queue.videoId,
+            index: queue.index,
+            items: queue.items,
+            hasPrev: queue.index > 0,
+            hasNext: queue.index >= 0 && queue.index < queue.items.length - 1,
+            open: Boolean(this._ytQueueOpen?.[slotId]),
+            relatedLoading: Boolean(this._ytRelatedPending?.[slotId])
+        };
+    },
+
+    /**
+     * Switch the tile to one queue entry. Same clip resumes; a different clip
+     * goes through the adapter's in-place `swapVideo()` (no iframe teardown, so
+     * mute/volume/play intent carry over).
+     * @param {string} slotId
+     * @param {number} index
+     * @param {{ autoplay?: boolean }} [opts]
+     */
+    _ytApplyQueueIndex(slotId, index, { autoplay = true } = {}) {
+        const player = this.slots?.[slotId]?.player;
+        if (!player || player.kind !== 'youtube') return false;
+        const queue = this.ensureYouTubeQueue(slotId);
+        const target = Math.floor(Number(index));
+        const item = Number.isFinite(target) ? queue.items[target] : null;
+        if (!item) return false;
+
+        this._ytQueue.queue = selectYouTubeQueueIndex(queue, target);
+        this._ytRememberAuthor(item);
+
+        if (item.videoId === player.videoId) {
+            if (autoplay) player.resume();
+            this.scheduleRefreshTiles?.();
+            return true;
+        }
+
+        const ok = typeof player.swapVideo === 'function'
+            ? player.swapVideo(item.videoId, { title: item.title, autoplay })
+            : false;
+        if (!ok) return false;
+
+        touchYouTubeClip({ videoId: item.videoId, title: item.title, author: item.author });
+        recordYouTubeHistory({ videoId: item.videoId, title: item.title, author: item.author });
+        this.persistSlots?.();
+        this.scheduleRefreshTiles?.();
+        this.syncStatusChrome?.();
+        this._ytPrefetchRelated(slotId);
+        return true;
+    },
+
+    /**
+     * Step through the queue. At the tail, one related lookup extends it before
+     * giving up — the local library keeps prev/next working fully offline.
+     * @param {string} slotId
+     * @param {number} delta +1 next, -1 previous
+     * @param {{ silent?: boolean }} [opts]
+     * @returns {Promise<boolean>} true when a clip started
+     */
+    async stepYouTubeQueue(slotId, delta, { silent = false } = {}) {
+        if (!this.isYouTubeSlot(slotId)) {
+            if (!silent) showAppToast('YouTube mode is off');
+            return false;
+        }
+        const direction = Math.trunc(Number(delta)) || 0;
+        if (!direction) return false;
+
+        let step = resolveYouTubeQueueStep(this.ensureYouTubeQueue(slotId), direction);
+        if (!step && direction > 0) {
+            await this._ytPrefetchRelated(slotId, { force: true });
+            step = resolveYouTubeQueueStep(this.ensureYouTubeQueue(slotId), direction);
+        }
+        if (!step) {
+            if (!silent) showAppToast(direction > 0 ? 'No more videos in the queue' : 'Start of the queue');
+            return false;
+        }
+        return this._ytApplyQueueIndex(slotId, step.index, { autoplay: true });
+    },
+
+    /** Jump to one tray thumbnail (and collapse the tray). */
+    playYouTubeQueueIndex(slotId, index) {
+        this._ytQueueOpen = { ...(this._ytQueueOpen || {}), [slotId]: false };
+        const ok = this._ytApplyQueueIndex(slotId, index, { autoplay: true });
+        this.scheduleRefreshTiles?.();
+        return ok;
+    },
+
+    /**
+     * Toggle (or force) the thumbnail tray hover-pin.
+     * @param {string} slotId
+     * @param {boolean} [force]
+     * @returns {boolean} the new open state
+     */
+    toggleYouTubeQueueTray(slotId, force) {
+        const player = this.slots?.[slotId]?.player;
+        if (!player || player.kind !== 'youtube') return false;
+        const open = typeof force === 'boolean' ? force : !this._ytQueueOpen?.[slotId];
+        this._ytQueueOpen = { ...(this._ytQueueOpen || {}), [slotId]: open };
+        if (open) {
+            this.ensureYouTubeQueue(slotId);
+            this._ytPrefetchRelated(slotId);
+        }
+        this.scheduleRefreshTiles?.();
+        return open;
+    },
+
+    /**
+     * Append remotely suggested clips to the tail. Generation-guarded so a fast
+     * prev/next or a tile teardown can never write into a stale queue.
+     * @param {string} slotId
+     * @param {{ force?: boolean }} [opts]
+     * @returns {Promise<boolean>} true when new items were appended
+     */
+    async _ytPrefetchRelated(slotId, { force = false } = {}) {
+        const player = this.slots?.[slotId]?.player;
+        if (!player || player.kind !== 'youtube') return false;
+        const videoId = normalizeYouTubeId(player.videoId);
+        if (!videoId) return false;
+        if (!SettingsStore.getYouTubeRelatedEnabled()) return false;
+
+        this.ensureYouTubeQueue(slotId);
+
+        const inFlight = this._ytRelatedPending?.[slotId];
+        if (inFlight) {
+            // A forced call (tail of the queue) waits for the running lookup
+            // instead of reporting "no more videos" mid-flight.
+            if (force) {
+                try { await inFlight; } catch { /* handled below */ }
+            }
+            return false;
+        }
+        if (!force && this._ytQueue?.relatedFor === videoId) return false;
+
+        const token = {};
+        this._ytRelatedTokens = { ...(this._ytRelatedTokens || {}), [slotId]: token };
+        this._ytQueue.relatedFor = videoId;
+        const generation = this._ytRelatedGen || 0;
+
+        const task = (async () => {
+            // `_ytRelatedFetcher` is the test seam (no network in unit tests).
+            const load = this._ytRelatedFetcher || fetchYouTubeRelated;
+            const result = await load(videoId, {
+                provider: SettingsStore.getYouTubeRelatedProvider(),
+                invidiousInstance: SettingsStore.getYouTubeRelatedInstance()
+            });
+            if (generation !== (this._ytRelatedGen || 0)) return false;
+            if (!this.isYouTubeSlot(slotId)) return false;
+            if (normalizeYouTubeId(this.slots?.[slotId]?.player?.videoId) !== videoId) return false;
+
+            const items = Array.isArray(result?.items) ? result.items : [];
+            if (!items.length) {
+                // Nothing came back: allow a later tray/queue action to retry
+                // (fetchYouTubeRelated's negative cache keeps that cheap).
+                if (this._ytQueue?.slotId === slotId) this._ytQueue.relatedFor = '';
+                return false;
+            }
+            items.forEach((item) => this._ytRememberAuthor(item));
+            this._ytQueue.queue = appendYouTubeRelated(this.ensureYouTubeQueue(slotId), items);
+            saveYouTubeQueue(this._ytQueue.queue);
+            return true;
+        })().catch(() => false);
+
+        this._ytRelatedPending = { ...(this._ytRelatedPending || {}), [slotId]: task };
+        this.scheduleRefreshTiles?.();
+
+        try {
+            return await task;
+        } finally {
+            if (this._ytRelatedTokens?.[slotId] === token) {
+                this._ytClearRelatedPending(slotId);
+                this.scheduleRefreshTiles?.();
+            }
+        }
+    },
+
+    /**
+     * Auto-play the next queue entry when a clip ends. One hop per ended event,
+     * skipped entirely when the setting is off.
+     * @param {string} slotId
+     * @param {object} player
+     */
+    _ytMaybeAutoAdvance(slotId, player) {
+        if (!player?.ended) return;
+        const now = Date.now();
+        this._ytEndedAt = this._ytEndedAt || {};
+        if (now - (this._ytEndedAt[slotId] || 0) < 500) return;
+        this._ytEndedAt[slotId] = now;
+        if (!SettingsStore.getYouTubeQueueAutoAdvance()) return;
+        if (!this.isYouTubeSlot(slotId)) return;
+        const run = () => {
+            if (!this.isYouTubeSlot(slotId)) return;
+            this.stepYouTubeQueue(slotId, 1, { silent: true });
+        };
+        if (typeof setTimeout === 'function') setTimeout(run, 0);
+        else run();
     },
 
     /** Guard used by swap / rotate / cast / popout: any YouTube tile involved? */

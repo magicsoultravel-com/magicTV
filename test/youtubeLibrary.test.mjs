@@ -28,6 +28,7 @@ const {
     removeYouTubeClip,
     saveYouTubeLibrary,
     toggleYouTubeClip,
+    touchYouTubeClip,
     youtubeClipUrl
 } = await import('../js/youtube/youtubeLibrary.js');
 
@@ -106,6 +107,22 @@ test('add / has / remove / toggle persist through localStorage', () => {
     assert.equal(removeYouTubeClip(ID_A), true);
     assert.equal(removeYouTubeClip(ID_A), false);
     assert.deepEqual(loadYouTubeLibrary(), { clips: [] });
+});
+
+test('touchYouTubeClip refreshes a saved clip without adding suggestions', () => {
+    addYouTubeClip({ videoId: ID_A, title: 'Old title', author: 'Artist' });
+    addYouTubeClip({ videoId: ID_B, title: 'Other' });
+
+    const refreshed = touchYouTubeClip({ videoId: ID_A, title: 'New title', author: 'Artist 2' });
+    assert.equal(refreshed.title, 'New title');
+    assert.equal(refreshed.author, 'Artist 2');
+    assert.equal(listYouTubeClips().length, 2, 'no duplicate entry');
+    assert.equal(listYouTubeClips()[0].videoId, ID_A, 'refreshed clip sorts as most recent');
+
+    // Unknown clips are left alone: the queue must never evict saved clips.
+    assert.equal(touchYouTubeClip({ videoId: '9bZkp7q19f0', title: 'Suggestion' }), null);
+    assert.equal(hasYouTubeClip('9bZkp7q19f0'), false);
+    assert.equal(touchYouTubeClip('bad'), null);
 });
 
 test('corrupt library JSON degrades to an empty library', () => {

@@ -33,6 +33,10 @@ import {
 } from '../mosaic/constants.js';
 import { normalizeProxyTemplate } from '../webstream/webStreamLinks.js';
 import { normalizeShieldLevel } from '../webstream/webShield.js';
+import {
+    normalizeRelatedProvider,
+    normalizeInvidiousInstance
+} from '../youtube/youtubeRelated.js';
 
 export {
     VIEW_TRANSITIONS,
@@ -79,6 +83,8 @@ const TV_TRAVEL_TICK_MIN = 5;
 const TV_TRAVEL_TICK_MAX = 300;
 export const TV_TRAVEL_STYLES = ['quick', 'slow', 'random'];
 export const DEFAULT_TV_TRAVEL_STYLE = 'quick';
+const DEFAULT_YOUTUBE_RELATED_ENABLED = true;
+const DEFAULT_YOUTUBE_QUEUE_AUTO_ADVANCE = true;
 
 function clampTvTravelTickSec(value) {
     const n = Math.round(Number(value));
@@ -725,6 +731,56 @@ export const SettingsStore = {
     setWebStreamProxyPlayback(value) {
         const next = value === true;
         patchPersistedState({ webStreamProxyPlayback: next });
+        return next;
+    },
+
+    /** Related-video lookup for the YouTube queue (Piped / Invidious). */
+    getYouTubeRelatedEnabled() {
+        const raw = readPersistedState().youtubeRelatedEnabled;
+        return raw == null ? DEFAULT_YOUTUBE_RELATED_ENABLED : raw === true;
+    },
+
+    /** @param {boolean} value @returns {boolean} */
+    setYouTubeRelatedEnabled(value) {
+        const next = value === true;
+        patchPersistedState({ youtubeRelatedEnabled: next });
+        return next;
+    },
+
+    /** @returns {'auto' | 'piped' | 'invidious'} */
+    getYouTubeRelatedProvider() {
+        return normalizeRelatedProvider(readPersistedState().youtubeRelatedProvider);
+    },
+
+    /** @param {string} value @returns {'auto' | 'piped' | 'invidious'} */
+    setYouTubeRelatedProvider(value) {
+        const next = normalizeRelatedProvider(value);
+        patchPersistedState({ youtubeRelatedProvider: next });
+        return next;
+    },
+
+    /** Custom Invidious instance (`https://host`) or '' for the built-in one. */
+    getYouTubeRelatedInstance() {
+        return normalizeInvidiousInstance(readPersistedState().youtubeRelatedInstance);
+    },
+
+    /** @param {string} value @returns {string} normalized instance or '' */
+    setYouTubeRelatedInstance(value) {
+        const next = normalizeInvidiousInstance(value);
+        patchPersistedState({ youtubeRelatedInstance: next });
+        return next;
+    },
+
+    /** Auto-play the next queue entry when a clip ends. */
+    getYouTubeQueueAutoAdvance() {
+        const raw = readPersistedState().youtubeQueueAutoAdvance;
+        return raw == null ? DEFAULT_YOUTUBE_QUEUE_AUTO_ADVANCE : raw === true;
+    },
+
+    /** @param {boolean} value @returns {boolean} */
+    setYouTubeQueueAutoAdvance(value) {
+        const next = value === true;
+        patchPersistedState({ youtubeQueueAutoAdvance: next });
         return next;
     },
 

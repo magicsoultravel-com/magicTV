@@ -56,6 +56,11 @@ npm test            # or: node --test
 | `test/channelShape.test.mjs` | `channelKey`, `parseChannelKey`, `normalizeChannel`, `migrateFavoriteRef` |
 | `test/shareChannel.test.mjs` | Deep-link build/parse round-trip, stream link, `chooseSharedPlayTarget` slot policy (free → center, full → last/fallback) |
 | `test/frameCache.test.mjs` | `FrameCache.setFrame`/`getFrame` round-trip, 7-day TTL expiry, per-key remove |
+| `test/youtubeLibrary.test.mjs` | Saved-clip library normalization, add/remove/toggle, oEmbed metadata lookup (timeouts, failures) |
+| `test/youtubeQueue.test.mjs` | Queue ordering (current → author → library → related → history), dedupe/caps, append-without-index-shift, step/select/retarget, history move-to-front |
+| `test/youtubeRelated.test.mjs` | Piped/Invidious payload parsers, provider + attempt ordering, host health cooldown, positive/negative cache TTL, in-flight de-dupe, timeout degradation |
+| `test/youtubeChrome.test.mjs` | Prev/next/tray markup contract, tray thumbnails + escaping, `is-youtube` CSS gating, settings markup/bindings |
+| `test/mosaicYouTube.test.mjs` | YouTube-mode lifecycle (one live tile, detach/restore, swap) + queue stepping, tray jump, ENDED auto-advance |
 
 ## 📁 Project Structure
 
@@ -92,6 +97,8 @@ magicTV/
 │   │   ├── youtubeLinks.js    # URL/id/thumb helpers (pure)
 │   │   ├── youtubeApi.js      # Lazy IFrame API loader
 │   │   ├── youtubeLibrary.js  # Saved clips + oEmbed metadata
+│   │   ├── youtubeQueue.js    # Tile play queue + watch history (pure/storage)
+│   │   ├── youtubeRelated.js  # Piped → Invidious related lookup, cache + host health
 │   │   └── youtubePlayer.js   # playerInstance-compatible embed adapter
 │   ├── webstream/
 │   │   ├── webStreamLinks.js    # Media/page URL helpers, synthetic channel (pure)
@@ -141,6 +148,18 @@ Hover a TV tile and press the **YouTube** button (rounded play glyph) to paste a
 - **Swap with main** works on a YouTube tile — the embed is re-created on the other screen at the same clip, playhead and mute/volume, while the TV stream moves across untouched (the iframe has to reload, so it buffers for a moment). The channel YouTube displaced follows the embed, and Rotate/TV Travel leave the embed on its own screen.
 - Cast, pop-out/PiP, favourite and Bank are unavailable on a YouTube tile (a cross-origin embed can't be captured or cast).
 - Press the button again (or pick a channel on that tile) to leave YouTube mode and return to the channel that was there before.
+
+#### Next / previous + related tray
+Every YouTube tile gets a **⏮ / queue / ⏭** group in its hover strip (shown only while the tile is in YouTube mode), with the thumbnail tray sliding out above it.
+
+- The queue is built locally and instantly: **current clip → the same channel from your saved clips → the rest of your saved clips → related videos → watch history**. Prev/next therefore works offline.
+- **Related videos** are fetched from public, key-less APIs — **Piped** first (`api.piped.private.coffee`, `pipedapi.ducks.party`), **Invidious** as fallback. Both answer with CORS `*`; InnerTube's `next` endpoint rejects browser preflights and the Data API v3 dropped `relatedToVideoId`, so neither is used.
+- Suggestions are **appended at the tail only**, so the live index never moves mid-video. Thumbnails always come from `i.ytimg.com` (instance proxies and signed URLs expire).
+- Different clip = `loadVideoById()` on the live iframe (no teardown), so mute/volume/play intent carry across and the switch is instant.
+- Hovering the group slides out the **thumbnail tray**; the middle button pins it open and clicking a card jumps to that clip. Edge tiles clamp the tray inwards so it never leaves the screen.
+- **ENDED auto-advances** to the next entry when *Auto-play next video* is on.
+- Related lookups cache for 6 h (misses for 15 min), de-dupe concurrent requests, and remember failing hosts (2 failures → 10 min cooldown, healthy hosts tried first) so a dead instance never costs a timeout twice.
+- Settings → **YouTube** turns related lookup on/off, picks the provider, sets a custom Invidious instance, toggles auto-play, and clears watch history (`magictv_youtube_history_v1` + `magictv_youtube_queue_v1`). Saved clips are untouched.
 
 ### Web Video (any page or direct link)
 Hover a TV tile, then hover the **YouTube** button to slide out the **globe** button (Web Video). Paste any page URL — magicTV looks for the video behind it — or a direct `.m3u8` / `.mp4` link, which plays immediately.

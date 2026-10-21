@@ -1,6 +1,9 @@
 /** Shared HTML for per-tile hover control rows (local + optional cast). */
 
+import { escapeHtml } from '../tvUtils.js';
 import { SHIELD_LEVELS, shieldLabel, shieldSummary } from '../webstream/webShield.js';
+import { normalizeYouTubeId, youtubeThumbUrl } from '../youtube/youtubeLinks.js';
+import { YOUTUBE_QUEUE_SOURCES } from '../youtube/youtubeQueue.js';
 
 export const MUTE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
@@ -17,6 +20,15 @@ export const RESET_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusa
 
 /** YouTube mode — rounded screen + play glyph (per-tile hover button). */
 export const YOUTUBE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.2" y="2.6" width="9.6" height="6.8" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.1 4.4 8 6 5.1 7.6V4.4z" fill="currentColor"/></svg>`;
+
+/** YouTube queue — previous clip (double chevron left). */
+export const YT_PREV_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M6.2 2.6 2.8 6l3.4 3.4M10 2.6 6.6 6 10 9.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/** YouTube queue — next clip (double chevron right). */
+export const YT_NEXT_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5.8 2.6 9.2 6l-3.4 3.4M2 2.6 5.4 6 2 9.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/** YouTube queue — thumbnail tray toggle (play inside a list). */
+export const YT_QUEUE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M1.4 2.6h5.2M1.4 6h3.4M1.4 9.4h5.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M7.4 6.3 10.9 8.2 7.4 10.1V6.3z" fill="currentColor"/></svg>`;
 
 /** Web Video — globe with a play triangle (slide-out of the YouTube button). */
 export const WEBSTREAM_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 6h8.4M6 1.6c1.5 1.5 1.5 7.3 0 8.8M6 1.6c-1.5 1.5-1.5 7.3 0 8.8" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M5 4.6 7.4 6 5 7.4V4.6z" fill="currentColor"/></svg>`;
@@ -243,6 +255,7 @@ function coreRowButtons(target) {
         controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),
         shieldWrap(target),
         youtubeWrap(target),
+        youtubeQueueWrap(target),
         controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
         muteWrap(target),
         travelWrap(target)
@@ -258,6 +271,52 @@ function youtubeWrap(target) {
         ${controlBtn('youtube', 'YouTube mode', YOUTUBE_SVG, target, 'tv-controls__btn--main-2 tv-controls__youtube-btn')}
         <div class="tv-controls__youtube-popout" aria-hidden="true">
             ${controlBtn('web-video', 'Web video (any URL)', WEBSTREAM_SVG, target, 'tv-controls__btn--main-2 tv-controls__webvideo-btn')}
+        </div>
+    </div>`;
+}
+
+/**
+ * Thumbnail strip for the YouTube queue tray (inner HTML of
+ * `[data-yt-queue-strip]`). Pure so tileChrome can diff on a fingerprint and
+ * tests can pin the markup.
+ * @param {{ items?: any[], index?: number, relatedLoading?: boolean }} [state]
+ * @returns {string}
+ */
+export function buildYouTubeQueueTrayHtml({ items = [], index = -1, relatedLoading = false } = {}) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+        return `<p class="tv-controls__ytqueue-empty">${relatedLoading
+            ? 'Looking for related videos…'
+            : 'Queue is empty'}</p>`;
+    }
+    const cards = list.map((item, i) => {
+        const videoId = normalizeYouTubeId(item?.videoId);
+        if (!videoId) return '';
+        const current = i === index;
+        const label = escapeHtml(item?.title || `YouTube ${videoId}`);
+        const source = YOUTUBE_QUEUE_SOURCES.includes(item?.source) ? item.source : 'related';
+        return `<button type="button" class="tv-controls__btn tv-controls__ytqueue-item${current ? ' is-current' : ''}" data-tile-action="yt-play" data-yt-index="${i}" data-yt-source="${source}" title="${label}" aria-label="Play ${label}" aria-current="${current ? 'true' : 'false'}">`
+            + `<img class="tv-controls__ytqueue-thumb" src="${youtubeThumbUrl(videoId, 'mqdefault')}" alt="" loading="lazy" decoding="async">`
+            + `<span class="tv-controls__ytqueue-label">${label}</span>`
+            + '</button>';
+    }).join('');
+    const more = relatedLoading
+        ? '<span class="tv-controls__ytqueue-more" aria-hidden="true">…</span>'
+        : '';
+    return `${cards}${more}`;
+}
+
+/**
+ * Prev / next / tray group. CSS keeps the whole group invisible until the tile
+ * runs YouTube (`is-youtube`), so TV tiles never see it.
+ */
+function youtubeQueueWrap(target) {
+    return `<div class="tv-controls__ytqueue-wrap">
+        ${controlBtn('yt-prev', 'Previous video', YT_PREV_SVG, target, 'tv-controls__btn--main-3 tv-controls__ytqueue-prev')}
+        ${controlBtn('yt-queue', 'Video queue', YT_QUEUE_SVG, target, 'tv-controls__btn--main-2 tv-controls__ytqueue-toggle')}
+        ${controlBtn('yt-next', 'Next video', YT_NEXT_SVG, target, 'tv-controls__btn--main-1 tv-controls__ytqueue-next')}
+        <div class="tv-controls__ytqueue-popout" data-yt-queue-tray aria-hidden="true">
+            <div class="tv-controls__ytqueue-strip" data-yt-queue-strip></div>
         </div>
     </div>`;
 }
@@ -304,6 +363,17 @@ function ensureTravelWraps(mosaic) {
     });
 }
 
+/** Same upgrade path for the YouTube queue group (prev / next / tray). */
+function ensureYouTubeQueueWraps(mosaic) {
+    mosaic.querySelectorAll('.tv-player-tile').forEach((tile) => {
+        const row = tile.querySelector('[data-controls-row="local"]');
+        if (!row || row.querySelector('.tv-controls__ytqueue-wrap')) return;
+        const yt = row.querySelector('.tv-controls__youtube-wrap');
+        if (yt) yt.insertAdjacentHTML('afterend', youtubeQueueWrap('local'));
+        else row.insertAdjacentHTML('beforeend', youtubeQueueWrap('local'));
+    });
+}
+
 /**
  * Inject dual-row hover controls + outside-strip vol rocker into all mosaic tiles (once).
  */
@@ -314,6 +384,7 @@ export function hydrateTileHoverControls() {
 
     if (mosaic.dataset.hoverHydrated === '1') {
         ensureTravelWraps(mosaic);
+        ensureYouTubeQueueWraps(mosaic);
         return;
     }
     mosaic.dataset.hoverHydrated = '1';

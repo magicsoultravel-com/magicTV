@@ -111,6 +111,38 @@ export function addYouTubeClip(entry) {
 }
 
 /**
+ * Refresh a clip that was just played (metadata + `addedAt`) without changing
+ * its position in the stored array. Unknown ids are ignored on purpose — the
+ * queue must never evict a curated library entry with a random suggestion.
+ * @param {{ videoId: string, title?: string, thumb?: string, author?: string }} entry
+ * @returns {object | null} the refreshed clip, or null when it is not saved
+ */
+export function touchYouTubeClip(entry) {
+    const source = entry && typeof entry === 'object' ? entry : { videoId: entry };
+    const id = normalizeYouTubeId(source.videoId || '');
+    if (!id) return null;
+    const { clips } = loadYouTubeLibrary();
+    const existing = clips.find((clip) => clip.videoId === id);
+    if (!existing) return null;
+
+    const title = typeof source.title === 'string' && source.title.trim()
+        ? source.title.trim().slice(0, 200)
+        : existing.title;
+    const author = typeof source.author === 'string' && source.author.trim()
+        ? source.author.trim().slice(0, 120)
+        : (existing.author || '');
+    // Monotonic bump: two writes in the same millisecond must still sort as
+    // "just played" (reads sort by addedAt, storage order stays untouched).
+    const newest = clips.reduce((max, clip) => Math.max(max, Number(clip.addedAt) || 0), 0);
+    const addedAt = Math.max(Date.now(), newest + 1);
+    const next = clips.map((clip) => (clip.videoId === id
+        ? normalizeYouTubeClip({ ...clip, title, author, addedAt })
+        : clip));
+    saveYouTubeLibrary({ clips: next });
+    return next.find((clip) => clip.videoId === id) || null;
+}
+
+/**
  * @param {string} videoId
  * @returns {boolean} true when a clip was removed
  */

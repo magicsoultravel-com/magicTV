@@ -74,6 +74,172 @@
 }
 
 /* ------------------------------------------------------------------ *
+ * Queue chrome: prev / next + thumbnail preview tray.
+ * Invisible on TV tiles; only `.is-youtube` reveals the group. Hovering
+ * any of the three buttons slides the tray out (same recipe as the
+ * other popouts), and clicking the tray toggle pins it open.
+ * ------------------------------------------------------------------ */
+.tv-controls__ytqueue-wrap {
+    position: relative;
+    display: none;
+    align-items: center;
+    gap: 0.15rem;
+    /* Tray anchors: centered by default, clamped on edge tiles below. */
+    --ytqueue-left: 50%;
+    --ytqueue-right: auto;
+    --ytqueue-x: -50%;
+    --ytqueue-card: 92px;
+}
+
+.tv-player-tile.is-youtube .tv-controls__ytqueue-wrap {
+    display: inline-flex;
+}
+
+/* Hover bridge: keeps the tray open while the pointer crosses the gap. */
+.tv-controls__ytqueue-wrap::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    bottom: 100%;
+    height: calc(var(--tv-controls-strip-pad-y, 0.25rem) + 16px);
+}
+
+.tv-controls__ytqueue-popout {
+    position: absolute;
+    bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
+    left: var(--ytqueue-left, 50%);
+    right: var(--ytqueue-right, auto);
+    transform: translateX(var(--ytqueue-x, -50%)) translateY(calc(100% + 6px));
+    display: block;
+    padding: 0.3rem;
+    border-radius: 8px 8px 0 0;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
+    border-bottom: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        transform 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.14s,
+        opacity 0.18s ease 0.14s,
+        visibility 0.22s ease 0.14s;
+    z-index: 40;
+}
+
+.tv-controls__ytqueue-wrap:hover .tv-controls__ytqueue-popout,
+.tv-controls__ytqueue-wrap:focus-within .tv-controls__ytqueue-popout,
+.tv-controls__ytqueue-wrap.is-open .tv-controls__ytqueue-popout {
+    transform: translateX(var(--ytqueue-x, -50%)) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+/* Left-edge tiles: grow rightwards from the button group. */
+.tv-player-tile[data-slot="topLeft"] .tv-controls__ytqueue-wrap,
+.tv-player-tile[data-slot="bottomLeft"] .tv-controls__ytqueue-wrap,
+.tv-player-tile[data-slot="midLeft"] .tv-controls__ytqueue-wrap {
+    --ytqueue-left: 0;
+    --ytqueue-right: auto;
+    --ytqueue-x: 0;
+}
+
+/* Right-edge tiles: grow leftwards from the button group. */
+.tv-player-tile[data-slot="topRight"] .tv-controls__ytqueue-wrap,
+.tv-player-tile[data-slot="bottomRight"] .tv-controls__ytqueue-wrap,
+.tv-player-tile[data-slot="midRight"] .tv-controls__ytqueue-wrap {
+    --ytqueue-left: auto;
+    --ytqueue-right: 0;
+    --ytqueue-x: 0;
+}
+
+.tv-controls__ytqueue-strip {
+    display: flex;
+    align-items: stretch;
+    gap: 0.3rem;
+    max-width: min(76vw, 400px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    padding: 2px;
+}
+
+/* Tray entries are cards, not round glyph buttons. */
+.tv-controls__ytqueue-popout .tv-controls__btn.tv-controls__ytqueue-item {
+    flex: 0 0 auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 3px;
+    width: var(--ytqueue-card, 92px);
+    height: auto;
+    min-width: var(--ytqueue-card, 92px);
+    padding: 3px;
+    border-radius: 6px;
+    border-color: transparent;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--tv-text, #f4f4f8);
+    font-size: 0.6rem;
+    line-height: 1.2;
+    text-align: left;
+    will-change: auto;
+}
+
+.tv-controls__ytqueue-popout .tv-controls__btn.tv-controls__ytqueue-item:hover,
+.tv-controls__ytqueue-popout .tv-controls__btn.tv-controls__ytqueue-item:focus-visible {
+    border-color: color-mix(in srgb, var(--tv-main-2, #ff4d6d) 70%, transparent);
+    background: rgba(255, 77, 109, 0.16);
+}
+
+.tv-controls__ytqueue-popout .tv-controls__btn.tv-controls__ytqueue-item.is-current {
+    border-color: var(--tv-main-2, #ff4d6d);
+    background: rgba(255, 77, 109, 0.2);
+}
+
+.tv-controls__ytqueue-thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 4px;
+    background: #000;
+}
+
+.tv-controls__ytqueue-label {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    width: 100%;
+}
+
+.tv-controls__ytqueue-empty,
+.tv-controls__ytqueue-more {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.62rem;
+    color: var(--tv-text-secondary, #b9b9c6);
+    white-space: nowrap;
+}
+
+.tv-controls__ytqueue-empty {
+    margin: 0;
+}
+
+/* Queue ends: dim instead of hiding, so the pair keeps its place. */
+.tv-player-tile.is-youtube .tv-controls__ytqueue-wrap .tv-controls__btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.tv-controls__ytqueue-toggle.is-active {
+    color: var(--tv-main-2-flip, currentColor);
+}
+
+/* ------------------------------------------------------------------ *
  * Grab handle — the cross-origin iframe swallows the tile-body
  * pointerdown, so an embed tile is dragged from its hover chrome.
  * Only embedded tiles show the handle; normal tiles drag by the body.

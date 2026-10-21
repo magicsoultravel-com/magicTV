@@ -10,6 +10,7 @@ import {
     isUnlimitedRadioRecentsCap
 } from '../radio/radioState.js';
 import { clearWatchStats, formatWatchDuration, flushAllWatchAccruals, getTopWatched } from '../storage/watchStats.js';
+import { clearYouTubeHistory, clearYouTubeQueue } from '../youtube/youtubeQueue.js';
 import { ACTION_ICONS } from './icons.js';
 import { copyThemeAttributes } from './popoutWindows.js';
 import { showAppToast } from './toast.js';
@@ -342,6 +343,69 @@ export const Appearance = {
             showMosaicWatchTotalEl.addEventListener('change', () => {
                 SettingsStore.setShowMosaicWatchTotal(showMosaicWatchTotalEl.checked);
                 window.dispatchEvent(new CustomEvent('tv:mosaic_watch_chrome_changed'));
+            });
+        }
+
+        const youtubeRelatedEnabledEl = el('youtube-related-enabled');
+        if (youtubeRelatedEnabledEl && youtubeRelatedEnabledEl.dataset.bound !== '1') {
+            youtubeRelatedEnabledEl.dataset.bound = '1';
+            youtubeRelatedEnabledEl.checked = SettingsStore.getYouTubeRelatedEnabled();
+            youtubeRelatedEnabledEl.addEventListener('change', () => {
+                const next = SettingsStore.setYouTubeRelatedEnabled(youtubeRelatedEnabledEl.checked);
+                showAppToast(next ? 'YouTube related videos on' : 'YouTube related videos off');
+            });
+        }
+
+        const youtubeRelatedProviderEl = el('youtube-related-provider-select');
+        if (youtubeRelatedProviderEl && youtubeRelatedProviderEl.dataset.bound !== '1') {
+            youtubeRelatedProviderEl.dataset.bound = '1';
+            youtubeRelatedProviderEl.value = SettingsStore.getYouTubeRelatedProvider();
+            youtubeRelatedProviderEl.addEventListener('change', () => {
+                const next = SettingsStore.setYouTubeRelatedProvider(youtubeRelatedProviderEl.value);
+                youtubeRelatedProviderEl.value = next;
+                const labels = { auto: 'Auto', piped: 'Piped', invidious: 'Invidious' };
+                showAppToast(`YouTube related source: ${labels[next] || next}`);
+            });
+        }
+
+        const youtubeRelatedInstanceEl = el('youtube-related-instance-input');
+        if (youtubeRelatedInstanceEl && youtubeRelatedInstanceEl.dataset.bound !== '1') {
+            youtubeRelatedInstanceEl.dataset.bound = '1';
+            youtubeRelatedInstanceEl.value = SettingsStore.getYouTubeRelatedInstance();
+            youtubeRelatedInstanceEl.addEventListener('change', () => {
+                const next = SettingsStore.setYouTubeRelatedInstance(youtubeRelatedInstanceEl.value);
+                youtubeRelatedInstanceEl.value = next;
+                showAppToast(next ? `Invidious: ${next}` : 'Invidious: built-in instance');
+            });
+            youtubeRelatedInstanceEl.addEventListener('blur', () => {
+                youtubeRelatedInstanceEl.value = SettingsStore.getYouTubeRelatedInstance();
+            });
+        }
+
+        const youtubeAutoAdvanceEl = el('youtube-queue-auto-advance');
+        if (youtubeAutoAdvanceEl && youtubeAutoAdvanceEl.dataset.bound !== '1') {
+            youtubeAutoAdvanceEl.dataset.bound = '1';
+            youtubeAutoAdvanceEl.checked = SettingsStore.getYouTubeQueueAutoAdvance();
+            youtubeAutoAdvanceEl.addEventListener('change', () => {
+                const next = SettingsStore.setYouTubeQueueAutoAdvance(youtubeAutoAdvanceEl.checked);
+                showAppToast(next ? 'Auto-play next video on' : 'Auto-play next video off');
+            });
+        }
+
+        const clearYouTubeHistoryBtn = el('clear-youtube-history-btn');
+        if (clearYouTubeHistoryBtn && clearYouTubeHistoryBtn.dataset.bound !== '1') {
+            clearYouTubeHistoryBtn.dataset.bound = '1';
+            clearYouTubeHistoryBtn.addEventListener('click', () => {
+                const ok = window.confirm(
+                    'Clear YouTube history?\n\nThis removes the watched-clip history and the current queue. Saved clips stay in your library.'
+                );
+                if (!ok) return;
+                clearYouTubeHistory();
+                clearYouTubeQueue();
+                if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                    window.dispatchEvent(new CustomEvent('tv:youtube_history_cleared'));
+                }
+                showAppToast('YouTube history cleared');
             });
         }
 
@@ -807,6 +871,24 @@ export const Appearance = {
         const showMosaicWatchTotal = el('show-mosaic-watch-total');
         if (showMosaicWatchTotal) {
             showMosaicWatchTotal.checked = SettingsStore.getShowMosaicWatchTotal();
+        }
+
+        const youtubeRelatedEnabledSync = el('youtube-related-enabled');
+        if (youtubeRelatedEnabledSync) {
+            youtubeRelatedEnabledSync.checked = SettingsStore.getYouTubeRelatedEnabled();
+        }
+        const youtubeRelatedProviderSync = el('youtube-related-provider-select');
+        if (youtubeRelatedProviderSync) {
+            youtubeRelatedProviderSync.value = SettingsStore.getYouTubeRelatedProvider();
+        }
+        const youtubeRelatedInstanceSync = el('youtube-related-instance-input');
+        if (youtubeRelatedInstanceSync) {
+            const instance = SettingsStore.getYouTubeRelatedInstance();
+            if (document.activeElement !== youtubeRelatedInstanceSync) youtubeRelatedInstanceSync.value = instance;
+        }
+        const youtubeAutoAdvanceSync = el('youtube-queue-auto-advance');
+        if (youtubeAutoAdvanceSync) {
+            youtubeAutoAdvanceSync.checked = SettingsStore.getYouTubeQueueAutoAdvance();
         }
 
         const remoteTextureSelect = el('remote-texture-select');
