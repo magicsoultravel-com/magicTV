@@ -1,0 +1,510 @@
+/** @css {"owns":"Web Video — page iframe tiles, Web Video chrome, picker overlay"} */
+
+/* ------------------------------------------------------------------ *
+ * Slide-out from the YouTube button: the Web Video button sits above
+ * the hover strip, same geometry/transition as the Swap & TV Travel
+ * popouts in player.css.
+ * ------------------------------------------------------------------ */
+.tv-controls__youtube-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.tv-controls__youtube-wrap::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    bottom: 100%;
+    height: calc(var(--tv-controls-strip-pad-y, 0.25rem) + 16px);
+}
+
+.tv-controls__youtube-popout {
+    position: absolute;
+    bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
+    left: 50%;
+    transform: translateX(-50%) translateY(calc(100% + 6px));
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.25rem 0.35rem;
+    border-radius: 8px 8px 0 0;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 55%, transparent);
+    border-bottom: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        transform 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.14s,
+        opacity 0.18s ease 0.14s,
+        visibility 0.22s ease 0.14s;
+    white-space: nowrap;
+    z-index: 40;
+}
+
+.tv-controls__youtube-wrap:hover .tv-controls__youtube-popout,
+.tv-controls__youtube-wrap:focus-within .tv-controls__youtube-popout {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+.tv-controls__youtube-popout .tv-controls__btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+}
+
+.tv-controls__webvideo-btn.is-active {
+    color: var(--tv-main-2-flip, currentColor);
+}
+
+/* ------------------------------------------------------------------ *
+ * Web Video tiles: TV-only affordances that make no sense for an
+ * arbitrary web stream / embedded page.
+ * ------------------------------------------------------------------ */
+.tv-player-tile.is-webstream [data-tile-action="fav"],
+.tv-player-tile.is-webstream [data-tile-action="bank"],
+.tv-player-tile.is-webstream .tv-player-tile__chan-rocker,
+.tv-player-tile.is-webstream .tv-player-tile__quality-echo,
+.tv-player-tile.is-webstream .tv-player-tile__watch-sep,
+.tv-player-tile.is-webstream .tv-player-tile__watch-total {
+    display: none !important;
+}
+
+/* Cast only for direct, non-proxied media URLs. */
+.tv-player-tile.is-webstream:not(.is-webstream-castable) .tv-controls__cast-wrap {
+    display: none !important;
+}
+
+/* Embedded page: the iframe swallows the tile pointer, so its grab handle is
+ * the only way to drag. Controls that could not reach the page are hidden —
+ * mute stays, because its slide-out still mutes the other TVs. */
+.tv-player-tile.is-webpage [data-tile-action="pip"],
+.tv-player-tile.is-webpage .tv-controls__travel-wrap,
+.tv-player-tile.is-webpage .tv-player-tile__vol-rocker {
+    display: none !important;
+}
+
+/* A page tile stays `is-stopped` until ▶ (an iframe is not a <video> we play)
+ * and the centre slate sits at z-index 3 over the frame's 2, so while the page
+ * is mounted it would paint a big grey ■ on top of the content. The page *is*
+ * the picture: no slate. `:has()` restores the ■ when Stop removed the frame,
+ * so a stopped page tile still reads as stopped instead of a blank square. */
+.tv-player-tile.is-webpage .tv-player-tile__playback-state {
+    display: none !important;
+}
+
+.tv-player-tile.is-webpage:not(:has(.webstream-frame-wrap)) .tv-player-tile__playback-state {
+    display: flex !important;
+}
+
+.tv-player-tile.is-webpage .tv-controls__grab-btn {
+    display: flex !important;
+    cursor: grab;
+    touch-action: none;
+}
+
+.tv-player-tile.is-dragging.is-webpage .tv-controls__grab-btn {
+    cursor: grabbing;
+}
+
+/* Page shield — one button that slides out Off / Basic / Strict (embed only;
+ * in media mode the tile has no third-party page to shield). */
+.tv-player-tile .tv-controls__shield-wrap {
+    display: none !important;
+}
+
+.tv-player-tile.is-webpage .tv-controls__shield-wrap {
+    display: inline-flex !important;
+}
+
+.tv-player-tile.is-webpage .tv-controls__shield-btn.is-off {
+    opacity: 0.55;
+}
+
+/* The option matching the live level lights up like an engaged toggle. */
+.tv-controls__shield-popout .tv-controls__btn.is-active,
+.tv-controls__shield-popout .tv-controls__btn[aria-pressed='true']:not([aria-pressed='false']) {
+    color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
+    border-color: color-mix(in srgb, var(--tv-accent, #7ecbff) 55%, transparent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Embedded page iframe — fills the tile surface, sits above the idle
+ * <video> element that stays parked underneath.
+ * ------------------------------------------------------------------ */
+.webstream-frame-wrap {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: #000;
+    overflow: hidden;
+}
+
+.webstream-frame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+}
+
+.webstream-frame-wrap:fullscreen {
+    background: #000;
+}
+
+/* Shield-off badge: the page is running with normal-tab powers. */
+.webstream-frame-wrap[data-shield="off"]::after {
+    content: 'Shield off';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 3;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffd9a8;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Picker overlay
+ * ------------------------------------------------------------------ */
+.webstream-picker {
+    position: fixed;
+    inset: 0;
+    z-index: 8600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2vmin;
+}
+
+.webstream-picker[hidden],
+.webstream-picker.is-hidden {
+    display: none;
+}
+
+.webstream-picker__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(3px);
+}
+
+.webstream-picker__dialog {
+    position: relative;
+    width: min(720px, 94vw);
+    max-height: min(86vh, 760px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 18px 20px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--tv-panel-border, rgba(255, 255, 255, 0.16));
+    background: var(--tv-panel-bg, #101018);
+    color: var(--tv-text, #f4f4f8);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.webstream-picker__title {
+    margin: 0;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+}
+
+.webstream-picker__subtitle,
+.webstream-picker__hint,
+.webstream-picker__footnote {
+    margin: 0;
+    font-size: 0.76rem;
+    opacity: 0.7;
+}
+
+.webstream-picker__footnote {
+    opacity: 0.55;
+}
+
+.webstream-picker__close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.webstream-picker__form {
+    display: flex;
+    gap: 8px;
+}
+
+.webstream-picker__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 9px 12px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    font-size: 0.9rem;
+}
+
+.webstream-picker__add,
+.webstream-picker__btn,
+.webstream-picker__embed-btn {
+    flex: 0 0 auto;
+    padding: 9px 14px;
+    border-radius: 9px;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: var(--tv-main-2, #ff4d6d);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.webstream-picker__add:disabled {
+    opacity: 0.5;
+    cursor: progress;
+}
+
+.webstream-picker__btn {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    color: inherit;
+}
+.webstream-picker__error {
+    min-height: 1em;
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--tv-main-3, #ffb454);
+}
+
+.webstream-picker__status {
+    margin: 0;
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+
+.webstream-picker__error.is-hidden,
+.webstream-picker__status.is-hidden,
+.webstream-picker__sources.is-hidden,
+.webstream-picker__embed.is-hidden {
+    display: none;
+}
+
+.webstream-picker__sources,
+.webstream-picker__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 34vh;
+    overflow-y: auto;
+}
+
+.webstream-picker__source-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.webstream-picker__source-kind {
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    color: var(--tv-accent, #7ecbff);
+}
+
+.webstream-picker__source-url {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.74rem;
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.webstream-picker__embed {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.webstream-picker__sniff,
+.webstream-picker__advanced {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 8px;
+    font-size: 0.8rem;
+}
+
+.webstream-picker__sniff summary,
+.webstream-picker__advanced summary {
+    cursor: pointer;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.webstream-picker__steps {
+    margin: 8px 0;
+    padding-left: 1.1rem;
+    font-size: 0.76rem;
+    opacity: 0.8;
+}
+
+.webstream-picker__sniff-link {
+    color: var(--tv-accent, #7ecbff);
+    text-decoration: underline;
+    cursor: grab;
+}
+
+.webstream-picker__sniff-actions,
+.webstream-picker__proxy-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.webstream-picker__proxy-row .webstream-picker__input {
+    flex: 1 1 240px;
+}
+
+.webstream-picker__textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.05);
+    color: inherit;
+    font: inherit;
+    font-size: 0.78rem;
+    resize: vertical;
+}
+
+.webstream-picker__check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    margin: 4px 0;
+}
+
+.webstream-picker__shield-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.webstream-picker__select {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.05);
+    color: inherit;
+    font: inherit;
+    font-size: 0.78rem;
+}
+
+/* Native dropdown popups ignore `color: inherit`; keep them readable. */
+.webstream-picker__select option {
+    background: #fff;
+    color: #111;
+}
+
+.webstream-picker__empty {
+    margin: 0;
+    font-size: 0.82rem;
+    opacity: 0.65;
+}
+
+.webstream-picker__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    max-height: 26vh;
+}
+
+.webstream-picker__item {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+}
+
+.webstream-picker__pick {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.webstream-picker__item-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.webstream-picker__item-meta {
+    font-size: 0.68rem;
+    opacity: 0.65;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.webstream-picker__remove {
+    flex: 0 0 auto;
+    width: 26px;
+    border: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.webstream-picker__remove:hover {
+    opacity: 1;
+}
+

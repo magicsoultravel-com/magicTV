@@ -1,5 +1,6 @@
 import { canPlayNativeHls, isHlsUrl, loadHlsLibrary } from '../tvHls.js';
 import { shouldRestartHlsOnError } from './loadBudget.js';
+import { withProxyLoader } from '../webstream/webStreamLoader.js';
 
 export const HLS_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 export const HLS_MAX_BITRATE = 12_000_000;
@@ -58,8 +59,8 @@ export function applyHlsBufferConfig(hls, bufferSize) {
     hls.config.maxBitrate = HLS_MAX_BITRATE;
 }
 
-export function buildHlsConfig(Hls, bufferSize) {
-    return {
+export function buildHlsConfig(Hls, bufferSize, { proxyTemplate = '' } = {}) {
+    const config = {
         maxBufferSize: HLS_MAX_BUFFER_BYTES,
         maxBufferLength: bufferSize,
         minBufferLength: 3.0,
@@ -71,6 +72,9 @@ export function buildHlsConfig(Hls, bufferSize) {
         liveSyncDurationCount: LIVE_SYNC_DURATION_COUNT,
         liveMaxLatencyDurationCount: LIVE_MAX_LATENCY_DURATION_COUNT
     };
+    // Web Video proxy: rewrite manifest + fragment requests through the user's
+    // template. No template → the stock loader is untouched.
+    return withProxyLoader(config, { Hls, proxyTemplate });
 }
 
 export async function destroyHls(ctx) {
@@ -255,8 +259,16 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
     video.removeAttribute('src');
     video.load();
 
-    if (isHlsUrl(url)) {
-        if (canPlayNativeHls(video)) {
+    // Web Video can carry an explicit kind: proxy URLs (`?url=…m3u8`) do not
+    // end in .m3u8, so extension sniffing alone would send them to <video>.
+    const channel = ctx.channel || null;
+    const proxyTemplate = typeof channel?.proxyTemplate === 'string' ? channel.proxyTemplate : '';
+    const wantsHls = isHlsUrl(url) || channel?.streamKind === 'hls';
+
+    if (wantsHls) {
+        // Native HLS (Safari) cannot rewrite segment URLs — when a proxy is in
+        // play, force hls.js so its loader handles manifest + fragments.
+        if (canPlayNativeHls(video) && !proxyTemplate) {
             if (generation !== ctx.playGeneration) return;
             video.src = url;
             ctx.updateBufferSize();
@@ -272,7 +284,7 @@ export async function attachStream(ctx, url, generation = ctx.playGeneration) {
                 resolve();
                 return;
             }
-            ctx.hls = new Hls(buildHlsConfig(Hls, ctx.getBufferSize()));
+            ctx.hls = new Hls(buildHlsConfig(Hls, ctx.getBufferSize(), { proxyTemplate }));
             ctx._onPlaybackFatal = () => reject(new Error('Stream unavailable'));
             bindHlsPlaybackHandlers(ctx, ctx.hls, generation, {
                 onManifestParsed: () => resolve()

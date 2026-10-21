@@ -39,7 +39,13 @@ export function normalizeChannel(raw, providerId = PROVIDER_IPTV_ORG) {
         countrycode: raw.country || raw.countrycode || '',
         categories: Array.isArray(raw.categories) ? raw.categories : [],
         tags: Array.isArray(raw.categories) ? raw.categories.join(', ') : (raw.tags || ''),
-        lastcheckok: raw.url_resolved ? 1 : 0
+        lastcheckok: raw.url_resolved ? 1 : 0,
+        // Web Video hints the normal player needs (ignored for TV channels).
+        ...(raw.streamKind === 'hls' || raw.streamKind === 'video' ? { streamKind: raw.streamKind } : {}),
+        ...(typeof raw.proxyTemplate === 'string' && raw.proxyTemplate ? { proxyTemplate: raw.proxyTemplate } : {}),
+        ...(typeof raw.webStreamPageUrl === 'string' && raw.webStreamPageUrl
+            ? { webStreamPageUrl: raw.webStreamPageUrl }
+            : {})
     };
 }
 

@@ -73,6 +73,17 @@ export function compactNonEssentialPersistedState(state) {
             slots[id] = {
                 key: entry.key || '',
                 ...(entry.kind === 'youtube' ? { kind: 'youtube', videoId: entry.videoId || '' } : {}),
+                ...(entry.kind === 'webstream'
+                    ? {
+                        kind: 'webstream',
+                        pageUrl: entry.pageUrl || '',
+                        streamUrl: entry.streamUrl || '',
+                        streamKind: entry.streamKind || '',
+                        mode: entry.mode === 'embed' ? 'embed' : 'media',
+                        frameUrl: entry.frameUrl || '',
+                        shield: entry.shield || ''
+                    }
+                    : {}),
                 name: entry.name || '',
                 muted: entry.muted !== false,
                 volume: Number.isFinite(Number(entry.volume)) ? Number(entry.volume) : 1,

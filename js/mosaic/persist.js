@@ -10,6 +10,7 @@ import { channelKey, parseChannelKey } from '../tvProviders/channelShape.js';
 import { TvProviderRegistry } from '../tvProviders/registry.js';
 import { el } from '../tvUtils.js';
 import { isYouTubeEntry, youtubeEntryConfig } from '../youtube/youtubeLinks.js';
+import { isWebStreamEntry, webStreamEntryConfig } from '../webstream/webStreamLinks.js';
 import { CORNER_IDS, SLOT_IDS } from './constants.js';
 import { fetchStoredFramesForMosaic, applyStoredFramesToSlots } from './frameLookup.js';
 
@@ -83,6 +84,39 @@ export const persistMethods = {
                 })).catch(() => {});
                 return;
             }
+            // Web Video tiles stub as paused placeholders; `restoreSlots()`
+            // rehydrates the synthetic channel / embed frame.
+            if (isWebStreamEntry(entry)) {
+                const config = webStreamEntryConfig(entry);
+                if (!config) return;
+                this.rememberedSlotKeys[id] = entry.key || `webstream:${config.channelId}`;
+                if (id !== 'center' && !this.slots[id]?.enabled) {
+                    this.setSideEnabled(id, true, { silent: true });
+                }
+                const startMuted = entry.muted !== false;
+                const wsPlayer = this.ensurePlayer(id, { startMuted });
+                if (!wsPlayer) return;
+                wsPlayer.muted = startMuted;
+                wsPlayer.channel = {
+                    providerId: 'webstream',
+                    channelId: config.channelId,
+                    channeluuid: entry.key || `webstream:${config.channelId}`,
+                    name: config.name || 'Web Video',
+                    // Keep the last good URL on the stub so an early persist (or
+                    // ▶ before restoreSlots finishes) cannot wipe it.
+                    url_resolved: entry.mode === 'embed' ? '' : config.streamUrl,
+                    webStreamPageUrl: config.pageUrl,
+                    ...(config.kind ? { streamKind: config.kind } : {}),
+                    webStreamEmbed: entry.mode === 'embed'
+                };
+                wsPlayer.stopped = true;
+                wsPlayer.wantPlaying = false;
+                wsPlayer.playing = false;
+                wsPlayer.pausePhase = 'idle';
+                wsPlayer.loading = false;
+                wsPlayer.loadPhase = 'idle';
+                return;
+            }
             if (!entry.key) return;
             this.rememberedSlotKeys[id] = entry.key;
             keys.push(entry.key);
@@ -145,6 +179,13 @@ export const persistMethods = {
                 return;
             }
 
+            // Web Video tiles persist page + last good stream, never `url`.
+            const wsEntry = this.webStreamSlotEntry?.(id);
+            if (wsEntry) {
+                mosaicSlots[id] = wsEntry;
+                return;
+            }
+
             if (!slot.player?.channel) {
                 // Before hydrate, empty players must not wipe saved satellites.
                 if (!this.slotsHydrated) return;
@@ -170,7 +211,10 @@ export const persistMethods = {
 
         const primary = this.getPrimary();
         const primaryIsYouTube = primary?.kind === 'youtube';
-        const primaryKey = !primaryIsYouTube && primary?.channel ? channelKey(primary.channel) : null;
+        const primaryIsWebStream = primary?.channel?.providerId === 'webstream';
+        const primaryKey = !primaryIsYouTube && !primaryIsWebStream && primary?.channel
+            ? channelKey(primary.channel)
+            : null;
         savePlayerState({
             mosaicSlots,
             ...(primaryKey && !primaryKey.endsWith(':')
@@ -194,7 +238,7 @@ export const persistMethods = {
             // Re-enable any satellite that has a saved channel so restore cannot skip it.
             CORNER_IDS.forEach((id) => {
                 const entry = mosaic[id];
-                if (!entry || (!entry.key && !isYouTubeEntry(entry))) return;
+                if (!entry || (!entry.key && !isYouTubeEntry(entry) && !isWebStreamEntry(entry))) return;
                 if (!this.slots[id]?.enabled) {
                     this.setSideEnabled(id, true, { silent: true });
                 }
@@ -231,6 +275,11 @@ export const persistMethods = {
                         silent: true,
                         persist: false
                     });
+                    return;
+                }
+                if (isWebStreamEntry(entry)) {
+                    if (id !== 'center' && !this.slots[id]?.enabled) return;
+                    await this.restoreWebStreamSlots?.({ [id]: entry });
                     return;
                 }
                 if (!entry.key) return;

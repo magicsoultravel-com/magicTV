@@ -106,6 +106,35 @@ test('buildTileHoverHtml center variant includes mosaic controls', () => {
     assert.doesNotMatch(html, /data-tile-action="swap"/);
 });
 
+test('shield is one button that slides out the three levels, in order', () => {
+    for (const variant of ['corner', 'center']) {
+        const html = buildTileHoverHtml(variant);
+        const localRow = html.slice(html.indexOf('data-controls-row="local"'));
+
+        assert.equal((localRow.match(/data-tile-action="shield"/g) || []).length, 1,
+            `${variant}: exactly one shield button`);
+        assert.match(localRow, /tv-controls__shield-wrap/, `${variant}: popout needs its wrap`);
+        assert.match(localRow, /tv-controls__shield-popout/, `${variant}: options live in the popout`);
+        assert.equal((localRow.match(/tv-controls__shield-opt/g) || []).length, 3,
+            `${variant}: three options`);
+
+        const levels = [...localRow.matchAll(/data-tile-action="shield-(off|basic|strict)"/g)]
+            .map((match) => match[1]);
+        assert.deepEqual(levels, ['off', 'basic', 'strict'],
+            `${variant}: least → most restrictive`);
+
+        // Host glyph comes first; the options are its slide-out (not extra strip buttons).
+        const host = localRow.indexOf('data-tile-action="shield"');
+        const popout = localRow.indexOf('tv-controls__shield-popout');
+        const off = localRow.indexOf('data-tile-action="shield-off"');
+        assert.ok(host < popout && popout < off, `${variant}: options are after the glyph`);
+
+        assert.match(localRow,
+            /data-tile-action="shield-off" data-controls-target="local" title="[^"]+" aria-label="Page shield: Off"/,
+            `${variant}: options carry a target and a hint`);
+    }
+});
+
 test('hydrateTileHoverControls replaces hover content once', () => {
     const mosaic = { dataset: {}, querySelectorAll: () => [] };
     const origDoc = globalThis.document;

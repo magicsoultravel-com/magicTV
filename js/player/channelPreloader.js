@@ -120,6 +120,9 @@ export class ChannelPreloader {
         const gen = this.generation;
 
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
+        // Web Video streams (proxy templates / explicit HLS hints) must attach
+        // through the normal player's loader — never the staging preloader.
+        if (normalized?.providerId === 'webstream') return false;
         const url = (normalized?.url_resolved || '').trim();
         if (!url || !video) return false;
 

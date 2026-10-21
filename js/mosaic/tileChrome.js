@@ -16,6 +16,14 @@ import { SLOT_IDS, SLOT_SCREEN_LABELS, slotIsOccupied } from './constants.js';
 import { setMarqueeText } from '../ui/marquee.js';
 import { SettingsStore } from '../storage/settingsStore.js';
 import { formatWatchDuration, getLiveWatchSeconds } from '../storage/watchStats.js';
+import { shieldLabel } from '../webstream/webShield.js';
+
+/** Shield popout actions → the exact level they pick (the glyph cycles instead). */
+const SHIELD_ACTION_LEVELS = {
+    'shield-off': 'off',
+    'shield-basic': 'basic',
+    'shield-strict': 'strict'
+};
 
 function pipSupported() {
     return typeof document !== 'undefined'
@@ -110,6 +118,18 @@ export const tileChromeMethods = {
 
         if (action === 'stop-play') {
             const player = this.slots[slotId]?.player;
+            if (this.isWebStreamSlot(slotId)) {
+                if (this.webStreamMode(slotId) === 'embed') {
+                    this.reloadWebStreamFrame(slotId);
+                    return;
+                }
+                // Signed page URLs rotate: Stop & Play re-scans the page and
+                // starts the fresh stream (direct-URL tiles fall through).
+                if (this.webStreamState?.[slotId]?.pageUrl) {
+                    await this.reResolveWebStreamSlot(slotId);
+                    return;
+                }
+            }
             if (!player?.channel) return;
             if (player.kind === 'youtube') {
                 await player.stop();
@@ -205,10 +225,45 @@ export const tileChromeMethods = {
             return;
         }
 
+        if (action === 'web-video') {
+            if (this.isWebStreamSlot(slotId)) {
+                await this.detachWebStreamMode(slotId);
+                this.syncMosaicChrome();
+                return;
+            }
+            const { WebStreamPicker } = await import('../ui/webStreamPicker.js');
+            WebStreamPicker.open({
+                slotId,
+                play: (spec) => (spec?.mode === 'embed'
+                    ? this.playEmbeddedWebPage(slotId, spec)
+                    : this.playWebStream(slotId, spec))
+            });
+            return;
+        }
+
+        if (action === 'shield' || SHIELD_ACTION_LEVELS[action]) {
+            if (this.webStreamMode(slotId) !== 'embed') {
+                showAppToast('Page shield applies to embedded pages only');
+                return;
+            }
+            // The glyph cycles; a popout option names its level outright.
+            const next = this.setWebStreamShield(slotId, SHIELD_ACTION_LEVELS[action] || '');
+            if (next) showAppToast(`Page shield: ${shieldLabel(next)}`);
+            return;
+        }
+
         if (action === 'cast') {
             const player = this.slots[slotId]?.player;
             if (player?.kind === 'youtube') {
                 showAppToast('YouTube tiles can’t be cast');
+                return;
+            }
+            if (this.webStreamMode(slotId) === 'embed') {
+                showAppToast('Embedded pages can’t be cast');
+                return;
+            }
+            if (player?.channel?.providerId === 'webstream' && player.channel.proxyTemplate) {
+                showAppToast('Proxied Web Video can’t be cast');
                 return;
             }
             const channel = player?.channel;
@@ -238,6 +293,7 @@ export const tileChromeMethods = {
         switch (action) {
             case 'play':
                 if (useCast) ChromecastManager.togglePlayPause();
+                else if (this.webStreamMode(slotId) === 'embed') this.resumeEmbeddedWebPage(slotId);
                 else player.toggle();
                 break;
             case 'bank':
@@ -246,6 +302,9 @@ export const tileChromeMethods = {
             case 'stop':
                 if (useCast) {
                     await ChromecastManager.stopMedia();
+                } else if (this.webStreamMode(slotId) === 'embed') {
+                    this.stopEmbeddedWebPage(slotId);
+                    this.persistSlots();
                 } else {
                     player._stopPlayGeneration = (player._stopPlayGeneration || 0) + 1;
                     const shouldAnimate = player.playing || player.loading || player.pausePhase !== 'idle';
@@ -263,6 +322,12 @@ export const tileChromeMethods = {
                 } else if (player.channel) {
                     player.toggleMute();
                     this.persistSlots();
+                    // Same tray on a page tile: the flag always flips, but the
+                    // page's own audio is only reachable when it is same-origin.
+                    if (this.webStreamMode(slotId) === 'embed'
+                        && !this.syncEmbeddedPageMute(slotId)) {
+                        showAppToast('Embedded pages keep their own sound');
+                    }
                 }
                 break;
             case 'vol-up':
@@ -307,6 +372,12 @@ export const tileChromeMethods = {
                 }
                 break;
             case 'fullscreen': {
+                if (this.webStreamMode(slotId) === 'embed') {
+                    const { fullscreenWebPageFrame } = await import('../webstream/webPagePlayer.js');
+                    const ok = await fullscreenWebPageFrame(el(`tv-playback-surface-${slotId}`));
+                    if (!ok) showAppToast('Fullscreen blocked');
+                    break;
+                }
                 if (player.kind === 'youtube') {
                     const frameWrap = player.videoHolder;
                     if (!frameWrap?.requestFullscreen) {
@@ -333,6 +404,10 @@ export const tileChromeMethods = {
                 break;
             }
             case 'pip': {
+                if (this.webStreamMode(slotId) === 'embed') {
+                    showAppToast('Pop out isn’t available for embedded pages');
+                    break;
+                }
                 if (player.kind === 'youtube') {
                     showAppToast('Pop out isn’t available in YouTube mode');
                     break;
@@ -443,6 +518,20 @@ export const tileChromeMethods = {
             tile.classList.toggle('is-disconnected', uiDisconnected);
             tile.classList.toggle('is-banking', uiBanking);
             tile.classList.toggle('is-youtube', player?.kind === 'youtube');
+            const wsMode = this.webStreamMode?.(id) || '';
+            const isWebStream = Boolean(wsMode) || player?.channel?.providerId === 'webstream';
+            tile.classList.toggle('is-webstream', isWebStream);
+            tile.classList.toggle('is-webpage', wsMode === 'embed');
+            if (isWebStream) {
+                const castable = wsMode !== 'embed'
+                    && !player?.channel?.proxyTemplate
+                    && Boolean(player?.channel?.url_resolved);
+                tile.classList.toggle('is-webstream-castable', castable);
+                // A re-mount can strip the surface; put the page frame back.
+                if (wsMode === 'embed' && !tile.querySelector('.webstream-frame-wrap')) {
+                    this.mountWebStreamFrame?.(id);
+                }
+            }
             const stateEl = tile.querySelector('.tv-player-tile__playback-state');
             const countdownEl = tile.querySelector('.tv-player-tile__retry-countdown');
             if (stateEl) {
@@ -772,6 +861,40 @@ export const tileChromeMethods = {
             btn.setAttribute('aria-pressed', String(active));
             btn.title = active ? 'Exit YouTube mode' : 'YouTube mode';
             btn.setAttribute('aria-label', btn.title);
+            return;
+        }
+        if (action === 'web-video') {
+            const active = this.isWebStreamSlot(slotId);
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', String(active));
+            btn.title = active ? 'Exit Web Video' : 'Web video (any URL)';
+            btn.setAttribute('aria-label', btn.title);
+            return;
+        }
+        if (action === 'shield') {
+            const embedding = this.webStreamMode(slotId) === 'embed';
+            const level = embedding ? (this.webStreamShieldFor(slotId) || '') : '';
+            const off = level === 'off';
+            btn.classList.toggle('is-active', embedding && !off);
+            btn.classList.toggle('is-off', embedding && off);
+            btn.setAttribute('aria-pressed', String(embedding && !off));
+            btn.title = embedding
+                ? `Page shield: ${shieldLabel(level) || 'Basic'} — click to cycle`
+                : 'Page shield (embed mode only)';
+            btn.setAttribute('aria-label', btn.title);
+            const check = btn.querySelector('.tile-shield-check');
+            const slash = btn.querySelector('.tile-shield-slash');
+            if (check) check.style.opacity = off ? '0' : '1';
+            if (slash) slash.style.opacity = off ? '1' : '0';
+            return;
+        }
+        if (SHIELD_ACTION_LEVELS[action]) {
+            // Popout options mirror the live level as a radio group.
+            const embedding = this.webStreamMode(slotId) === 'embed';
+            const level = embedding ? (this.webStreamShieldFor(slotId) || '') : '';
+            const active = embedding && level === SHIELD_ACTION_LEVELS[action];
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', String(active));
             return;
         }
         if (action === 'fav') {

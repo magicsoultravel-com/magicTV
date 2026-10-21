@@ -1198,6 +1198,7 @@
 .tv-controls__play-wrap,
 .tv-controls__stop-wrap,
 .tv-controls__swap-wrap,
+.tv-controls__shield-wrap,
 .tv-controls__travel-wrap {
     position: relative;
     display: inline-flex;
@@ -1208,6 +1209,7 @@
 .tv-controls__play-wrap::after,
 .tv-controls__stop-wrap::after,
 .tv-controls__swap-wrap::after,
+.tv-controls__shield-wrap::after,
 .tv-controls__travel-wrap::after {
     content: '';
     position: absolute;
@@ -1228,6 +1230,7 @@
 .tv-controls__play-popout,
 .tv-controls__stop-popout,
 .tv-controls__swap-popout,
+.tv-controls__shield-popout,
 .tv-controls__travel-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
@@ -1262,6 +1265,8 @@
 .tv-controls__stop-wrap:focus-within .tv-controls__stop-popout,
 .tv-controls__swap-wrap:hover .tv-controls__swap-popout,
 .tv-controls__swap-wrap:focus-within .tv-controls__swap-popout,
+.tv-controls__shield-wrap:hover .tv-controls__shield-popout,
+.tv-controls__shield-wrap:focus-within .tv-controls__shield-popout,
 .tv-controls__travel-wrap:hover .tv-controls__travel-popout,
 .tv-controls__travel-wrap:focus-within .tv-controls__travel-popout {
     transform: translateX(-50%) translateY(0);
@@ -1276,6 +1281,7 @@
 .tv-controls__play-popout .tv-controls__btn,
 .tv-controls__stop-popout .tv-controls__btn,
 .tv-controls__swap-popout .tv-controls__btn,
+.tv-controls__shield-popout .tv-controls__btn,
 .tv-controls__travel-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
@@ -1284,6 +1290,17 @@
 }
 
 .tv-controls__travel-popout .tv-controls__travel-opt {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+/* Shield levels are words, not glyphs — let them breathe (Off / Basic / Strict).
+ * `.tv-controls__btn` is repeated so this beats the later 28px strip default. */
+.tv-controls__shield-popout .tv-controls__btn.tv-controls__shield-opt {
+    width: auto;
+    min-width: 28px;
+    padding: 0 0.4rem;
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.02em;

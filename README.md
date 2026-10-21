@@ -12,6 +12,7 @@
 - **🎨 Themes** — Preset themes with customizable accent, background, border, and text colors
 - **🔊 Full Controls** — Play, pause, volume, quality, Picture-in-Picture, fullscreen, Chromecast
 - **▶️ YouTube Mode** — Run an embedded YouTube clip on one TV tile; paste a link or pick a saved clip
+- **🌐 Web Video** — Paste any page (or direct `.m3u8`/`.mp4`) and play the video behind it on a tile; sniffer + optional proxy, no backend
 - **🔗 Share Channels** — Copy a raw stream link or a magicTV deep link that opens the channel on a TV screen
 - **💾 Persistent** — localStorage saves favorites, recents, settings
 - **🚀 No Build** — Pure JavaScript modules, runs directly in browser
@@ -74,6 +75,7 @@ magicTV/
 │       ├── settings.css     # Settings panels, appearance controls, responsive tweaks
 │       ├── modals.css       # Channel picker modal, tab-bar popups
 │       ├── youtube.css      # YouTube tile embed + clip picker overlay
+│       ├── webstream.css    # Web Video chrome, page iframe tiles + picker
 │       ├── remote.css       # Aggregator → remote/*.css (shell, shapes, panel, textures, pickers)
 │       └── remote/          # Remote module parts (shell, shapes, panel, textures, pickers)
 ├── js/
@@ -85,12 +87,20 @@ magicTV/
 │   ├── toast.js           # Bridge re-export → ui/toast.js
 │   ├── icons.js           # Bridge re-export → ui/icons.js
 │   ├── clipboard.js       # Bridge re-export → ui/clipboard.js
-│   ├── mosaic/             # MultiView mixins (playback, persist, chrome, youtube)
+│   ├── mosaic/             # MultiView mixins (playback, persist, chrome, youtube, webstream)
 │   ├── youtube/
 │   │   ├── youtubeLinks.js    # URL/id/thumb helpers (pure)
 │   │   ├── youtubeApi.js      # Lazy IFrame API loader
 │   │   ├── youtubeLibrary.js  # Saved clips + oEmbed metadata
 │   │   └── youtubePlayer.js   # playerInstance-compatible embed adapter
+│   ├── webstream/
+│   │   ├── webStreamLinks.js    # Media/page URL helpers, synthetic channel (pure)
+│   │   ├── webStreamResolver.js # Resolution ladder: direct → scrape → proxy → embed
+│   │   ├── webStreamSniffer.js  # Bookmarklet + postMessage + pasted-URL fallback
+│   │   ├── webStreamLoader.js   # hls.js loader that rewrites requests via a proxy
+│   │   ├── webStreamLibrary.js  # Saved pages/streams (localStorage)
+│   │   ├── webShield.js         # Embed page shield: sandbox + permission policy (pure)
+│   │   └── webPagePlayer.js     # Last-resort iframe embed helpers
 │   ├── tvProviders/
 │   │   ├── registry.js    # Provider abstraction
 │   │   ├── channelShape.js # Channel data model
@@ -132,6 +142,44 @@ Hover a TV tile and press the **YouTube** button (rounded play glyph) to paste a
 - Cast, pop-out/PiP, favourite and Bank are unavailable on a YouTube tile (a cross-origin embed can't be captured or cast).
 - Press the button again (or pick a channel on that tile) to leave YouTube mode and return to the channel that was there before.
 
+### Web Video (any page or direct link)
+Hover a TV tile, then hover the **YouTube** button to slide out the **globe** button (Web Video). Paste any page URL — magicTV looks for the video behind it — or a direct `.m3u8` / `.mp4` link, which plays immediately.
+
+- **Resolution ladder** (all client-side, no backend):
+  1. The pasted URL is already a media file → plays at once.
+  2. magicTV `fetch`es the page and scans its HTML for `<video>`/`<source>`/`src`/`file`/`contentUrl`/`og:video`/JSON blobs.
+  3. Sites that block cross-origin reads are retried through your optional proxy template (`…?url={url}`).
+  4. Still blocked → **Sniff**: drag the *magicTV Sniff* bookmarklet to your bookmarks bar, open the page, press play there, click the bookmark. It reports the `.m3u8`/`.mp4` URLs the page itself requested back to the picker (`postMessage`, plus a clipboard copy as fallback). A paste box accepts the report or any URL list.
+  5. No media but an embeddable player → **Embed the page** (iframe fallback).
+  6. DRM pages (Widevine / PlayReady / FairPlay) are refused with an explanation.
+- **Media mode is a real TV tile**: the resolved URL plays through the normal player, so play / stop / mute / volume / fullscreen / PiP / pop-out / persistence all work, including multiple Web Video tiles at once.
+- **Chrome differences**: favourite and Bank are hidden; Cast only appears for direct, non-proxied media URLs. In embed mode the tile keeps play (reload), stop, mute, fullscreen, drag and the **shield** button — and nothing is painted over the page (no centre ■/▶ slate: the page itself is the picture).
+- **Mute on a page tile**: the tray's mute glyph behaves like a normal TV tile — it flips the tile's mute flag and its slide-out offers **Mute other TVs** / **Mute all**, which always work on the other tiles. The page's *own* audio is only reachable when the page is same-origin, so a remote embed keeps its sound and magicTV says “Embedded pages keep their own sound”; the mute state is remembered, so a same-origin page comes back muted after ▶ / reload.
+- **Page shield (embed mode)**: a cross-origin iframe is a black box — magicTV cannot remove the page's scripts, block its subresource/ad requests, or touch in-player/stitched ads. What it *can* do is deny the capabilities nuisance ads rely on. Hover or focus the **shield** button (next to fullscreen) and the three levels slide out above the strip — **Off / Basic / Strict**, with the live one lit; clicking the glyph itself cycles basic → strict → off. Each change re-navigates the page (sandbox flags only apply at navigation) and is remembered on that saved page.
+
+  | Level | Sandbox tokens | Denies |
+  | --- | --- | --- |
+  | **Off** | *(none)* | nothing — the page behaves like a normal tab (escape hatch for OAuth/pop-up logins) |
+  | **Basic** *(default)* | `allow-scripts allow-same-origin allow-forms allow-presentation` | pop-ups and new-tab ads, top-navigation hijacks, downloads, `alert()`/`confirm()` scams |
+  | **Strict** | `allow-scripts allow-same-origin allow-presentation` + `referrerpolicy="no-referrer"` | the above plus forms (fake logins / cross-tile submits) and referrer leakage |
+
+  `allow-scripts` + `allow-same-origin` stay on purpose: the frame is cross-origin (so it cannot reach magicTV's window) and nearly every player needs its real origin for cookies and `localStorage`. Camera, microphone, geolocation, payment, USB/serial/HID/MIDI, `clipboard-write` and `display-capture` stay denied at every level via the `allow` policy. Set the global default under *Advanced — proxy & page shield* in the picker; a shield change on a tile is stored with that page, so replaying it later keeps the fix. An **Off** tile shows a small “Shield off” badge.
+- **Media mode is the ad-free path**: it fetches only the resolved stream, never the page around it, so the page's ad/tracker requests never happen at all. The shield is the best effort available *after* you fall back to embedding.
+- **Persistence**: each tile saves its `pageUrl` plus the last stream URL that worked (or the embed URL). Reload restores the tile paused; ▶ attaches fresh. Signed URLs expire — use **Stop & Play** (the ⏹▶ popout under Play) to re-scan the page and start the new stream, or turn the globe off and reopen the picker to pick the saved entry.
+- **Proxy is optional and user-supplied** — magicTV ships none. Enter it under *Advanced — proxy & page shield* in the picker (stored as `webStreamProxyTemplate` in the state blob, with a `webStreamProxyPlayback` toggle that routes manifest + segment requests through it via an hls.js custom loader). Templates support `{url}` and `{url_encoded}`.
+- Web Video tiles never write `webstream:` keys into history, Recents or `lastChannelKey`; the previous TV channel comes back when you turn Web Video off (press the globe again).
+
+Manual checklist after changes:
+
+1. Paste `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8` → tile plays, play/stop/mute/volume work, reload restores paused.
+2. Paste a page that embeds an HLS player (CORS-friendly) → resolves and plays without the sniffer.
+3. Paste a CORS-blocked page → status points at the sniffer; run the bookmarklet → candidates appear; click one → plays.
+4. Choose *Embed the page instead* → iframe fills the tile with no grey ■ slate on top of it, ▶ reloads it, ■ blanks it, ⛶ fullscreens the wrapper, and the tray still shows mute with its **Mute other TVs / Mute all** slide-out (a remote page keeps its own sound and the tile says so).
+5. Turn the globe off → the previous TV channel returns; Recents/history show no `webstream:` entries.
+6. Add a proxy template → a blocked page resolves through it; enable *Play through the proxy* → HLS still plays (proxy loader).
+7. Embed a pop-up-heavy page, hover its shield button → **Off / Basic / Strict** slide out with the live level lit; pick **Basic** → no new tabs, no download prompts, dialogs are blocked; pick **Strict** → the page's forms stop submitting; pick **Off** → it behaves like a normal tab and the tile shows the “Shield off” badge. Each change reloads the embed.
+8. Reload magicTV → the embed tile replays with the shield level you last chose for that page.
+
 ### Favorites & Recents
 - **Favorite Button** — Use ★ on the player controls while a channel is playing
 - **Auto-tracked** — Recents tab fills as you watch
@@ -170,6 +218,7 @@ Volume and catalog layout (tiles/list) live on the player chrome / catalog toolb
 ## 💾 Storage
 
 - **localStorage** — Favorites, recents, settings under isolated `magictv_*` keys (separate from magiclists)
+- **Web Video library** — `magictv_webstream_library_v1` (saved pages/streams; proxy template + playback toggle live in the state blob)
 - **IndexedDB** — `magictv_cache_db` for catalog + frame cache (manual refresh; frames TTL 7 days)
 
 ## 🎨 Color Scheme
@@ -204,6 +253,19 @@ import { TvProviderRegistry } from './js/tvProviders/registry.js';
 - No multi-provider support yet (iptv-org only)
 - Catalog has no real offline-health signal (channels without a URL are simply omitted)
 - Mobile volume control hidden on small screens
+
+### Web Video limits (by design — everything runs in the browser)
+
+| Limit | What it means |
+| --- | --- |
+| DRM | Widevine / PlayReady / FairPlay streams cannot play outside their own app; magicTV refuses them and says so. |
+| CORS | Most large sites block cross-origin page reads. The sniffer (bookmarklet in the page's own tab) or your own proxy template is the way around it. |
+| Cross-origin iframes | The embed fallback cannot list the iframe's internal media URLs, cannot seek, and cannot read its cookies. |
+| Ads inside an embedded player | The page shield can only deny capabilities (pop-ups, downloads, dialogs, forms, referrer); it cannot strip pre-roll/stitched ads or block the page's own ad requests. Media mode — which requests only the resolved stream — is the reliable ad-free path. |
+| Referer / UA / cookie-bound CDNs | Some streams only answer the site that owns them. They fail even when the URL is found (no proxy → no spoofed headers). |
+| Signed URLs | Tokens expire; a restored tile may need a fresh resolve via the picker/sniff panel. |
+| Mixed content | `http://` media on the `https://` magicTV page is blocked by the browser. |
+| Thumbnails | Freeze-frame snaps of a `webstream:`/proxied source are skipped (canvas tainting); the tile keeps its name. |
 
 ## 📦 Next Steps
 

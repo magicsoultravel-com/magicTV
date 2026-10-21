@@ -4,6 +4,7 @@
  */
 import { loadPlayerState, savePlayerState, normalizeWatchStatsMeta } from './playerState.js';
 import { channelKey, migrateFavoriteRef } from '../tvProviders/channelShape.js';
+import { WEBSTREAM_PROVIDER_ID } from '../webstream/webStreamLinks.js';
 
 export const WATCH_STATS_CAP = 100;
 const PERSIST_DEBOUNCE_MS = 45000;
@@ -149,9 +150,10 @@ export function getLiveWatchSeconds(player) {
         return { session: 0, total: 0, key: '' };
     }
 
-    // YouTube tiles keep a session-only counter: never pollute lifetime stats
-    // (and never write a bogus `youtube:<id>` row into watchStatsMeta).
-    if (player?.kind === 'youtube') {
+    // YouTube / Web Video tiles keep a session-only counter: never pollute
+    // lifetime stats (and never write bogus `youtube:` / `webstream:` rows
+    // into watchStatsMeta).
+    if (player?.kind === 'youtube' || player?.channel?.providerId === WEBSTREAM_PROVIDER_ID) {
         if (typeof player.syncWatchAccrual === 'function') {
             try { player.syncWatchAccrual(); } catch { /* ignore */ }
         }

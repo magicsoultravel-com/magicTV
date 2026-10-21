@@ -9,6 +9,13 @@ import {
     youtubeKey,
     youtubeThumbUrl
 } from '../youtube/youtubeLinks.js';
+import {
+    isWebStreamEntry,
+    sanitizeStreamUrl,
+    webStreamEntryConfig,
+    webstreamChannelId,
+    webstreamKey
+} from '../webstream/webStreamLinks.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
 
 function hasFavoriteFolders(folders) {
@@ -345,6 +352,33 @@ function normalizeMosaicSlots(raw) {
                 volume: Number.isFinite(rawYtVol) ? Math.min(1, Math.max(0, rawYtVol)) : 1,
                 url: (typeof entry === 'object' && (entry.url || entry.url_resolved))
                     || youtubeThumbUrl(ytConfig.videoId)
+            };
+            return;
+        }
+        // Web Video tiles keep their page + last good stream — never a TV key.
+        if (isWebStreamEntry(entry)) {
+            const config = webStreamEntryConfig(entry);
+            if (!config) return;
+            const rawVol = Number(entry.volume);
+            const mode = entry.mode === 'embed' ? 'embed' : 'media';
+            const frameUrl = mode === 'embed'
+                ? (sanitizeStreamUrl(entry.frameUrl || '') || config.pageUrl)
+                : '';
+            out[id] = {
+                kind: 'webstream',
+                key: webstreamKey(config.pageUrl || config.streamUrl, config.streamUrl),
+                providerId: 'webstream',
+                channelId: config.channelId || webstreamChannelId(config.pageUrl || config.streamUrl, config.streamUrl),
+                pageUrl: config.pageUrl,
+                streamUrl: mode === 'embed' ? '' : config.streamUrl,
+                streamKind: config.kind || '',
+                mode,
+                frameUrl,
+                shield: mode === 'embed' ? config.shield : '',
+                name: config.name || '',
+                muted: entry.muted !== false,
+                volume: Number.isFinite(rawVol) ? Math.min(1, Math.max(0, rawVol)) : 1,
+                url: ''
             };
             return;
         }

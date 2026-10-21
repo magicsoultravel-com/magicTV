@@ -197,6 +197,9 @@ export const swapMethods = {
         applySwapPlaybackContinuity(centerBefore, centerPlayer);
         applySwapPlaybackContinuity(sideBefore, sidePlayer);
 
+        // Web Video page/embed bookkeeping follows the tile, not the player.
+        this.swapWebStreamSlots?.(sideId);
+
         // After pointers flip: unmute main and mute every other TV (+ radio).
         if (opts.unmuteCenter) {
             this.muteSolo('center');

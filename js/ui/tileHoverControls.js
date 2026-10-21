@@ -1,5 +1,7 @@
 /** Shared HTML for per-tile hover control rows (local + optional cast). */
 
+import { SHIELD_LEVELS, shieldLabel, shieldSummary } from '../webstream/webShield.js';
+
 export const MUTE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2.5 4.5H5l3-3v9l-3-3H2.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path class="tile-mute-wave" d="M7 5.5c.5.5.5 1.5 0 2M8 4c1 1 1 3 0 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line class="tile-mute-slash" x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
 const BROWSE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="1.5" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
@@ -15,6 +17,12 @@ export const RESET_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusa
 
 /** YouTube mode — rounded screen + play glyph (per-tile hover button). */
 export const YOUTUBE_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.2" y="2.6" width="9.6" height="6.8" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.1 4.4 8 6 5.1 7.6V4.4z" fill="currentColor"/></svg>`;
+
+/** Web Video — globe with a play triangle (slide-out of the YouTube button). */
+export const WEBSTREAM_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 6h8.4M6 1.6c1.5 1.5 1.5 7.3 0 8.8M6 1.6c-1.5 1.5-1.5 7.3 0 8.8" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M5 4.6 7.4 6 5 7.4V4.6z" fill="currentColor"/></svg>`;
+
+/** Page shield — shield with a check (line through it when the shield is off). */
+export const SHIELD_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M6 1.3 10 2.7v3.4c0 2.2-1.6 3.9-4 4.9-2.4-1-4-2.7-4-4.9V2.7L6 1.3z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path class="tile-shield-check" d="M4.1 6 5.4 7.3 8 4.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><line class="tile-shield-slash" x1="2" y1="1.6" x2="10" y2="10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" style="opacity:0"/></svg>`;
 
 /** Grab handle — 2×3 grip dots; drags the tile when the embed owns the pointer. */
 export const GRAB_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><circle cx="4.2" cy="3" r="1.1" fill="currentColor"/><circle cx="7.8" cy="3" r="1.1" fill="currentColor"/><circle cx="4.2" cy="6" r="1.1" fill="currentColor"/><circle cx="7.8" cy="6" r="1.1" fill="currentColor"/><circle cx="4.2" cy="9" r="1.1" fill="currentColor"/><circle cx="7.8" cy="9" r="1.1" fill="currentColor"/></svg>`;
@@ -210,6 +218,21 @@ function grabHandle() {
     return `<button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__grab-btn" data-tile-drag-handle title="Drag screen" aria-label="Drag this screen">${GRAB_SVG}</button>`;
 }
 
+/**
+ * Page shield — one button; hovering / focusing it slides out the three levels
+ * (same recipe as TV Travel, Mute, Play and Stop). Clicking the glyph itself
+ * still cycles basic → strict → off, so the popout is the precise path and the
+ * cycle is the quick one.
+ */
+function shieldWrap(target) {
+    return `<div class="tv-controls__shield-wrap">
+        ${controlBtn('shield', 'Page shield', SHIELD_SVG, target, 'tv-controls__btn--main-2 tv-controls__shield-btn')}
+        <div class="tv-controls__shield-popout" aria-hidden="true">
+            ${SHIELD_LEVELS.map((level) => `<button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-controls__shield-opt" data-tile-action="shield-${level}" data-controls-target="${target}" title="${shieldSummary(level)}" aria-label="Page shield: ${shieldLabel(level)}" aria-pressed="false">${shieldLabel(level)}</button>`).join('')}
+        </div>
+    </div>`;
+}
+
 function coreRowButtons(target) {
     return [
         grabHandle(),
@@ -218,11 +241,25 @@ function coreRowButtons(target) {
         stopWrap(target),
         controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2'),
         controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),
-        controlBtn('youtube', 'YouTube mode', YOUTUBE_SVG, target, 'tv-controls__btn--main-2 tv-controls__youtube-btn'),
+        shieldWrap(target),
+        youtubeWrap(target),
         controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
         muteWrap(target),
         travelWrap(target)
     ].join('');
+}
+
+/**
+ * YouTube button + Web Video slide-out. Hovering / focusing YouTube reveals the
+ * Web Video button above the strip (same recipe as Swap / TV Travel popouts).
+ */
+function youtubeWrap(target) {
+    return `<div class="tv-controls__youtube-wrap">
+        ${controlBtn('youtube', 'YouTube mode', YOUTUBE_SVG, target, 'tv-controls__btn--main-2 tv-controls__youtube-btn')}
+        <div class="tv-controls__youtube-popout" aria-hidden="true">
+            ${controlBtn('web-video', 'Web video (any URL)', WEBSTREAM_SVG, target, 'tv-controls__btn--main-2 tv-controls__webvideo-btn')}
+        </div>
+    </div>`;
 }
 
 function cornerExtras(target) {

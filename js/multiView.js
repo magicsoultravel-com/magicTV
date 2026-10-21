@@ -47,6 +47,7 @@ import { focusChromeMethods } from './mosaic/focusChrome.js';
 import { playbackMethods } from './mosaic/playback.js';
 import { tileChromeMethods } from './mosaic/tileChrome.js';
 import { youtubeMethods } from './mosaic/youtube.js';
+import { webStreamMethods } from './mosaic/webstream.js';
 import { resolveMosaicGridTemplate } from './mosaic/gridLayout.js';
 import { hydrateTileHoverControls, syncTileRockers } from './ui/tileHoverControls.js';
 import { ChanBindPicker } from './ui/chanBindPicker.js';
@@ -91,6 +92,7 @@ export const MultiView = {
     ...playbackMethods,
     ...tileChromeMethods,
     ...youtubeMethods,
+    ...webStreamMethods,
 
     initialized: false,
     sharedVolume: savedVolume(),
@@ -121,6 +123,14 @@ export const MultiView = {
     youtubeReturn: {},
     _ytPendingReturn: {},
     _ytErrorToastAt: 0,
+
+    /** Web Video tiles: page/stream state + the channel to restore on exit. */
+    /** @type {Record<string, { pageUrl: string, streamUrl?: string, frameUrl?: string, kind?: string, mode: 'media'|'embed', title?: string }>} */
+    webStreamState: {},
+    /** @type {Record<string, { channel: object|null, key: string, remembered: string }>} */
+    webStreamReturn: {},
+    /** @type {Record<string, boolean>} */
+    _wsIntent: {},
 
     /** @type {Record<string, { x: number, y: number, w: number, h: number, z: number }>} */
     mosaicPlacement: {},
@@ -740,6 +750,8 @@ export const MultiView = {
                     this.forgetYouTubeSlot?.(sideId);
                     this.detachYouTubeModeSync?.(sideId);
                 }
+                this.forgetWebStreamSlot?.(sideId);
+                this.detachWebStreamModeSync?.(sideId);
                 if (this.mosaicPlacement[sideId]) {
                     delete this.mosaicPlacement[sideId];
                     this.persistPlacement();

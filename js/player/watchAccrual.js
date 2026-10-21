@@ -4,6 +4,7 @@
 import { channelKey } from '../tvProviders/channelShape.js';
 import { addWatchSeconds } from '../storage/watchStats.js';
 import { isHealthyWatchPlayback } from './pauseBuffer.js';
+import { WEBSTREAM_PROVIDER_ID } from '../webstream/webStreamLinks.js';
 
 /** Max seconds credited in a single addWatchSeconds call (safety bound per chunk). */
 export const WATCH_ACCRUAL_FLUSH_CAP_SEC = 30;
@@ -64,7 +65,15 @@ export function createWatchAccrualControllers({
         if (remaining <= 0) return;
         while (remaining > 0) {
             const chunk = Math.min(remaining, WATCH_ACCRUAL_FLUSH_CAP_SEC);
-            addWatchSeconds(key, chunk, channel);
+            // Web Video keys are not catalog channels — session counter only,
+            // never a Most-watched row / lifetime stat. `channel` can be null
+            // when the window closes on a switch, so fall back to the key.
+            const isWebStreamKey = channel
+                ? channel.providerId === WEBSTREAM_PROVIDER_ID
+                : key.startsWith(`${WEBSTREAM_PROVIDER_ID}:`);
+            if (!isWebStreamKey) {
+                addWatchSeconds(key, chunk, channel);
+            }
             player.watchSessionSeconds = (Number(player.watchSessionSeconds) || 0) + chunk;
             remaining -= chunk;
         }

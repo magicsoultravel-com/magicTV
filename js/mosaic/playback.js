@@ -143,6 +143,9 @@ function prepareSlotForPlay(mv, id) {
     // prev/next, restore, popout). Detach before ensuring the real player and
     // drop the YouTube return state — the new channel is the new identity.
     if (mv.detachYouTubeModeSync?.(id)) mv.forgetYouTubeSlot?.(id);
+    // A TV tune also replaces Web Video on this tile (iframe or synthetic
+    // channel). Never restore the old channel here — the new tune wins.
+    mv.detachWebStreamModeSync?.(id);
     if (CORNER_IDS.includes(id) && !mv.slots[id]?.enabled) {
         mv.setSideEnabled(id, true);
     }
@@ -222,6 +225,7 @@ export const playbackMethods = {
             slot.player.mute();
         });
         if (radioEnabled() && RP()?.hasActiveStation?.()) RP().mute();
+        this.syncEmbeddedPageMutes?.();
         this.persistSlots();
         // emitState → onState → scheduleRefreshTiles
         this.getPrimary()?.emitState();
@@ -241,6 +245,7 @@ export const playbackMethods = {
             else slot.player.mute();
         });
         if (radioEnabled()) RP()?.mute?.();
+        this.syncEmbeddedPageMutes?.();
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
@@ -257,6 +262,7 @@ export const playbackMethods = {
             slot.player.unmute();
         });
         if (radioEnabled() && RP()?.hasActiveStation?.()) RP().unmute();
+        this.syncEmbeddedPageMutes?.();
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
@@ -282,6 +288,7 @@ export const playbackMethods = {
         try {
             if (!player.playing) await player.play();
         } catch { /* toast handled by caller UI */ }
+        this.syncEmbeddedPageMutes?.();
         this.persistSlots();
         this.getPrimary()?.emitState();
         this.syncMosaicChrome();
@@ -621,8 +628,11 @@ export const playbackMethods = {
         const previousKey = channelKey(player.channel);
         const normalized = normalizeChannel(channel, channel?.providerId) || channel;
         const key = channelKey(normalized);
+        // Web Video: no staging pre-warm / prefetch (proxy + signed URLs only
+        // work through the Web Video loader) and never Safe Loading.
+        const isWebStream = normalized?.providerId === 'webstream';
 
-        if (SettingsStore.getChanSwitchMode() === 'safeLoading') {
+        if (!isWebStream && SettingsStore.getChanSwitchMode() === 'safeLoading') {
             return this.playOnSlotSafeLoading(id, channel, player, normalized, key, {
                 skipHistory,
                 previousKey
@@ -641,7 +651,7 @@ export const playbackMethods = {
         // Only Safe Loading benefits from a background warm (it waits for the
         // staging buffer). Classic mode immediately falls back to playChannel,
         // so starting a warm here would just double the HLS traffic per click.
-        if (hasVisibleContent && SettingsStore.getChanSwitchMode() === 'safeLoading') {
+        if (hasVisibleContent && !isWebStream && SettingsStore.getChanSwitchMode() === 'safeLoading') {
             void player.startPrepareChannel(normalized, switchGen, { suppressUi: false });
         }
 

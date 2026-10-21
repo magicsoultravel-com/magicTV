@@ -1604,6 +1604,89 @@
             <p class="youtube-picker__footnote">Embedded player: use its own controls for seek/quality. Turning YouTube mode off restores the TV channel.</p>
         </div>
     </div>
+    <div id="webstream-picker" class="webstream-picker is-hidden" hidden aria-hidden="true">
+        <div class="webstream-picker__backdrop" data-webstream-picker-dismiss tabindex="-1"></div>
+        <div
+            id="webstream-picker-dialog"
+            class="webstream-picker__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="webstream-picker-title"
+            tabindex="-1"
+        >
+            <button type="button" class="webstream-picker__close" data-webstream-picker-dismiss aria-label="Close">
+                <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <h2 id="webstream-picker-title" class="webstream-picker__title">Web Video on this TV</h2>
+            <p class="webstream-picker__subtitle">Paste any page URL — magicTV looks for the video behind it. A direct .m3u8 / .mp4 link plays immediately.</p>
+            <form id="webstream-picker-form" class="webstream-picker__form">
+                <input
+                    id="webstream-picker-input"
+                    class="webstream-picker__input"
+                    type="text"
+                    inputmode="url"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="https://site.example/watch/123 · or …/master.m3u8"
+                    aria-label="Page or media URL"
+                >
+                <button id="webstream-picker-add" class="webstream-picker__add" type="submit">Play</button>
+            </form>
+            <p id="webstream-picker-error" class="webstream-picker__error is-hidden" role="status"></p>
+            <p id="webstream-picker-status" class="webstream-picker__status is-hidden" role="status"></p>
+            <ul id="webstream-picker-sources" class="webstream-picker__sources is-hidden"></ul>
+            <div id="webstream-picker-embed-wrap" class="webstream-picker__embed is-hidden">
+                <button id="webstream-picker-embed" class="webstream-picker__embed-btn" type="button">Embed the page instead</button>
+                <p class="webstream-picker__hint">Best effort: the site's own player in a tile iframe. Tile volume and PiP do not work. The page shield blocks pop-ups, new-tab ads, downloads and alert() dialogs; in-player ads still come along.</p>
+            </div>
+            <details id="webstream-picker-sniff" class="webstream-picker__sniff">
+                <summary>Site blocked it? Sniff the page</summary>
+                <ol class="webstream-picker__steps">
+                    <li>Drag <a id="webstream-picker-sniff-link" class="webstream-picker__sniff-link" href="#" draggable="true">magicTV Sniff</a> to your bookmarks bar (once).</li>
+                    <li>Open the page below, press play there, then click the bookmark on that page.</li>
+                    <li>magicTV hears the media URLs and lists them here.</li>
+                </ol>
+                <div class="webstream-picker__sniff-actions">
+                    <button id="webstream-picker-sniff-open" class="webstream-picker__btn" type="button">Open page &amp; listen</button>
+                    <button id="webstream-picker-sniff-copy" class="webstream-picker__btn" type="button">Copy sniffer</button>
+                </div>
+                <textarea
+                    id="webstream-picker-sniff-text"
+                    class="webstream-picker__textarea"
+                    rows="3"
+                    placeholder="Or paste the sniff report / any .m3u8 / .mp4 URLs here"
+                    aria-label="Pasted media URLs"
+                ></textarea>
+                <button id="webstream-picker-sniff-apply" class="webstream-picker__btn" type="button">Use pasted URLs</button>
+                <p id="webstream-picker-sniff-hint" class="webstream-picker__hint"></p>
+            </details>
+            <details id="webstream-picker-advanced" class="webstream-picker__advanced">
+                <summary>Advanced — proxy &amp; page shield</summary>
+                <p class="webstream-picker__hint">Optional. A proxy that accepts <code>{url}</code> (or <code>{url_encoded}</code>) is used to scan blocked pages and, if enabled, to fetch segments during playback. magicTV ships no proxy of its own.</p>
+                <div class="webstream-picker__proxy-row">
+                    <input id="webstream-picker-proxy" class="webstream-picker__input" type="text" autocomplete="off" spellcheck="false" placeholder="https://proxy.example/?url={url}" aria-label="Proxy template">
+                    <button id="webstream-picker-proxy-save" class="webstream-picker__btn" type="button">Save</button>
+                </div>
+                <label class="webstream-picker__check">
+                    <input id="webstream-picker-proxy-playback" type="checkbox">
+                    Play through the proxy (rewrites manifest + segment requests)
+                </label>
+                <p id="webstream-picker-proxy-hint" class="webstream-picker__hint"></p>
+                <label class="webstream-picker__check webstream-picker__shield-row">
+                    Page shield (embedded pages)
+                    <select id="webstream-picker-shield" class="webstream-picker__select">
+                        <option value="basic">Basic — block pop-ups, downloads, dialogs</option>
+                        <option value="strict">Strict — also block forms and referrer</option>
+                        <option value="off">Off — behave like a normal tab</option>
+                    </select>
+                </label>
+                <p id="webstream-picker-shield-hint" class="webstream-picker__hint"></p>
+            </details>
+            <ul id="webstream-picker-list" class="webstream-picker__list"></ul>
+            <p id="webstream-picker-empty" class="webstream-picker__empty">Nothing saved yet — paste a link once and it stays here.</p>
+            <p class="webstream-picker__footnote">Static site: resolution happens in your browser. DRM streams (Netflix, Disney+, …) cannot play here.</p>
+        </div>
+    </div>
     <div id="toast-container"></div>
     <script type="module" src="./js/app.js"></script>
 </body>

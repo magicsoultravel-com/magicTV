@@ -31,6 +31,8 @@ import {
     HARD_MAX_MOSAIC_SLOTS,
     DEFAULT_MAX_MOSAIC_SLOTS
 } from '../mosaic/constants.js';
+import { normalizeProxyTemplate } from '../webstream/webStreamLinks.js';
+import { normalizeShieldLevel } from '../webstream/webShield.js';
 
 export {
     VIEW_TRANSITIONS,
@@ -689,6 +691,59 @@ export const SettingsStore = {
     setTvTravelStyle(value) {
         const next = normalizeTvTravelStyle(value);
         patchPersistedState({ tvTravelStyle: next });
+        return next;
+    },
+
+    /**
+     * Optional CORS/stream proxy template for Web Video (`…?url={url}`).
+     * Empty string = direct requests only.
+     * @returns {string}
+     */
+    getWebStreamProxyTemplate() {
+        return normalizeProxyTemplate(readPersistedState().webStreamProxyTemplate);
+    },
+
+    /**
+     * @param {string} value
+     * @returns {string} normalized template ('' clears it)
+     */
+    setWebStreamProxyTemplate(value) {
+        const next = normalizeProxyTemplate(value);
+        patchPersistedState({ webStreamProxyTemplate: next });
+        return next;
+    },
+
+    /** Route Web Video playback through the proxy (page scans always try it). */
+    getWebStreamProxyPlayback() {
+        return readPersistedState().webStreamProxyPlayback === true;
+    },
+
+    /**
+     * @param {boolean} value
+     * @returns {boolean}
+     */
+    setWebStreamProxyPlayback(value) {
+        const next = value === true;
+        patchPersistedState({ webStreamProxyPlayback: next });
+        return next;
+    },
+
+    /**
+     * Page shield level for embedded Web Video pages ('off' | 'basic' | 'strict').
+     * Global default; a saved page may remember its own level.
+     * @returns {'off' | 'basic' | 'strict'}
+     */
+    getWebStreamShield() {
+        return normalizeShieldLevel(readPersistedState().webStreamShield);
+    },
+
+    /**
+     * @param {string} value
+     * @returns {'off' | 'basic' | 'strict'}
+     */
+    setWebStreamShield(value) {
+        const next = normalizeShieldLevel(value);
+        patchPersistedState({ webStreamShield: next });
         return next;
     },
 
