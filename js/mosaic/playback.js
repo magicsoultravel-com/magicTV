@@ -11,7 +11,7 @@ import { cancelSlotPrefetch, cancelAllPrefetch } from '../player/channelPrefetch
 import { computeMosaicLaunchDelay } from '../player/loadBudget.js';
 import { tvDebug } from '../player/tvDebug.js';
 import { ChromecastManager } from '../cast/chromecastManager.js';
-import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from '../ui/tileHoverControls.js';
+import { syncMuteAllKeys, syncPlayAllKeys, syncStopAllKeys, applyMuteAllTo } from '../ui/remoteAllKeys.js';
 import { pushSlotChannelHistory, hasSlotChannelHistory, hasSlotChannelForward } from './channelHistory.js';
 import {
     CORNER_IDS,
@@ -423,36 +423,18 @@ export const playbackMethods = {
         const muteAllActive = this.isMuteAllActive();
         app.classList.toggle('is-mute-all-active', muteAllActive);
 
-        const muteAllBtns = [
-            el('remote-mute-all-btn'),
-            ...Array.from(document.querySelectorAll(
-                '#player-mosaic .tv-controls__mute-popout [data-tile-action="mute-all"]'
-            ))
-        ].filter(Boolean);
-        muteAllBtns.forEach((btn) => {
-            const label = muteAllActive ? 'Unmute all' : 'Mute all';
-            btn.title = label;
-            btn.setAttribute('aria-label', label);
-            btn.setAttribute('aria-pressed', String(muteAllActive));
-            const wave = btn.querySelector('.mosaic-mute-all-wave, .remote-mute-all-wave');
-            const slash = btn.querySelector('.mosaic-mute-all-slash, .remote-mute-all-slash');
-            if (wave) wave.style.opacity = muteAllActive ? '0' : '1';
-            if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
-        });
+        // Remote mute-all keys (full remote + mini fly-out) morph to Unmute all.
+        syncMuteAllKeys(muteAllActive);
+        const muteAllBtns = Array.from(document.querySelectorAll(
+            '#player-mosaic .tv-controls__mute-popout [data-tile-action="mute-all"]'
+        ));
+        muteAllBtns.forEach((btn) => applyMuteAllTo(btn, muteAllActive));
 
         const anyPlaying = this.isAnyPlaying();
         const allPlaying = this.isAllPlaying();
 
         // Remote play-all morphs to pause-all; tile chrome play-all only shows when needed.
-        const remotePlayAll = el('remote-play-all-btn');
-        if (remotePlayAll) {
-            const isPause = allPlaying;
-            const label = isPause ? 'Pause all' : 'Play all';
-            remotePlayAll.title = label;
-            remotePlayAll.setAttribute('aria-label', label);
-            remotePlayAll.setAttribute('aria-pressed', String(isPause));
-            remotePlayAll.innerHTML = isPause ? PAUSE_ALL_SVG : PLAY_ALL_SVG;
-        }
+        syncPlayAllKeys(allPlaying);
 
         const mosaic = el('player-mosaic');
         mosaic?.querySelectorAll('.tv-controls__play-popout [data-tile-action="play-all"]').forEach((btn) => {
@@ -461,14 +443,7 @@ export const playbackMethods = {
             btn.hidden = hide;
         });
 
-        const remoteStopAll = el('remote-stop-all-btn');
-        if (remoteStopAll) {
-            remoteStopAll.title = 'Stop all';
-            remoteStopAll.setAttribute('aria-label', 'Stop all');
-            remoteStopAll.classList.toggle('is-hidden', !anyPlaying);
-            remoteStopAll.setAttribute('aria-disabled', String(!anyPlaying));
-            remoteStopAll.setAttribute('aria-pressed', String(anyPlaying));
-        }
+        syncStopAllKeys(anyPlaying);
 
         mosaic?.querySelectorAll('.tv-controls__stop-popout [data-tile-action="stop-all"]').forEach((btn) => {
             const hide = !anyPlaying;

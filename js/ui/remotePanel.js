@@ -6,7 +6,7 @@ import { FavoritesRecents } from '../storage/favoritesRecents.js';
 import { GuidePanel } from './guidePanel.js';
 import { isSplit } from './moduleLayout.js';
 import { syncVolumeDial } from './volumeDial.js';
-import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
+import { syncMuteAllKeys, syncPlayAllKeys, syncStopAllKeys } from './remoteAllKeys.js';
 import { buildStreamLink, buildDeepLink, copyShareText } from '../share/shareChannel.js';
 import { navigateChannel, navigateToChannelNumber } from '../channelNav.js';
 import { ChanBindPicker } from './chanBindPicker.js';
@@ -464,41 +464,15 @@ export function syncRemotePanel() {
         favBtn.setAttribute('aria-label', favBtn.title);
     }
 
-    const muteAllActive = MultiView.isMuteAllActive?.() ?? false;
-    const muteAllBtn = el('remote-mute-all-btn');
-    if (muteAllBtn) {
-        const label = muteAllActive ? 'Unmute all' : 'Mute all';
-        muteAllBtn.title = label;
-        muteAllBtn.setAttribute('aria-label', label);
-        muteAllBtn.setAttribute('aria-pressed', String(muteAllActive));
-        const wave = muteAllBtn.querySelector('.mosaic-mute-all-wave, .remote-mute-all-wave');
-        const slash = muteAllBtn.querySelector('.mosaic-mute-all-slash, .remote-mute-all-slash');
-        if (wave) wave.style.opacity = muteAllActive ? '0' : '1';
-        if (slash) slash.setAttribute('opacity', muteAllActive ? '1' : '0');
-    }
+    // "All" keys: full-remote mosaic keys + mini hover fly-outs share one sync.
+    syncMuteAllKeys(MultiView.isMuteAllActive?.() ?? false);
 
     const anyPlaying = MultiView.isAnyPlaying?.() ?? false;
     const allPlaying = MultiView.isAllPlaying?.() ?? false;
 
-    const playAllBtn = el('remote-play-all-btn');
-    if (playAllBtn) {
-        const isPause = allPlaying;
-        const label = isPause ? 'Pause all' : 'Play all';
-        playAllBtn.title = label;
-        playAllBtn.setAttribute('aria-label', label);
-        playAllBtn.setAttribute('aria-pressed', String(isPause));
-        playAllBtn.innerHTML = isPause ? PAUSE_ALL_SVG : PLAY_ALL_SVG;
-    }
-
-    const stopAllBtn = el('remote-stop-all-btn');
-    if (stopAllBtn) {
-        const label = 'Stop all';
-        stopAllBtn.title = label;
-        stopAllBtn.setAttribute('aria-label', label);
-        stopAllBtn.classList.toggle('is-hidden', !anyPlaying);
-        stopAllBtn.setAttribute('aria-disabled', String(!anyPlaying));
-        stopAllBtn.setAttribute('aria-pressed', String(anyPlaying));
-    }
+    // Play all morphs to Pause all while everything plays.
+    syncPlayAllKeys(allPlaying);
+    syncStopAllKeys(anyPlaying);
 
     // Rotate TVs — only meaningful (and only visible) with 2+ screens.
     const rotateBtn = el('remote-rotate-btn');

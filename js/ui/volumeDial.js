@@ -1,6 +1,7 @@
 import { el } from '../tvUtils.js';
 import { MultiView } from '../multiView.js';
 import { TvPlayer } from '../tvPlayer.js';
+import { setMuteAllPct } from './remoteAllKeys.js';
 
 function applyDial(sliderId, dialId, pctId, value) {
     const slider = el(sliderId);
@@ -31,6 +32,5 @@ export function syncVolumeDial(state) {
     if (mutePct) mutePct.textContent = String(tvPct);
 
     // Mute-all sits with mosaic controls — show master %.
-    const muteAllPct = el('remote-mute-all-vol-pct');
-    if (muteAllPct) muteAllPct.textContent = String(masterPct);
+    setMuteAllPct(masterPct);
 }

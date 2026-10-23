@@ -655,7 +655,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     min-height: var(--remote-btn-size, 40px);
 }
 
-/* Radio tray — chrome-row tray hidden until panel hover; grid play/stop/mute cells stay visible. */
+/* Radio tray — grid play/stop/mute cells host an "-all" fly-out (mini remote only). */
 .radio-tray {
     position: relative;
     min-height: var(--remote-btn-size, 40px);
@@ -668,10 +668,6 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     gap: 0.25rem;
     overflow: hidden;
     pointer-events: none;
-}
-
-.remote-module__chrome-row .radio-tray {
-    display: none;
 }
 
 .radio-tray__btn {
@@ -713,11 +709,6 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     background: color-mix(in srgb, currentColor var(--btn-tint-active, 24%), transparent);
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active, 45%), transparent);
     transform: scale(var(--btn-press-scale, 1.04));
-}
-
-/* Chrome-row radio tray stays compact until the panel is hovered. */
-.remote-panel:hover .remote-module__chrome-row .radio-tray {
-    display: flex;
 }
 
 .remote-panel:hover .radio-tray__btn {
@@ -813,6 +804,12 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     visibility: visible;
     pointer-events: auto;
     transition-delay: 0.06s;
+}
+
+/* The full remote renders dedicated play/stop/mute-all keys in the keypad, so
+   the "-all" hover fly-outs are a mini-floating affordance only. */
+body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__popout {
+    display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

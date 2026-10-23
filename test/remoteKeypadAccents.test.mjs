@@ -82,6 +82,11 @@ test('chan/vol rockers and bind match tile hover accents', () => {
 });
 
 test('power lives in shell chrome', () => {
+    // Power + radio sit in the shell chrome row above the keypad (full remote).
+    assert.match(html, /remote-panel__cell--radio-power/);
+    assert.match(html, /tv-controls__btn--main-3" id="remote-power-btn"/);
+    assert.match(html, /id="remote-power-btn"[^>]*data-remote-action="power-off"/);
+
     assert.match(html, /data-mini-slot="bind"/);
     assert.match(html, /data-mini-slot="play"/);
     assert.match(html, /data-mini-slot="stop"/);
@@ -101,7 +106,7 @@ test('power lives in shell chrome', () => {
     assert.match(html, /id="remote-play-all-btn"[^>]*data-remote-action="play-all"/);
     assert.match(html, /id="remote-stop-btn"[^>]*data-remote-action="stop"/);
     assert.match(html, /id="remote-stop-all-btn"[^>]*data-remote-action="stop-all"/);
-    assert.match(html, /radio-tray__btn[^>]*is-hidden[^>]*id="remote-radio-btn"/);
+    assert.match(html, /class="[^"]*is-hidden"[^>]*id="remote-radio-btn"/);
     assert.match(html, /id="remote-external-popout-btn"[^>]*>/);
     assert.match(html, /id="remote-mini-float-btn"/);
 
@@ -135,7 +140,10 @@ test('power lives in shell chrome', () => {
     // radio key removed from mini floating
     assert.doesNotMatch(css, /remote-radio-btn-mini/);
     assert.match(css, /\.remote-panel__cell--mini-only\s*\{\s*display:\s*none/s);
-    assert.match(html, /miniTrayExpanded|miniTraySlotId/);
+    // Power + radio render in the chrome row, never inside the mini grid.
+    assert.match(html, /remote-module__chrome-row[\s\S]*?id="remote-power-btn"[\s\S]*?id="remote-radio-btn"[\s\S]*?<\/header>/);
+    // The "-all" hover fly-outs remain a mini-floating affordance only.
+    assert.match(css, /body:not\(\.remote-mini-floating\) #remote-panel \.remote-panel__grid \.radio-tray__popout\s*\{\s*display:\s*none/s);
 });
 
 test('keypad play/stop/mute hover popouts use a slide-out tray above the primary', () => {
@@ -146,14 +154,26 @@ test('keypad play/stop/mute hover popouts use a slide-out tray above the primary
     assert.match(buttonChunk('remote-stop-all-btn'), /\bis-hidden\b/);
     assert.match(buttonChunk('remote-radio-btn'), /\bis-hidden\b/);
 
-    // Each "-all" key lives inside its own tile-style popout tray.
+    // Mini fly-out copy of each "-all" key lives inside its own tile-style popout tray.
     const popoutTrays = html.match(/<div class="radio-tray__popout">/g) || [];
     assert.equal(popoutTrays.length, 3, 'play, stop and mute each get a popout tray');
-    for (const id of ['remote-play-all-btn', 'remote-stop-all-btn', 'remote-mute-all-btn']) {
+    for (const id of ['remote-play-all-btn-mini', 'remote-stop-all-btn-mini', 'remote-mute-all-btn-mini']) {
         const btnIdx = html.indexOf(`id="${id}"`);
         const trayIdx = html.lastIndexOf('<div class="radio-tray__popout">', btnIdx);
         assert.ok(trayIdx > 0 && trayIdx < btnIdx, `${id} is wrapped by a popout tray`);
         assert.ok(html.indexOf('</div>', btnIdx) > btnIdx, `${id} popout tray is closed`);
+    }
+
+    // The full remote exposes the same three actions as dedicated keypad keys —
+    // plain grid cells (no [data-mini-slot], no fly-out) inside the mosaic group.
+    const mosaicStart = html.indexOf('id="remote-panel-mosaic-group"');
+    const mosaicEnd = html.indexOf('id="remote-volume-split"');
+    for (const id of ['remote-play-all-btn', 'remote-stop-all-btn', 'remote-mute-all-btn']) {
+        const btnIdx = html.indexOf(`id="${id}"`);
+        const cellIdx = html.lastIndexOf('<div class="remote-panel__cell', btnIdx);
+        assert.ok(mosaicStart > 0 && btnIdx > mosaicStart && btnIdx < mosaicEnd, `${id} sits in the mosaic group`);
+        assert.ok(cellIdx > 0 && cellIdx < btnIdx, `${id} sits in a keypad cell`);
+        assert.match(html.slice(cellIdx, btnIdx), /^<div class="remote-panel__cell">$/m, `${id} cell is a plain grid cell`);
     }
 
     const css = readCssWithImports(join(root, 'css/components/remote.css'));
