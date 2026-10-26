@@ -1198,8 +1198,7 @@
 .tv-controls__play-wrap,
 .tv-controls__stop-wrap,
 .tv-controls__swap-wrap,
-.tv-controls__shield-wrap,
-.tv-controls__travel-wrap {
+.tv-controls__shield-wrap {
     position: relative;
     display: inline-flex;
 }
@@ -1209,8 +1208,7 @@
 .tv-controls__play-wrap::after,
 .tv-controls__stop-wrap::after,
 .tv-controls__swap-wrap::after,
-.tv-controls__shield-wrap::after,
-.tv-controls__travel-wrap::after {
+.tv-controls__shield-wrap::after {
     content: '';
     position: absolute;
     left: -10px;
@@ -1230,8 +1228,7 @@
 .tv-controls__play-popout,
 .tv-controls__stop-popout,
 .tv-controls__swap-popout,
-.tv-controls__shield-popout,
-.tv-controls__travel-popout {
+.tv-controls__shield-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
     bottom: calc(100% + var(--tv-controls-strip-pad-y, 0.25rem) + 1px);
@@ -1266,9 +1263,7 @@
 .tv-controls__swap-wrap:hover .tv-controls__swap-popout,
 .tv-controls__swap-wrap:focus-within .tv-controls__swap-popout,
 .tv-controls__shield-wrap:hover .tv-controls__shield-popout,
-.tv-controls__shield-wrap:focus-within .tv-controls__shield-popout,
-.tv-controls__travel-wrap:hover .tv-controls__travel-popout,
-.tv-controls__travel-wrap:focus-within .tv-controls__travel-popout {
+.tv-controls__shield-wrap:focus-within .tv-controls__shield-popout {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
     visibility: visible;
@@ -1281,18 +1276,11 @@
 .tv-controls__play-popout .tv-controls__btn,
 .tv-controls__stop-popout .tv-controls__btn,
 .tv-controls__swap-popout .tv-controls__btn,
-.tv-controls__shield-popout .tv-controls__btn,
-.tv-controls__travel-popout .tv-controls__btn {
+.tv-controls__shield-popout .tv-controls__btn {
     width: 28px;
     height: 28px;
     min-width: 28px;
     padding: 0;
-}
-
-.tv-controls__travel-popout .tv-controls__travel-opt {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
 }
 
 /* Shield levels are words, not glyphs — let them breathe (Off / Basic / Strict).
@@ -1304,20 +1292,6 @@
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.02em;
-}
-
-.tv-controls__travel-popout .tv-controls__btn[data-tile-action="tv-travel-off"] {
-    width: auto;
-    min-width: 28px;
-    padding: 0 0.35rem;
-}
-
-.tv-controls__travel-btn.is-active,
-.tv-controls__travel-btn[aria-pressed='true']:not([aria-pressed='false']),
-.tv-controls__travel-popout .tv-controls__btn.is-active,
-.tv-controls__travel-popout .tv-controls__btn[aria-pressed='true']:not([aria-pressed='false']) {
-    color: color-mix(in srgb, var(--tv-accent, #7ecbff) 90%, white);
-    border-color: color-mix(in srgb, var(--tv-accent, #7ecbff) 55%, transparent);
 }
 
 .tv-controls__play-popout .tv-controls__btn[aria-pressed='true'],

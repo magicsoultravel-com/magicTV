@@ -75,9 +75,6 @@ export const CHAN_BIND_SVG = `<svg viewBox="0 0 12 12" width="11" height="11" fo
 /** Bank buffer — fill toward headroom (hourglass-ish stack). */
 export const BANK_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M3 2.2h6M3 9.8h6M3.4 2.5 6 6l2.6-3.5M3.4 9.5 6 6l2.6 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.8h2.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
 
-/** Clock + hop — TV Travel auto-rotate. */
-export const TV_TRAVEL_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><circle cx="6" cy="6" r="3.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 2.4v3.2l2.2 1.3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.6 3.2 10.6 2.2M10.6 2.2H9M10.6 2.2V3.8" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
 const VOL_CHEVRON_UP = CHAN_CHEVRON_UP;
 const VOL_CHEVRON_DOWN = CHAN_CHEVRON_DOWN;
 
@@ -206,19 +203,6 @@ function castWrap() {
     </div>`;
 }
 
-/** Multi-TV auto-rotate — hover slide-out with Off / Quick / Slow / Random. */
-function travelWrap(target) {
-    return `<div class="tv-controls__travel-wrap is-hidden">
-        <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-controls__travel-btn" data-tile-action="tv-travel" data-controls-target="${target}" title="TV Travel" aria-label="TV Travel" aria-pressed="false">${TV_TRAVEL_SVG}</button>
-        <div class="tv-controls__travel-popout" aria-hidden="true">
-            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-controls__travel-opt" data-tile-action="tv-travel-off" data-controls-target="${target}" title="Off" aria-label="TV Travel off" aria-pressed="false">Off</button>
-            <button type="button" class="tv-controls__btn tv-controls__btn--main-1 tv-controls__travel-opt" data-tile-action="tv-travel-quick" data-controls-target="${target}" title="Quick" aria-label="TV Travel quick" aria-pressed="false">Q</button>
-            <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__travel-opt" data-tile-action="tv-travel-slow" data-controls-target="${target}" title="Slow" aria-label="TV Travel slow" aria-pressed="false">S</button>
-            <button type="button" class="tv-controls__btn tv-controls__btn--main-3 tv-controls__travel-opt" data-tile-action="tv-travel-random" data-controls-target="${target}" title="Random (Channel switch)" aria-label="TV Travel random" aria-pressed="false">R</button>
-        </div>
-    </div>`;
-}
-
 /**
  * Grab handle for an embedded (YouTube) tile: the cross-origin iframe swallows
  * the body pointerdown that normally starts a mosaic drag, so the tile is
@@ -232,7 +216,7 @@ function grabHandle() {
 
 /**
  * Page shield — one button; hovering / focusing it slides out the three levels
- * (same recipe as TV Travel, Mute, Play and Stop). Clicking the glyph itself
+ * (same recipe as Mute, Play and Stop). Clicking the glyph itself
  * still cycles basic → strict → off, so the popout is the precise path and the
  * cycle is the quick one.
  */
@@ -257,14 +241,13 @@ function coreRowButtons(target) {
         youtubeWrap(target),
         youtubeQueueWrap(target),
         controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
-        muteWrap(target),
-        travelWrap(target)
+        muteWrap(target)
     ].join('');
 }
 
 /**
  * YouTube button + Web Video slide-out. Hovering / focusing YouTube reveals the
- * Web Video button above the strip (same recipe as Swap / TV Travel popouts).
+ * Web Video button above the strip (same recipe as Swap / Cast popouts).
  */
 function youtubeWrap(target) {
     return `<div class="tv-controls__youtube-wrap">
@@ -351,18 +334,6 @@ export function buildTileHoverHtml(variant) {
     </div>`;
 }
 
-/** Ensure TV Travel wrap exists on already-hydrated tiles (hot reload / upgrades). */
-function ensureTravelWraps(mosaic) {
-    mosaic.querySelectorAll('.tv-player-tile').forEach((tile) => {
-        const row = tile.querySelector('[data-controls-row="local"]');
-        if (!row || row.querySelector('.tv-controls__travel-wrap')) return;
-        const cast = row.querySelector('.tv-controls__cast-wrap');
-        const html = travelWrap('local');
-        if (cast) cast.insertAdjacentHTML('beforebegin', html);
-        else row.insertAdjacentHTML('beforeend', html);
-    });
-}
-
 /** Same upgrade path for the YouTube queue group (prev / next / tray). */
 function ensureYouTubeQueueWraps(mosaic) {
     mosaic.querySelectorAll('.tv-player-tile').forEach((tile) => {
@@ -383,7 +354,6 @@ export function hydrateTileHoverControls() {
     if (!mosaic) return;
 
     if (mosaic.dataset.hoverHydrated === '1') {
-        ensureTravelWraps(mosaic);
         ensureYouTubeQueueWraps(mosaic);
         return;
     }

@@ -31,7 +31,7 @@ test('a page tile keeps the mute tray button and its slide-out', () => {
     const hideBlock = css.match(/\.tv-player-tile\.is-webpage \[data-tile-action="pip"\][^{]*\{[^}]*\}/s);
     assert.ok(hideBlock, 'the embed-only hide rule is present');
     assert.doesNotMatch(hideBlock[0], /mute-wrap/, 'mute is no longer hidden on page tiles');
-    assert.match(hideBlock[0], /travel-wrap/, 'TV Travel stays hidden for embeds');
+    assert.doesNotMatch(hideBlock[0], /travel-wrap/, 'TV Travel left the tile chrome for the remote');
     assert.match(hideBlock[0], /vol-rocker/, 'the volume rocker stays hidden for embeds');
 
     // The tray HTML still carries the same mute glyph + popout on every tile.
@@ -41,5 +41,6 @@ test('a page tile keeps the mute tray button and its slide-out', () => {
         assert.match(html, /data-tile-action="mute"/, `${variant}: mute glyph`);
         assert.match(html, /data-tile-action="mute-solo"/, `${variant}: Mute other TVs`);
         assert.match(html, /data-tile-action="mute-all"/, `${variant}: Mute all`);
+        assert.doesNotMatch(html, /tv-travel/, `${variant}: TV Travel is remote-only now`);
     }
 });

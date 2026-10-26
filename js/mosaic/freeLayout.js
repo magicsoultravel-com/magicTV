@@ -253,7 +253,6 @@ export const freeLayoutMethods = {
         if (e.target.closest?.('.tv-controls__play-wrap')) return;
         if (e.target.closest?.('.tv-controls__stop-wrap')) return;
         if (e.target.closest?.('.tv-controls__swap-wrap')) return;
-        if (e.target.closest?.('.tv-controls__travel-wrap')) return;
         if (e.target.closest?.('.tv-controls__chan-prev-wrap')) return;
         if (e.target.closest?.('.tv-controls__chan-next-wrap')) return;
         // Chrome presses are inert for dragging — except the grab handle, which

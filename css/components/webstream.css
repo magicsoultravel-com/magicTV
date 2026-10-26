@@ -84,7 +84,6 @@
  * the only way to drag. Controls that could not reach the page are hidden —
  * mute stays, because its slide-out still mutes the other TVs. */
 .tv-player-tile.is-webpage [data-tile-action="pip"],
-.tv-player-tile.is-webpage .tv-controls__travel-wrap,
 .tv-player-tile.is-webpage .tv-player-tile__vol-rocker {
     display: none !important;
 }

@@ -205,11 +205,13 @@ Manual checklist after changes:
 - **Persistent** — Data saved to localStorage
 
 ### Sharing a channel
-While a channel is playing, the magic remote shows two share buttons (next to ★):
+While a channel is playing, the magic remote shows one share key (next to ★). Tapping it slides out the two copy paths:
 
 - **Copy stream link** — copies the raw HLS `url_resolved` for the focused channel.
 - **Copy magicTV link** — copies a deep link the recipient opens in magicTV:
   `index.html?ch=iptv-org%3ACNBC&name=CNBC&country=us`
+
+The tray closes after copying, on Escape, or on any click outside it, and the key hides itself (keeping its grid cell) while no channel is loaded.
 
 Opening a magicTV deep link resolves the channel from the active catalog and plays it on a TV screen — the first free screen (only the single TV for a clean recipient), or the **last screen** when every screen is already full. It routes through normal playback, so it lands in Recents like any other watch. No share URL survives these deep links; only the channel *key* is in the URL.
 
@@ -225,7 +227,7 @@ Open via the remote/browser **Settings** tab (`#settings-panel`):
 - **Storage** — Counts and quota estimate
 - **About** — Version
 
-Volume and catalog layout (tiles/list) live on the player chrome / catalog toolbar, not in this panel. Screen add/remove is on the remote mosaic controls. With 2+ screens the remote also shows **Rotate TVs** — every channel shifts to the next screen (TV 1 → 2 → … → last → 1) while the pictures travel between the tiles.
+Volume and catalog layout (tiles/list) live on the player chrome / catalog toolbar, not in this panel. Screen add/remove is on the remote mosaic controls. With 2+ screens the remote also shows **Rotate TVs** — every channel shifts to the next screen (TV 1 → 2 → … → last → 1) while the pictures travel between the tiles — and **TV Travel**, whose slide-out picks **Off / Quick / Slow / Random** and auto-rotates every screen on a timer (a running travel stops when only one screen is left).
 
 ## 🔌 Data Source
 

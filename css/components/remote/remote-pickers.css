@@ -126,3 +126,95 @@
     background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
 }
+
+/* Share + TV Travel — one key, options slide out above it. Same recipe as the
+ * layout picker above; each wrap keeps its own shift var so the two trays clamp
+ * independently inside the remote dialog. */
+.remote-panel__share-wrap,
+.remote-panel__travel-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    --popout-shift: 0px;
+}
+
+.remote-panel__share-wrap {
+    --popout-shift: var(--share-popout-shift, 0px);
+}
+
+.remote-panel__travel-wrap {
+    --popout-shift: var(--travel-popout-shift, 0px);
+}
+
+.remote-panel__share-wrap::after,
+.remote-panel__travel-wrap::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    bottom: 100%;
+    height: calc(0.35rem + 16px);
+    pointer-events: none;
+}
+
+.remote-panel__share-popout,
+.remote-panel__travel-popout {
+    position: absolute;
+    bottom: calc(100% + 0.35rem);
+    left: 50%;
+    transform: translateX(calc(-50% + var(--popout-shift))) translateY(4px);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border-radius: 8px;
+    background: var(--tv-bg-secondary, #12151f);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        transform 0.22s ease,
+        opacity 0.22s ease,
+        visibility 0.22s ease 0.14s;
+    white-space: nowrap;
+    z-index: 9000;
+}
+
+.remote-panel__share-wrap.is-open .remote-panel__share-popout,
+.remote-panel__travel-wrap.is-open .remote-panel__travel-popout {
+    transform: translateX(calc(-50% + var(--popout-shift))) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+.remote-panel__share-popout .remote-panel__share-option,
+.remote-panel__travel-popout .remote-panel__travel-option {
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    padding: 0;
+}
+
+/* "Off" is a word, not a glyph — let it breathe (mirrors the shield levels). */
+.remote-panel__travel-popout .remote-panel__travel-option[data-remote-action='tv-travel-off'] {
+    width: auto;
+    min-width: var(--remote-btn-size, 40px);
+    padding: 0 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.remote-panel__travel-option.is-active {
+    background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
+    border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
+}

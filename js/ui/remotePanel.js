@@ -202,29 +202,66 @@ function focusedChannel() {
     return player?.channel || null;
 }
 
-function closeLayoutPicker() {
-    const wrap = el('remote-layout-picker-wrap');
-    const btn = el('remote-layout-picker-btn');
-    const popout = el('remote-layout-picker-popout');
+/**
+ * Remote popout pickers — one host key slides a tray of options out above it.
+ * The Multi-TV layout picker set this interaction; Share and TV Travel reuse it
+ * so every "key with options" on the remote opens, clamps and dismisses alike.
+ */
+const POPOUT_PICKERS = {
+    layout: {
+        wrapId: 'remote-layout-picker-wrap',
+        btnId: 'remote-layout-picker-btn',
+        popoutId: 'remote-layout-picker-popout',
+        shiftVar: '--layout-popout-shift'
+    },
+    share: {
+        wrapId: 'remote-share-picker-wrap',
+        btnId: 'remote-share-btn',
+        popoutId: 'remote-share-picker-popout',
+        shiftVar: '--share-popout-shift'
+    },
+    travel: {
+        wrapId: 'remote-travel-picker-wrap',
+        btnId: 'remote-travel-btn',
+        popoutId: 'remote-travel-picker-popout',
+        shiftVar: '--travel-popout-shift'
+    }
+};
+
+const POPOUT_INSET_PX = 8;
+
+/** Close one remote popout picker. */
+function closePicker(name) {
+    const ids = POPOUT_PICKERS[name];
+    if (!ids) return;
+    const wrap = el(ids.wrapId);
+    const btn = el(ids.btnId);
+    const popout = el(ids.popoutId);
     wrap?.classList.remove('is-open');
-    wrap?.style.removeProperty('--layout-popout-shift');
+    wrap?.style.removeProperty(ids.shiftVar);
     btn?.setAttribute('aria-expanded', 'false');
     popout?.setAttribute('aria-hidden', 'true');
 }
 
-const LAYOUT_POPOUT_INSET_PX = 8;
+function closeLayoutPicker() {
+    closePicker('layout');
+}
 
-/** Shift centered layout popout so it stays inside the remote dialog/panel. */
-function clampLayoutPopout(wrap, popout) {
+function closeAllPickers() {
+    for (const name of Object.keys(POPOUT_PICKERS)) closePicker(name);
+}
+
+/** Shift a centered popout so it stays inside the remote dialog/panel. */
+function clampPopout(wrap, popout, shiftVar = '--layout-popout-shift') {
     if (!wrap || !popout) return;
-    wrap.style.removeProperty('--layout-popout-shift');
+    wrap.style.removeProperty(shiftVar);
     const root = wrap.closest('.remote-module__dialog') || el('remote-panel');
     if (!root) return;
 
     const rootRect = root.getBoundingClientRect();
     const popRect = popout.getBoundingClientRect();
-    const minLeft = rootRect.left + LAYOUT_POPOUT_INSET_PX;
-    const maxRight = rootRect.right - LAYOUT_POPOUT_INSET_PX;
+    const minLeft = rootRect.left + POPOUT_INSET_PX;
+    const maxRight = rootRect.right - POPOUT_INSET_PX;
     const innerW = maxRight - minLeft;
 
     let shift = 0;
@@ -237,7 +274,7 @@ function clampLayoutPopout(wrap, popout) {
     }
 
     if (shift !== 0) {
-        wrap.style.setProperty('--layout-popout-shift', `${Math.round(shift)}px`);
+        wrap.style.setProperty(shiftVar, `${Math.round(shift)}px`);
     }
 }
 
@@ -267,25 +304,53 @@ export function syncLayoutPicker() {
     }
 }
 
-function bindLayoutPicker() {
-    const wrap = el('remote-layout-picker-wrap');
-    const btn = el('remote-layout-picker-btn');
-    if (!wrap || !btn || wrap.dataset.layoutPickerBound === '1') return;
-    wrap.dataset.layoutPickerBound = '1';
+/**
+ * Wire one popout picker: the host key toggles the tray, an outside press or
+ * Escape dismisses it. Option clicks are wired by the caller (layout modes) or
+ * flow through `data-remote-action` into `handleRemoteAction` (share / travel).
+ * @param {'layout' | 'share' | 'travel'} name
+ * @returns {HTMLElement | null} the wrap, or null when absent/already bound
+ */
+function bindPicker(name) {
+    const ids = POPOUT_PICKERS[name];
+    const wrap = el(ids.wrapId);
+    const btn = el(ids.btnId);
+    if (!wrap || !btn || wrap.dataset.popoutPickerBound === '1') return null;
+    wrap.dataset.popoutPickerBound = '1';
 
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (wrap.classList.contains('is-open')) {
-            closeLayoutPicker();
+            closePicker(name);
             btn.blur();
             return;
         }
         wrap.classList.add('is-open');
         btn.setAttribute('aria-expanded', 'true');
-        const popout = el('remote-layout-picker-popout');
+        const popout = el(ids.popoutId);
         popout?.setAttribute('aria-hidden', 'false');
-        clampLayoutPopout(wrap, popout);
+        clampPopout(wrap, popout, ids.shiftVar);
     });
+
+    if (typeof window !== 'undefined' && !window.__remotePopoutPickerDismissBound) {
+        window.__remotePopoutPickerDismissBound = true;
+        document.addEventListener('pointerdown', (e) => {
+            for (const [key, picker] of Object.entries(POPOUT_PICKERS)) {
+                if (e.target.closest?.(`#${picker.wrapId}`)) continue;
+                closePicker(key);
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAllPickers();
+        });
+    }
+
+    return wrap;
+}
+
+function bindLayoutPicker() {
+    const wrap = bindPicker('layout');
+    if (!wrap) return;
 
     wrap.querySelectorAll('[data-layout-mode]').forEach((opt) => {
         opt.addEventListener('click', (e) => {
@@ -296,17 +361,14 @@ function bindLayoutPicker() {
             syncRemotePanel();
         });
     });
+}
 
-    if (typeof window !== 'undefined' && !window.__remoteLayoutPickerDismissBound) {
-        window.__remoteLayoutPickerDismissBound = true;
-        document.addEventListener('pointerdown', (e) => {
-            if (e.target.closest?.('#remote-layout-picker-wrap')) return;
-            closeLayoutPicker();
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeLayoutPicker();
-        });
-    }
+function bindSharePicker() {
+    bindPicker('share');
+}
+
+function bindTravelPicker() {
+    bindPicker('travel');
 }
 
 async function handleRemoteAction(action) {
@@ -320,16 +382,33 @@ async function handleRemoteAction(action) {
 
         switch (action) {
         case 'share-copy-stream': {
+            closePicker('share');
             const channel = focusedChannel();
             if (channel) copyShareText(buildStreamLink(channel), 'Stream link copied');
             break;
         }
         case 'share-copy-magictv': {
+            closePicker('share');
             const channel = focusedChannel();
             if (channel) {
                 const link = buildDeepLink(channel);
                 if (link) copyShareText(link, 'magicTV link copied');
             }
+            break;
+        }
+        // TV Travel rotates the whole ring (MultiView global), never one slot.
+        // Re-picking the running style stops it inside startTvTravel(); the
+        // explicit "Off" key stays as the obvious way out.
+        case 'tv-travel-off': {
+            closePicker('travel');
+            MultiView.stopTvTravel?.();
+            break;
+        }
+        case 'tv-travel-quick':
+        case 'tv-travel-slow':
+        case 'tv-travel-random': {
+            closePicker('travel');
+            MultiView.startTvTravel?.(action.slice('tv-travel-'.length));
             break;
         }
         case 'vol-up': {
@@ -441,10 +520,15 @@ export function syncRemotePanel() {
         if (slash) slash.style.opacity = audible ? '0' : '1';
     }
 
-    // Hide share buttons only (keep cells) so the chrome row does not reflow.
-    queryAllInApp('.remote-share-btn').forEach((btn) => {
-        const show = Boolean(player?.channel);
-        btn.classList.toggle('is-hidden', !show);
+    // Share key hides as a whole (cell stays) so the chrome row never reflows.
+    const showShare = Boolean(player?.channel);
+    queryAllInApp('.remote-share-btn').forEach((wrap) => {
+        wrap.classList.toggle('is-hidden', !showShare);
+        if (showShare) return;
+        // Drop a stale open tray so it cannot reappear with the next channel.
+        wrap.classList.remove('is-open');
+        wrap.querySelector('.remote-panel__share-popout')?.setAttribute('aria-hidden', 'true');
+        wrap.querySelector('button[aria-expanded]')?.setAttribute('aria-expanded', 'false');
     });
 
     const favBtn = el('remote-fav-btn');
@@ -474,14 +558,15 @@ export function syncRemotePanel() {
     syncPlayAllKeys(allPlaying);
     syncStopAllKeys(anyPlaying);
 
-    // Rotate TVs — only meaningful (and only visible) with 2+ screens.
+    // Rotate TVs / TV Travel — only meaningful (and visible) with 2+ screens.
+    const tvCount = MultiView.getRotationRing?.().length
+        ?? Object.values(MultiView.slots || {}).filter((slot) => slot?.enabled).length;
+    const multiTv = tvCount > 1;
+
     const rotateBtn = el('remote-rotate-btn');
-    if (rotateBtn) {
-        const tvCount = MultiView.getRotationRing?.().length
-            ?? Object.values(MultiView.slots || {}).filter((slot) => slot?.enabled).length;
-        const showRotate = tvCount > 1;
-        rotateBtn.classList.toggle('is-hidden', !showRotate);
-    }
+    rotateBtn?.classList.toggle('is-hidden', !multiTv);
+
+    syncTvTravelPicker(multiTv);
 
     const guideBtn = el('remote-guide-toggle');
     if (guideBtn) {
@@ -531,6 +616,42 @@ function bindRemoteActions(root, { forceTvCatalog = false } = {}) {
     });
 }
 
+/**
+ * TV Travel now lives on the remote (tile chrome no longer carries it). It is a
+ * ring-wide mode — every screen rotates — so the key only makes sense with 2+
+ * screens, and a running travel must stop when the ring shrinks back to one.
+ * @param {boolean} multiTv
+ */
+function syncTvTravelPicker(multiTv) {
+    const wrap = el('remote-travel-picker-wrap');
+    const btn = el('remote-travel-btn');
+    const style = MultiView.getTvTravelStyle?.() || null;
+    let active = MultiView.isTvTravelActive?.() === true;
+
+    if (!multiTv && active) {
+        MultiView.stopTvTravel?.();
+        active = false;
+    }
+    wrap?.classList.toggle('is-hidden', !multiTv);
+    if (!multiTv) closePicker('travel');
+
+    if (btn) {
+        const label = active && style ? `TV Travel (${style})` : 'TV Travel';
+        btn.classList.toggle('is-active', active);
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+    }
+
+    el('remote-travel-picker-popout')
+        ?.querySelectorAll('[data-remote-action^="tv-travel-"]')
+        .forEach((opt) => {
+            const key = (opt.getAttribute('data-remote-action') || '').slice('tv-travel-'.length);
+            const on = key === 'off' ? !active : (active && key === style);
+            opt.classList.toggle('is-active', on);
+            opt.setAttribute('aria-pressed', String(on));
+        });
+}
+
 export const RemotePanel = {
     init({ switchTab, openTvCatalog, getRemoteModule } = {}) {
         if (typeof switchTab === 'function') deps.switchTab = switchTab;
@@ -555,6 +676,8 @@ export const RemotePanel = {
             bindRemoteActions(browser, { forceTvCatalog: false });
         }
         bindLayoutPicker();
+        bindSharePicker();
+        bindTravelPicker();
         syncRemotePanel();
     },
 
