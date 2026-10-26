@@ -404,6 +404,7 @@ function clamp01(n) {
 /** Multi-TV layout preset: equal grid (default), butterfly CSS grid, or theatre stage. */
 export function normalizeMosaicLayoutMode(raw) {
     if (raw === 'theatre') return 'theatre';
+    if (raw === 'theatre-wide') return 'theatre-wide';
     if (raw === 'butterfly') return 'butterfly';
     if (raw === 'grid-v') return 'grid-v';
     if (raw === 'grid' || raw === 'grid-h') return 'grid-h';

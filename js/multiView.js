@@ -783,6 +783,8 @@ export const MultiView = {
             if (mosaic?.classList?.add) {
                 if (this.isTheatreLayoutMode?.()) {
                     this.applyTheatreLayoutPreset({ animate: true });
+                } else if (this.isTheatreWideLayoutMode?.()) {
+                    this.applyTheatreWideLayoutPreset({ animate: true });
                 } else if (next && this.isGridLayoutMode?.()) {
                     this.applyGridLayoutPreset(undefined, { animate: true });
                 }

@@ -60,6 +60,7 @@ function gridBoxForCell(cell, orientation, enabledCount = 6) {
 
 function normalizeSelectedLayoutMode(mode) {
     if (mode === 'theatre') return 'theatre';
+    if (mode === 'theatre-wide') return 'theatre-wide';
     if (mode === 'butterfly') return 'butterfly';
     if (mode === 'grid-v') return 'grid-v';
     if (mode === 'grid' || mode === 'grid-h') return 'grid-h';
@@ -74,9 +75,13 @@ function isTheatreLayoutMode(mode) {
     return mode === 'theatre';
 }
 
+function isTheatreWideLayoutMode(mode) {
+    return mode === 'theatre-wide';
+}
+
 /** Placement presets that write mosaicPlacement (vs butterfly CSS shell). */
 function isPlacementPresetMode(mode) {
-    return isGridLayoutMode(mode) || isTheatreLayoutMode(mode);
+    return isGridLayoutMode(mode) || isTheatreLayoutMode(mode) || isTheatreWideLayoutMode(mode);
 }
 
 /**
@@ -668,6 +673,10 @@ export const freeLayoutMethods = {
         return isTheatreLayoutMode(this.getSelectedLayoutMode());
     },
 
+    isTheatreWideLayoutMode() {
+        return isTheatreWideLayoutMode(this.getSelectedLayoutMode());
+    },
+
     isPlacementPresetMode() {
         return isPlacementPresetMode(this.getSelectedLayoutMode());
     },
@@ -765,12 +774,54 @@ export const freeLayoutMethods = {
     },
 
     /**
+     * Theatre-wide: TV1 full-width top 80% + all other TVs in one bottom row (20%).
+     * @param {{ animate?: boolean }} [opts]
+     */
+    async applyTheatreWideLayoutPreset(opts = {}) {
+        const enabledIds = PLAY_FILL_ORDER.filter((id) => this.slots[id]?.enabled);
+        const satellites = enabledIds.filter((id) => id !== 'center');
+        const n = satellites.length;
+        const next = {};
+        let z = 1;
+        enabledIds.forEach((id) => {
+            if (id === 'center') {
+                next[id] = { x: 0, y: 0, w: 1, h: 0.8, z: z++ };
+                return;
+            }
+            const idx = satellites.indexOf(id);
+            if (idx < 0) return;
+            next[id] = { x: idx / (n || 1), y: 0.8, w: 1 / (n || 1), h: 0.2, z: z++ };
+        });
+        if (!Object.keys(next).length) return;
+
+        const animate = opts.animate === true && travelAnimationsEnabled();
+        const firstRects = animate ? captureTileRects(enabledIds) : null;
+
+        this.mosaicPlacement = next;
+        this.placementZTop = Object.values(next).reduce((max, p) => Math.max(max, p.z || 1), 1);
+        this.ensureCenterOnTop();
+        this.syncLayout();
+        this.applyFreeLayout();
+        this.persistPlacement();
+        this.mountAll();
+        this.scheduleRefreshTiles();
+        this.syncPlacementChrome();
+
+        if (firstRects) {
+            await flipTilesToCurrent(enabledIds, firstRects);
+        }
+    },
+
+    /**
      * @param {{ animate?: boolean }} [opts]
      */
     resetToSelectedLayout(opts = {}) {
         const mode = this.getSelectedLayoutMode();
         if (isTheatreLayoutMode(mode)) {
             return this.applyTheatreLayoutPreset(opts);
+        }
+        if (isTheatreWideLayoutMode(mode)) {
+            return this.applyTheatreWideLayoutPreset(opts);
         }
         if (isGridLayoutMode(mode)) {
             return this.applyGridLayoutPreset(mode, opts);
@@ -784,6 +835,7 @@ export const freeLayoutMethods = {
         const missingSlot = SLOT_IDS.some((id) => this.slots[id]?.enabled && !this.mosaicPlacement[id]);
         if (!this.hasCustomPlacement() || missingSlot) {
             if (isTheatreLayoutMode(mode)) this.applyTheatreLayoutPreset();
+            else if (isTheatreWideLayoutMode(mode)) this.applyTheatreWideLayoutPreset();
             else this.applyGridLayoutPreset(mode);
         }
     },
