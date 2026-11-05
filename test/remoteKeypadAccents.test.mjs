@@ -193,9 +193,58 @@ test('keypad play/stop/mute hover popouts use a slide-out tray above the primary
     assert.match(css, /\.remote-panel__grid \.radio-tray:hover > \.radio-tray__popout,\s*\.remote-panel__grid \.radio-tray:focus-within > \.radio-tray__popout\s*\{[^}]*transform:\s*translateX\(-50%\)\s*translateY\(0\)[^}]*visibility:\s*visible/s);
     // Hidden Stop all must not leave an empty dark tray on hover.
     assert.match(css, /\.remote-panel__grid \.radio-tray__popout:has\(> \.radio-tray__btn\.is-hidden\)\s*\{[^}]*display:\s*none/s);
-    assert.match(css, /body\.remote-mini-floating #remote-panel\s*\{[^}]*overflow:\s*hidden/s);
+    // Mini keypad must never scroll — a stray 1px scrollbar used to appear because
+    // the 0.4rem gaps' subpixel rounding pushed the keypad past the dialog box.
+    // The whole mini ancestor chain is overflow: visible, which also lets the
+    // layout tray slide out of row 1 instead of being clipped to nothing. The
+    // `#remote-shell` / `.is-active` parts of that selector list are load-bearing:
+    // `#remote-shell #remote-panel.is-active` further up the same file out-ranks a
+    // bare `#remote-panel` override.
+    const miniOverflowGroup = css.match(/body\.remote-mini-floating #remote-module \.remote-module__dialog,[^{]*\{[^}]*\}/s);
+    assert.ok(miniOverflowGroup, 'mini chain overflow rule group exists');
+    assert.match(miniOverflowGroup[0], /body\.remote-mini-floating #remote-shell #remote-panel\.is-active/);
+    assert.match(miniOverflowGroup[0], /overflow:\s*visible/);
+    assert.doesNotMatch(miniOverflowGroup[0], /overflow:\s*(hidden|auto|scroll)/);
+
+    // Keys keep the full remote's fixed key size instead of stretching to fill the
+    // box, and the box takes its width from the grid (no inner padding/pad doubling).
+    assert.match(css, /body\.remote-mini-floating #remote-panel \.remote-panel__grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*var\(--remote-btn-size/s);
+    assert.match(css, /body\.remote-mini-floating #remote-panel \.remote-panel__grid\s*\{[^}]*grid-auto-rows:\s*var\(--remote-btn-size/s);
+    assert.match(css, /body\.remote-mini-floating #remote-panel \.remote-panel__grid\s*\{[^}]*width:\s*max-content/s);
+    assert.match(css, /body\.remote-mini-floating #remote-panel \.remote-panel__grid\s*\{[^}]*padding:\s*0/s);
+    // Even frame: mini gets a symmetric pad on all four sides.
+    assert.match(css, /body\.remote-mini-floating #remote-panel\s*\{[^}]*padding:\s*var\(--remote-space-md/s);
+
+    // Mini layout tray: options compacted to fit the ~214px box, plus the flipped
+    // variant used when there is no room above the key.
+    assert.match(css, /body\.remote-mini-floating \.remote-panel__layout-popout \.remote-panel__layout-option\s*\{[^}]*width:\s*calc\(var\(--remote-btn-size, 40px\) \* 0\.8\)/s);
+    assert.match(css, /body\.remote-mini-floating \.remote-panel__layout-wrap\.is-drop-down \.remote-panel__layout-popout\s*\{[^}]*top:\s*calc\(100% \+ 0\.35rem\)/s);
+    // Bind menu: anchored to the key's left edge in mini so the 9.5rem list cannot
+    // hang off the box (it used to be clipped entirely by the old overflow: hidden).
+    assert.match(css, /body\.remote-mini-floating \.remote-panel__chan-bind-popup \.chan-bind-menu\s*\{[^}]*left:\s*0[^}]*transform:\s*none/s);
     // The empty dialog drag header must not consume keypad height in mini mode.
     assert.match(css, /body\.remote-mini-floating #remote-module \.remote-module__header,/);
+
+    // Mini pad opens its tray on hover (the full remote keeps the click toggle),
+    // and the dialog footprint follows the same fixed 4×3 token geometry as the CSS.
+    const remotePanelJs = readFileSync(join(root, 'js/ui/remotePanel.js'), 'utf8');
+    assert.match(remotePanelJs, /function isMiniFloating\(\)\s*\{[^}]*remote-mini-floating/s);
+    assert.match(remotePanelJs, /wrap\.addEventListener\('pointerenter',[\s\S]{0,240}?openPicker\(name\);/);
+    assert.match(remotePanelJs, /wrap\.addEventListener\('pointerleave',[\s\S]{0,400}?closePicker\(name\);[\s\S]{0,60}?POPOUT_HOVER_CLOSE_MS\);/);
+    // Mini clamps against the viewport (its tray is wider than the box) and flips down.
+    assert.match(remotePanelJs, /const root = mini\s*\?\s*document\.documentElement/);
+    assert.match(remotePanelJs, /wrap\.classList\.add\('is-drop-down'\)/);
+
+    const remoteModuleJs = readFileSync(join(root, 'js/ui/remoteModule.js'), 'utf8');
+    assert.match(remoteModuleJs, /const MINI_COLS = 4;/);
+    assert.match(remoteModuleJs, /const MINI_ROWS = 3;/);
+    assert.match(remoteModuleJs, /const MINI_BTN = 40;/);
+    assert.match(remoteModuleJs, /const MINI_GAP = 6\.4;/);
+    assert.match(remoteModuleJs, /const MINI_PAD = 16;/);
+    // Content is ceiled before the border so subpixel scaling cannot undershoot.
+    assert.match(remoteModuleJs, /return Math\.ceil\(MINI_CONTENT_W \* clampModuleScale\(s\)\) \+ MINI_BORDER;/);
+    assert.match(remoteModuleJs, /return Math\.ceil\(MINI_CONTENT_H \* clampModuleScale\(s\)\) \+ MINI_BORDER;/);
+    assert.doesNotMatch(remoteModuleJs, /const MINI_BASE_W = 240;/);
     // Scale reset survives mini action pruning so a non-1× mini can recover.
     assert.match(html, /id="remote-scale-reset-btn"/);
     assert.match(css, /\.tv-module__action:not\(#remote-mini-float-btn\):not\(#remote-scale-reset-btn\):not\(#remote-collapse-header-btn\)/);

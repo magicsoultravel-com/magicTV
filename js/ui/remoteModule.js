@@ -48,12 +48,24 @@ import {
 
 const MIN_W = REMOTE_BASE_W;
 const MIN_H = REMOTE_BASE_H;
-/** Mini-floating keypad design size (CSS px) at scale 1. */
-const MINI_BASE_W = 240;
-/** 4x3 keypad rows, gaps, panel padding, and mini grid padding at 1× (header hidden). */
-const MINI_CONTENT_H = 168;
+/**
+ * Mini-floating keypad design box (CSS px) at scale 1 — mirrors the
+ * `body.remote-mini-floating` rules in remote-shell.css: a 4×3 grid of fixed
+ * `--remote-btn-size` tracks (40px) with `--remote-grid-gap` (0.4rem = 6.4px)
+ * between them, a symmetric `--remote-space-md` (16px) panel pad, and the
+ * dialog's 1px border per side. Everything here is unscaled — the CSS tokens
+ * already carry `--remote-scale` (= miniScale while mini).
+ */
+const MINI_COLS = 4;
+const MINI_ROWS = 3;
+const MINI_BTN = 40;
+const MINI_GAP = 6.4;
+const MINI_PAD = 16;
+const MINI_CONTENT_W = MINI_COLS * MINI_BTN + (MINI_COLS - 1) * MINI_GAP + 2 * MINI_PAD; // 211.2
+const MINI_CONTENT_H = MINI_ROWS * MINI_BTN + (MINI_ROWS - 1) * MINI_GAP + 2 * MINI_PAD; // 164.8
 const MINI_BORDER = 2;
-const MINI_BASE_H = MINI_CONTENT_H + MINI_BORDER;
+const MINI_BASE_W = MINI_CONTENT_W + MINI_BORDER; // 213.2
+const MINI_BASE_H = MINI_CONTENT_H + MINI_BORDER; // 166.8
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
 const DEFAULT_SHEET_HEIGHT = 0.62;
@@ -71,22 +83,31 @@ function activeScale() {
     return miniFloating ? miniScale : scale;
 }
 
+/**
+ * Mini dialog footprint. Content is ceiled before the border is added so
+ * subpixel scaling can never leave the box shorter than its own keypad (which is
+ * what used to force a 1px scrollbar).
+ */
+function miniDialogWidth(s = activeScale()) {
+    return Math.ceil(MINI_CONTENT_W * clampModuleScale(s)) + MINI_BORDER;
+}
+
+function miniDialogHeight(s = activeScale()) {
+    return Math.ceil(MINI_CONTENT_H * clampModuleScale(s)) + MINI_BORDER;
+}
+
 function minDialogWidth() {
-    if (miniFloating) return Math.round(MINI_BASE_W * clampModuleScale(miniScale));
+    if (miniFloating) return miniDialogWidth(miniScale);
     return Math.round(MIN_W * scale * wingMultiplier());
 }
 
 function baseWidthForScale(s = activeScale()) {
-    if (miniFloating) return Math.round(MINI_BASE_W * clampModuleScale(s));
+    if (miniFloating) return miniDialogWidth(s);
     return Math.round(MIN_W * clampModuleScale(s) * wingMultiplier());
 }
 
 function baseHeightForScale(s = activeScale()) {
-    if (miniFloating) {
-        // Round the content up before adding the border so subpixel scaling can
-        // never leave the dialog shorter than the keypad (which causes scrollbars).
-        return Math.ceil(MINI_CONTENT_H * clampModuleScale(s)) + MINI_BORDER;
-    }
+    if (miniFloating) return miniDialogHeight(s);
     return Math.round(MIN_H * clampModuleScale(s));
 }
 
@@ -366,7 +387,8 @@ function enterMiniFloating() {
         scale: clampModuleScale(scale)
     };
     const saved = getSavedState() || {};
-    miniScale = clampModuleScale(saved.miniScale ?? 1);
+    // First entry inherits the full float's scale so the mini pad does not jump size.
+    miniScale = clampModuleScale(saved.miniScale ?? scale);
     miniFloating = true;
 
     const fallback = defaultMiniGeometry();

@@ -847,19 +847,44 @@ body.remote-mini-floating #remote-module .remote-module__host > #tv-catalog-body
     max-width: none;
 }
 
+/* Mini dialog is content-exact. Making the whole ancestor chain non-scrolling does
+   double duty: a visible-overflow box can never raise a scrollbar (so the 0.4rem
+   gaps' subpixel rounding cannot produce a phantom one), and the layout key's
+   option tray — which slides out ABOVE its key, i.e. straight out of row 1 — is no
+   longer clipped to nothing. Nothing leaks visually: only
+   `.remote-module__dialog` paints a background. The `#remote-shell` /
+   `.is-active` parts are load-bearing — this file's
+   `#remote-shell > .remote-module__scroll` (1 ID) and
+   `#remote-shell #remote-panel.is-active` (2 IDs) out-rank a bare `#remote-panel`
+   override, which is exactly why the mini pad kept a stray scrollbar. */
+body.remote-mini-floating #remote-module .remote-module__dialog,
+body.remote-mini-floating #remote-module .remote-module__host,
+body.remote-mini-floating #remote-shell,
 body.remote-mini-floating #remote-shell > .remote-module__scroll,
-body.remote-mini-floating #remote-panel {
-    /* Dialog height is content-exact; clip subpixel rounding instead of scrolling. */
-    overflow: hidden;
+body.remote-mini-floating #remote-panel,
+body.remote-mini-floating #remote-shell #remote-panel.is-active {
+    overflow: visible;
 }
 
-/* Keypad becomes the 4-col mini grid. */
+/* Even frame: the full remote's pad is asymmetric (grid gap on top, space-md on
+   the sides/bottom) because its 5-col grid stretches to fill the dialog. The mini
+   box is driven by its grid instead, so all four sides get `--remote-space-md`. */
+body.remote-mini-floating #remote-panel {
+    padding: var(--remote-space-md, 1rem);
+}
+
+/* Keypad becomes the 4×3 mini grid. Tracks are the same fixed
+   `--remote-btn-size` the full remote uses, so keys keep the regular remote's size
+   instead of being stretched to fill the box; the dialog takes its width from the
+   grid (`width: max-content`, with `min-width: 0` above). */
 body.remote-mini-floating #remote-panel .remote-panel__grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, var(--remote-btn-size, 40px));
+    grid-auto-rows: var(--remote-btn-size, 40px);
     gap: var(--remote-grid-gap, 0.4rem);
-    width: 100%;
+    justify-content: center;
+    width: max-content;
     margin: 0;
-    padding: calc(var(--remote-space-md, 1rem) * 0.4);
+    padding: 0;
 }
 
 /* Only the marked mini cells join the grid; everything else disappears

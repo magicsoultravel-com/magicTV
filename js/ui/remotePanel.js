@@ -229,6 +229,26 @@ const POPOUT_PICKERS = {
 };
 
 const POPOUT_INSET_PX = 8;
+/** Hover-intent grace (ms): the key→tray gap must not slam a hovered tray shut. */
+const POPOUT_HOVER_CLOSE_MS = 140;
+
+/** Mini keypad opens its trays on hover; the full remote keeps the click toggle. */
+function isMiniFloating() {
+    return document.body?.classList?.contains('remote-mini-floating') === true;
+}
+
+/** Open one remote popout picker — shared by the click toggle and mini hover. */
+function openPicker(name) {
+    const ids = POPOUT_PICKERS[name];
+    const wrap = ids ? el(ids.wrapId) : null;
+    if (!wrap) return;
+    const btn = el(ids.btnId);
+    const popout = el(ids.popoutId);
+    wrap.classList.add('is-open');
+    btn?.setAttribute('aria-expanded', 'true');
+    popout?.setAttribute('aria-hidden', 'false');
+    clampPopout(wrap, popout, ids.shiftVar);
+}
 
 /** Close one remote popout picker. */
 function closePicker(name) {
@@ -238,6 +258,7 @@ function closePicker(name) {
     const btn = el(ids.btnId);
     const popout = el(ids.popoutId);
     wrap?.classList.remove('is-open');
+    wrap?.classList.remove('is-drop-down');
     wrap?.style.removeProperty(ids.shiftVar);
     btn?.setAttribute('aria-expanded', 'false');
     popout?.setAttribute('aria-hidden', 'true');
@@ -251,15 +272,31 @@ function closeAllPickers() {
     for (const name of Object.keys(POPOUT_PICKERS)) closePicker(name);
 }
 
-/** Shift a centered popout so it stays inside the remote dialog/panel. */
+/**
+ * Shift a centered popout so it stays on screen. The full remote clamps inside its
+ * dialog; the mini keypad clamps against the viewport instead, because its tray is
+ * wider than the ~214px box and is explicitly allowed to hang outside it, and it
+ * flips below the key (`.is-drop-down`) when there is no room above.
+ */
 function clampPopout(wrap, popout, shiftVar = '--layout-popout-shift') {
     if (!wrap || !popout) return;
     wrap.style.removeProperty(shiftVar);
-    const root = wrap.closest('.remote-module__dialog') || el('remote-panel');
+    wrap.classList.remove('is-drop-down');
+
+    const mini = isMiniFloating();
+    const root = mini
+        ? document.documentElement
+        : (wrap.closest('.remote-module__dialog') || el('remote-panel'));
     if (!root) return;
 
     const rootRect = root.getBoundingClientRect();
-    const popRect = popout.getBoundingClientRect();
+    let popRect = popout.getBoundingClientRect();
+
+    if (mini && popRect.top < POPOUT_INSET_PX) {
+        wrap.classList.add('is-drop-down');
+        popRect = popout.getBoundingClientRect();
+    }
+
     const minLeft = rootRect.left + POPOUT_INSET_PX;
     const maxRight = rootRect.right - POPOUT_INSET_PX;
     const innerW = maxRight - minLeft;
@@ -325,11 +362,30 @@ function bindPicker(name) {
             btn.blur();
             return;
         }
-        wrap.classList.add('is-open');
-        btn.setAttribute('aria-expanded', 'true');
-        const popout = el(ids.popoutId);
-        popout?.setAttribute('aria-hidden', 'false');
-        clampPopout(wrap, popout, ids.shiftVar);
+        openPicker(name);
+    });
+
+    // Mini keypad: the tray follows the pointer like the full remote's slide-out,
+    // without the extra click. Pointer-type gated so touch keeps the click toggle,
+    // and the tray lives inside the wrap, so moving onto it re-enters and cancels
+    // the pending close instead of flickering shut across the 0.35rem gap.
+    let hoverCloseTimer = 0;
+    const cancelHoverClose = () => {
+        if (hoverCloseTimer) clearTimeout(hoverCloseTimer);
+        hoverCloseTimer = 0;
+    };
+    wrap.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'touch' || !isMiniFloating()) return;
+        cancelHoverClose();
+        openPicker(name);
+    });
+    wrap.addEventListener('pointerleave', (e) => {
+        if (e.pointerType === 'touch' || !isMiniFloating()) return;
+        cancelHoverClose();
+        hoverCloseTimer = setTimeout(() => {
+            hoverCloseTimer = 0;
+            closePicker(name);
+        }, POPOUT_HOVER_CLOSE_MS);
     });
 
     if (typeof window !== 'undefined' && !window.__remotePopoutPickerDismissBound) {

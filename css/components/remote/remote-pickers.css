@@ -30,6 +30,15 @@
     top: calc(100% + 0.35rem);
 }
 
+/* Mini keypad: the bind key sits in the left column, so a centered 9.5rem menu
+ * would hang off the box edge (and until the mini chain went overflow: visible it
+ * was simply clipped away). Grow it rightward from the key instead — still sliding
+ * up out of the box like the full remote's. */
+body.remote-mini-floating .remote-panel__chan-bind-popup .chan-bind-menu {
+    left: 0;
+    transform: none;
+}
+
 .chan-bind-menu__item {
     display: block;
     width: 100%;
@@ -125,6 +134,28 @@
 .remote-panel__layout-option.is-active {
     background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
+}
+
+/* Mini keypad: same tray, compacted so the 5 options fit the ~214px box
+ * (5 × 32px + gaps ≈ 184px) instead of overflowing it. The mini dialog/panel
+ * chain is overflow: visible, so the tray is free to slide out of row 1 like the
+ * full remote's does — there it simply happens to sit mid-keypad. */
+body.remote-mini-floating .remote-panel__layout-popout .remote-panel__layout-option {
+    width: calc(var(--remote-btn-size, 40px) * 0.8);
+    height: calc(var(--remote-btn-size, 40px) * 0.8);
+    min-width: calc(var(--remote-btn-size, 40px) * 0.8);
+}
+
+/* Flipped variant for a mini float sitting too high on screen — `.is-drop-down`
+ * is set by clampPopout() in remotePanel.js when the tray would leave the top. */
+body.remote-mini-floating .remote-panel__layout-wrap.is-drop-down .remote-panel__layout-popout {
+    bottom: auto;
+    top: calc(100% + 0.35rem);
+    transform: translateX(calc(-50% + var(--layout-popout-shift, 0px))) translateY(-4px);
+}
+
+body.remote-mini-floating .remote-panel__layout-wrap.is-open.is-drop-down .remote-panel__layout-popout {
+    transform: translateX(calc(-50% + var(--layout-popout-shift, 0px))) translateY(0);
 }
 
 /* Share + TV Travel — one key, options slide out above it. Same recipe as the
