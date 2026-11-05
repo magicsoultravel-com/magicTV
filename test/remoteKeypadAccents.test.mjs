@@ -249,3 +249,37 @@ test('keypad play/stop/mute hover popouts use a slide-out tray above the primary
     assert.match(html, /id="remote-scale-reset-btn"/);
     assert.match(css, /\.tv-module__action:not\(#remote-mini-float-btn\):not\(#remote-scale-reset-btn\):not\(#remote-collapse-header-btn\)/);
 });
+
+test('mini pad holds the top overlay slot so floating windows cannot bury its bottom row', () => {
+    const moduleLayoutJs = readFileSync(join(root, 'js/ui/moduleLayout.js'), 'utf8');
+    // SSOT: a pinned host is re-raised above whichever window was just raised, so the
+    // last-interaction-wins stack can never paint the browser / multi-TV window and its
+    // 1…9 screens strip over the keypad's third key row.
+    assert.match(moduleLayoutJs, /const pinnedOverlayIds = new Set\(\);/);
+    assert.match(moduleLayoutJs, /export function setOverlayPinnedTop\(id, pinned = true\)/);
+    assert.match(moduleLayoutJs, /pinnedOverlayIds\.add\(id\)/);
+    assert.match(moduleLayoutJs, /pinnedOverlayIds\.delete\(id\)/);
+    // Pinned hosts are bumped after the target write, and raising a pinned host itself
+    // must not bump twice (that keeps the stack counter honest).
+    assert.match(
+        moduleLayoutJs,
+        /if \(pinnedOverlayIds\.size && !ids\.some\(\(id\) => pinnedOverlayIds\.has\(id\)\)\) \{/
+    );
+
+    const remoteModuleJs = readFileSync(join(root, 'js/ui/remoteModule.js'), 'utf8');
+    assert.match(remoteModuleJs, /import \{[\s\S]*?\bsetOverlayPinnedTop\b[\s\S]*?\} from '\.\/moduleLayout\.js';/);
+    // Pin follows the mini flag inside the shared body-class sync, so enter / exit /
+    // close / hide / restored-mini sessions all converge on the same rule.
+    assert.match(remoteModuleJs, /setOverlayPinnedTop\('remote-module', miniFloating\);/);
+    // Entering mini claims the slot immediately: restored-mini skips the pointerdown raise.
+    assert.match(remoteModuleJs, /function enterMiniFloating\(\)[\s\S]*?bringModuleToFront\(SHELL_REMOTE\);\n\}\n/);
+
+    // Both float hosts sit on the same 8510 band, and the browser module is later in the
+    // DOM, so it used to win the tie and cover the pad — pinning is what breaks it.
+    const css = readCssWithImports(join(root, 'css/components/remote.css'));
+    assert.match(css, /\.remote-module\s*\{[^}]*z-index:\s*8510/s);
+    const remoteIdx = html.indexOf('id="remote-module"');
+    const browserIdx = html.indexOf('id="browser-module"');
+    assert.ok(remoteIdx > 0 && browserIdx > remoteIdx, 'browser module is later in the DOM than the remote module');
+});
+

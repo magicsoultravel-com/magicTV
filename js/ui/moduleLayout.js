@@ -177,7 +177,28 @@ export function toggleSplitBrowser({ hostKind = 'undocked' } = {}) {
 /** @typedef {'remote'|'browser'|'radio'} OverlayTarget */
 
 /**
+ * Overlay hosts that must always keep the top stacking slot (the mini remote is
+ * a workspace HUD, so last-interaction-wins must never bury it under a browser
+ * or radio window). Re-asserted after every raise.
+ * @type {Set<string>}
+ */
+const pinnedOverlayIds = new Set();
+
+/**
+ * Pin/unpin an overlay host above every other raised overlay.
+ * Idempotent: safe to call from any state-sync path.
+ * @param {string} id host element id, e.g. 'remote-module'
+ * @param {boolean} [pinned]
+ */
+export function setOverlayPinnedTop(id, pinned = true) {
+    if (!id) return;
+    if (pinned) pinnedOverlayIds.add(id);
+    else pinnedOverlayIds.delete(id);
+}
+
+/**
  * Raise remote, browser, or radio float hosts so last interaction wins.
+ * Pinned hosts are re-raised afterwards so they stay on top.
  * @param {typeof SHELL_REMOTE | typeof SHELL_BROWSER | 'radio' | string} target
  * @returns {number} assigned z-index
  */
@@ -201,6 +222,16 @@ export function bringOverlayToFront(target) {
     for (const id of ids) {
         const node = document.getElementById(id);
         if (node) node.style.zIndex = z;
+    }
+
+    // Pinned hosts stay strictly above whichever window was just raised.
+    if (pinnedOverlayIds.size && !ids.some((id) => pinnedOverlayIds.has(id))) {
+        stackZ += 1;
+        const pinnedZ = String(stackZ);
+        for (const id of pinnedOverlayIds) {
+            const node = document.getElementById(id);
+            if (node) node.style.zIndex = pinnedZ;
+        }
     }
     return stackZ;
 }

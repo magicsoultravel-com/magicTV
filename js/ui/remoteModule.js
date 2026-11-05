@@ -33,6 +33,7 @@ import {
     remoteShellEl,
     browserShellEl,
     bringModuleToFront,
+    setOverlayPinnedTop,
     SHELL_REMOTE
 } from './moduleLayout.js';
 import {
@@ -402,6 +403,10 @@ function enterMiniFloating() {
     syncScaleResetBtn();
     RemotePanel.syncRemotePanel();
     persistState({ miniFloating: true });
+    // Claim the top overlay slot right away: restored-mini entry does not go
+    // through a pointerdown, so raise explicitly. updateBodyClasses() above has
+    // already pinned the pad, so this raise cannot be overtaken by the browser.
+    bringModuleToFront(SHELL_REMOTE);
 }
 
 /** Exit to the full-size floating remote (stays undocked). */
@@ -1120,6 +1125,11 @@ function updateBodyClasses() {
     document.body.classList.toggle('remote-mini-floating', miniFloating);
     document.body.classList.toggle('remote-dock-side-right', dockSide === 'right');
     document.body.classList.toggle('browser-dock-side-left', dockSide === 'right');
+    // The mini pad is a workspace HUD: hold the top overlay slot while it is up so
+    // raising the browser/radio window (last-interaction-wins) can never paint the
+    // multi-TV window and its screens strip over the keypad's bottom row. Unpinned
+    // on every other state (exit mini, close, hide) so normal stacking resumes.
+    setOverlayPinnedTop('remote-module', miniFloating);
 }
 
 function onKeydown(e) {

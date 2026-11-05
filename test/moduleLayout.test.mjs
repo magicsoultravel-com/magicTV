@@ -93,6 +93,51 @@ describe('moduleLayout SSOT', () => {
         assert.equal(tile.style.zIndex, '');
         assert.equal(Number(remote.style.zIndex), zRemote);
     });
+
+    it('setOverlayPinnedTop keeps the mini keypad above a raised browser window', async () => {
+        const remote = { style: { zIndex: '' }, id: 'remote-module' };
+        const browser = { style: { zIndex: '' }, id: 'browser-module' };
+        const nodes = { 'remote-module': remote, 'browser-module': browser };
+        globalThis.document = {
+            getElementById: (id) => nodes[id] || null
+        };
+        const { bringOverlayToFront, setOverlayPinnedTop } = await import(
+            '../js/ui/moduleLayout.js?layout=pinned'
+        );
+
+        setOverlayPinnedTop('remote-module', true);
+        bringOverlayToFront('remote');
+        // Touching the multi-TV browser window must not bury the mini pad (its
+        // bottom key row used to end up under the browser module + screens strip).
+        bringOverlayToFront('browser');
+        assert.equal(
+            Number(remote.style.zIndex) > Number(browser.style.zIndex),
+            true,
+            'pinned mini pad stays above the browser module'
+        );
+
+        // Unpinning restores plain last-interaction-wins.
+        setOverlayPinnedTop('remote-module', false);
+        bringOverlayToFront('browser');
+        assert.equal(Number(browser.style.zIndex) > Number(remote.style.zIndex), true);
+    });
+
+    it('raising a pinned host does not double-bump the stack', async () => {
+        const remote = { style: { zIndex: '' }, id: 'remote-module' };
+        const nodes = { 'remote-module': remote };
+        globalThis.document = {
+            getElementById: (id) => nodes[id] || null
+        };
+        const { bringOverlayToFront, getOverlayStackZ, setOverlayPinnedTop } = await import(
+            '../js/ui/moduleLayout.js?layout=pinned-self'
+        );
+
+        setOverlayPinnedTop('remote-module', true);
+        const before = getOverlayStackZ();
+        const z = bringOverlayToFront('remote');
+        assert.equal(z, before + 1);
+        assert.equal(Number(remote.style.zIndex), z);
+    });
 });
 
 describe('joined/split panel activation preserves activeTab concept', () => {
