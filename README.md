@@ -146,7 +146,7 @@ Hover a TV tile and press the **YouTube** button (rounded play glyph) to paste a
 - The embed is contain-fit like a TV `<video>`: the whole 16:9 player stays visible, so YouTube's own control bar is never cropped or magnified.
 - **Drag from the grab handle** — the embed swallows pointer events on its own surface, so a YouTube tile is moved by the grip icon at the left of its hover chrome (hover the tile to reveal it); the edge handles still resize it and a plain click raises the tile.
 - **Swap with main** works on a YouTube tile — the embed is re-created on the other screen at the same clip, playhead and mute/volume, while the TV stream moves across untouched (the iframe has to reload, so it buffers for a moment). The channel YouTube displaced follows the embed, and Rotate/TV Travel leave the embed on its own screen.
-- Cast, pop-out/PiP, favourite and Bank are unavailable on a YouTube tile (a cross-origin embed can't be captured or cast).
+- Cast, pop-out/PiP and Bank are unavailable on a YouTube tile (a cross-origin embed can't be captured or cast). Favourites live on the magic remote only, not in the tile chrome.
 - Press the button again (or pick a channel on that tile) to leave YouTube mode and return to the channel that was there before.
 
 #### Next / previous + related tray
@@ -172,7 +172,7 @@ Hover a TV tile, then hover the **YouTube** button to slide out the **globe** bu
   5. No media but an embeddable player → **Embed the page** (iframe fallback).
   6. DRM pages (Widevine / PlayReady / FairPlay) are refused with an explanation.
 - **Media mode is a real TV tile**: the resolved URL plays through the normal player, so play / stop / mute / volume / fullscreen / PiP / pop-out / persistence all work, including multiple Web Video tiles at once.
-- **Chrome differences**: favourite and Bank are hidden; Cast only appears for direct, non-proxied media URLs. In embed mode the tile keeps play (reload), stop, mute, fullscreen, drag and the **shield** button — and nothing is painted over the page (no centre ■/▶ slate: the page itself is the picture).
+- **Chrome differences**: favourites live on the magic remote only (no star in the tile strip) and Bank is hidden; Cast only appears for direct, non-proxied media URLs. In embed mode the tile keeps play (reload), stop, mute, fullscreen, drag and the **shield** button — the pop-out slide-out under fullscreen is hidden too (a cross-origin page can't be captured) — and nothing is painted over the page (no centre ■/▶ slate: the page itself is the picture).
 - **Mute on a page tile**: the tray's mute glyph behaves like a normal TV tile — it flips the tile's mute flag and its slide-out offers **Mute other TVs** / **Mute all**, which always work on the other tiles. The page's *own* audio is only reachable when the page is same-origin, so a remote embed keeps its sound and magicTV says “Embedded pages keep their own sound”; the mute state is remembered, so a same-origin page comes back muted after ▶ / reload.
 - **Page shield (embed mode)**: a cross-origin iframe is a black box — magicTV cannot remove the page's scripts, block its subresource/ad requests, or touch in-player/stitched ads. What it *can* do is deny the capabilities nuisance ads rely on. Hover or focus the **shield** button (next to fullscreen) and the three levels slide out above the strip — **Off / Basic / Strict**, with the live one lit; clicking the glyph itself cycles basic → strict → off. Each change re-navigates the page (sandbox flags only apply at navigation) and is remembered on that saved page.
 

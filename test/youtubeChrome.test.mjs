@@ -37,7 +37,7 @@ test('both tile variants carry one prev / next / tray group in the local row', (
         assert.match(localRow, /data-yt-queue-strip/);
         // The group sits right after the YouTube button (not inside its popout).
         assert.ok(localRow.indexOf('tv-controls__youtube-wrap') < localRow.indexOf('tv-controls__ytqueue-wrap'));
-        assert.ok(localRow.indexOf('tv-controls__ytqueue-wrap') < localRow.indexOf('data-tile-action="fav"'));
+        assert.ok(localRow.indexOf('tv-controls__ytqueue-wrap') < localRow.indexOf('tv-controls__mute-wrap'));
 
         // No tray entries in the static markup — they come from the queue sync.
         assert.doesNotMatch(localRow, /data-tile-action="yt-play"/);

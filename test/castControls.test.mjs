@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
     deriveCastPlaying,
     sniffCastContentType,
@@ -101,7 +104,6 @@ test('buildTileCastVolRockerHtml has cast icon and cast target volume controls',
 
 test('buildTileHoverHtml center variant includes mosaic controls', () => {
     const html = buildTileHoverHtml('center');
-    assert.match(html, /data-tile-action="reset"/);
     assert.match(html, /data-tile-action="mute-all"/);
     assert.doesNotMatch(html, /data-tile-action="swap"/);
 });
@@ -134,6 +136,44 @@ test('shield is one button that slides out the three levels, in order', () => {
             `${variant}: options carry a target and a hint`);
     }
 });
+
+test('fullscreen hosts the pop-out as a slide-out; favourites left the tile chrome', () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+    for (const variant of ['corner', 'center']) {
+        const html = buildTileHoverHtml(variant);
+        const localRow = html.slice(html.indexOf('data-controls-row="local"'));
+
+        // Favourites are remote-only now — no star in any tile strip.
+        assert.doesNotMatch(html, /data-tile-action="fav"/, `${variant}: no favourite button`);
+
+        assert.equal((localRow.match(/data-tile-action="pip"/g) || []).length, 1,
+            `${variant}: exactly one pop-out button`);
+        const wrap = localRow.indexOf('tv-controls__fullscreen-wrap');
+        const fullscreen = localRow.indexOf('data-tile-action="fullscreen"');
+        const popout = localRow.indexOf('tv-controls__fullscreen-popout');
+        const pip = localRow.indexOf('data-tile-action="pip"');
+        assert.ok(wrap !== -1 && fullscreen !== -1 && popout !== -1 && pip !== -1,
+            `${variant}: fullscreen wrap + pop-out markup`);
+        assert.ok(wrap < fullscreen && fullscreen < popout && popout < pip,
+            `${variant}: pop-out slides out of the fullscreen button`);
+        assert.match(localRow,
+            /data-tile-action="pip" data-controls-target="local" title="Pop out" aria-label="Pop out"/,
+            `${variant}: pop-out carries the local target`);
+    }
+
+    // The slide-out reuses the shared popout recipe in player.css …
+    const playerCss = readFileSync(join(root, 'css/components/player.css'), 'utf8');
+    assert.match(playerCss, /\.tv-controls__fullscreen-wrap:hover \.tv-controls__fullscreen-popout,/);
+    assert.match(playerCss, /\.tv-controls__fullscreen-wrap:focus-within \.tv-controls__fullscreen-popout,/);
+    assert.match(playerCss, /\.tv-controls__fullscreen-popout \.tv-controls__btn,/);
+    // … and the mode CSS hides it where pop-out cannot work.
+    const youtubeCss = readFileSync(join(root, 'css/components/youtube.css'), 'utf8');
+    assert.match(youtubeCss, /\.tv-player-tile\.is-youtube \.tv-controls__fullscreen-popout,/);
+    const webCss = readFileSync(join(root, 'css/components/webstream.css'), 'utf8');
+    assert.match(webCss, /\.tv-player-tile\.is-webpage \.tv-controls__fullscreen-popout,/);
+});
+
 
 test('hydrateTileHoverControls replaces hover content once', () => {
     const mosaic = { dataset: {}, querySelectorAll: () => [] };

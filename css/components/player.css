@@ -1198,6 +1198,7 @@
 .tv-controls__play-wrap,
 .tv-controls__stop-wrap,
 .tv-controls__swap-wrap,
+.tv-controls__fullscreen-wrap,
 .tv-controls__shield-wrap {
     position: relative;
     display: inline-flex;
@@ -1208,6 +1209,7 @@
 .tv-controls__play-wrap::after,
 .tv-controls__stop-wrap::after,
 .tv-controls__swap-wrap::after,
+.tv-controls__fullscreen-wrap::after,
 .tv-controls__shield-wrap::after {
     content: '';
     position: absolute;
@@ -1228,6 +1230,7 @@
 .tv-controls__play-popout,
 .tv-controls__stop-popout,
 .tv-controls__swap-popout,
+.tv-controls__fullscreen-popout,
 .tv-controls__shield-popout {
     position: absolute;
     /* Sit flush on the strip's outer top — adjacent, not overlapping (avoids stacked rgba). */
@@ -1262,6 +1265,8 @@
 .tv-controls__stop-wrap:focus-within .tv-controls__stop-popout,
 .tv-controls__swap-wrap:hover .tv-controls__swap-popout,
 .tv-controls__swap-wrap:focus-within .tv-controls__swap-popout,
+.tv-controls__fullscreen-wrap:hover .tv-controls__fullscreen-popout,
+.tv-controls__fullscreen-wrap:focus-within .tv-controls__fullscreen-popout,
 .tv-controls__shield-wrap:hover .tv-controls__shield-popout,
 .tv-controls__shield-wrap:focus-within .tv-controls__shield-popout {
     transform: translateX(-50%) translateY(0);
@@ -1276,6 +1281,7 @@
 .tv-controls__play-popout .tv-controls__btn,
 .tv-controls__stop-popout .tv-controls__btn,
 .tv-controls__swap-popout .tv-controls__btn,
+.tv-controls__fullscreen-popout .tv-controls__btn,
 .tv-controls__shield-popout .tv-controls__btn {
     width: 28px;
     height: 28px;

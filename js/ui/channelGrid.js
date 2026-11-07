@@ -69,17 +69,6 @@ function syncTileFavBtn(btn, isFav) {
     btn.setAttribute('aria-pressed', String(isFav));
 }
 
-function syncControlFavBtn() {
-    const favBtn = document.querySelector?.('#player-tile-center [data-tile-action="fav"]');
-    if (!favBtn) return;
-    const ch = TvPlayer.channel;
-    const isFav = ch ? TvPlayer.isFavorite(ch) : false;
-    favBtn.classList.toggle('is-active', isFav);
-    favBtn.innerHTML = isFav ? CARD_ICONS.starFilled : '☆';
-    favBtn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
-    favBtn.setAttribute('aria-pressed', String(isFav));
-}
-
 function metaChannels(metaEntries) {
     return (metaEntries || []).map(e => {
         const parsed = parseChannelKey(e.key);
@@ -480,7 +469,6 @@ export const ChannelGrid = {
             if (!key) return;
             syncTileFavBtn(btn, TvPlayer.isFavorite(key));
         });
-        syncControlFavBtn();
     },
 
     /** Re-render the active catalog tab after hide/unhide. */

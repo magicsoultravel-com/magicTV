@@ -121,6 +121,20 @@ function stopWrap(target) {
     </div>`;
 }
 
+/**
+ * Fullscreen button + Pop out slide-out. Hovering / focusing fullscreen
+ * reveals the Pop out (PiP) button above the strip — same recipe as Mute,
+ * Play, Stop, Swap and Shield, which keeps a spare slot on narrow tiles.
+ */
+function fullscreenWrap(target) {
+    return `<div class="tv-controls__fullscreen-wrap">
+        ${controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn')}
+        <div class="tv-controls__fullscreen-popout" aria-hidden="true">
+            ${controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2')}
+        </div>
+    </div>`;
+}
+
 /** Vertical rocker outside the bottom strip — left mid-height of the tile. */
 export function buildTileVolRockerHtml(target = 'local') {
     return `<div class="tv-player-tile__rocker tv-player-tile__vol-rocker" data-tile-vol-rocker>
@@ -235,12 +249,10 @@ function coreRowButtons(target) {
         controlBtn('browse', 'Pick channel', BROWSE_SVG, target, 'tv-controls__btn--main-3'),
         playWrap(target),
         stopWrap(target),
-        controlBtn('pip', 'Pop out', '⬆', target, 'tv-controls__btn--main-2'),
-        controlBtn('fullscreen', 'Fullscreen', '⛶', target, 'tv-controls__btn--main-2 tv-controls__action-btn'),
+        fullscreenWrap(target),
         shieldWrap(target),
         youtubeWrap(target),
         youtubeQueueWrap(target),
-        controlBtn('fav', 'Toggle favorite', '☆', target, 'tv-controls__btn--main-3 tv-controls__fav-btn'),
         muteWrap(target)
     ].join('');
 }

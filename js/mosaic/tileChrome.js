@@ -2,7 +2,7 @@
  * Mosaic tile DOM refresh, control chrome, and tile action routing.
  * Methods mix into MultiView (this === MultiView).
  */
-import { ACTION_ICONS, CARD_ICONS } from '../ui/icons.js';
+import { ACTION_ICONS } from '../ui/icons.js';
 import { showAppToast } from '../ui/toast.js';
 import { TvPopoutWindows } from '../tvPopoutWindows.js';
 import { countryFlagEmoji, el } from '../tvUtils.js';
@@ -360,12 +360,6 @@ export const tileChromeMethods = {
                 }
                 break;
             }
-            case 'fav':
-                if (player.channel && player.kind !== 'youtube') {
-                    FavoritesRecents.toggleFavorite(player.channel);
-                    this.getPrimary()?.emitState();
-                }
-                break;
             case 'fullscreen': {
                 if (this.webStreamMode(slotId) === 'embed') {
                     const { fullscreenWebPageFrame } = await import('../webstream/webPagePlayer.js');
@@ -954,18 +948,6 @@ export const tileChromeMethods = {
             const active = embedding && level === SHIELD_ACTION_LEVELS[action];
             btn.classList.toggle('is-active', active);
             btn.setAttribute('aria-pressed', String(active));
-            return;
-        }
-        if (action === 'fav') {
-            if (player?.channel) {
-                const isFav = FavoritesRecents.isFavorite(player.channel);
-                btn.classList.toggle('is-active', isFav);
-                btn.innerHTML = isFav ? CARD_ICONS.starFilled : '☆';
-                btn.setAttribute('aria-pressed', String(isFav));
-            } else {
-                btn.classList.remove('is-active');
-                btn.textContent = '☆';
-            }
             return;
         }
         if (action === 'pip') {

@@ -53,13 +53,13 @@
 }
 
 /* ------------------------------------------------------------------ *
- * YouTube tiles: hide TV-only affordances (cast, PiP, fav, bank, channel
- * rocker, quality/right-hand watch totals). Play/stop/volume/fullscreen
- * stay live and drive the pseudo player.
+ * YouTube tiles: hide TV-only affordances (cast, the fullscreen pop-out
+ * slide-out, bank, channel rocker, quality/right-hand watch totals).
+ * Play/stop/volume/fullscreen stay live and drive the pseudo player.
  * ------------------------------------------------------------------ */
 .tv-player-tile.is-youtube .tv-controls__cast-wrap,
+.tv-player-tile.is-youtube .tv-controls__fullscreen-popout,
 .tv-player-tile.is-youtube [data-tile-action="pip"],
-.tv-player-tile.is-youtube [data-tile-action="fav"],
 .tv-player-tile.is-youtube [data-tile-action="bank"],
 .tv-player-tile.is-youtube .tv-player-tile__chan-rocker,
 .tv-player-tile.is-youtube .tv-player-tile__quality-echo,
