@@ -654,9 +654,9 @@ function openRadioCatalog({ tab = 'browse' } = {}) {
     // Paint once via switchTab / openBrowse / refresh — not in setMode.
     setCatalogMode('radio', { paint: false });
     const nextTab = isBrowserCatalogTab(tab) ? tab : 'browse';
-    if (!RemoteModule.isOpen?.()) {
-        RemoteModule.open?.({ tab: nextTab });
-    }
+    // Reveal first: an open-but-collapsed dock, the mini pad and a hidden split
+    // Browser pane all swallow the paint, so the click would look like a no-op.
+    RemoteModule.revealCatalog?.({ tab: nextTab });
     ensureBrowserCatalogVisible({ refreshRadio: false });
     if (appState.activeTab !== nextTab) switchTab(nextTab);
     else if (nextTab === 'browse') RadioBrowseView.openBrowse();
@@ -671,6 +671,9 @@ function openTvCatalog({ tab = 'browse' } = {}) {
         RemoteModule.open?.({ tab: nextTab });
         return;
     }
+    // Same reveal as Radio Browse: open ≠ visible (collapsed dock, mini pad,
+    // hidden split Browser pane).
+    RemoteModule.revealCatalog?.({ tab: nextTab });
     ensureBrowserCatalogVisible();
     if (appState.activeTab !== nextTab) {
         switchTab(nextTab);

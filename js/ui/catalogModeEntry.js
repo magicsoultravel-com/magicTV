@@ -22,3 +22,49 @@ export function catalogModeForEntry(source) {
 export function isBrowserCatalogTab(tab) {
     return BROWSER_TABS.includes(tab);
 }
+
+/**
+ * Pure decision table behind `RemoteModule.revealCatalog()`: what has to move
+ * before a catalog entry point may paint its panels.
+ *
+ * A catalog can be "open" and still be invisible — a collapsed docked sheet, the
+ * mini keypad pad, or a hidden split Browser pane. Painting into any of those
+ * makes a Browse click look like a no-op, so every entry reveals first.
+ *
+ * @param {{
+ *   mode?: 'hidden' | 'docked' | 'undocked',
+ *   miniFloating?: boolean,
+ *   sheetExpanded?: boolean,
+ *   split?: boolean,
+ *   browserHostKind?: 'docked' | 'undocked' | 'hidden' | 'os' | null
+ * }} state
+ * @returns {{
+ *   exitMini: boolean,
+ *   open: boolean,
+ *   expandSheet: boolean,
+ *   revealBrowser: 'docked' | 'undocked' | null
+ * }}
+ */
+export function catalogEntryReveal({
+    mode = 'hidden',
+    miniFloating = false,
+    sheetExpanded = false,
+    split = false,
+    browserHostKind = null
+} = {}) {
+    const exitMini = miniFloating === true;
+    // Mini always floats: leaving it restores an expanded float, never a sheet.
+    const open = !exitMini && mode !== 'docked' && mode !== 'undocked';
+    const expandSheet = !exitMini && mode === 'docked' && sheetExpanded !== true;
+
+    let revealBrowser = null;
+    if (split === true) {
+        const kind = browserHostKind || 'undocked';
+        // Only a hidden (or OS-popped) Browser pane swallows the paint; docked and
+        // undocked panes are on screen already. Restoring as a float keeps the
+        // saved `layout.browser` geometry.
+        if (kind === 'hidden' || kind === 'os') revealBrowser = 'undocked';
+    }
+
+    return { exitMini, open, expandSheet, revealBrowser };
+}

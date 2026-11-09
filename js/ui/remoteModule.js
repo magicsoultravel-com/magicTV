@@ -4,6 +4,7 @@ import { ChannelGrid } from './channelGrid.js';
 import { MultiView } from '../multiView.js';
 import { TileFrames } from '../tileFrames.js';
 import { showAppToast } from './toast.js';
+import { catalogEntryReveal } from './catalogModeEntry.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore, isCatalogBarTab } from '../storage/settingsStore.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
@@ -1590,6 +1591,59 @@ export const RemoteModule = {
             return;
         }
         this.open({ slotId: id, tab });
+    },
+
+    /**
+     * Make the shared catalog actually visible *before* an entry point paints it.
+     * Every catalog entry (remote nav, chrome tile, Radio Browse) goes through
+     * here: an open-but-collapsed docked sheet, the mini keypad pad and a hidden
+     * split Browser pane all swallow the paint, which makes a Browse click look
+     * like a no-op. Idempotent — safe to call on every entry.
+     * @param {{ slotId?: string|null, tab?: string|null }} [options]
+     */
+    revealCatalog({ slotId = null, tab = null } = {}) {
+        bindOnce();
+        const plan = catalogEntryReveal({
+            mode,
+            miniFloating,
+            sheetExpanded,
+            split: isSplit(),
+            browserHostKind: getLayoutState().browserHostKind
+        });
+        const id = slotId || targetSlotId || 'center';
+
+        if (plan.exitMini) exitMiniFloating();
+
+        if (plan.open) {
+            this.open({
+                slotId: id,
+                mode: 'docked',
+                tab: tab || 'browse',
+                focusClose: false
+            });
+        } else {
+            targetSlotId = id;
+            MultiView.setStatusSlot(targetSlotId);
+            mountToActiveHost();
+            if (plan.expandSheet) {
+                setSheetExpanded(true, { persist: false, animateOpen: true });
+                applyDockScaleGeometry();
+            }
+            updateBodyClasses();
+            persistState({ open: true, mode, targetSlotId });
+            RemotePanel.syncRemotePanel();
+        }
+
+        // Split: the Browser pane owns the catalog panels, so a hidden pane has to
+        // come back before anything is painted into it.
+        if (plan.revealBrowser === 'docked') BrowserModule.dock();
+        else if (plan.revealBrowser === 'undocked') BrowserModule.openUndocked();
+
+        // Re-place the nav rows for the tab we are about to show (joined mode parks
+        // them in the browser shell footer; a stale placement lands in a hidden shell).
+        if (tab) syncRemoteNav(tab);
+        syncSplitChromeButtons();
+        return plan;
     },
 
     open({ slotId = 'center', mode: openMode = 'docked', tab = 'remote', focusClose = true } = {}) {

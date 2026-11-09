@@ -688,7 +688,7 @@ function bindOnce() {
             if (RadioPlayer.hideChannel(known)) {
                 showAppToast('Station hidden');
                 document.querySelectorAll(`[data-radio-station="${CSS.escape(key)}"]`).forEach((n) => n.remove());
-                refreshActiveLists({ soft: true });
+                refreshActiveLists();
             }
             return;
         }
@@ -697,7 +697,7 @@ function bindOnce() {
             e.preventDefault();
             e.stopPropagation();
             RadioPlayer.toggleFavorite(star.getAttribute('data-radio-star'));
-            refreshActiveLists({ soft: true });
+            refreshActiveLists();
             return;
         }
         const country = e.target.closest?.('[data-radio-country]');
@@ -737,7 +737,7 @@ function bindOnce() {
     });
 }
 
-function refreshActiveLists({ soft = false } = {}) {
+function refreshActiveLists() {
     if (catalogMode !== 'radio') return;
     syncFilterFromSearchInput();
     const tab = activeTabId();
@@ -756,9 +756,11 @@ function refreshActiveLists({ soft = false } = {}) {
                 // Soft refresh after fav toggle still needs marquee measure; play-state uses syncPlayingTiles.
                 Appearance.applyToTiles?.(list);
             }
-        } else if (!soft && browseLevel === 'countries') {
+        } else if (browseLevel === 'countries') {
             renderCountries();
-        } else if (soft && browseLevel === 'countries') {
+        } else if (browseLevel === 'stations') {
+            // Station cache emptied (country switch, failed/aborted load): fall back
+            // to the country grid instead of leaving a blank or stale TV list.
             renderCountries();
         }
     }
