@@ -153,7 +153,7 @@ function renderRadioTileHtml(tile) {
                             <span class="tv-header-channel-flag" aria-hidden="true">${escapeHtml(flag)}</span>
                             <span class="radio-module__art" aria-hidden="true">${artHtml}</span>
                         </span>
-                        <span class="resume-session__cassette-title tv-header-now-playing marquee" title="${escapeHtml(name)}">${marqueeInnerHtml(name)}</span>
+                        <span class="resume-session__cassette-title tv-header-now-playing" title="${escapeHtml(name)}">${marqueeInnerHtml(name)}</span>
                         <span class="resume-session__cassette-balance" aria-hidden="true"></span>
                     </span>
                 </span>

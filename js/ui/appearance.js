@@ -750,10 +750,8 @@ export const Appearance = {
 
         this.updatePreviewTile();
 
+        // Arming is observer-driven (see marquee.js), so one pass is enough.
         applyMarquee(document);
-        if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => applyMarquee(document));
-        }
 
         forEachAppDocument((doc) => copyThemeAttributes(document, doc));
     },
@@ -761,10 +759,8 @@ export const Appearance = {
     applyToTiles(container) {
         if (!container || !document.documentElement) return;
 
+        // Arming is observer-driven (see marquee.js), so one pass is enough.
         applyMarquee(container);
-        if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => applyMarquee(container));
-        }
     },
 
     updatePreviewTile() {

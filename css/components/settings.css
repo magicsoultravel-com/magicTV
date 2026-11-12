@@ -512,20 +512,27 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     align-self: stretch;
 }
 
-/* Duplicate-text marquee — two copies; track scrolls by 50% (one copy). */
+/* Overflow marquee — JS publishes --marquee-shift (exact overflow in px) on the
+   host, so long names scroll at a constant speed and always come back home. */
 .is-marquee {
     overflow: hidden;
-    text-overflow: clip;
+    /* Must win over the catalog chrome rules that ask for an ellipsis. */
+    text-overflow: clip !important;
 }
 
 .is-marquee .marquee-track {
-    display: inline-flex;
+    /* Block-level flex: the track always starts at the leading edge, so the
+       measured shift covers exactly the clipped tail even in centered hosts
+       (`text-align: center` would overflow on both sides). */
+    display: flex;
+    align-items: baseline;
+    gap: var(--marquee-gap, 2rem);
     white-space: nowrap;
-    animation: marquee-dup 4s linear infinite alternate;
+    animation: marquee-dup var(--marquee-duration, 6s) linear infinite;
 }
 
 .is-marquee .marquee-text {
-    flex-shrink: 0;
+    flex: 0 0 auto;
 }
 
 .is-marquee:hover .marquee-track,
@@ -533,9 +540,22 @@ html[data-channel-layout="list"] .channel-grid .favorite-folder-tile__delete-btn
     animation-play-state: paused;
 }
 
+/* Hold at both ends (20% each), travel in the middle (25% each way). */
 @keyframes marquee-dup {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
+    0%,
+    20% {
+        transform: translateX(0);
+    }
+
+    45%,
+    55% {
+        transform: translateX(var(--marquee-shift, 0px));
+    }
+
+    80%,
+    100% {
+        transform: translateX(0);
+    }
 }
 
 /* Settings reset — icon only */
