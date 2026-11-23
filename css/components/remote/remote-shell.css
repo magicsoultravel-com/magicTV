@@ -290,6 +290,23 @@ body.remote-dock-side-right .browser-module .remote-module__dialog {
     cursor: grabbing;
 }
 
+/* ---------------------------------------------------------------------------
+   Gesture transition guard
+   A drag/resize repaints the box on every pointermove. Any layout transition
+   (width / min-width / flex-basis) then makes the frame chase the pointer and
+   settle with a visible bounce — worst at the clamp edge, where the last jump
+   is largest. Keep only the fast opacity fade while a gesture is live; the
+   dock slide-in/out transitions are unaffected (they run without these classes).
+   --------------------------------------------------------------------------- */
+#remote-module.is-resizing .remote-module__dialog,
+#remote-module .remote-module__dialog.is-dragging,
+.browser-module.is-resizing .remote-module__dialog,
+.browser-module .remote-module__dialog.is-dragging,
+.remote-dock-sheet.is-resizing,
+.remote-dock-tab.is-resizing {
+    transition: opacity 0.15s ease;
+}
+
 #remote-module-pin,
 #remote-collapse-header-btn,
 #remote-dock-side-btn,

@@ -42,8 +42,8 @@ import {
 import { setWebStreamItemShield } from '../webstream/webStreamLibrary.js';
 
 function surfaceFor(slotId) {
-    // Concatenated on purpose: `el('literal')` ids are validated against
-    // index.html by appBoot.test.mjs, and this one is per-slot.
+    // Concatenated on purpose: appBoot.test.mjs validates literal element-id
+    // lookups against index.html, and this one is per-slot.
     return el('tv-playback-surface-' + slotId);
 }
 

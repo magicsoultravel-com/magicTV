@@ -19,20 +19,28 @@ import {
 import { assembleEndCluster, browserEndActionsEl, startActionsEl } from './moduleActions.js';
 import { RemoteModule } from './remoteModule.js';
 import { DockOpenGate } from './dockOpenGate.js';
+import { createFloatGestures } from './floatShell.js';
 import {
     BROWSER_BASE_W,
     BROWSER_BASE_H,
-    clampFloatGeometry,
+    BROWSER_MIN_W,
+    BROWSER_MIN_H,
+    REMOTE_BASE_W,
+    clampFloatPosition,
+    fitBoxToHost,
     freeCornerResize,
-    browserTileScaleFromGeom
+    browserTileScaleFromGeom,
+    readViewportSize,
+    VIEW_PAD,
+    EDGE_INSET,
+    DRAG_GRIP,
+    DEFAULT_SHEET_HEIGHT,
+    SHEET_BAR_RATIO,
+    SHEET_HEIGHT_MIN,
+    SHEET_HEIGHT_MAX
 } from './moduleScaleResize.js';
 
-const MIN_W = 260;
-const MIN_H = 480;
-const VIEW_PAD = 8;
-const EDGE_INSET = 24;
-const DEFAULT_SHEET_HEIGHT_FALLBACK = 0.62;
-const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT_FALLBACK * (3 / 8);
+const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * SHEET_BAR_RATIO;
 
 let bound = false;
 let pinned = false;
@@ -44,6 +52,13 @@ let uiMode = 'hidden';
 /** Saved dock footprint when user corner-resizes (px). */
 /** @type {{ width: number, height: number } | null} */
 let dockSizeOverride = null;
+/**
+ * User-chosen float size — *intent*, not what is currently painted. The painted
+ * box is `fitBoxToHost(intent)`, so a temporary shrink (small window, zoom) can
+ * never rewrite the size the user actually picked.
+ * @type {{ width: number, height: number } | null}
+ */
+let sizeIntent = null;
 /** @type {{ mode: 'drag'|'resize'|'dock-resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number } | null} */
 let gesture = null;
 
@@ -83,18 +98,41 @@ function stagingEl() {
 }
 
 function viewportSize() {
-    return {
-        w: window.innerWidth || document.documentElement.clientWidth || 800,
-        h: window.innerHeight || document.documentElement.clientHeight || 600
-    };
+    return readViewportSize();
 }
 
+/**
+ * Fit the *size* into the host, then clamp the *position* — never the other way
+ * around. The old combined clamp rewrote width/height as the window reached an
+ * edge, so dragging resized the window (the "bounce") and a window that had been
+ * clamped once could never come back.
+ */
 function clampGeometry({ left, top, width, height }) {
     const { w: vw, h: vh } = viewportSize();
-    return clampFloatGeometry(
-        { left, top, width, height },
-        { minW: MIN_W, minH: MIN_H, viewPad: VIEW_PAD, vw, vh }
+    const box = fitBoxToHost(
+        { width, height },
+        { vw, vh, pad: VIEW_PAD, minW: BROWSER_MIN_W, minH: BROWSER_MIN_H }
     );
+    const pos = clampFloatPosition({ left, top, ...box }, { grip: DRAG_GRIP, pad: VIEW_PAD, vw, vh });
+    return { ...pos, ...box };
+}
+
+/** The size the user picked (falls back to the painted box, then the base). */
+function currentSize() {
+    if (sizeIntent) return { ...sizeIntent };
+    const dialog = dialogEl();
+    const width = parseFloat(dialog?.style.width);
+    const height = parseFloat(dialog?.style.height);
+    if (Number.isFinite(width) && Number.isFinite(height)) return { width, height };
+    return { width: BROWSER_BASE_W, height: BROWSER_BASE_H };
+}
+
+function rememberSize({ width, height }) {
+    const w = Number(width);
+    const h = Number(height);
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+        sizeIntent = { width: Math.round(w), height: Math.round(h) };
+    }
 }
 
 function readDialogGeometry() {
@@ -102,18 +140,11 @@ function readDialogGeometry() {
     if (!dialog) return getLayoutState().browser;
     const left = parseFloat(dialog.style.left);
     const top = parseFloat(dialog.style.top);
-    const width = parseFloat(dialog.style.width);
-    const height = parseFloat(dialog.style.height);
-    if (![left, top, width, height].every(Number.isFinite)) {
+    if (!Number.isFinite(left) || !Number.isFinite(top)) {
         const rect = dialog.getBoundingClientRect();
-        return clampGeometry({
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height
-        });
+        return clampGeometry({ left: rect.left, top: rect.top, ...currentSize() });
     }
-    return clampGeometry({ left, top, width, height });
+    return clampGeometry({ left, top, ...currentSize() });
 }
 
 function applyBrowserTileScale(width, height) {
@@ -130,10 +161,22 @@ function applyBrowserTileScale(width, height) {
     floatHostEl()?.style.setProperty('--browser-tile-scale', value);
 }
 
-function applyGeometry(geom, { pinned: pinFlag } = {}) {
+/**
+ * Paint the float window.
+ *
+ * `remember: true` (restore / reset / end of a resize) records the requested
+ * size as intent. A drag must pass `remember: false`: it only moves the window
+ * and would otherwise persist whatever the host happened to fit.
+ *
+ * @param {{ left: number, top: number, width?: number, height?: number }} geom
+ * @param {{ pinned?: boolean, remember?: boolean }} [opts]
+ */
+function applyGeometry(geom, { pinned: pinFlag, remember = true } = {}) {
     const dialog = dialogEl();
     if (!dialog || !geom) return;
-    const next = clampGeometry(geom);
+    if (remember) rememberSize({ width: geom.width ?? currentSize().width, height: geom.height ?? currentSize().height });
+    const size = currentSize();
+    const next = clampGeometry({ left: geom.left, top: geom.top, ...size });
     dialog.style.left = `${next.left}px`;
     dialog.style.top = `${next.top}px`;
     dialog.style.width = `${next.width}px`;
@@ -148,7 +191,12 @@ function setPinned(next, { persist = true } = {}) {
     const dialog = dialogEl();
     if (dialog) dialog.setAttribute('aria-modal', pinned ? 'false' : 'true');
     if (persist) {
-        patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
+        // Keep intent width/height; the painted box may be host-fitted.
+        const painted = readDialogGeometry();
+        patchLayout(
+            { browser: { left: painted.left, top: painted.top, ...currentSize(), pinned } },
+            { reconcile: false }
+        );
     }
 }
 
@@ -174,7 +222,7 @@ function measureRemoteDockGeometry() {
             .getPropertyValue('--remote-min-width')
             .trim();
         const parsed = parseFloat(cssMin);
-        remoteW = Number.isFinite(parsed) ? parsed : MIN_W;
+        remoteW = Number.isFinite(parsed) ? parsed : REMOTE_BASE_W;
     }
 
     let remoteH = 0;
@@ -183,15 +231,16 @@ function measureRemoteDockGeometry() {
     } else {
         const saved = loadPlayerState()?.remoteModule;
         const ratio = Number(saved?.sheetHeight);
-        const r = Number.isFinite(ratio)
-            ? Math.min(0.85, Math.max(0.25, ratio))
-            : DEFAULT_SHEET_HEIGHT_FALLBACK;
-        remoteH = Math.round(vh * r);
+        const r = Number.isFinite(ratio) ? ratio : DEFAULT_SHEET_HEIGHT;
+        remoteH = Math.round(vh * Math.min(SHEET_HEIGHT_MAX, Math.max(SHEET_HEIGHT_MIN, r)));
     }
 
+    // "2× the remote" is a fixed rule against the *static* remote width — never
+    // the live remote scale, or resizing the remote would silently resize the
+    // browser (and change what the catalog shows).
     return {
-        width: Math.round(Math.min(vw * 0.9, Math.max(MIN_W * 2, remoteW * 2))),
-        height: Math.round(Math.min(vh * 0.9, Math.max(MIN_H, remoteH)))
+        width: Math.round(Math.min(vw * 0.9, Math.max(BROWSER_BASE_W, remoteW * 2))),
+        height: Math.round(Math.min(vh * 0.9, Math.max(BROWSER_MIN_H, remoteH)))
     };
 }
 
@@ -230,11 +279,11 @@ function applyDockGeometry(sizeOverride = null) {
     const override = sizeOverride || dockSizeOverride;
     const width = Math.round(Math.min(
         vw * 0.9,
-        Math.max(MIN_W * 2, override?.width ?? base.width)
+        Math.max(BROWSER_BASE_W, override?.width ?? base.width)
     ));
     const height = Math.round(Math.min(
         vh * 0.85,
-        Math.max(MIN_H, override?.height ?? base.height)
+        Math.max(BROWSER_MIN_H, override?.height ?? base.height)
     ));
     sheet.style.width = `${width}px`;
     sheet.style.height = `${height}px`;
@@ -349,20 +398,11 @@ function mountShellToHost(host) {
 
 function onPointerMove(e) {
     if (!gesture || e.pointerId !== gesture.pointerId) return;
+    // Only the docked sheet resizes here; the floating window goes through the
+    // shared gesture controller.
     const dx = e.clientX - gesture.startX;
     const dy = e.clientY - gesture.startY;
 
-    if (gesture.mode === 'drag') {
-        applyGeometry({
-            left: gesture.originLeft + dx,
-            top: gesture.originTop + dy,
-            width: gesture.originW,
-            height: gesture.originH
-        });
-        return;
-    }
-
-    const edge = gesture.edge || 'se';
     const next = freeCornerResize({
         originLeft: gesture.originLeft,
         originTop: gesture.originTop,
@@ -370,17 +410,16 @@ function onPointerMove(e) {
         originH: gesture.originH,
         dx,
         dy,
-        edge,
-        minW: gesture.mode === 'dock-resize' ? MIN_W * 2 : MIN_W,
-        minH: MIN_H
+        edge: gesture.edge || 'se',
+        // Docked sheet stays at least 2× the remote width — the same 2:1 rule
+        // the float default follows, so a docked/docked-then-undocked window
+        // does not change character.
+        minW: BROWSER_BASE_W,
+        minH: BROWSER_MIN_H
     });
-
-    if (gesture.mode === 'dock-resize') {
-        dockSizeOverride = { width: next.width, height: next.height };
-        applyDockGeometry(dockSizeOverride);
-        return;
-    }
-    applyGeometry(next);
+    dockSizeOverride = { width: next.width, height: next.height };
+    gesture.dockSize = dockSizeOverride;
+    applyDockGeometry(dockSizeOverride);
 }
 
 function onPointerUp(e) {
@@ -390,71 +429,89 @@ function onPointerUp(e) {
     } catch {
         /* ignore */
     }
-    window.removeEventListener('pointermove', onPointerMove);
-    window.removeEventListener('pointerup', onPointerUp);
-    window.removeEventListener('pointercancel', onPointerUp);
-    dialogEl()?.classList.remove('is-dragging');
-    moduleEl()?.classList.remove('is-resizing');
-    dockSheetEl()?.classList.remove('is-resizing');
-
-    const wasDock = gesture.mode === 'dock-resize';
-    gesture = null;
-    if (wasDock) {
-        const sheet = dockSheetEl();
-        const width = sheet?.getBoundingClientRect().width;
-        const height = sheet?.getBoundingClientRect().height;
-        if (Number.isFinite(width) && Number.isFinite(height)) {
-            dockSizeOverride = { width: Math.round(width), height: Math.round(height) };
-            patchLayout({
-                browserSheetWidth: width / Math.max(1, viewportSize().w)
-            }, { reconcile: false });
-        }
+    const settled = gesture.dockSize;
+    cancelDockResize();
+    if (settled) {
+        dockSizeOverride = settled;
         applyDockGeometry(dockSizeOverride);
-        syncScaleResetBtn();
-        return;
-    }
-    if (uiMode === 'undocked') {
-        patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
     }
     syncScaleResetBtn();
 }
 
+/**
+ * Drop the dock-sheet resize without persisting — for teardown paths (dock /
+ * hide) that can land mid-gesture and would otherwise leave the sheet stuck with
+ * `is-resizing` and the window listeners attached.
+ */
+function cancelDockResize() {
+    if (!gesture) return;
+    gesture = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    dockSheetEl()?.classList.remove('is-resizing');
+}
+
+/**
+ * Drag + corner-resize for the floating browser window.
+ *
+ * Free W×H surface: resize writes the intent size only, so a window the host
+ * fitted smaller keeps its real size and grows back with the viewport.
+ */
+const floatGestures = createFloatGestures({
+    getModule: () => moduleEl(),
+    getDialog: () => dialogEl(),
+    dragHandleSelector: '[data-browser-module-drag]',
+    getPaintedBox: () => readDialogGeometry(),
+    resolveModel() {
+        if (uiMode !== 'undocked' || !dialogEl()) return null;
+        return {
+            kind: 'free',
+            minW: BROWSER_MIN_W,
+            minH: BROWSER_MIN_H,
+            getIntent: () => currentSize(),
+            setIntent: (size) => rememberSize(size)
+        };
+    },
+    apply: (box) => applyGeometry(box, { remember: false }),
+    commit() {
+        // Persist intent (position + the size the user picked), not the fitted box.
+        if (uiMode !== 'undocked') {
+            syncScaleResetBtn();
+            return;
+        }
+        const painted = readDialogGeometry();
+        patchLayout(
+            { browser: { left: painted.left, top: painted.top, ...currentSize(), pinned } },
+            { reconcile: false }
+        );
+        syncScaleResetBtn();
+    }
+});
+
 function beginGesture(e, mode, edge = '') {
     if (e.button != null && e.button !== 0) return;
 
-    if (mode === 'dock-resize') {
-        const sheet = dockSheetEl();
-        const rect = sheet?.getBoundingClientRect();
-        gesture = {
-            mode: 'dock-resize',
-            edge,
-            pointerId: e.pointerId,
-            startX: e.clientX,
-            startY: e.clientY,
-            originLeft: rect?.left ?? 0,
-            originTop: rect?.top ?? 0,
-            originW: rect?.width ?? MIN_W * 2,
-            originH: rect?.height ?? MIN_H
-        };
-        sheet?.classList.add('is-resizing');
-    } else {
-        const dialog = dialogEl();
-        if (!dialog || uiMode !== 'undocked') return;
-        const geom = readDialogGeometry();
-        gesture = {
-            mode,
-            edge,
-            pointerId: e.pointerId,
-            startX: e.clientX,
-            startY: e.clientY,
-            originLeft: geom.left,
-            originTop: geom.top,
-            originW: geom.width,
-            originH: geom.height
-        };
-        if (mode === 'drag') dialog.classList.add('is-dragging');
-        if (mode === 'resize') moduleEl()?.classList.add('is-resizing');
+    if (mode !== 'dock-resize') {
+        floatGestures.begin(e, mode, edge);
+        return;
     }
+
+    const sheet = dockSheetEl();
+    const rect = sheet?.getBoundingClientRect();
+    gesture = {
+        mode: 'dock-resize',
+        edge,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        originLeft: rect?.left ?? 0,
+        originTop: rect?.top ?? 0,
+        originW: rect?.width ?? BROWSER_BASE_W,
+        originH: rect?.height ?? BROWSER_BASE_H,
+        dockSize: null
+    };
+    sheet?.classList.add('is-resizing');
 
     try {
         e.currentTarget?.setPointerCapture?.(e.pointerId);
@@ -469,7 +526,7 @@ function beginGesture(e, mode, edge = '') {
 
 function edgeInsetLeft(side, width) {
     const { w: vw } = viewportSize();
-    const w = Math.max(MIN_W, Number(width) || MIN_W);
+    const w = Math.max(BROWSER_BASE_W, Number(width) || BROWSER_BASE_W);
     if (side === 'right') {
         return Math.round(Math.max(VIEW_PAD, vw - w - EDGE_INSET));
     }
@@ -504,8 +561,9 @@ function syncCollapseHeaderBtn() {
 function browserSizeIsDirty() {
     if (dockSizeOverride) return true;
     if (uiMode !== 'undocked') return false;
-    const geom = readDialogGeometry();
-    return Math.abs(geom.width - BROWSER_BASE_W) > 2 || Math.abs(geom.height - BROWSER_BASE_H) > 2;
+    // Compare intent, not the painted box: a host-fitted box is not a user choice.
+    const size = currentSize();
+    return Math.abs(size.width - BROWSER_BASE_W) > 2 || Math.abs(size.height - BROWSER_BASE_H) > 2;
 }
 
 function syncScaleResetBtn() {
@@ -530,7 +588,7 @@ function resetSize() {
             height: BROWSER_BASE_H,
             pinned
         };
-        applyGeometry(next, { pinned });
+        applyGeometry(next, { pinned, remember: true });
         patchLayout({ browser: next }, { reconcile: false });
     } else if (uiMode === 'docked') {
         applyDockGeometry();
@@ -653,7 +711,13 @@ function bindOnce() {
 
     window.addEventListener('resize', () => {
         if (!isSplit()) return;
-        if (uiMode === 'undocked') applyGeometry(readDialogGeometry());
+        if (uiMode === 'undocked') {
+            // Re-fit from intent. Reading the painted (host-clamped) box back and
+            // re-clamping it is what made every resize/zoom ratchet the window
+            // smaller with no way back.
+            const painted = readDialogGeometry();
+            applyGeometry({ left: painted.left, top: painted.top }, { remember: false });
+        }
         if (uiMode === 'docked') applyDockGeometry();
     });
 }
@@ -664,9 +728,11 @@ function tearDownHosts() {
     restoreShellToHome(shell);
     showFloatUI(false);
     setDockExpanded(false);
+    dockSheetEl()?.classList.remove('is-resizing');
     dockSheetEl()?.style.removeProperty('width');
     dockTabEl()?.classList.add('is-hidden');
-    dockTabEl()?.classList.remove('is-visible');
+    dockTabEl()?.classList.remove('is-visible', 'is-resizing');
+    sizeIntent = null;
     uiMode = 'hidden';
     document.body.classList.remove('browser-shell-split', 'browser-docked', 'browser-docked-expanded', 'browser-dock-tab-visible', 'browser-hidden-tab');
     syncActionButtons();
@@ -715,6 +781,8 @@ export const BrowserModule = {
     dock() {
         if (!isSplit()) return;
         bindOnce();
+        floatGestures.cancel();
+        cancelDockResize();
         showFloatUI(false);
         const host = dockHostEl();
         if (!host) return;
@@ -741,6 +809,8 @@ export const BrowserModule = {
     hide() {
         if (!isSplit()) return;
         bindOnce();
+        floatGestures.cancel();
+        cancelDockResize();
         // Keep shell mounted in dock host (collapsed) for fast restore.
         if (uiMode === 'undocked') {
             const host = dockHostEl();
@@ -766,9 +836,11 @@ export const BrowserModule = {
         if (!isSplit() || uiMode !== 'undocked') return;
         const browserSide = remoteDockSide === 'right' ? 'left' : 'right';
         const geom = readDialogGeometry();
+        const size = currentSize();
         const next = {
-            ...geom,
-            left: edgeInsetLeft(browserSide, geom.width)
+            left: edgeInsetLeft(browserSide, size.width),
+            top: geom.top,
+            ...size
         };
         applyGeometry(next);
         patchLayout({ browser: { ...next, pinned } }, { reconcile: false });
@@ -813,6 +885,10 @@ export const BrowserModule = {
 
     persistGeometry() {
         if (uiMode !== 'undocked') return;
-        patchLayout({ browser: { ...readDialogGeometry(), pinned } }, { reconcile: false });
+        const painted = readDialogGeometry();
+        patchLayout(
+            { browser: { left: painted.left, top: painted.top, ...currentSize(), pinned } },
+            { reconcile: false }
+        );
     }
 };

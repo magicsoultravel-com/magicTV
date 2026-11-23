@@ -227,13 +227,6 @@ body.is-header-collapsed[data-header-mode="greyMarkBehind"] .tv-player-tile,
     line-height: 1;
 }
 
-/* Mosaic reset lives in the main suite; shown only with a custom layout */
-#mosaic-reset-btn.is-hidden,
-#mosaic-reset-btn[hidden] {
-    display: none;
-}
-
-
 /* ===== TABS (bottom) ===== */
 .tv-tabs {
     position: relative;

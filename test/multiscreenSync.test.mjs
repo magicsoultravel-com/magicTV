@@ -38,7 +38,7 @@ function makeEl(tag = 'div', id = '') {
         tagName: tag.toUpperCase(),
         className: '',
         classList: makeClassList(),
-        style: { setProperty() {}, getPropertyValue: () => '' },
+        style: { setProperty() {}, getPropertyValue: () => '', removeProperty() {} },
         dataset: {},
         attributes: attrs,
         children: [],

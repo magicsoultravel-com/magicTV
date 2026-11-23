@@ -240,13 +240,7 @@ export const freeLayoutMethods = {
     syncPlacementChrome() {
         if (typeof document === 'undefined') return;
         const app = el('app-container') || document.body;
-        const custom = this.hasCustomPlacement();
-        app.classList.toggle('has-custom-mosaic-placement', custom);
-        const resetBtns = [el('mosaic-reset-btn')].filter(Boolean);
-        resetBtns.forEach((btn) => {
-            btn.classList.toggle('is-hidden', !custom);
-            btn.hidden = !custom;
-        });
+        app.classList.toggle('has-custom-mosaic-placement', this.hasCustomPlacement());
     },
 
     onTilePointerDown(e) {

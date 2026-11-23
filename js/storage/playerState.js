@@ -21,8 +21,20 @@ import {
     REMOTE_BASE_W,
     REMOTE_BASE_H,
     SCALE_MIN,
+    BROWSER_BASE_W,
+    BROWSER_BASE_H,
+    BROWSER_MIN_W,
+    BROWSER_MIN_H,
+    BROWSER_DEFAULT_BOX,
+    RADIO_BASE_W,
+    RADIO_BASE_H,
+    RADIO_SCALE_RANGE,
+    LEGACY_RADIO_BASE_W,
+    SHEET_HEIGHT_MIN,
+    SHEET_HEIGHT_MAX,
     clampModuleScale,
-    scaleFromWidth
+    scaleFromWidth,
+    normalizeFloatBox
 } from '../ui/moduleScaleResize.js';
 
 function hasFavoriteFolders(folders) {
@@ -448,26 +460,17 @@ function normalizeModuleLayout(raw) {
     let browserHostKind = raw.browserHostKind;
     if (mode === 'joined') browserHostKind = null;
     else if (!['docked', 'undocked', 'hidden', 'os'].includes(browserHostKind)) browserHostKind = 'undocked';
-    const b = raw.browser && typeof raw.browser === 'object' ? raw.browser : {};
-    const bl = Number(b.left);
-    const bt = Number(b.top);
-    const bw = Number(b.width);
-    const bh = Number(b.height);
-    const sheetW = Number(raw.browserSheetWidth);
     return {
         mode,
         remoteHostKind,
         browserHostKind,
-        browser: {
-            left: Number.isFinite(bl) ? bl : 300,
-            top: Number.isFinite(bt) ? bt : 48,
-            width: Number.isFinite(bw) && bw >= 240 ? bw : 320,
-            height: Number.isFinite(bh) && bh >= 320 ? bh : 600,
-            pinned: b.pinned === true
-        },
-        browserSheetWidth: Number.isFinite(sheetW)
-            ? Math.min(0.55, Math.max(0.22, sheetW))
-            : 0.36
+        // Same normaliser as the layout store — the box below is the *user's*
+        // intent, so it must survive untouched unless it is unusable.
+        browser: normalizeFloatBox(raw.browser, {
+            fallback: BROWSER_DEFAULT_BOX,
+            minW: BROWSER_MIN_W,
+            minH: BROWSER_MIN_H
+        })
     };
 }
 
@@ -494,7 +497,7 @@ function normalizeRemoteModule(raw, legacyPicker) {
     width = Math.round(REMOTE_BASE_W * scale);
     height = Math.round(REMOTE_BASE_H * scale);
     const sheetHeight = Number.isFinite(Number(src.sheetHeight))
-        ? Math.min(0.85, Math.max(0.25, Number(src.sheetHeight)))
+        ? Math.min(SHEET_HEIGHT_MAX, Math.max(SHEET_HEIGHT_MIN, Number(src.sheetHeight)))
         : 0.45;
     const layout = normalizeModuleLayout(src.layout);
     const miniLeftN = Number(src.miniLeft);
@@ -528,30 +531,29 @@ function normalizeChannelPicker(raw) {
     return normalizeRemoteModule(null, raw);
 }
 
-/** Floating radio module geometry (CSS px) + uniform scale 0.5–1.5. */
+/** Floating radio module geometry (CSS px) + uniform scale 0.65–1.5. */
 function normalizeRadioModule(raw) {
     const src = raw && typeof raw === 'object' ? raw : null;
     if (!src) return null;
     const left = Number(src.left);
     const top = Number(src.top);
     if (![left, top].every(Number.isFinite)) return null;
-    const baseW = 340;
-    const baseH = 260;
     const rawScale = Number(src.scale);
     let scale;
     if (Number.isFinite(rawScale)) {
-        scale = Math.min(1.5, Math.max(0.5, rawScale));
+        scale = clampModuleScale(rawScale, RADIO_SCALE_RANGE);
     } else {
+        // Width-only saves predate `scale` and were measured against 340px.
         const width = Number(src.width);
         scale = Number.isFinite(width)
-            ? Math.min(1.5, Math.max(0.5, width / baseW))
+            ? scaleFromWidth(width, LEGACY_RADIO_BASE_W, RADIO_SCALE_RANGE)
             : 1;
     }
     return {
         left,
         top,
-        width: Math.round(baseW * scale),
-        height: Math.round(baseH * scale),
+        width: Math.round(RADIO_BASE_W * scale),
+        height: Math.round(RADIO_BASE_H * scale),
         scale,
         pinned: src.pinned === true,
         open: src.open === true

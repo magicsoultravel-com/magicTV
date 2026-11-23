@@ -33,13 +33,6 @@
     transition: opacity 0.15s ease;
 }
 
-body.remote-dock-expanded .radio-module .radio-module__dialog,
-body.remote-dock-side-right .radio-module .radio-module__dialog {
-    min-width: calc(280px * var(--radio-scale, 1));
-    width: calc(340px * var(--radio-scale, 1));
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
-}
-
 .radio-module__header {
     position: relative;
     display: flex;

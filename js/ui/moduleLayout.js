@@ -3,19 +3,13 @@
  * Catalog content (activeTab, lists) stays in appState — this only owns joined|split and hosts.
  */
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
+import { BROWSER_DEFAULT_BOX, BROWSER_MIN_W, BROWSER_MIN_H, normalizeFloatBox } from './moduleScaleResize.js';
 
 export const SHELL_REMOTE = 'remote';
 export const SHELL_BROWSER = 'browser';
 
 /** @typedef {'joined'|'split'} LayoutMode */
 /** @typedef {'hidden'|'docked'|'undocked'|'os'} HostKind */
-
-const DEFAULT_BROWSER_GEOM = Object.freeze({
-    left: 300,
-    top: 48,
-    width: 320,
-    height: 600
-});
 
 const BASE_MODULE_Z = 8510;
 let stackZ = BASE_MODULE_Z;
@@ -25,38 +19,29 @@ let stackZ = BASE_MODULE_Z;
  *   remoteHostKind: HostKind,
  *   browserHostKind: HostKind | null,
  *   browser: { left: number, top: number, width: number, height: number, pinned: boolean },
- *   browserSheetWidth: number,
  * }} */
 let layout = {
     mode: 'joined',
     remoteHostKind: 'hidden',
     browserHostKind: null,
-    browser: { ...DEFAULT_BROWSER_GEOM, pinned: false },
-    browserSheetWidth: 0.36
+    browser: { ...BROWSER_DEFAULT_BOX }
 };
 
 /** @type {null | (() => void)} */
 let reconcileFn = null;
 
+/**
+ * Browser float box = the user's *intent*. There is deliberately no clamping
+ * against the viewport here: a size chosen on a large screen must not be
+ * rewritten by a small one (that ratcheted the window smaller and smaller).
+ * Only unusable values fall back.
+ */
 function clampBrowserGeom(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const left = Number(src.left);
-    const top = Number(src.top);
-    const width = Number(src.width);
-    const height = Number(src.height);
-    return {
-        left: Number.isFinite(left) ? left : DEFAULT_BROWSER_GEOM.left,
-        top: Number.isFinite(top) ? top : DEFAULT_BROWSER_GEOM.top,
-        width: Number.isFinite(width) && width >= 240 ? width : DEFAULT_BROWSER_GEOM.width,
-        height: Number.isFinite(height) && height >= 320 ? height : DEFAULT_BROWSER_GEOM.height,
-        pinned: src.pinned === true
-    };
-}
-
-function clampSheetWidth(raw) {
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return 0.36;
-    return Math.min(0.55, Math.max(0.22, n));
+    return normalizeFloatBox(raw, {
+        fallback: BROWSER_DEFAULT_BOX,
+        minW: BROWSER_MIN_W,
+        minH: BROWSER_MIN_H
+    });
 }
 
 export function normalizeLayoutState(raw) {
@@ -72,8 +57,7 @@ export function normalizeLayoutState(raw) {
         mode,
         remoteHostKind,
         browserHostKind,
-        browser: clampBrowserGeom(src.browser),
-        browserSheetWidth: clampSheetWidth(src.browserSheetWidth)
+        browser: clampBrowserGeom(src.browser)
     };
 }
 
@@ -100,8 +84,7 @@ export function getLayoutState() {
         mode: layout.mode,
         remoteHostKind: layout.remoteHostKind,
         browserHostKind: layout.browserHostKind,
-        browser: { ...layout.browser },
-        browserSheetWidth: layout.browserSheetWidth
+        browser: { ...layout.browser }
     };
 }
 
@@ -132,7 +115,7 @@ function persistLayoutSlice() {
 }
 
 /**
- * @param {Partial<{ mode: LayoutMode, remoteHostKind: HostKind, browserHostKind: HostKind | null, browser: object, browserSheetWidth: number }>} patch
+ * @param {Partial<{ mode: LayoutMode, remoteHostKind: HostKind, browserHostKind: HostKind | null, browser: object }>} patch
  * @param {{ persist?: boolean, reconcile?: boolean }} [opts]
  */
 export function patchLayout(patch = {}, { persist = true, reconcile = true } = {}) {
@@ -141,9 +124,6 @@ export function patchLayout(patch = {}, { persist = true, reconcile = true } = {
     if (patch.browserHostKind !== undefined) layout.browserHostKind = patch.browserHostKind;
     if (patch.browser && typeof patch.browser === 'object') {
         layout.browser = clampBrowserGeom({ ...layout.browser, ...patch.browser });
-    }
-    if (patch.browserSheetWidth != null) {
-        layout.browserSheetWidth = clampSheetWidth(patch.browserSheetWidth);
     }
     if (layout.mode === 'joined') layout.browserHostKind = null;
     if (persist) persistLayoutSlice();

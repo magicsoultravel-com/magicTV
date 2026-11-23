@@ -226,8 +226,9 @@ export function setMarqueeText(host, text) {
     if (!host) return;
     const value = String(text ?? '');
     host.innerHTML = marqueeInnerHtml(value);
-    // Stubs often don't parse innerHTML; keep textContent readable for tests/readers.
-    if (!host.querySelector) host.textContent = value;
+    // Stubs often don't parse innerHTML into a track; keep textContent readable
+    // for tests/readers. A real DOM always has the track, so this never fires.
+    if (!trackOf(host)) host.textContent = value;
     measureHostOrDefer(host);
 }
 

@@ -10,7 +10,6 @@ import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore, isCatalogBarTab } from '../storage/settingsStore.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { RemotePanel, syncRemoteNav } from './remotePanel.js';
-import { GuidePanel } from './guidePanel.js';
 import { WingPanel } from './wingPanel.js';
 import { RemoteExternalPopout } from './remoteExternalPopout.js';
 import {
@@ -22,6 +21,7 @@ import {
 import { BrowserModule } from './browserModule.js';
 import { ModuleIdleFade } from './moduleIdleFade.js';
 import { DockOpenGate } from './dockOpenGate.js';
+import { createFloatGestures } from './floatShell.js';
 import {
     hydrateLayoutFromPlayerState,
     getLayoutState,
@@ -29,7 +29,6 @@ import {
     setReconcileHandler,
     syncCatalogRootClasses,
     splitBrowser,
-    joinBrowser,
     toggleSplitBrowser,
     isSplit,
     remoteShellEl,
@@ -44,9 +43,16 @@ import {
     SCALE_MIN,
     SCALE_MAX,
     clampModuleScale,
-    clampFloatGeometry,
+    clampFloatPosition,
+    fitBoxToHost,
+    readViewportSize,
     uniformScaleFromCorner,
-    scaleFromWidth
+    scaleFromWidth,
+    VIEW_PAD,
+    EDGE_INSET,
+    DRAG_GRIP,
+    DEFAULT_SHEET_HEIGHT,
+    SHEET_BAR_RATIO
 } from './moduleScaleResize.js';
 
 /**
@@ -67,13 +73,10 @@ const MINI_CONTENT_H = MINI_ROWS * MINI_BTN + (MINI_ROWS - 1) * MINI_GAP + 2 * M
 const MINI_BORDER = 2;
 const MINI_BASE_W = MINI_CONTENT_W + MINI_BORDER; // 213.2
 const MINI_BASE_H = MINI_CONTENT_H + MINI_BORDER; // 166.8
-const VIEW_PAD = 24;
-const EDGE_INSET = 24;
 /** Docked sheet may use at most this share of the viewport height (85vh in CSS). */
 const DOCK_MAX_RATIO = 0.85;
-const DEFAULT_SHEET_HEIGHT = 0.62;
 /** Short bottom catalog bar ≈ 3/8 of default docked remote height. */
-const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * (3 / 8);
+const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * SHEET_BAR_RATIO;
 const SHEET_TRANSITION_MS = 280;
 
 function wingMultiplier() {
@@ -227,10 +230,7 @@ function dockTabEl() {
 }
 
 function viewportSize() {
-    return {
-        w: window.innerWidth || document.documentElement.clientWidth || 800,
-        h: window.innerHeight || document.documentElement.clientHeight || 600
-    };
+    return readViewportSize();
 }
 
 function defaultGeometry() {
@@ -509,22 +509,35 @@ function toggleDockSide() {
 }
 
 /**
- * Clamp a remote/dialog footprint into the viewport.
+ * Clamp a remote/dialog footprint.
  *
- * `minW`/`minH` are the floor of the *scale range* (REMOTE_BASE_* at SCALE_MIN),
- * never the requested box itself: passing the requested height as the floor made
- * `clampFloatGeometry`'s `Math.max(minH, …)` a no-op, so the box could not shrink
- * on a short viewport and the keypad had to scroll inside it. The box itself is
- * always derived from the rendered scale here — callers do not get to supply it.
+ * Two separate steps, on purpose:
+ *  1. `fitBoxToHost` fits the *size* — the box is always derived from the
+ *     rendered scale, and the floor is the bottom of the scale range
+ *     (REMOTE_BASE_* at SCALE_MIN). Passing the requested height as the floor
+ *     made the old combined clamp a no-op, so the keypad had to scroll inside
+ *     its own frame on a short viewport.
+ *  2. `clampFloatPosition` clamps the *position* only. The previous combined
+ *     clamp rewrote width/height once the window touched the right/bottom edge,
+ *     which is what made a drag look like it was bouncing (and clip the keypad).
  */
 function clampGeometry({ left, top }) {
-    const minW = baseWidthForScale(SCALE_MIN);
-    const minH = baseHeightForScale(SCALE_MIN);
     const { w: vw, h: vh } = viewportSize();
-    return clampFloatGeometry(
-        { left, top, width: baseWidthForScale(), height: baseHeightForScale() },
-        { minW, minH, viewPad: VIEW_PAD, vw, vh }
+    const box = fitBoxToHost(
+        { width: baseWidthForScale(), height: baseHeightForScale() },
+        {
+            vw,
+            vh,
+            pad: VIEW_PAD,
+            minW: baseWidthForScale(SCALE_MIN),
+            minH: baseHeightForScale(SCALE_MIN)
+        }
     );
+    const pos = clampFloatPosition(
+        { left, top, ...box },
+        { grip: DRAG_GRIP, pad: VIEW_PAD, vw, vh }
+    );
+    return { ...pos, ...box };
 }
 
 function readDialogGeometry() {
@@ -550,6 +563,41 @@ function applyGeometry(geom, { pinned: pinFlag } = {}) {
     dialog.style.height = `${next.height}px`;
     if (typeof pinFlag === 'boolean') setPinned(pinFlag, { persist: false });
 }
+
+/**
+ * Drag + corner-resize for the undocked dialog.
+ *
+ * The dock sheet keeps its own gesture handler (it scales a sheet, not a
+ * floating window), but the float uses the shared controller: drag moves,
+ * resize only ever writes the *intent* scale.
+ */
+const floatGestures = createFloatGestures({
+    getModule: () => moduleEl(),
+    getDialog: () => dialogEl(),
+    dragHandleSelector: '[data-remote-module-drag]',
+    getPaintedBox: () => readDialogGeometry(),
+    resolveModel() {
+        if (mode !== 'undocked') return null;
+        return {
+            kind: 'uniform',
+            baseW: miniFloating ? MINI_BASE_W : REMOTE_BASE_W * wingMultiplier(),
+            baseH: miniFloating ? MINI_BASE_H : REMOTE_BASE_H,
+            minScale: SCALE_MIN,
+            maxScale: SCALE_MAX,
+            getIntent: () => activeScale(),
+            setIntent(next) {
+                if (miniFloating) miniScale = next;
+                else scale = next;
+            },
+            getPainted: () => renderedScale()
+        };
+    },
+    apply: (box) => applyGeometry({ left: box.left, top: box.top }),
+    commit: () => {
+        syncScaleResetBtn();
+        persistState(miniFloating ? { miniScale } : { scale });
+    }
+});
 
 function getSavedState() {
     return loadPlayerState().remoteModule;
@@ -1179,27 +1227,32 @@ function onKeydown(e) {
 
 function endGesture() {
     if (!gesture) return;
-    moduleEl()?.querySelector('[data-remote-module-drag]')?.classList.remove('is-dragging');
-    dialogEl()?.classList.remove('is-dragging');
-    moduleEl()?.classList.remove('is-resizing');
-    dockSheetEl()?.classList.remove('is-resizing');
-    gesture = null;
+    cancelDockResize();
     syncScaleResetBtn();
-    persistState(miniFloating ? { miniScale } : { scale });
+    persistState({ scale });
+}
+
+/**
+ * Drop the dock-sheet resize without persisting — for teardown paths (close /
+ * hide / dock) that can land mid-gesture and would otherwise leave the sheet
+ * stuck with `is-resizing` and the window listeners attached.
+ */
+function cancelDockResize() {
+    if (!gesture) return;
+    gesture = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    dockSheetEl()?.classList.remove('is-resizing');
+    dockTabEl()?.classList.remove('is-resizing');
 }
 
 function onPointerMove(e) {
     if (!gesture || e.pointerId !== gesture.pointerId) return;
+    // Only the dock-sheet resize is handled here; the floating dialog goes
+    // through the shared gesture controller.
     const dx = e.clientX - gesture.startX;
     const dy = e.clientY - gesture.startY;
-
-    if (gesture.mode === 'drag') {
-        applyGeometry({
-            left: gesture.originLeft + dx,
-            top: gesture.originTop + dy
-        });
-        return;
-    }
 
     const edge = gesture.edge || 'se';
     const next = uniformScaleFromCorner({
@@ -1208,24 +1261,16 @@ function onPointerMove(e) {
         originW: gesture.originW,
         originH: gesture.originH,
         originScale: gesture.originScale ?? activeScale(),
-        baseW: miniFloating ? MINI_BASE_W : REMOTE_BASE_W * wingMultiplier(),
-        baseH: miniFloating ? MINI_BASE_H : REMOTE_BASE_H,
+        baseW: REMOTE_BASE_W * wingMultiplier(),
+        baseH: REMOTE_BASE_H,
         dx,
         dy,
         edge,
         minScale: SCALE_MIN,
         maxScale: SCALE_MAX
     });
-    if (miniFloating) miniScale = next.scale;
-    else scale = next.scale;
-    if (gesture.mode === 'dock-resize') {
-        applyDockScaleGeometry();
-        return;
-    }
-    applyGeometry({
-        left: next.left,
-        top: next.top
-    });
+    scale = next.scale;
+    applyDockScaleGeometry();
 }
 
 function onPointerUp(e) {
@@ -1240,49 +1285,34 @@ function onPointerUp(e) {
 function beginGesture(e, modeName, edge = '') {
     if (e.button != null && e.button !== 0) return;
 
-    if (modeName === 'dock-resize') {
-        const sheet = dockSheetEl();
-        const rect = sheet?.getBoundingClientRect();
-        gesture = {
-            mode: 'dock-resize',
-            edge,
-            pointerId: e.pointerId,
-            startX: e.clientX,
-            startY: e.clientY,
-            originLeft: rect?.left ?? 0,
-            originTop: rect?.top ?? 0,
-            originW: rect?.width ?? baseWidthForScale(),
-            originH: rect?.height ?? baseHeightForScale(),
-            // Painted scale, not intent: the drag ratio must apply to the box the
-            // user is actually looking at, otherwise a capped box jumps on the
-            // first move (or ignores the pointer until intent falls below the cap).
-            originScale: renderedScale()
-        };
-        sheet?.classList.add('is-resizing');
-    } else {
-        const dialog = dialogEl();
-        if (!dialog) return;
-        const geom = readDialogGeometry();
-        gesture = {
-            mode: modeName,
-            edge,
-            pointerId: e.pointerId,
-            startX: e.clientX,
-            startY: e.clientY,
-            originLeft: geom.left,
-            originTop: geom.top,
-            originW: geom.width,
-            originH: geom.height,
-            originScale: renderedScale()
-        };
-        if (modeName === 'drag') {
-            e.currentTarget?.classList?.add('is-dragging');
-            dialogEl()?.classList.add('is-dragging');
-        }
-        if (modeName === 'resize') {
-            moduleEl()?.classList.add('is-resizing');
-        }
+    // Floating drag / corner resize: shared controller (intent-based, no
+    // size rewriting on drag, no ratchet when the host capped the box).
+    if (modeName !== 'dock-resize') {
+        floatGestures.begin(e, modeName, edge);
+        return;
     }
+
+    const sheet = dockSheetEl();
+    const rect = sheet?.getBoundingClientRect();
+    gesture = {
+        mode: 'dock-resize',
+        edge,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        originLeft: rect?.left ?? 0,
+        originTop: rect?.top ?? 0,
+        originW: rect?.width ?? baseWidthForScale(),
+        originH: rect?.height ?? baseHeightForScale(),
+        // Painted scale, not intent: the drag ratio must apply to the box the
+        // user is actually looking at, otherwise a capped box jumps on the
+        // first move (or ignores the pointer until intent falls below the cap).
+        originScale: renderedScale()
+    };
+    sheet?.classList.add('is-resizing');
+    // The dock tab is width-locked to the sheet; freeze its width transition
+    // too or it trails the pointer during a dock resize.
+    dockTabEl()?.classList.add('is-resizing');
 
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     window.addEventListener('pointermove', onPointerMove);
@@ -1744,6 +1774,8 @@ export const RemoteModule = {
 
     close() {
         if (mode === 'hidden') return;
+        floatGestures.cancel();
+        cancelDockResize();
 
         if (isSplit()) {
             this.hide();
@@ -1766,11 +1798,14 @@ export const RemoteModule = {
             return;
         }
 
+        cancelDockResize();
         animateDockedCollapseThen(finishHideSplit);
     },
 
     dock() {
         if (mode !== 'undocked') return;
+        floatGestures.cancel();
+        cancelDockResize();
         if (miniFloating) exitMiniFloating();
         showUndockedUI(false);
         mode = 'docked';

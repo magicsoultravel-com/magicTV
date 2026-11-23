@@ -48,11 +48,31 @@ describe('moduleLayout SSOT', () => {
         const state = normalizeLayoutState({
             mode: 'split',
             browserHostKind: 'hidden',
+            // Legacy dock-sheet width ratio: the key is gone on purpose, and it
+            // must not be resurrected into the layout state.
             browserSheetWidth: 0.4
         });
         assert.equal(state.mode, 'split');
         assert.equal(state.browserHostKind, 'hidden');
-        assert.equal(state.browserSheetWidth, 0.4);
+        assert.equal('browserSheetWidth' in state, false);
+    });
+
+    it('browser float defaults to 2× the remote width (520×560)', async () => {
+        const { normalizeLayoutState } = await import('../js/ui/moduleLayout.js?layout=geom');
+        const state = normalizeLayoutState(null);
+        assert.equal(state.browser.width, 520);
+        assert.equal(state.browser.height, 560);
+    });
+
+    it('keeps a browser size chosen on a large screen (no viewport clamp here)', async () => {
+        const { normalizeLayoutState } = await import('../js/ui/moduleLayout.js?layout=intent');
+        const state = normalizeLayoutState({
+            mode: 'split',
+            browser: { left: 40, top: 30, width: 1400, height: 1000, pinned: false }
+        });
+        assert.equal(state.browser.width, 1400);
+        assert.equal(state.browser.height, 1000);
+        assert.equal(state.browser.left, 40);
     });
 
     it('bringModuleToFront bumps z-index', async () => {

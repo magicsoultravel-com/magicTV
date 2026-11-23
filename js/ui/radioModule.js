@@ -14,13 +14,21 @@ import { stationKey } from '../radio/stationShape.js';
 import { setMarqueeText } from './marquee.js';
 import { ACTION_ICONS, CARD_ICONS } from './icons.js';
 import { StationBindPicker } from './stationBindPicker.js';
+import { createFloatGestures } from './floatShell.js';
 import {
     RADIO_BASE_W,
     RADIO_BASE_H,
+    RADIO_SCALE_MIN,
+    RADIO_SCALE_RANGE,
+    SCALE_MAX,
+    LEGACY_RADIO_BASE_W,
     clampModuleScale,
-    clampFloatGeometry,
-    uniformScaleFromCorner,
-    scaleFromWidth
+    clampFloatPosition,
+    fitBoxToHost,
+    readViewportSize,
+    scaleFromWidth,
+    VIEW_PAD,
+    DRAG_GRIP
 } from './moduleScaleResize.js';
 
 /** @type {{ sharedVolume?: number, focusRadio?: () => Promise<void> } | null} */
@@ -33,7 +41,9 @@ async function getMultiView() {
     return multiViewRef;
 }
 
-const VIEW_PAD = 8;
+/** Design floor: the cassette never renders below RADIO_SCALE_MIN of its base. */
+const RADIO_MIN_W = Math.round(RADIO_BASE_W * RADIO_SCALE_MIN);
+const RADIO_MIN_H = Math.round(RADIO_BASE_H * RADIO_SCALE_MIN);
 
 /** @type {(opts?: { tab?: string }) => void} */
 let openRadioBrowser = () => {};
@@ -44,8 +54,6 @@ let pinned = false;
 let scale = 1;
 /** @type {{ left: number, top: number } | null} */
 let position = null;
-/** @type {{ mode: 'drag'|'resize', pointerId: number, edge?: string, startX: number, startY: number, originLeft: number, originTop: number, originW: number, originH: number, originScale: number } | null} */
-let gesture = null;
 
 function moduleEl() {
     return el('radio-module');
@@ -56,14 +64,11 @@ function dialogEl() {
 }
 
 function viewportSize() {
-    return {
-        w: window.innerWidth || document.documentElement.clientWidth || 800,
-        h: window.innerHeight || document.documentElement.clientHeight || 600
-    };
+    return readViewportSize();
 }
 
 function sizeForScale(s = scale) {
-    const next = clampModuleScale(s);
+    const next = clampModuleScale(s, RADIO_SCALE_RANGE);
     return {
         width: Math.round(RADIO_BASE_W * next),
         height: Math.round(RADIO_BASE_H * next),
@@ -71,25 +76,39 @@ function sizeForScale(s = scale) {
     };
 }
 
+/**
+ * Painted frame for the current intent scale.
+ *
+ * Intent (the scale the user picked) is fitted to the host viewport; the frame
+ * never shrinks the *intent*, so a short window only shrinks the painted box and
+ * the radio grows back on its own when the viewport does. Position is clamped
+ * separately, so dragging the window near an edge can no longer resize it.
+ */
 function currentGeometry() {
-    const { width, height } = sizeForScale(scale);
+    const intent = sizeForScale(scale);
     const { w: vw, h: vh } = viewportSize();
     const fallback = {
-        left: Math.round((vw - width) / 2),
-        top: Math.round(Math.max(48, (vh - height) / 3))
+        left: Math.round((vw - intent.width) / 2),
+        top: Math.round(Math.max(48, (vh - intent.height) / 3))
     };
-    return clampFloatGeometry({
-        left: position?.left ?? fallback.left,
-        top: position?.top ?? fallback.top,
-        width,
-        height
-    }, {
-        minW: Math.round(RADIO_BASE_W * 0.5),
-        minH: Math.round(RADIO_BASE_H * 0.5),
-        viewPad: VIEW_PAD,
+    const box = fitBoxToHost(intent, {
         vw,
-        vh
+        vh,
+        pad: VIEW_PAD,
+        minW: RADIO_MIN_W,
+        minH: RADIO_MIN_H
     });
+    const pos = clampFloatPosition(
+        { left: position?.left ?? fallback.left, top: position?.top ?? fallback.top, ...box },
+        { grip: DRAG_GRIP, pad: VIEW_PAD, vw, vh }
+    );
+    const fitted = box.width !== intent.width || box.height !== intent.height;
+    // The CSS var must describe the *painted* box, or the cassette overflows a
+    // host-fitted frame and clips its controls.
+    const paintedScale = fitted
+        ? Math.min(intent.scale, box.width / RADIO_BASE_W, box.height / RADIO_BASE_H)
+        : intent.scale;
+    return { ...pos, ...box, scale: intent.scale, paintedScale };
 }
 
 function applyScaleAndPosition() {
@@ -97,8 +116,12 @@ function applyScaleAndPosition() {
     if (!dialog) return;
     const geom = currentGeometry();
     position = { left: geom.left, top: geom.top };
-    scale = clampModuleScale(scale);
-    dialog.style.setProperty('--radio-scale', String(scale));
+    scale = geom.scale;
+    const value = String(geom.paintedScale);
+    dialog.style.setProperty('--radio-scale', value);
+    // Mirror on the host so every radio-scoped rule inherits one knob, the same
+    // way the remote writes `--remote-scale` on the document root.
+    moduleEl()?.style.setProperty('--radio-scale', value);
     dialog.style.left = `${geom.left}px`;
     dialog.style.top = `${geom.top}px`;
     dialog.style.width = `${geom.width}px`;
@@ -109,7 +132,7 @@ function applyScaleAndPosition() {
 function syncScaleResetBtn() {
     const btn = el('radio-scale-reset-btn');
     if (!btn) return;
-    const dirty = Math.abs(clampModuleScale(scale) - 1) > 0.01;
+    const dirty = Math.abs(clampModuleScale(scale, RADIO_SCALE_RANGE) - 1) > 0.01;
     btn.innerHTML = ACTION_ICONS.scaleReset;
     btn.title = 'Reset size';
     btn.setAttribute('aria-label', 'Reset size');
@@ -140,12 +163,15 @@ function resetScale() {
 
 function persistState() {
     const geom = currentGeometry();
+    const intent = sizeForScale(scale);
+    // Persist intent (scale + the box it implies), never the host-fitted box:
+    // the fitted box is a paint-time detail and would ratchet.
     savePlayerState({
         radioModule: {
             left: geom.left,
             top: geom.top,
-            width: geom.width,
-            height: geom.height,
+            width: intent.width,
+            height: intent.height,
             scale,
             pinned,
             open
@@ -165,9 +191,10 @@ function showUI(show) {
 
 function restoreFromSaved(saved) {
     if (saved && Number.isFinite(saved.scale)) {
-        scale = clampModuleScale(saved.scale);
+        scale = clampModuleScale(saved.scale, RADIO_SCALE_RANGE);
     } else if (saved && Number.isFinite(saved.width)) {
-        scale = scaleFromWidth(saved.width, RADIO_BASE_W);
+        // Width-only saves predate `scale` and were measured against 340px.
+        scale = scaleFromWidth(saved.width, LEGACY_RADIO_BASE_W, RADIO_SCALE_RANGE);
     } else {
         scale = 1;
     }
@@ -307,67 +334,35 @@ function syncTransportUi() {
     moduleEl()?.classList.toggle('is-playing', playing);
 }
 
-function beginGesture(mode, pointerId, clientX, clientY, edge) {
-    const geom = currentGeometry();
-    gesture = {
-        mode,
-        pointerId,
-        edge,
-        startX: clientX,
-        startY: clientY,
-        originLeft: geom.left,
-        originTop: geom.top,
-        originW: geom.width,
-        originH: geom.height,
-        originScale: scale
-    };
-    const dialog = dialogEl();
-    dialog?.setPointerCapture?.(pointerId);
-    dialog?.classList.toggle('is-dragging', mode === 'drag');
-    dialog?.querySelector('[data-radio-module-drag]')?.classList.toggle('is-dragging', mode === 'drag');
-    moduleEl()?.classList.toggle('is-resizing', mode === 'resize');
-    bringOverlayToFront('radio');
-}
-
-function onPointerMove(e) {
-    if (!gesture || e.pointerId !== gesture.pointerId) return;
-    const dx = e.clientX - gesture.startX;
-    const dy = e.clientY - gesture.startY;
-    if (gesture.mode === 'drag') {
-        position = {
-            left: gesture.originLeft + dx,
-            top: gesture.originTop + dy
-        };
+/**
+ * Drag + corner-resize for the radio window.
+ *
+ * Uniform scale model: a drag only moves, a resize writes the *intent* scale and
+ * the painted box is derived from it (fitted to the host at paint time).
+ */
+const floatGestures = createFloatGestures({
+    getModule: () => moduleEl(),
+    getDialog: () => dialogEl(),
+    dragHandleSelector: '[data-radio-module-drag]',
+    getPaintedBox: () => currentGeometry(),
+    resolveModel: () => (open && dialogEl()
+        ? {
+            kind: 'uniform',
+            baseW: RADIO_BASE_W,
+            baseH: RADIO_BASE_H,
+            minScale: RADIO_SCALE_MIN,
+            maxScale: SCALE_MAX,
+            getIntent: () => scale,
+            setIntent: (next) => { scale = next; },
+            getPainted: () => currentGeometry().paintedScale
+        }
+        : null),
+    apply: (box) => {
+        position = { left: box.left, top: box.top };
         applyScaleAndPosition();
-        return;
-    }
-    const next = uniformScaleFromCorner({
-        originLeft: gesture.originLeft,
-        originTop: gesture.originTop,
-        originW: gesture.originW,
-        originH: gesture.originH,
-        originScale: gesture.originScale,
-        baseW: RADIO_BASE_W,
-        baseH: RADIO_BASE_H,
-        dx,
-        dy,
-        edge: gesture.edge || 'se'
-    });
-    scale = next.scale;
-    position = { left: next.left, top: next.top };
-    applyScaleAndPosition();
-}
-
-function endGesture(e) {
-    if (!gesture || (e && e.pointerId !== gesture.pointerId)) return;
-    gesture = null;
-    const dialog = dialogEl();
-    dialog?.classList.remove('is-dragging');
-    dialog?.querySelector('[data-radio-module-drag]')?.classList.remove('is-dragging');
-    moduleEl()?.classList.remove('is-resizing');
-    syncScaleResetBtn();
-    persistState();
-}
+    },
+    commit: () => persistState()
+});
 
 async function handleAction(action) {
     try {
@@ -450,7 +445,7 @@ function bindOnce() {
         const resize = e.target.closest?.('[data-radio-resize]');
         if (resize) {
             e.preventDefault();
-            beginGesture('resize', e.pointerId, e.clientX, e.clientY, resize.getAttribute('data-radio-resize'));
+            floatGestures.begin(e, 'resize', resize.getAttribute('data-radio-resize') || 'se');
             return;
         }
         // Drag anywhere grab-cursor shows (dialog/body/header), except interactive controls
@@ -458,14 +453,9 @@ function bindOnce() {
             return;
         }
         if (e.target.closest?.('.radio-module__dialog, [data-radio-module-drag]')) {
-            e.preventDefault();
-            beginGesture('drag', e.pointerId, e.clientX, e.clientY);
+            floatGestures.begin(e, 'drag');
         }
     });
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', endGesture);
-    window.addEventListener('pointercancel', endGesture);
 
     el('radio-scale-reset-btn')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -587,6 +577,7 @@ export const RadioModule = {
     },
 
     close() {
+        floatGestures.cancel();
         RadioPlayer.stop();
         open = false;
         showUI(false);
