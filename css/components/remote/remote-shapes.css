@@ -14,7 +14,7 @@
     border-radius: 48%;
     border: 1px solid color-mix(in srgb, currentColor var(--btn-ring), transparent);
     background: color-mix(in srgb, currentColor var(--btn-tint), var(--remote-btn-face));
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--remote-scale, 1));
     line-height: 1;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
     transform: scale(1);
@@ -178,8 +178,8 @@
 
 .remote-panel__btn--stack {
     flex-direction: column;
-    gap: 0.05rem;
-    padding: 0.15rem 0 0.1rem;
+    gap: calc(0.05rem * var(--remote-scale, 1));
+    padding: calc(0.15rem * var(--remote-scale, 1)) 0 calc(0.1rem * var(--remote-scale, 1));
 }
 
 .remote-panel__btn--stack svg {
@@ -188,7 +188,7 @@
 }
 
 .remote-panel__btn-pct {
-    font-size: 0.55rem;
+    font-size: calc(0.55rem * var(--remote-scale, 1));
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1;

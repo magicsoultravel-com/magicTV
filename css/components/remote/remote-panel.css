@@ -48,55 +48,67 @@
 .remote-panel__footer-screens {
     position: relative;
     width: 100%;
-    padding-top: 0.35rem;
+    /* One geometry knob for the strip tiles in BOTH states: the collapsed row
+       (player.css defaults them to 2.25rem × 1.5rem) and the per-count expanded
+       grid below only override these two values. Keeping the tile box in a single
+       scaled pair is what makes the footer height linear in --remote-scale. */
+    --strip-tile-w: calc(2.25rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(1.5rem * var(--remote-scale, 1));
+    padding-top: calc(0.35rem * var(--remote-scale, 1));
     min-height: 0;
 }
 
+.remote-panel__footer-screens .tv-controls__screen-btn,
+.remote-panel__footer-screens .tv-controls__add-screen-btn {
+    width: var(--strip-tile-w);
+    height: var(--strip-tile-h);
+}
+
 .remote-panel__footer-screens.is-screens-expanded {
-    --strip-tile-w: 7.25rem;
-    --strip-tile-h: 4.1rem;
-    padding-top: 1.15rem;
-    padding-bottom: 0.75rem;
-    min-height: calc(2 * var(--strip-tile-h) + 1.9rem);
+    --strip-tile-w: calc(7.25rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(4.1rem * var(--remote-scale, 1));
+    padding-top: calc(1.15rem * var(--remote-scale, 1));
+    padding-bottom: calc(0.75rem * var(--remote-scale, 1));
+    min-height: calc(2 * var(--strip-tile-h) + 1.9rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="1"] {
-    --strip-tile-w: 11rem;
-    --strip-tile-h: 6.2rem;
-    min-height: calc(var(--strip-tile-h) + 1.9rem);
+    --strip-tile-w: calc(11rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(6.2rem * var(--remote-scale, 1));
+    min-height: calc(var(--strip-tile-h) + 1.9rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="2"] {
-    --strip-tile-w: 9.25rem;
-    --strip-tile-h: 5.2rem;
-    min-height: calc(var(--strip-tile-h) + 1.9rem);
+    --strip-tile-w: calc(9.25rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(5.2rem * var(--remote-scale, 1));
+    min-height: calc(var(--strip-tile-h) + 1.9rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="3"] {
-    --strip-tile-w: 8rem;
-    --strip-tile-h: 4.5rem;
+    --strip-tile-w: calc(8rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(4.5rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="4"] {
-    --strip-tile-w: 7.5rem;
-    --strip-tile-h: 4.2rem;
+    --strip-tile-w: calc(7.5rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(4.2rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="5"] {
-    --strip-tile-w: 6.75rem;
-    --strip-tile-h: 3.8rem;
+    --strip-tile-w: calc(6.75rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(3.8rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="6"] {
-    --strip-tile-w: 6rem;
-    --strip-tile-h: 3.4rem;
+    --strip-tile-w: calc(6rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(3.4rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="7"],
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="8"],
 .remote-panel__footer-screens.is-screens-expanded[data-screen-count="9"] {
-    --strip-tile-w: 5.25rem;
-    --strip-tile-h: 3rem;
+    --strip-tile-w: calc(5.25rem * var(--remote-scale, 1));
+    --strip-tile-h: calc(3rem * var(--remote-scale, 1));
 }
 
 .remote-module__host > :is(.tv-module__actions-cluster--end, .tv-module__actions--remote-end, .tv-module__actions--browser-end),
@@ -406,34 +418,11 @@
 .remote-module__resize[data-remote-dock-resize="se"],
 .remote-module__resize[data-browser-dock-resize="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
 
-/* Browser window + layout controls — same circular row as nav/tools when split */
-.browser-window-controls,
-.layout-window-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.4rem;
-    width: auto;
-    padding: 0;
-}
-
-.browser-window-controls.is-hidden,
-.layout-window-controls.is-hidden {
-    display: none !important;
-}
-
 .catalog-root.module-layout--split #remote-shell.module-shell {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
-}
-
-#remote-shell .remote-shell__footer {
-    flex: 0 0 auto;
-    padding: 0 var(--tv-spacing-md, 1rem) var(--tv-spacing-md, 1rem);
-    border-top: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
-    background: color-mix(in srgb, var(--tv-bg-secondary) 92%, transparent);
 }
 
 /* --- Bottom-right browser dock (mirrors remote bottom-left) --- */
@@ -554,18 +543,6 @@ body.dock-ui-opening .browser-dock-sheet {
     width: auto;
 }
 
-.browser-dock-sheet__resize {
-    flex: 0 0 6px;
-    cursor: row-resize;
-    touch-action: none;
-    align-self: stretch;
-    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tv-border) 60%, transparent));
-}
-
-.browser-dock-sheet__resize.is-dragging {
-    background: var(--tv-main-2, #00FF88);
-}
-
 .browser-dock-sheet__inner {
     position: relative;
     flex: 1 1 auto;
@@ -598,16 +575,22 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     box-sizing: border-box;
 }
 
+/* Single scroll owner for the remote column (see the scaling contract at the top
+   of remote-shell.css). Y stays `auto` as a last resort for the in-flow expanded
+   screens tray; X is clipped so a sub-pixel tile width can never raise a
+   horizontal bar. With every column length linear in --remote-scale the keypad
+   itself always fits, so this never scrolls in the resize path. */
 .remote-module__scroll > .tv-panel {
     display: none;
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
 }
 
 .remote-module__scroll > .tv-panel.is-active {
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .remote-module__shell.is-subview .remote-panel {
@@ -618,8 +601,18 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     display: grid;
     grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
     gap: var(--remote-grid-gap, 0.4rem);
-    justify-content: stretch;
-    width: min(100%, var(--remote-min-width, 260px));
+    /* The grid already stretches its tracks to the panel width; a `min()` against
+       --remote-min-width would only shrink it and manufacture X overflow. */
+    width: 100%;
+}
+
+/* Full remote only: the dialog is tall enough for the pad plus a chin of unused
+   space at ~scale 1, so let the rows take that height (keys keep their fixed
+   --remote-btn-size and centre in the taller tracks → the slack becomes evenly
+   distributed air instead of a dead band under the keypad). Excluded from the
+   mini keypad, whose box is content-exact by design. */
+body:not(.remote-mini-floating) #remote-panel .remote-panel__grid {
+    min-height: 100%;
 }
 
 .remote-panel__cell {
@@ -629,24 +622,20 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     min-height: var(--remote-btn-size, 40px);
 }
 
-.remote-panel__cell--spacer {
-    pointer-events: none;
-}
-
-/* Mini-floating only cells (e.g. radio key) because they stay out of the full keypad. */
+/* Pinned by test/remoteKeypadAccents.test.mjs: mini-only cells stay out of the
+   full keypad even when tagged. */
 .remote-panel__cell--mini-only {
     display: none;
 }
 
 .remote-panel__btn--digit {
-    font-size: 0.95rem;
+    font-size: calc(0.95rem * var(--remote-scale, 1));
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
     line-height: 1;
 }
 
-.remote-panel__cell--slider,
 .remote-panel__cell--volume {
     grid-column: 1 / -1;
     display: flex;
@@ -665,7 +654,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     flex: 0 0 var(--remote-btn-size, 40px);
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
+    gap: calc(0.25rem * var(--remote-scale, 1));
     overflow: hidden;
     pointer-events: none;
 }
@@ -682,7 +671,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     border-radius: 48%;
     border: 1px solid color-mix(in srgb, currentColor var(--btn-ring), transparent);
     background: color-mix(in srgb, currentColor var(--btn-tint), var(--remote-btn-face));
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--remote-scale, 1));
     line-height: 1;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
     transform: scale(1);
@@ -766,7 +755,7 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.2rem;
+    gap: calc(0.2rem * var(--remote-scale, 1));
     padding:
         calc(var(--remote-btn-size, 40px) * 0.1)
         calc(var(--remote-grid-gap, 0.4rem) / 2 - 1px);
@@ -865,23 +854,15 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__p
 }
 
 .remote-panel__volume-split .remote-volume-bar__role {
-    left: 0.65rem;
-    font-size: 0.55rem;
+    left: calc(0.65rem * var(--remote-scale, 1));
+    font-size: calc(0.55rem * var(--remote-scale, 1));
 }
 
 .remote-panel__volume-split .remote-volume-bar__pct {
-    font-size: 0.65rem;
+    font-size: calc(0.65rem * var(--remote-scale, 1));
 }
 
 .remote-panel__cell--volume > .remote-volume-bar {
-    width: 100%;
-    min-width: 0;
-}
-
-.remote-panel__volume-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
     width: 100%;
     min-width: 0;
 }
@@ -931,7 +912,7 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__p
 .remote-volume-bar__pct {
     position: relative;
     z-index: 1;
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--remote-scale, 1));
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -941,10 +922,10 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__p
 
 .remote-volume-bar__role {
     position: absolute;
-    left: 0.85rem;
+    left: calc(0.85rem * var(--remote-scale, 1));
     top: 50%;
     transform: translateY(-50%);
-    font-size: 0.65rem;
+    font-size: calc(0.65rem * var(--remote-scale, 1));
     font-weight: 500;
     color: var(--tv-text-muted, var(--tv-text-secondary));
 }
@@ -997,25 +978,8 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__p
     box-shadow: none;
 }
 
-.remote-panel__cell--nav {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: center;
-    gap: 0.4rem;
-}
-
-.remote-panel__footer-nav.remote-panel__cell--nav {
-    display: flex;
-    justify-content: center;
-    width: auto;
-    gap: 0.4rem;
-    flex-wrap: nowrap;
-}
-
-.remote-panel__footer-nav .remote-panel__nav-btn,
-.remote-module__catalog-tools .remote-panel__nav-btn,
-.browser-window-controls .remote-panel__nav-btn,
-.layout-window-controls .remote-panel__nav-btn {
+.remote-panel__footer-nav-row .remote-panel__nav-btn,
+.remote-module__catalog-tools .remote-panel__nav-btn {
     flex: 0 0 var(--remote-btn-size, 40px);
     width: var(--remote-btn-size, 40px);
     height: var(--remote-btn-size, 40px);
@@ -1026,7 +990,7 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__p
     justify-content: center;
     margin-left: 0;
     flex-direction: row-reverse;
-    gap: var(--tv-spacing-sm);
+    gap: calc(0.5rem * var(--remote-scale, 1));
 }
 
 .remote-panel__cell--screens,
@@ -1042,12 +1006,6 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__p
     width: 100%;
     min-width: 0;
     margin-right: 0;
-}
-
-.remote-panel__volume .tv-controls__volume-slider {
-    flex: 1 1 auto;
-    width: auto;
-    min-width: 0;
 }
 
 .remote-panel__nav-btn.is-pink-active {
@@ -1324,8 +1282,4 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active .browser-dock-tab {
     right: 0;
     width: 100vw;
     max-width: 100vw;
-}
-
-html[data-catalog-chrome="bar"] .browser-dock-sheet.is-catalog-bar .browser-dock-sheet__resize {
-    display: none;
 }

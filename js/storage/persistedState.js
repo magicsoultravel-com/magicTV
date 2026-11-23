@@ -2,6 +2,8 @@
  * magicTV persisted state — isolated from magiclists sidebar TV.
  * Legacy key `matrix_tv_state` is copied once into the new key and never written again.
  */
+import { REMOTE_BASE_W, REMOTE_BASE_H } from '../ui/moduleScaleResize.js';
+
 export const STATE_KEY = 'magictv_persisted_state';
 export const LEGACY_STATE_KEY = 'matrix_tv_state';
 
@@ -97,8 +99,8 @@ export function compactNonEssentialPersistedState(state) {
         next.remoteModule = {
             left: 24,
             top: 48,
-            width: 260,
-            height: 560,
+            width: REMOTE_BASE_W,
+            height: REMOTE_BASE_H,
             scale: 1,
             mode: 'hidden',
             pinned: false,

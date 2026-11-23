@@ -1,5 +1,6 @@
 /** @module Remote module — teleports catalog body into docked sheet or floating dialog. */
 import { el } from '../tvUtils.js';
+import { forEachAppDocument } from '../appDocuments.js';
 import { ChannelGrid } from './channelGrid.js';
 import { MultiView } from '../multiView.js';
 import { TileFrames } from '../tileFrames.js';
@@ -48,8 +49,6 @@ import {
     scaleFromWidth
 } from './moduleScaleResize.js';
 
-const MIN_W = REMOTE_BASE_W;
-const MIN_H = REMOTE_BASE_H;
 /**
  * Mini-floating keypad design box (CSS px) at scale 1 — mirrors the
  * `body.remote-mini-floating` rules in remote-shell.css: a 4×3 grid of fixed
@@ -70,6 +69,8 @@ const MINI_BASE_W = MINI_CONTENT_W + MINI_BORDER; // 213.2
 const MINI_BASE_H = MINI_CONTENT_H + MINI_BORDER; // 166.8
 const VIEW_PAD = 24;
 const EDGE_INSET = 24;
+/** Docked sheet may use at most this share of the viewport height (85vh in CSS). */
+const DOCK_MAX_RATIO = 0.85;
 const DEFAULT_SHEET_HEIGHT = 0.62;
 /** Short bottom catalog bar ≈ 3/8 of default docked remote height. */
 const BAR_SHEET_HEIGHT = DEFAULT_SHEET_HEIGHT * (3 / 8);
@@ -86,6 +87,41 @@ function activeScale() {
 }
 
 /**
+ * Tallest box the current host can actually show. Docked, that is the sheet's
+ * own 85vh ceiling; floating, the viewport minus the drag pad it is clamped to.
+ */
+function hostHeightLimit() {
+    const { h: vh } = viewportSize();
+    if (mode === 'docked') return Math.round(vh * DOCK_MAX_RATIO);
+    // Undocked (and hidden → the next open is a float) leave room for VIEW_PAD.
+    return vh - 2 * VIEW_PAD;
+}
+
+/**
+ * Rendered scale = user intent (`activeScale`) capped by the host budget.
+ *
+ * The dialog box is `REMOTE_BASE_H * scale` and every length in the column is
+ * linear in the same factor (see the scaling contract in remote-shell.css), so
+ * capping the scale keeps content and box in step at any viewport height: never
+ * taller than the box (that was the keypad's phantom scrollbar), never shorter
+ * (that was the dead band under the keypad). Intent is kept in `scale` /
+ * `miniScale` so a later, roomier viewport renders the size the user asked for.
+ */
+function fitScale(s = activeScale()) {
+    const clamped = clampModuleScale(s);
+    if (miniFloating) return clamped;
+    const limit = hostHeightLimit() / REMOTE_BASE_H;
+    if (!Number.isFinite(limit) || limit <= 0) return clamped;
+    // Below SCALE_MIN nothing can fit; the floor still wins so the pad stays usable.
+    return Math.max(SCALE_MIN, Math.min(clamped, limit));
+}
+
+/** Scale actually painted (user intent after the host cap). */
+function renderedScale() {
+    return fitScale(activeScale());
+}
+
+/**
  * Mini dialog footprint. Content is ceiled before the border is added so
  * subpixel scaling can never leave the box shorter than its own keypad (which is
  * what used to force a 1px scrollbar).
@@ -98,19 +134,14 @@ function miniDialogHeight(s = activeScale()) {
     return Math.ceil(MINI_CONTENT_H * clampModuleScale(s)) + MINI_BORDER;
 }
 
-function minDialogWidth() {
-    if (miniFloating) return miniDialogWidth(miniScale);
-    return Math.round(MIN_W * scale * wingMultiplier());
-}
-
-function baseWidthForScale(s = activeScale()) {
+function baseWidthForScale(s = renderedScale()) {
     if (miniFloating) return miniDialogWidth(s);
-    return Math.round(MIN_W * clampModuleScale(s) * wingMultiplier());
+    return Math.round(REMOTE_BASE_W * clampModuleScale(s) * wingMultiplier());
 }
 
-function baseHeightForScale(s = activeScale()) {
+function baseHeightForScale(s = renderedScale()) {
     if (miniFloating) return miniDialogHeight(s);
-    return Math.round(MIN_H * clampModuleScale(s));
+    return Math.round(REMOTE_BASE_H * clampModuleScale(s));
 }
 
 let deps = {
@@ -216,14 +247,20 @@ function defaultGeometry() {
 }
 
 function applyRemoteScaleCss() {
-    const s = String(clampModuleScale(activeScale()));
-    const dialog = dialogEl();
-    const sheet = dockSheetEl();
-    const tab = dockTabEl();
-    dialog?.style.setProperty('--remote-scale', s);
-    sheet?.style.setProperty('--remote-scale', s);
-    tab?.style.setProperty('--remote-scale', s);
+    const s = String(renderedScale());
+    // One write per document root: every remote-scoped rule (shell, keypad,
+    // footer, screens strip) inherits it, including the dock sheet and tab.
     document.documentElement.style.setProperty('--remote-scale', s);
+    // An OS popout moves the remote shell into another document (its own :root),
+    // so keep that root in step too — otherwise resizing while popped out would
+    // leave the column at the popout-time value.
+    forEachAppDocument((doc) => {
+        try {
+            doc.documentElement?.style.setProperty('--remote-scale', s);
+        } catch {
+            /* detached document */
+        }
+    });
 }
 
 function normalizeDockSide(value) {
@@ -232,7 +269,7 @@ function normalizeDockSide(value) {
 
 function edgeInsetLeft(side, width) {
     const { w: vw } = viewportSize();
-    const w = Math.max(MIN_W, Number(width) || MIN_W);
+    const w = Math.max(REMOTE_BASE_W, Number(width) || REMOTE_BASE_W);
     if (normalizeDockSide(side) === 'right') {
         return Math.round(Math.max(VIEW_PAD, vw - w - EDGE_INSET));
     }
@@ -271,12 +308,7 @@ function resetScale() {
         applyDockScaleGeometry();
     } else if (mode === 'undocked') {
         const geom = readDialogGeometry();
-        applyGeometry({
-            left: geom.left,
-            top: geom.top,
-            width: baseWidthForScale(1),
-            height: baseHeightForScale(1)
-        });
+        applyGeometry({ left: geom.left, top: geom.top });
     } else {
         applyRemoteScaleCss();
     }
@@ -464,7 +496,7 @@ function applyDockSide(side, { persist = true, moveGeometry = true } = {}) {
     }
     if (persist) {
         const prev = getSavedState() || {};
-        const width = Number.isFinite(prev.width) ? prev.width : MIN_W;
+        const width = Number.isFinite(prev.width) ? prev.width : REMOTE_BASE_W;
         persistState({
             dockSide,
             ...(mode !== 'undocked' ? { left: edgeInsetLeft(dockSide, width) } : {})
@@ -476,33 +508,34 @@ function toggleDockSide() {
     applyDockSide(dockSide === 'right' ? 'left' : 'right');
 }
 
-function clampGeometry({ left, top, width, height }) {
-    const minW = minDialogWidth();
-    const minH = baseHeightForScale();
+/**
+ * Clamp a remote/dialog footprint into the viewport.
+ *
+ * `minW`/`minH` are the floor of the *scale range* (REMOTE_BASE_* at SCALE_MIN),
+ * never the requested box itself: passing the requested height as the floor made
+ * `clampFloatGeometry`'s `Math.max(minH, …)` a no-op, so the box could not shrink
+ * on a short viewport and the keypad had to scroll inside it. The box itself is
+ * always derived from the rendered scale here — callers do not get to supply it.
+ */
+function clampGeometry({ left, top }) {
+    const minW = baseWidthForScale(SCALE_MIN);
+    const minH = baseHeightForScale(SCALE_MIN);
     const { w: vw, h: vh } = viewportSize();
     return clampFloatGeometry(
-        { left, top, width: width ?? minW, height: height ?? minH },
+        { left, top, width: baseWidthForScale(), height: baseHeightForScale() },
         { minW, minH, viewPad: VIEW_PAD, vw, vh }
     );
 }
 
 function readDialogGeometry() {
     const dialog = dialogEl();
-    if (!dialog) {
-        return {
-            ...defaultGeometry(),
-            width: baseWidthForScale(),
-            height: baseHeightForScale()
-        };
-    }
+    if (!dialog) return defaultGeometry();
     // Prefer persisted scale box over live rect (avoids CSS inflation).
     const left = parseFloat(dialog.style.left);
     const top = parseFloat(dialog.style.top);
     return clampGeometry({
         left: Number.isFinite(left) ? left : dialog.getBoundingClientRect().left,
-        top: Number.isFinite(top) ? top : dialog.getBoundingClientRect().top,
-        width: baseWidthForScale(),
-        height: baseHeightForScale()
+        top: Number.isFinite(top) ? top : dialog.getBoundingClientRect().top
     });
 }
 
@@ -510,12 +543,7 @@ function applyGeometry(geom, { pinned: pinFlag } = {}) {
     const dialog = dialogEl();
     if (!dialog || !geom) return;
     applyRemoteScaleCss();
-    const next = clampGeometry({
-        left: geom.left,
-        top: geom.top,
-        width: baseWidthForScale(),
-        height: baseHeightForScale()
-    });
+    const next = clampGeometry({ left: geom.left, top: geom.top });
     dialog.style.left = `${next.left}px`;
     dialog.style.top = `${next.top}px`;
     dialog.style.width = `${next.width}px`;
@@ -537,8 +565,8 @@ function persistState(overrides = {}) {
         geom = {
             left: overrides.left != null ? overrides.left : miniSavedFull.left,
             top: overrides.top != null ? overrides.top : miniSavedFull.top,
-            width: Math.round(MIN_W * miniSavedFull.scale * wingMultiplier()),
-            height: Math.round(MIN_H * miniSavedFull.scale)
+            width: Math.round(REMOTE_BASE_W * miniSavedFull.scale * wingMultiplier()),
+            height: Math.round(REMOTE_BASE_H * miniSavedFull.scale)
         };
     } else {
         geom = wasUndocked
@@ -969,7 +997,9 @@ function applyDockScaleGeometry() {
     applyRemoteScaleCss();
     const { h: vh } = viewportSize();
     const width = baseWidthForScale();
-    const height = Math.min(Math.round(vh * 0.85), baseHeightForScale());
+    // Same ceiling the scale cap uses, so the docked sheet can never be shorter
+    // than the column it hosts.
+    const height = Math.min(Math.round(vh * DOCK_MAX_RATIO), baseHeightForScale());
     const ratio = height / Math.max(1, vh);
     sheet.style.setProperty('--remote-sheet-height', String(ratio));
     sheet.style.width = `${width}px`;
@@ -1166,9 +1196,7 @@ function onPointerMove(e) {
     if (gesture.mode === 'drag') {
         applyGeometry({
             left: gesture.originLeft + dx,
-            top: gesture.originTop + dy,
-            width: gesture.originW,
-            height: gesture.originH
+            top: gesture.originTop + dy
         });
         return;
     }
@@ -1180,8 +1208,8 @@ function onPointerMove(e) {
         originW: gesture.originW,
         originH: gesture.originH,
         originScale: gesture.originScale ?? activeScale(),
-        baseW: miniFloating ? MINI_BASE_W : MIN_W * wingMultiplier(),
-        baseH: miniFloating ? MINI_BASE_H : MIN_H,
+        baseW: miniFloating ? MINI_BASE_W : REMOTE_BASE_W * wingMultiplier(),
+        baseH: miniFloating ? MINI_BASE_H : REMOTE_BASE_H,
         dx,
         dy,
         edge,
@@ -1196,9 +1224,7 @@ function onPointerMove(e) {
     }
     applyGeometry({
         left: next.left,
-        top: next.top,
-        width: next.width,
-        height: next.height
+        top: next.top
     });
 }
 
@@ -1227,7 +1253,10 @@ function beginGesture(e, modeName, edge = '') {
             originTop: rect?.top ?? 0,
             originW: rect?.width ?? baseWidthForScale(),
             originH: rect?.height ?? baseHeightForScale(),
-            originScale: scale
+            // Painted scale, not intent: the drag ratio must apply to the box the
+            // user is actually looking at, otherwise a capped box jumps on the
+            // first move (or ignores the pointer until intent falls below the cap).
+            originScale: renderedScale()
         };
         sheet?.classList.add('is-resizing');
     } else {
@@ -1244,7 +1273,7 @@ function beginGesture(e, modeName, edge = '') {
             originTop: geom.top,
             originW: geom.width,
             originH: geom.height,
-            originScale: activeScale()
+            originScale: renderedScale()
         };
         if (modeName === 'drag') {
             e.currentTarget?.classList?.add('is-dragging');
@@ -1388,7 +1417,7 @@ function restoreFromState() {
         if (Number.isFinite(saved.scale)) {
             scale = clampModuleScale(saved.scale);
         } else if (Number.isFinite(saved.width)) {
-            scale = scaleFromWidth(saved.width / wingMultiplier(), MIN_W);
+            scale = scaleFromWidth(saved.width / wingMultiplier(), REMOTE_BASE_W);
         } else {
             scale = 1;
         }
@@ -1396,9 +1425,7 @@ function restoreFromState() {
         if (saved.miniTraySlotId != null)   { miniTraySlotId = saved.miniTraySlotId; }
         applyGeometry({
             left: Number.isFinite(saved.left) ? saved.left : geom.left,
-            top: Number.isFinite(saved.top) ? saved.top : geom.top,
-            width: baseWidthForScale(),
-            height: baseHeightForScale()
+            top: Number.isFinite(saved.top) ? saved.top : geom.top
         }, { pinned: saved.pinned === true });
         applyDockScaleGeometry();
         syncScaleResetBtn();

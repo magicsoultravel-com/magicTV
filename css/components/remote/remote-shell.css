@@ -1,6 +1,16 @@
 /** @css {part}: remote shell — dock, host, module chrome */
 
 /* ===== Remote module overhaul ===== */
+/* Scaling contract: EVERY length inside the remote column (chrome, channel bar,
+   footer, screens strip, keypad + its typography) is expressed as
+   `calc(<design px/rem> * var(--remote-scale, 1))`. That keeps the rendered
+   content height linear in the dialog height (`REMOTE_BASE_H * scale` in
+   js/ui/moduleScaleResize.js) at every scale, so the column can never outgrow
+   its own box — the defect that forced a vertical scrollbar on the keypad and
+   (once the box was clamped by JS) left a dead band under it. Do not add an
+   unscaled length here: it becomes a constant that the shrink path cannot
+   absorb. `--remote-scale` itself is written on each app document root by
+   remoteModule.js (`applyRemoteScaleCss`). */
 :root {
     --remote-grid-cols: 5;
     --remote-scale: 1;
@@ -8,8 +18,6 @@
     --remote-grid-gap: calc(0.4rem * var(--remote-scale, 1));
     --remote-space-md: calc(var(--tv-spacing-md, 1rem) * var(--remote-scale, 1));
     --remote-edge-inset: 1.5rem;
-    --browser-tile-scale: 1;
-    --radio-scale: 1;
     --remote-min-width: calc(
         var(--remote-grid-cols) * var(--remote-btn-size)
         + (var(--remote-grid-cols) - 1) * var(--remote-grid-gap)
@@ -218,8 +226,10 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
     width: var(--remote-min-width, 260px);
     height: auto;
     min-width: var(--remote-min-width, 260px);
-    max-width: calc(100vw - 0.5rem);
-    max-height: calc(100vh - 0.5rem);
+    /* Mirrors VIEW_PAD (24px) in js/ui/remoteModule.js: 2 * 24px = 3rem. Both
+       must agree or the JS clamp and this CSS clamp fight at different scales. */
+    max-width: calc(100vw - 3rem);
+    max-height: calc(100vh - 3rem);
     box-sizing: border-box;
     background: var(--tv-bg-secondary, #141829);
     border: 1px solid var(--tv-border, #2A2E3A);
@@ -239,11 +249,9 @@ body.dock-ui-opening.remote-wing-mode-browser #browser-shell {
     cursor: grab;
 }
 
-/* Remote float min-height tracks scale so shrink does not fight a fixed 320px floor */
-#remote-module .remote-module__dialog {
-    min-height: calc(320px * var(--remote-scale, 1));
-}
-
+/* Browser only: its docked dialog is auto-height (no inline height), so keep a
+   usable floor. The remote dialog always carries an inline height from JS — a
+   min-height there would be dead weight that only ever fights the clamp. */
 .browser-module .remote-module__dialog {
     min-height: 320px;
 }
@@ -263,7 +271,9 @@ body.remote-dock-side-right .browser-module .remote-module__dialog {
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    padding: 0.3rem 0.85rem;
+    padding:
+        calc(0.3rem * var(--remote-scale, 1))
+        calc(0.85rem * var(--remote-scale, 1));
     border-bottom: 1px solid var(--tv-border, #2A2E3A);
     background: rgba(0, 0, 0, 0.25);
     cursor: grab;
@@ -456,11 +466,6 @@ body.remote-dock-expanded #remote-module .remote-module__dialog {
     touch-action: none;
 }
 
-.remote-dock-sheet__resize,
-.browser-dock-sheet__resize {
-    display: none !important;
-}
-
 /* Split: each shell fills its own host window */
 .catalog-root.module-layout--split,
 body.browser-shell-split #browser-module-host .module-shell {
@@ -509,23 +514,6 @@ body.browser-shell-split #remote-shell {
     pointer-events: auto;
 }
 
-.remote-module__brand {
-    position: relative;
-    margin: 0;
-    background: linear-gradient(90deg, var(--tv-primary), var(--tv-secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    line-height: 1.2;
-    text-transform: lowercase;
-    opacity: 0.72;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s ease;
-}
-
 .remote-module__chrome-row .remote-panel__cell {
     display: flex;
     align-items: center;
@@ -540,7 +528,7 @@ body.browser-shell-split #remote-shell {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    font-size: 12px;
+    font-size: calc(12px * var(--remote-scale, 1));
     letter-spacing: 0.05em;
     line-height: 1.2;
     text-transform: lowercase;
@@ -553,8 +541,10 @@ body.browser-shell-split #remote-shell {
 .remote-module__brand::before {
     content: '';
     position: absolute;
-    inset: -0.3rem -0.65rem;
-    border-radius: 8px;
+    inset:
+        calc(-0.3rem * var(--remote-scale, 1))
+        calc(-0.65rem * var(--remote-scale, 1));
+    border-radius: calc(8px * var(--remote-scale, 1));
     border: 1px solid transparent;
     pointer-events: none;
     transition:
@@ -582,11 +572,11 @@ body.browser-shell-split #remote-shell {
     flex-wrap: nowrap;
     align-items: baseline;
     justify-content: center;
-    gap: 0.3rem;
-    margin-top: 0.25rem;
+    gap: calc(0.3rem * var(--remote-scale, 1));
+    margin-top: calc(0.25rem * var(--remote-scale, 1));
     min-width: 0;
     max-width: 100%;
-    padding: 0 0.25rem;
+    padding: 0 calc(0.25rem * var(--remote-scale, 1));
 }
 
 .remote-module__channel-bar .tv-header-now-playing,
@@ -602,7 +592,7 @@ body.browser-shell-split #remote-shell {
 }
 
 .remote-module__channel-bar .tv-header-now-playing {
-    font-size: 10px;
+    font-size: calc(10px * var(--remote-scale, 1));
     max-width: min(100%, 14rem);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -613,7 +603,7 @@ body.browser-shell-split #remote-shell {
 
 .remote-module__channel-bar .tv-header-channel-flag {
     flex-shrink: 0;
-    font-size: 9px;
+    font-size: calc(9px * var(--remote-scale, 1));
     filter: none;
     opacity: 0.9;
 }
@@ -622,37 +612,33 @@ body.browser-shell-split #remote-shell {
     display: none;
 }
 
+/* Single scroll owner. The wrapper never scrolls; the active panel does, as a
+   last resort only — with every column length linear in --remote-scale the
+   keypad always fits its box, but the expanded screens tray is in-flow and may
+   legitimately exceed it. */
 .remote-module__scroll {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
     display: flex;
     flex-direction: column;
-}
-
-/* Keypad only — hide spurious X scroll from unscaled rem vs scaled box; Y still if needed */
-#remote-shell > .remote-module__scroll {
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-
-#remote-shell #remote-panel.is-active {
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .remote-module__footer {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 0 var(--tv-spacing-md, 1rem) var(--tv-spacing-md, 1rem);
+    gap: calc(0.35rem * var(--remote-scale, 1));
+    padding:
+        0
+        var(--remote-space-md, var(--tv-spacing-md, 1rem))
+        var(--remote-space-md, var(--tv-spacing-md, 1rem));
     border-top: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
     background: color-mix(in srgb, var(--tv-bg-secondary) 92%, transparent);
 }
 
 #browser-shell > .remote-module__footer {
-    padding-top: var(--tv-spacing-sm, 0.5rem);
+    padding-top: calc(0.5rem * var(--remote-scale, 1));
 }
 
 .remote-module__catalog-tools {
@@ -660,7 +646,7 @@ body.browser-shell-split #remote-shell {
     flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
+    gap: calc(0.4rem * var(--remote-scale, 1));
     padding: 0;
     background: transparent;
     border-top: none;
@@ -673,7 +659,7 @@ body.browser-shell-split #remote-shell {
 .remote-module__footer-panel {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: calc(0.35rem * var(--remote-scale, 1));
 }
 
 .remote-panel__footer-chrome {
@@ -682,7 +668,9 @@ body.browser-shell-split #remote-shell {
     flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
-    gap: 0.45rem 0.65rem;
+    gap:
+        calc(0.45rem * var(--remote-scale, 1))
+        calc(0.65rem * var(--remote-scale, 1));
     width: 100%;
     /* Never grow a vertical scrollbar on the remote button strip. */
     overflow-x: auto;
@@ -694,15 +682,15 @@ body.browser-shell-split #remote-shell {
     flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
-    gap: 0.45rem 0.65rem;
+    gap:
+        calc(0.45rem * var(--remote-scale, 1))
+        calc(0.65rem * var(--remote-scale, 1));
     width: auto;
     flex: 0 0 auto;
     overflow: hidden;
 }
 
-.remote-panel__footer-tools-row .remote-module__catalog-tools.is-visible,
-.remote-panel__footer-tools-row .browser-window-controls,
-.remote-panel__footer-tools-row .layout-window-controls {
+.remote-panel__footer-tools-row .remote-module__catalog-tools.is-visible {
     width: auto;
     flex: 0 0 auto;
 }
@@ -807,10 +795,6 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .remote
     padding: 0.1rem 0.35rem;
 }
 
-html[data-catalog-chrome="bar"] body.catalog-bar-active .remote-dock-sheet__resize {
-    display: none;
-}
-
 /* ===== Mini-floating compact keypad (body.remote-mini-floating) =====
    A reduced 4×4 keypad suspended as a small float. Always undocked. Keeps only
    the hover tray actions that matter (mini toggle + collapse) and hides all the
@@ -852,11 +836,10 @@ body.remote-mini-floating #remote-module .remote-module__host > #tv-catalog-body
    gaps' subpixel rounding cannot produce a phantom one), and the layout key's
    option tray — which slides out ABOVE its key, i.e. straight out of row 1 — is no
    longer clipped to nothing. Nothing leaks visually: only
-   `.remote-module__dialog` paints a background. The `#remote-shell` /
-   `.is-active` parts are load-bearing — this file's
-   `#remote-shell > .remote-module__scroll` (1 ID) and
-   `#remote-shell #remote-panel.is-active` (2 IDs) out-rank a bare `#remote-panel`
-   override, which is exactly why the mini pad kept a stray scrollbar. */
+   `.remote-module__dialog` paints a background. The `#remote-shell` parts are
+   load-bearing: they out-rank the `.remote-module__scroll > .tv-panel.is-active`
+   rule in remote-panel.css (2 IDs beat 2 classes), which is exactly why the mini
+   pad kept a stray scrollbar. */
 body.remote-mini-floating #remote-module .remote-module__dialog,
 body.remote-mini-floating #remote-module .remote-module__host,
 body.remote-mini-floating #remote-shell,

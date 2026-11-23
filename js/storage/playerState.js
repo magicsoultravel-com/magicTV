@@ -17,6 +17,13 @@ import {
     webstreamKey
 } from '../webstream/webStreamLinks.js';
 import { SLOT_IDS } from '../mosaic/constants.js';
+import {
+    REMOTE_BASE_W,
+    REMOTE_BASE_H,
+    SCALE_MIN,
+    clampModuleScale,
+    scaleFromWidth
+} from '../ui/moduleScaleResize.js';
 
 function hasFavoriteFolders(folders) {
     return Array.isArray(folders) && folders.length > 0;
@@ -473,20 +480,19 @@ function normalizeRemoteModule(raw, legacyPicker) {
     let width = Number(src.width);
     let height = Number(src.height);
     if (![left, top, width, height].every(Number.isFinite)) return null;
-    if (width < 130 || height < 280) return null;
+    if (width < REMOTE_BASE_W * SCALE_MIN || height < REMOTE_BASE_H * SCALE_MIN) return null;
     const target = typeof src.targetSlotId === 'string' && MOSAIC_SLOT_IDS.includes(src.targetSlotId)
         ? src.targetSlotId
         : 'center';
     let mode = src.mode;
     if (!mode) mode = src.open === true ? 'undocked' : 'hidden';
     if (!['hidden', 'docked', 'undocked'].includes(mode)) mode = 'hidden';
-    const baseW = 260;
     const rawScale = Number(src.scale);
     const scale = Number.isFinite(rawScale)
-        ? Math.min(1.5, Math.max(0.5, rawScale))
-        : Math.min(1.5, Math.max(0.5, width / baseW));
-    width = Math.round(baseW * scale);
-    height = Math.round(560 * scale);
+        ? clampModuleScale(rawScale)
+        : scaleFromWidth(width, REMOTE_BASE_W);
+    width = Math.round(REMOTE_BASE_W * scale);
+    height = Math.round(REMOTE_BASE_H * scale);
     const sheetHeight = Number.isFinite(Number(src.sheetHeight))
         ? Math.min(0.85, Math.max(0.25, Number(src.sheetHeight)))
         : 0.45;
