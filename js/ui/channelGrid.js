@@ -69,36 +69,47 @@ function syncTileFavBtn(btn, isFav) {
     btn.setAttribute('aria-pressed', String(isFav));
 }
 
-function metaChannels(metaEntries) {
-    return (metaEntries || []).map(e => {
-        const parsed = parseChannelKey(e.key);
-        return {
-            providerId: parsed?.providerId,
-            channelId: parsed?.channelId,
-            channeluuid: e.key,
-            name: e.name || '',
-            logo: e.logo || '',
-            countrycode: e.countrycode || '',
-            url_resolved: '',
-            categories: [],
-            at: Number.isFinite(e.at) ? e.at : 0
-        };
-    });
+function favoritePlaceholder(key, metaEntry = null) {
+    const parsed = parseChannelKey(key);
+    return {
+        providerId: parsed?.providerId,
+        channelId: parsed?.channelId,
+        channeluuid: key,
+        name: metaEntry?.name || parsed?.channelId || key,
+        logo: metaEntry?.logo || '',
+        countrycode: metaEntry?.countrycode || '',
+        url_resolved: '',
+        categories: [],
+        at: Number.isFinite(metaEntry?.at) ? metaEntry.at : 0,
+        // Marks a stored ref the catalog no longer resolves: still shown in the
+        // grid, but never queued for playback.
+        placeholder: true
+    };
 }
 
-function skeletonChannels(keys) {
-    return (keys || []).map(k => {
-        const parsed = parseChannelKey(k);
+/**
+ * Build the favorites / recents render list for every stored ref.
+ * Hydrated channels win; refs the provider cannot resolve fall back to their
+ * stored meta (then to the channel id). Keeping every ref means folder counts,
+ * grid contents and mosaic queues all agree, and reorder can still splice
+ * visible keys into the full stored order.
+ * @param {string[]} keys persisted refs, in library order
+ * @param {{ key: string, name?: string, logo?: string, countrycode?: string, at?: number }[]} metaEntries
+ * @param {object[]} hydrated channels resolved by the provider
+ */
+export function mergeFavoriteChannels(keys, metaEntries = [], hydrated = []) {
+    const hydratedByKey = new Map((hydrated || []).map((ch) => [channelKey(ch), ch]));
+    const metaByKey = new Map((metaEntries || []).map((e) => [e?.key, e]));
+    return (keys || []).map((key) => {
+        const meta = metaByKey.get(key) || null;
+        const ch = hydratedByKey.get(key);
+        if (!ch) return favoritePlaceholder(key, meta);
         return {
-            providerId: parsed?.providerId,
-            channelId: parsed?.channelId,
-            channeluuid: k,
-            name: parsed?.channelId || k,
-            logo: '',
-            countrycode: '',
-            url_resolved: '',
-            categories: [],
-            at: 0
+            ...ch,
+            name: ch.name || meta?.name || '',
+            logo: ch.logo || meta?.logo || '',
+            countrycode: ch.countrycode || meta?.countrycode || '',
+            at: Number.isFinite(meta?.at) ? meta.at : (Number.isFinite(ch.at) ? ch.at : 0)
         };
     });
 }
@@ -109,15 +120,6 @@ function matchesFilter(ch, q) {
     const id = (ch?.channelId || '').toLowerCase();
     if (name.includes(q) || id.includes(q)) return true;
     return matchesCategoryFilter(ch, q);
-}
-
-function mergeRecentAt(channels, metaEntries) {
-    const atByKey = new Map((metaEntries || []).map((e) => [e.key, e.at || 0]));
-    return (channels || []).map((ch) => {
-        const key = channelKey(ch);
-        const at = atByKey.get(key);
-        return at != null ? { ...ch, at } : ch;
-    });
 }
 
 function filterVisibleChannels(channels) {
@@ -214,11 +216,10 @@ export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {
     if (folderId) {
         const folder = getFolder(folderId);
         if (folder) {
-            let list = (folder.items || [])
-                .map((key) => channelByKey(source, key))
-                .filter(Boolean)
-                .filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
-            list = visibleFilter(list);
+            // Placeholder refs (the catalog cannot resolve them) stay visible in
+            // the grid but cannot be played, so never queue them for the mosaic.
+            let list = visibleFolderChannels(source, folder, filter, categoryId, visibleFilter)
+                .filter((ch) => !ch.placeholder);
             list = sortChannelList(list, sortBy, sortDir);
             return {
                 list: list.slice(0, maxSlots),
@@ -234,7 +235,7 @@ export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {
     const out = [];
     for (const ref of rootKeys) {
         const ch = channelByKey(source, ref);
-        if (!ch) continue;
+        if (!ch || ch.placeholder) continue;
         if (!matchesFilter(ch, filter) || !channelHasCategory(ch, categoryId)) continue;
         const visible = visibleFilter([ch]);
         if (visible.length) out.push(visible[0]);
@@ -244,6 +245,29 @@ export function getFavoritesMosaicQueue({ fallbackFilter = '' } = {}, inject = {
 
 function channelByKey(list, key) {
     return (list || []).find((ch) => channelKey(ch) === key) || null;
+}
+
+function channelMap(list) {
+    return new Map((list || []).map((ch) => [channelKey(ch), ch]));
+}
+
+/**
+ * Folder contents in display-ready form: every stored ref, filtered exactly
+ * like the folder grid (text + category + hidden). Shared by the folder view,
+ * the root folder-tile count and the mosaic queue so all three agree.
+ * @param {object[]|Map<string, object>} source channel list (or prebuilt map)
+ * @param {{ items?: string[] }} folder
+ * @param {string} filter text filter
+ * @param {string} categoryId category filter
+ * @param {(channels: object[]) => object[]} visibleFilter hidden-channel filter
+ */
+function visibleFolderChannels(source, folder, filter, categoryId, visibleFilter = filterVisibleChannels) {
+    const byKey = source instanceof Map ? source : channelMap(source);
+    const list = (folder?.items || [])
+        .map((key) => byKey.get(key))
+        .filter(Boolean)
+        .filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
+    return visibleFilter(list);
 }
 
 function sortRootChannelRefs(rootChannelKeys, channels, sortBy, sortDir) {
@@ -261,9 +285,16 @@ function renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir,
     rootChannelKeys = sortRootChannelRefs(rootChannelKeys, appState.favoritesList, sortBy, sortDir);
     const { numberByKey } = channelIndexForScope(TvPlayer.getChanBindScope(MultiView.statusSlotId || 'center'));
 
-    const parts = folders.map((folder) => ({ type: 'folder', folder }));
+    const favoritesByKey = channelMap(appState.favoritesList);
+    const parts = folders.map((folder) => ({
+        type: 'folder',
+        folder,
+        // Count what opening the folder will actually show (text + category +
+        // hidden filters), so the tile label never overstates the contents.
+        visibleCount: visibleFolderChannels(favoritesByKey, folder, filter, categoryId).length
+    }));
     for (const ref of rootChannelKeys) {
-        const ch = channelByKey(appState.favoritesList, ref);
+        const ch = favoritesByKey.get(ref);
         if (ch && matchesFilter(ch, filter) && channelHasCategory(ch, categoryId)) {
             const visible = filterVisibleChannels([ch]);
             if (visible.length) parts.push({ type: 'channel', channel: visible[0] });
@@ -278,7 +309,7 @@ function renderFavoritesRootGrid(appState, grid, empty, filter, sortBy, sortDir,
 
     const html = parts.map((part) => (
         part.type === 'folder'
-            ? FavoritesFolders.folderTileHtml(part.folder)
+            ? FavoritesFolders.folderTileHtml(part.folder, { visible: part.visibleCount })
             : tileHtml(part.channel, { chanNumber: numberByKey.get(channelKey(part.channel)) })
     )).join('');
     grid.innerHTML = html;
@@ -301,11 +332,7 @@ function renderFavoritesFolderGrid(appState, grid, empty, folderId, filter, sort
         return;
     }
 
-    let list = folder.items
-        .map((key) => channelByKey(appState.favoritesList, key))
-        .filter(Boolean)
-        .filter((ch) => matchesFilter(ch, filter) && channelHasCategory(ch, categoryId));
-    list = filterVisibleChannels(list);
+    let list = visibleFolderChannels(appState.favoritesList, folder, filter, categoryId);
     list = sortChannelList(list, sortBy, sortDir);
     const { numberByKey } = channelIndexForScope(TvPlayer.getChanBindScope(MultiView.statusSlotId || 'center'));
 
@@ -635,19 +662,18 @@ export const ChannelGrid = {
         empty.classList.add('is-hidden');
 
         const favMeta = TvPlayer.getFavoritesMeta();
-        appState.favoritesList = favMeta.length
-            ? metaChannels(favMeta)
-            : skeletonChannels(favorites);
+        // Every stored ref gets a tile: the first paint uses stored meta, then
+        // the hydrated pass upgrades entries without ever dropping refs the
+        // provider cannot resolve (stale ids, URL-less catalog rows).
+        appState.favoritesList = mergeFavoriteChannels(favorites, favMeta);
         this.renderFavorites();
 
         try {
             const channels = await TvProviderRegistry.getChannelsByRefs(favorites, { refresh: forceRefresh });
-            if (channels.length) {
-                appState.favoritesList = channels;
-                setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
-                ListSort.syncCategoryFilterControls();
-                this.renderFavorites();
-            }
+            appState.favoritesList = mergeFavoriteChannels(favorites, favMeta, channels);
+            setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
+            ListSort.syncCategoryFilterControls();
+            this.renderFavorites();
         } catch (err) {
             console.error('Failed to hydrate favorites:', err);
         }
@@ -667,17 +693,16 @@ export const ChannelGrid = {
         }
         empty.classList.add('is-hidden');
 
-        appState.recentsList = metaChannels(recents);
+        const keys = recents.map((r) => r.key);
+        appState.recentsList = mergeFavoriteChannels(keys, recents);
         this.renderRecents();
 
         try {
-            const channels = await TvProviderRegistry.getChannelsByRefs(recents.map(r => r.key), { refresh: forceRefresh });
-            if (channels.length) {
-                appState.recentsList = mergeRecentAt(channels, recents);
-                setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
-                ListSort.syncCategoryFilterControls();
-                this.renderRecents();
-            }
+            const channels = await TvProviderRegistry.getChannelsByRefs(keys, { refresh: forceRefresh });
+            appState.recentsList = mergeFavoriteChannels(keys, recents, channels);
+            setCategoryNameMap(TvProviderRegistry.getCategoryNameMap());
+            ListSort.syncCategoryFilterControls();
+            this.renderRecents();
         } catch (err) {
             console.error('Failed to hydrate recents:', err);
         }

@@ -453,6 +453,18 @@ async function resolveFavoriteStations(keys) {
     return new Map(stations.map((s) => [stationKey(s), s]));
 }
 
+/**
+ * Stations a folder will actually render under the current text, category and
+ * hidden filters. Unresolved refs fall back to a stub so the count matches the
+ * tiles the folder view paints.
+ */
+function visibleFolderStations(byKey, folder, filter, categoryId) {
+    return (folder?.items || [])
+        .map((k) => byKey.get(k) || stubFromKey(k))
+        .filter((s) => stationMatchesFilter(s, filter) && channelHasCategory(s, categoryId))
+        .filter((s) => !RadioPlayer.isHidden(stationKey(s) || s.stationuuid));
+}
+
 function syncRadioFavoritesReorder(enabled) {
     const grid = el('favorites-grid');
     if (!grid) return;
@@ -467,7 +479,11 @@ async function renderFavoritesRoot(list, empty, byKey, filter, sortBy, sortDir, 
         rootKeys = sortStationRows(sortable, sortBy, sortDir).map((s) => stationKey(s) || s.stationuuid);
     }
 
-    const parts = folders.map((folder) => ({ type: 'folder', folder }));
+    const parts = folders.map((folder) => ({
+        type: 'folder',
+        folder,
+        visibleCount: visibleFolderStations(byKey, folder, filter, categoryId).length
+    }));
     const stationRows = [];
     for (const ref of rootKeys) {
         const s = byKey.get(ref) || stubFromKey(ref);
@@ -490,7 +506,7 @@ async function renderFavoritesRoot(list, empty, byKey, filter, sortBy, sortDir, 
     const favs = favoritesSet();
     list.innerHTML = parts.map((part) => (
         part.type === 'folder'
-            ? FavoritesFolders.folderTileHtml(part.folder)
+            ? FavoritesFolders.folderTileHtml(part.folder, { visible: part.visibleCount })
             : stationTileHtml(part.station, favs)
     )).join('');
     setVisible(empty, false);
@@ -510,10 +526,7 @@ async function renderFavoritesFolder(list, empty, folderId, byKey, filter, sortB
         return renderFavoritesRoot(list, empty, byKey, filter, sortBy, sortDir, categoryId);
     }
 
-    let rows = (folder.items || [])
-        .map((k) => byKey.get(k) || stubFromKey(k))
-        .filter((s) => stationMatchesFilter(s, filter) && channelHasCategory(s, categoryId))
-        .filter((s) => !RadioPlayer.isHidden(stationKey(s) || s.stationuuid));
+    let rows = visibleFolderStations(byKey, folder, filter, categoryId);
     rows = sortStationRows(rows, sortBy === 'custom' ? 'custom' : sortBy, sortDir);
 
     favoritesRows = rows;

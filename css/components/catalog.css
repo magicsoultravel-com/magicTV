@@ -287,6 +287,9 @@ html[data-non-visited-style]:not([data-non-visited-style="undistinguished"]) .ch
     font-size: 0.75rem;
     color: var(--tv-text-secondary);
     margin-top: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .favorite-folder-tile__edit-btn,

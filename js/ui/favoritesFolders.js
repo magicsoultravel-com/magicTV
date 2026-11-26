@@ -24,9 +24,20 @@ function promptFolderName(defaultName = '', title = 'Folder name') {
     return trimmed || null;
 }
 
-export function folderTileHtml(folder) {
-    const count = folder.items?.length || 0;
-    const label = count === 1 ? '1 channel' : `${count} channels`;
+/**
+ * Folder tile markup.
+ * @param {{ id: string, name?: string, items?: string[] }} folder
+ * @param {{ visible?: number|null }} [opts] `visible` is how many channels the
+ *   folder will actually show under the current text / category / hidden
+ *   filters. When it differs from the stored total the label says
+ *   "N of M channels" so the count never promises more than the grid renders.
+ */
+export function folderTileHtml(folder, { visible = null } = {}) {
+    const total = folder?.items?.length || 0;
+    const shown = Number.isFinite(visible) ? Math.min(Math.max(visible, 0), total) : total;
+    const label = shown === total
+        ? (total === 1 ? '1 channel' : `${total} channels`)
+        : `${shown} of ${total} channels`;
     return `
         <div class="favorite-folder-tile" data-folder-id="${escapeHtml(folder.id)}" role="button" tabindex="0">
             <button type="button" class="favorite-folder-tile__edit-btn" title="Rename folder" aria-label="Rename folder">${CARD_ICONS.tileEdit}</button>
