@@ -426,12 +426,31 @@ function snapshotLocalPlayer(slotId) {
     };
 }
 
+/**
+ * Host toggles → what the local <video> has to do.
+ * A paused element emits no sound, so "audio on host" implies play; mute then
+ * follows the audio flag alone.
+ * @param {{ hostVideo?: boolean, hostAudio?: boolean }} [state]
+ * @returns {{ shouldPlay: boolean, shouldMute: boolean }}
+ */
+export function resolveHostPlayback({ hostVideo = false, hostAudio = false } = {}) {
+    return {
+        shouldPlay: Boolean(hostVideo || hostAudio),
+        shouldMute: !hostAudio
+    };
+}
+
 function applyHostPlaybackState(slotId) {
     const player = getLocalPlayer(slotId);
     if (!player?.channel) return;
     if (!ChromecastManager.isCasting() || castActiveSlotId !== slotId) return;
 
-    if (hostVideoEnabled) {
+    const { shouldPlay, shouldMute } = resolveHostPlayback({
+        hostVideo: hostVideoEnabled,
+        hostAudio: hostAudioEnabled
+    });
+
+    if (shouldPlay) {
         if (player.wantPlaying !== true && !player.playing) {
             player.resume?.();
         }
@@ -439,10 +458,10 @@ function applyHostPlaybackState(slotId) {
         player.pause?.();
     }
 
-    if (hostAudioEnabled) {
-        if (player.muted) player.unmute?.();
-    } else if (!player.muted) {
-        player.mute?.();
+    if (shouldMute) {
+        if (!player.muted) player.mute?.();
+    } else if (player.muted) {
+        player.unmute?.();
     }
     player.applyAudioToVideo?.();
 }
@@ -456,12 +475,15 @@ function restoreLocalPlayer(slotId) {
 
     const stuckLoading = player.loading === true
         || (player.wantPlaying === true && player.playing !== true);
-    if (stuckLoading || (!hostVideoEnabled && (player.playing || player.wantPlaying))) {
+    // Either host flag means the tile was playing throughout the cast — leave it going.
+    const keepPlaying = hostVideoEnabled || hostAudioEnabled;
+    if (stuckLoading || (!keepPlaying && (player.playing || player.wantPlaying))) {
         player.pause?.();
     }
 
     if (localSnapshot) {
-        if (localSnapshot.wasMuted) player.mute?.();
+        // Host audio is an explicit "I want sound" — don't re-mute from the snapshot.
+        if (localSnapshot.wasMuted && !hostAudioEnabled) player.mute?.();
         else player.unmute?.();
     }
     player.applyAudioToVideo?.();
@@ -525,6 +547,17 @@ export const ChromecastManager = {
 
     getHostVideo() {
         return hostVideoEnabled;
+    },
+
+    /** Active cast tile that keeps the sound on the host but hides the picture. */
+    isHostAudioOnlySlot(slotId) {
+        return Boolean(
+            slotId
+            && castActiveSlotId === slotId
+            && this.isCasting()
+            && hostAudioEnabled
+            && !hostVideoEnabled
+        );
     },
 
     isCastPlaying() {

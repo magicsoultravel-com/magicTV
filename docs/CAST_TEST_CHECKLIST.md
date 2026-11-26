@@ -12,6 +12,8 @@ Use Chrome with a Chromecast / Nest Hub on the same network.
 - [ ] Cast rocker ± changes Nest Hub volume; `%` tracks the receiver; local rocker stays browser-only.
 - [ ] Change channel on the active cast tile — the TV switches to the new stream.
 - [ ] Toggle host video in the CAST popout — local video pauses/resumes; local controls stay visible (host+target vs target-only).
+- [ ] Toggle host audio in the CAST popout — the receiver keeps playing and the host tile keeps its soundtrack (local row unmutes itself).
+- [ ] Host video off + host audio on — the tile's picture is hidden behind the channel poster while the sound continues; ending the cast restores the normal tile.
 - [ ] Control the local row independently from the CAST row (local play/stop/mute do not drive the receiver).
 - [ ] Disconnect / end cast from the host — local tile does not stay in a loading spinner; play shows play if local is paused.
 - [ ] Refresh the page while casting — the app reconnects to the same session and highlights the active tile.

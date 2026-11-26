@@ -623,6 +623,9 @@ export const tileChromeMethods = {
             }
 
             const posterEl = tile.querySelector('.tv-player-tile__poster');
+            // Audio-only cast: CSS hides the picture, so the poster *is* the tile even
+            // though the local player keeps running for its soundtrack.
+            const hostAudioOnly = ChromecastManager.isHostAudioOnlySlot(id);
             // Cover black gaps: keep poster while loading/awaiting first paint, or when
             // the <video> has no decoded frame yet.
             const videoHasFrame = Boolean(player?.video?.videoWidth > 0);
@@ -630,9 +633,10 @@ export const tileChromeMethods = {
                 hasChannel
                 && player
                 && player.posterDataUrl
-                && !uiPlaying
-                && !tuningLive
-                && (uiLoading || uiBanking || !videoHasFrame)
+                && (hostAudioOnly
+                    || (!uiPlaying
+                        && !tuningLive
+                        && (uiLoading || uiBanking || !videoHasFrame)))
             );
             tile.classList.toggle('has-poster', showPoster);
             if (posterEl) {
@@ -793,6 +797,7 @@ export const tileChromeMethods = {
         const isCasting = ChromecastManager.isCasting();
         const isActiveCastSlot = ChromecastManager.getActiveSlot() === slotId;
         const hostVideo = ChromecastManager.getHostVideo();
+        const hostAudio = ChromecastManager.getHostAudio();
 
         const castRow = tile.querySelector('[data-controls-row="cast"]');
         const localRow = tile.querySelector('[data-controls-row="local"]');
@@ -836,6 +841,14 @@ export const tileChromeMethods = {
             btn.classList.toggle('is-active', hostVideo);
             btn.setAttribute('aria-pressed', String(hostVideo));
         });
+
+        tile.querySelectorAll('[data-cast-toggle="host-audio"]').forEach((btn) => {
+            btn.classList.toggle('is-active', hostAudio);
+            btn.setAttribute('aria-pressed', String(hostAudio));
+        });
+
+        // Audio-only cast: sound stays on the host, so the picture is hidden by CSS.
+        tile.classList.toggle('is-host-audio', ChromecastManager.isHostAudioOnlySlot(slotId));
 
         const intentPlaying = player?.wantPlaying === true || player?.playing === true;
         const isBanking = player?.banking === true;

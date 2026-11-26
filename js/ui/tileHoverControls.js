@@ -82,6 +82,9 @@ export { VOL_CHEVRON_UP, VOL_CHEVRON_DOWN };
 
 const HOST_VIDEO_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><rect x="1.6" y="2.2" width="8.8" height="6.2" rx="0.7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.2 10.2h3.6M6 8.4v1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
+/** Speaker with waves — keep the soundtrack on the host while the TV plays. */
+const HOST_AUDIO_SVG = `<svg viewBox="0 0 12 12" width="14" height="14" focusable="false" aria-hidden="true"><path d="M2 4.7h2l2.6-2.4v7.4L4 7.3H2a.5.5 0 0 1-.5-.5V5.2a.5.5 0 0 1 .5-.5z" fill="currentColor"/><path d="M8 4.6c.6.6.6 1.7 0 2.3M9.5 3.2c1.2 1.2 1.2 4 0 5.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+
 function controlBtn(action, label, content, target, extraClass = '') {
     const cls = `tv-controls__btn ${extraClass}`.trim();
     return `<button type="button" class="${cls}" data-tile-action="${action}" data-controls-target="${target}" title="${label}" aria-label="${label}">${content}</button>`;
@@ -213,6 +216,7 @@ function castWrap() {
         <button type="button" class="tv-controls__btn tv-controls__btn--main-2 tv-controls__cast-btn" data-tile-action="cast" data-cast-active="false" title="Cast" aria-label="Cast" aria-pressed="false">${CAST_SVG}</button>
         <div class="tv-controls__cast-popout" aria-hidden="true">
             <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-cast-toggle="host-video" title="Video on host PC" aria-label="Video on host PC" aria-pressed="false">${HOST_VIDEO_SVG}</button>
+            <button type="button" class="tv-controls__btn tv-controls__btn--main-1" data-cast-toggle="host-audio" title="Audio on host PC" aria-label="Audio on host PC" aria-pressed="false">${HOST_AUDIO_SVG}</button>
         </div>
     </div>`;
 }

@@ -8,7 +8,8 @@ import {
     sniffCastContentType,
     buildCastLoadAttempts,
     buildMediaInfoOptions,
-    formatCastError
+    formatCastError,
+    resolveHostPlayback
 } from '../js/cast/chromecastManager.js';
 import {
     buildTileHoverHtml,
@@ -23,8 +24,8 @@ test('buildTileHoverHtml includes cast and dual rows', () => {
     assert.match(html, /data-controls-row="local"/);
     assert.match(html, />CAST</);
     assert.match(html, /data-tile-action="cast"/);
-    assert.doesNotMatch(html, /data-cast-toggle="host-audio"/);
     assert.match(html, /data-cast-toggle="host-video"/);
+    assert.match(html, /data-cast-toggle="host-audio"/);
     assert.match(html, /data-controls-target="cast"/);
     assert.match(html, /data-controls-target="local"/);
     assert.equal((html.match(/data-tile-action="cast"/g) || []).length, 1);
@@ -52,6 +53,54 @@ test('buildTileHoverHtml includes cast and dual rows', () => {
     assert.doesNotMatch(localRow, /data-tile-action="vol-up"/);
     assert.doesNotMatch(localRow, /data-tile-action="vol-down"/);
     assert.doesNotMatch(localRow, /data-tile-vol-pct/);
+});
+
+test('cast popout carries independent host-video and host-audio toggles', () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+    for (const variant of ['corner', 'center']) {
+        const html = buildTileHoverHtml(variant);
+        const popoutStart = html.indexOf('tv-controls__cast-popout');
+        assert.ok(popoutStart !== -1, `${variant}: cast popout markup`);
+
+        const popout = html.slice(popoutStart, html.indexOf('</div>', popoutStart));
+        assert.equal((popout.match(/data-cast-toggle=/g) || []).length, 2,
+            `${variant}: exactly two host toggles`);
+        assert.match(popout,
+            /data-cast-toggle="host-video" title="Video on host PC" aria-label="Video on host PC" aria-pressed="false"/,
+            `${variant}: host video toggle starts off`);
+        assert.match(popout,
+            /data-cast-toggle="host-audio" title="Audio on host PC" aria-label="Audio on host PC" aria-pressed="false"/,
+            `${variant}: host audio toggle starts off`);
+        assert.ok(popout.indexOf('host-video') < popout.indexOf('host-audio'),
+            `${variant}: video toggle comes first`);
+    }
+
+    // Audio-only mode hides the picture without tearing the <video> out of the page.
+    const playerCss = readFileSync(join(root, 'css/components/player.css'), 'utf8');
+    assert.match(playerCss,
+        /\.tv-player-tile\.is-host-audio \.tv-playback-surface[^{]*\{\s*visibility: hidden;/,
+        'hidden picture keeps the element (and its audio) alive');
+    assert.match(playerCss,
+        /\.tv-player-tile\.is-host-audio[^{]*__poster:not\(\.is-hidden\)[^{]*\{\s*display: block;/,
+        'poster stands in for the hidden picture');
+});
+
+test('resolveHostPlayback keeps the local element decoding for host audio', () => {
+    // Neither flag: the receiver owns playback, the host tile stays quiet.
+    assert.deepEqual(resolveHostPlayback({ hostVideo: false, hostAudio: false }),
+        { shouldPlay: false, shouldMute: true });
+    // Video only: picture on the host, still muted.
+    assert.deepEqual(resolveHostPlayback({ hostVideo: true, hostAudio: false }),
+        { shouldPlay: true, shouldMute: true });
+    // Audio only: paused video has no soundtrack, so it has to keep playing.
+    assert.deepEqual(resolveHostPlayback({ hostVideo: false, hostAudio: true }),
+        { shouldPlay: true, shouldMute: false });
+    assert.deepEqual(resolveHostPlayback({ hostVideo: true, hostAudio: true }),
+        { shouldPlay: true, shouldMute: false });
+    // Missing/empty state falls back to "receiver only".
+    assert.deepEqual(resolveHostPlayback(), { shouldPlay: false, shouldMute: true });
+    assert.deepEqual(resolveHostPlayback({}), { shouldPlay: false, shouldMute: true });
 });
 
 test('buildTileHoverHtml puts the drag grab handle first in the local row', () => {

@@ -696,6 +696,24 @@
     display: none;
 }
 
+/*
+ * Audio-only cast (host audio on, host video off): keep the <video> in the page
+ * — and therefore decoding, which is the only way the host still hears it — but
+ * stop painting the picture. `visibility` rather than `display`: a display:none
+ * video is exactly what makes browsers drop the soundtrack.
+ */
+.tv-player-tile.is-host-audio .tv-playback-surface,
+.tv-player-tile.is-host-audio .tv-playback-surface video {
+    visibility: hidden;
+}
+
+/* Without the picture the captured poster is the tile again, even while playing.
+ * `:not(.is-hidden)` keeps JS authoritative — no stale frame when a channel has none. */
+.tv-player-tile.is-host-audio .tv-player-tile__poster:not(.is-hidden),
+.tv-player-tile.is-host-audio.is-playing .tv-player-tile__poster:not(.is-hidden) {
+    display: block;
+}
+
 .tv-player-tile__empty.is-hidden {
     display: none;
 }

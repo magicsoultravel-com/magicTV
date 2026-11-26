@@ -471,6 +471,7 @@ export const MultiView = {
                 e.preventDefault();
                 const kind = castToggle.getAttribute('data-cast-toggle');
                 if (kind === 'host-video') ChromecastManager.toggleHostVideo();
+                else if (kind === 'host-audio') ChromecastManager.toggleHostAudio();
                 this.scheduleRefreshTiles();
                 return;
             }
