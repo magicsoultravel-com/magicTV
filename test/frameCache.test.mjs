@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FrameCache } from '../js/storage/frameCache.js';
+import { IndexedDBStore } from '../js/storage/indexedDbStore.js';
 
 test('setFrame/getFrame round-trips a data URL keyed by channel URL', async () => {
     await FrameCache.clearFrames();
@@ -130,4 +131,66 @@ test('concurrent first writes after clear all survive (hydrate + writeChain)', a
     // After concurrent settle, both keys must be present.
     assert.equal(await FrameCache.getFrame(a), 'data:image/jpeg;base64,a');
     assert.equal(await FrameCache.getFrame(b), 'data:image/jpeg;base64,b');
+});
+
+test('persists one record per key instead of a single library blob', async () => {
+    await FrameCache.clearFrames();
+    const url = 'https://example.test/per-record.m3u8';
+    const dataUrl = 'data:image/jpeg;base64,perrecord';
+    await FrameCache.setFrame(url, dataUrl);
+
+    assert.equal(
+        await IndexedDBStore.get(FrameCache._LEGACY_FRAME_CACHE_KEY),
+        null,
+        'the legacy whole-library blob is not written any more'
+    );
+    const recordKey = FrameCache._FRAME_PREFIX + url;
+    const records = await IndexedDBStore.getMany([recordKey, FrameCache._FRAME_PREFIX + 'missing']);
+    assert.equal(records.size, 1, 'only the written key exists');
+    assert.equal(records.get(recordKey)?.dataUrl, dataUrl);
+});
+
+test('splits the legacy single-blob cache into per-key records on first use', async () => {
+    await FrameCache.clearFrames();
+    const url = 'https://example.test/legacy-blob.m3u8';
+    const chKey = 'iptv-org:legacy.blob';
+    const dataUrl = 'data:image/jpeg;base64,legacy';
+    const legacyKey = FrameCache._LEGACY_FRAME_CACHE_KEY;
+    await IndexedDBStore.set(legacyKey, {
+        entries: {
+            [url]: { cachedAt: Date.now(), dataUrl },
+            [chKey]: { cachedAt: Date.now(), dataUrl }
+        }
+    });
+
+    // Simulate a fresh page load: no module state, only persisted records.
+    FrameCache._resetForTests();
+    assert.equal(await FrameCache.getFrame(url), dataUrl, 'legacy entry survives the split');
+    assert.equal(await IndexedDBStore.get(legacyKey), null, 'blob removed after the split');
+
+    // A second reload reads straight from the per-key records.
+    FrameCache._resetForTests();
+    assert.equal(await FrameCache.getFrame(chKey), dataUrl);
+});
+
+test('setFrames reports a failed persist instead of faking success', async () => {
+    await FrameCache.clearFrames();
+    const url = 'https://example.test/quota.m3u8';
+    const dataUrl = 'data:image/jpeg;base64,quota';
+    const realSetMany = IndexedDBStore.setMany;
+    const realWarn = console.warn;
+    const errors = [];
+    const off = FrameCache.onStorageError((err) => errors.push(err));
+    try {
+        console.warn = () => {};
+        IndexedDBStore.setMany = async () => false;
+        assert.equal(await FrameCache.setFrame(url, dataUrl), false, 'caller sees the failure');
+        assert.equal(errors.length, 1, 'subscriber is notified once');
+        // The session still renders what it captured, it just is not durable.
+        assert.equal(await FrameCache.getFrame(url), dataUrl);
+    } finally {
+        IndexedDBStore.setMany = realSetMany;
+        console.warn = realWarn;
+        off();
+    }
 });

@@ -290,11 +290,21 @@ async function get(key, legacyKey) {
     }
 
     return new Promise((resolve) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.get(key);
-        req.onsuccess = () => resolve(req.result ? req.result.value : null);
-        req.onerror = () => resolve(getFromMemory(key) ?? null);
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).get(key);
+            req.onsuccess = () => finish(req.result ? req.result.value : null);
+            req.onerror = () => finish(getFromMemory(key) ?? null);
+            tx.onabort = () => finish(getFromMemory(key) ?? null);
+        } catch {
+            finish(getFromMemory(key) ?? null);
+        }
     });
 }
 
@@ -313,15 +323,26 @@ async function set(key, value) {
     }
 
     return new Promise((resolve) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.put({ key, value });
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => {
+        let settled = false;
+        const finish = (ok) => {
+            if (settled) return;
+            settled = true;
             // If IndexedDB fails, fall back to in-memory for this session
-            setInMemory(key, value);
-            resolve(false);
+            if (!ok) setInMemory(key, value);
+            resolve(ok);
         };
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put({ key, value });
+            tx.oncomplete = () => finish(true);
+            tx.onerror = () => finish(false);
+            // An aborted transaction (quota, tab closing mid-write) must never
+            // leave the caller hanging — a shared write chain that never settles
+            // freezes every later write for the rest of the session.
+            tx.onabort = () => finish(false);
+        } catch {
+            finish(false);
+        }
     });
 }
 
@@ -339,14 +360,180 @@ async function remove(key) {
     }
 
     return new Promise((resolve) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.delete(key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => {
-            removeFromMemory(key);
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
             resolve();
         };
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).delete(key);
+            tx.oncomplete = finish;
+            tx.onerror = () => {
+                removeFromMemory(key);
+                finish();
+            };
+            tx.onabort = () => {
+                removeFromMemory(key);
+                finish();
+            };
+        } catch {
+            removeFromMemory(key);
+            finish();
+        }
+    });
+}
+
+/**
+ * Read many keys in a single IndexedDB transaction.
+ *
+ * Frame/poster caches keep one record per key, so a grid of N tiles primes with
+ * one transaction instead of N reads (or one whole-library blob read).
+ *
+ * @param {string[]} keys
+ * @returns {Promise<Map<string, any>>} key → value for hits only
+ */
+async function getMany(keys) {
+    const list = [...new Set((keys || []).filter(Boolean))];
+    const out = new Map();
+    if (!list.length) return out;
+
+    const db = await openDb();
+    if (!db) {
+        for (const key of list) {
+            const value = getFromMemory(key);
+            if (value !== undefined) out.set(key, value);
+        }
+        return out;
+    }
+
+    return new Promise((resolve) => {
+        const finish = () => resolve(out);
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            for (const key of list) {
+                const req = store.get(key);
+                req.onsuccess = () => {
+                    if (req.result) out.set(key, req.result.value);
+                };
+            }
+            tx.oncomplete = finish;
+            tx.onerror = finish;
+            tx.onabort = finish;
+        } catch {
+            for (const key of list) {
+                const value = getFromMemory(key);
+                if (value !== undefined) out.set(key, value);
+            }
+            resolve(out);
+        }
+    });
+}
+
+/**
+ * Write many records in a single IndexedDB transaction.
+ *
+ * @param {Array<[string, any]>} pairs
+ * @returns {Promise<boolean>} True only when the whole transaction committed.
+ *   False means the data lives only in the session memory fallback.
+ */
+async function setMany(pairs) {
+    const list = (pairs || []).filter((pair) => Array.isArray(pair) && pair[0]);
+    if (!list.length) return true;
+
+    const db = await openDb();
+    if (!db) {
+        for (const [key, value] of list) setInMemory(key, value);
+        return true;
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (ok) => {
+            if (settled) return;
+            settled = true;
+            if (!ok) {
+                // Keep this session usable, but report the batch was not durable.
+                for (const [key, value] of list) setInMemory(key, value);
+            }
+            resolve(ok);
+        };
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            for (const [key, value] of list) store.put({ key, value });
+            tx.oncomplete = () => finish(true);
+            tx.onerror = () => finish(false);
+            tx.onabort = () => finish(false);
+        } catch {
+            finish(false);
+        }
+    });
+}
+
+/**
+ * Delete many records in a single IndexedDB transaction.
+ *
+ * @param {string[]} keys
+ * @returns {Promise<void>}
+ */
+async function removeMany(keys) {
+    const list = [...new Set((keys || []).filter(Boolean))];
+    if (!list.length) return;
+
+    const db = await openDb();
+    if (!db) {
+        for (const key of list) removeFromMemory(key);
+        return;
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+        };
+        const fallbackAndFinish = () => {
+            for (const key of list) removeFromMemory(key);
+            finish();
+        };
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            for (const key of list) store.delete(key);
+            tx.oncomplete = finish;
+            tx.onerror = fallbackAndFinish;
+            tx.onabort = fallbackAndFinish;
+        } catch {
+            fallbackAndFinish();
+        }
+    });
+}
+
+/**
+ * List every stored key (keys only — no values are deserialized).
+ *
+ * @returns {Promise<string[]>}
+ */
+async function getAllKeys() {
+    const db = await openDb();
+    if (!db) {
+        return memoryFallback ? Array.from(memoryFallback.keys()) : [];
+    }
+
+    return new Promise((resolve) => {
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).getAllKeys();
+            req.onsuccess = () => resolve((req.result || []).filter((k) => typeof k === 'string'));
+            req.onerror = () => resolve([]);
+            tx.onabort = () => resolve([]);
+        } catch {
+            resolve([]);
+        }
     });
 }
 
@@ -385,23 +572,41 @@ async function clear() {
     }
 
     return new Promise((resolve) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => {
-            clearMemory();
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
             resolve();
         };
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).clear();
+            tx.oncomplete = finish;
+            tx.onerror = () => {
+                clearMemory();
+                finish();
+            };
+            tx.onabort = () => {
+                clearMemory();
+                finish();
+            };
+        } catch {
+            clearMemory();
+            finish();
+        }
     });
 }
 
 export const IndexedDBStore = {
     get,
+    getMany,
     set,
+    setMany,
     remove,
+    removeMany,
     clear,
     getAll,
+    getAllKeys,
     openDb,
     /** @internal test seam */
     _DB_NAME: DB_NAME,
