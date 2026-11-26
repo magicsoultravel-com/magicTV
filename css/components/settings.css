@@ -168,6 +168,16 @@ details.settings-section > summary::-webkit-details-marker {
     max-width: none;
 }
 
+/* Online-check sits inboard of the unhide toggle (catalog leaves a fav slot). */
+.settings-hidden-grid .channel-tile__refresh-btn {
+    right: 20px;
+}
+
+/* Spin while the check is in flight — mirrors #browser-refresh-btn.is-loading. */
+.settings-hidden-grid .channel-tile__refresh-btn.is-checking svg {
+    animation: spin 0.8s linear infinite;
+}
+
 .settings-color-group {
     display: flex;
     flex-direction: column;

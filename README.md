@@ -222,7 +222,7 @@ Open via the remote/browser **Settings** tab (`#settings-panel`):
 - **Playback** — Buffer size (5–120s), max recents / previous channels (0–500 or unlimited)
 - **Transitions** — Channel-switch and catalog view transitions (default: Random)
 - **Appearance** — Theme, font, color groups, text size (default 75%), tile/list width (default 120px), active-tile (default Wave), visited accents (default Accent 2 / undistinguished), remote opacity & idle fade, remote texture, live preview; **Reset to defaults** under the preview
-- **Hidden / Visited Channels** — Browse and restore/remove entries by country
+- **Hidden / Visited Channels** — Browse and restore/remove entries by country; hover a hidden TV tile and hit its refresh icon to **check if the stream is still online** (snapshot = online, toast verdict — radio tiles are audio-only, so no check)
 - **Most watched** — Collapsible watch-time stats with refresh/clear
 - **Storage** — Counts and quota estimate
 - **About** — Version

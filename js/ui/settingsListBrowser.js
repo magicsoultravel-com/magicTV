@@ -47,6 +47,8 @@ function groupByCountry(meta, countryNameFn) {
  * @param {(ch: object) => boolean} config.onRemove
  * @param {string} config.removeToast
  * @param {(ch: object) => void} [config.afterRemove]
+ * @param {(ch: object, tile: HTMLElement) => void} [config.onRefresh] refresh/online-check button
+ * @param {string} [config.refreshBtnSelector] defaults to '.channel-tile__refresh-btn'
  */
 export function createSettingsListBrowser(config) {
     let deps = {
@@ -81,6 +83,17 @@ export function createSettingsListBrowser(config) {
             tile.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); }
             });
+            const refreshBtn = typeof config.onRefresh === 'function'
+                ? tile.querySelector(config.refreshBtnSelector || '.channel-tile__refresh-btn')
+                : null;
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    config.onRefresh(ch, tile);
+                });
+                refreshBtn.addEventListener('keydown', (e) => e.stopPropagation());
+            }
             const btn = tile.querySelector(config.actionBtnSelector);
             if (!btn) return;
             btn.addEventListener('click', (e) => {
