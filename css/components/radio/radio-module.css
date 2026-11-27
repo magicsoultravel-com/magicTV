@@ -130,12 +130,14 @@
     cursor: pointer;
 }
 
-/* Station rocker — left gutter of cassette; always visible (unlike tile hover rockers) */
+/* Station rocker — right gutter of cassette; always visible (unlike tile hover rockers).
+ * Mirrored to the right edge and lifted one rocker row so it sits beside the
+ * cassette's label row, clear of the transport keys below. */
 .radio-module__station-rocker.tv-player-tile__rocker {
     position: absolute;
-    left: calc(2px * var(--radio-scale, 1));
-    top: calc(48px * var(--radio-scale, 1));
-    right: auto;
+    left: auto;
+    right: calc(2px * var(--radio-scale, 1));
+    top: calc(22px * var(--radio-scale, 1));
     transform: none;
     z-index: 2;
     opacity: 1;
@@ -164,12 +166,14 @@
     position: relative;
 }
 
+/* Rocker lives on the right now — the bind menu opens leftward into the dialog
+ * instead of running off its edge. */
 .chan-bind-menu.radio-module__station-bind-menu {
     position: absolute;
     top: 50%;
     bottom: auto;
-    left: calc(100% + 0.35rem);
-    right: auto;
+    left: auto;
+    right: calc(100% + 0.35rem);
     transform: translateY(-50%);
     z-index: 9000;
     min-width: 11rem;
@@ -398,7 +402,9 @@
 
 .radio-module__controls {
     position: relative;
-    z-index: 1;
+    /* Above the station rocker (z-index 2) so the Play/Mute trays can slide out
+     * over it — a tray inside a lower stacking context could never do that. */
+    z-index: 3;
     margin-top: auto;
     display: flex;
     flex-direction: column;
@@ -422,8 +428,92 @@
     min-height: calc(36px * var(--radio-scale, 1));
 }
 
+/* Play / Mute trays — one extra key each, sliding out of the top of the key on
+ * hover, same recipe as the Chrome TV-player hover chrome (tile popouts) and the
+ * remote's slide-out keys. Opacity-only instead of `visibility: hidden` so Tab
+ * can still reach Cast / focus-radio: `:focus-within` opens the tray. */
+.radio-module__tray-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* The key is the tray's anchor for the cast dot below. */
+.radio-module__tray-wrap > .tv-controls__btn {
+    position: relative;
+}
+
+/* Pointer bridge across the gap above the key so the tray survives the travel. */
+.radio-module__tray-wrap::after {
+    content: '';
+    position: absolute;
+    left: calc(-10px * var(--radio-scale, 1));
+    right: calc(-10px * var(--radio-scale, 1));
+    bottom: 100%;
+    height: calc(0.4rem * var(--radio-scale, 1) + 12px);
+}
+
+/* Mute is the last column — nudge its tray left so it clears the station rocker. */
+.radio-module__tray-wrap--mute {
+    --radio-tray-shift: calc(-8px * var(--radio-scale, 1));
+}
+
+.radio-module__tray {
+    position: absolute;
+    bottom: calc(100% + 0.3rem * var(--radio-scale, 1));
+    left: 50%;
+    transform: translateX(calc(-50% + var(--radio-tray-shift, 0px))) translateY(calc(100% + 4px));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(0.2rem * var(--radio-scale, 1));
+    padding: calc(0.2rem * var(--radio-scale, 1));
+    width: max-content;
+    border-radius: calc(8px * var(--radio-scale, 1));
+    background: var(--tv-bg-secondary, #12151f);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    z-index: 2;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        transform 0.22s ease,
+        opacity 0.18s ease;
+}
+
+.radio-module__tray-wrap:hover .radio-module__tray,
+.radio-module__tray-wrap:focus-within .radio-module__tray {
+    transform: translateX(calc(-50% + var(--radio-tray-shift, 0px))) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+/* Cast now rides the Play tray, so keep its state visible on the key itself. */
+.radio-module.is-casting .radio-module__tray-wrap--play > #radio-play-btn::after {
+    content: '';
+    position: absolute;
+    top: calc(4px * var(--radio-scale, 1));
+    right: calc(4px * var(--radio-scale, 1));
+    width: calc(4px * var(--radio-scale, 1));
+    height: calc(4px * var(--radio-scale, 1));
+    border-radius: 50%;
+    background: var(--tv-accent, #7ecbff);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--tv-accent, #7ecbff) 70%, transparent);
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .radio-module__tray {
+        transition: opacity 0.12s ease;
+    }
+}
+
 .radio-module__vol.remote-volume-bar {
-    grid-column: 1 / span 3;
+    /* Row 2 is the volume bar alone now that Cast / focus-radio ride the Play and
+     * Mute trays — let it span the full toolbar instead of hugging the left. */
+    grid-column: 1 / -1;
     justify-self: stretch;
     width: 100%;
     min-width: 0;
