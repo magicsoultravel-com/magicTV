@@ -1,5 +1,5 @@
 /** Remote control panel — default view inside the remote module. */
-import { countryFlagEmoji, el, queryAllInApp } from '../tvUtils.js';
+import { countryFlagEmoji, el, queryAllInApp, hideKeyCell } from '../tvUtils.js';
 import { MultiView, SLOT_SCREEN_LABELS } from '../multiView.js';
 import { ACTION_ICONS, CARD_ICONS, LAYOUT_ICONS } from './icons.js';
 import { FavoritesRecents } from '../storage/favoritesRecents.js';
@@ -67,7 +67,6 @@ function syncNavPlacement(tabName) {
 
     const footerNavRow = el('remote-panel-footer-nav-row');
     const browserNav = el('browser-panel-nav-group');
-    const mosaicGroup = el('remote-panel-mosaic-group');
     const split = isSplit();
     const joined = !split;
     const browserTab = tabName !== 'remote';
@@ -86,13 +85,13 @@ function syncNavPlacement(tabName) {
         return;
     }
 
-    // Keep catalog nav immediately before mosaic controls (after volumes / chrome).
-    if (mosaicGroup) {
-        if (navGroup.parentElement !== grid || navGroup.nextElementSibling !== mosaicGroup) {
-            grid.insertBefore(navGroup, mosaicGroup);
-        }
-    } else if (navGroup.parentElement !== grid) {
-        grid.appendChild(navGroup);
+    // Key positions are pinned by the keypad map (remote-panel.css), so the nav row
+    // no longer has to sit at the end of the flow — it only has to be back inside
+    // the grid after a footer stint. Anchoring before the volume row keeps the DOM
+    // order equal to the visual order (rows 4-5 → row 6 → volume) for keyboard users.
+    if (navGroup.parentElement !== grid) {
+        const volumeCell = grid.querySelector('.remote-panel__cell--volume');
+        grid.insertBefore(navGroup, volumeCell || null);
     }
 
     if (browserNav) {
@@ -203,9 +202,10 @@ function focusedChannel() {
 }
 
 /**
- * Remote popout pickers — one host key slides a tray of options out above it.
- * The Multi-TV layout picker set this interaction; Share and TV Travel reuse it
- * so every "key with options" on the remote opens, clamps and dismisses alike.
+ * Remote popout pickers — one host key slides a tray of options out above (or,
+ * for the 1-9 key, below) it. The Multi-TV layout picker set this interaction;
+ * Share, TV Travel and the number board reuse it so every "key with options" on
+ * the remote opens, clamps and dismisses alike.
  */
 const POPOUT_PICKERS = {
     layout: {
@@ -225,6 +225,12 @@ const POPOUT_PICKERS = {
         btnId: 'remote-travel-btn',
         popoutId: 'remote-travel-picker-popout',
         shiftVar: '--travel-popout-shift'
+    },
+    numpad: {
+        wrapId: 'remote-numpad-wrap',
+        btnId: 'remote-numpad-btn',
+        popoutId: 'remote-numpad-popout',
+        shiftVar: '--numpad-popout-shift'
     }
 };
 
@@ -232,7 +238,7 @@ const POPOUT_INSET_PX = 8;
 /** Hover-intent grace (ms): the key→tray gap must not slam a hovered tray shut. */
 const POPOUT_HOVER_CLOSE_MS = 140;
 
-/** Mini keypad opens its trays on hover; the full remote keeps the click toggle. */
+/** Mini keypad clamps its trays against the viewport instead of the dialog. */
 function isMiniFloating() {
     return document.body?.classList?.contains('remote-mini-floating') === true;
 }
@@ -342,10 +348,11 @@ export function syncLayoutPicker() {
 }
 
 /**
- * Wire one popout picker: the host key toggles the tray, an outside press or
- * Escape dismisses it. Option clicks are wired by the caller (layout modes) or
- * flow through `data-remote-action` into `handleRemoteAction` (share / travel).
- * @param {'layout' | 'share' | 'travel'} name
+ * Wire one popout picker: the host key toggles the tray, hovering it opens the
+ * tray, an outside press or Escape dismisses it. Option clicks are wired by the
+ * caller (layout modes) or flow through `data-remote-action` into
+ * `handleRemoteAction` (share / travel / digits).
+ * @param {'layout' | 'share' | 'travel' | 'numpad'} name
  * @returns {HTMLElement | null} the wrap, or null when absent/already bound
  */
 function bindPicker(name) {
@@ -365,22 +372,23 @@ function bindPicker(name) {
         openPicker(name);
     });
 
-    // Mini keypad: the tray follows the pointer like the full remote's slide-out,
-    // without the extra click. Pointer-type gated so touch keeps the click toggle,
-    // and the tray lives inside the wrap, so moving onto it re-enters and cancels
-    // the pending close instead of flickering shut across the 0.35rem gap.
+    // Every surface (full remote, docked sheet, mini float, external popout)
+    // opens the tray on hover, like the player-tile chrome. Pointer-type gated so
+    // touch keeps the click toggle, and the tray lives inside the wrap, so moving
+    // onto it re-enters and cancels the pending close instead of flickering shut
+    // across the 0.35rem gap.
     let hoverCloseTimer = 0;
     const cancelHoverClose = () => {
         if (hoverCloseTimer) clearTimeout(hoverCloseTimer);
         hoverCloseTimer = 0;
     };
     wrap.addEventListener('pointerenter', (e) => {
-        if (e.pointerType === 'touch' || !isMiniFloating()) return;
+        if (e.pointerType === 'touch') return;
         cancelHoverClose();
         openPicker(name);
     });
     wrap.addEventListener('pointerleave', (e) => {
-        if (e.pointerType === 'touch' || !isMiniFloating()) return;
+        if (e.pointerType === 'touch') return;
         cancelHoverClose();
         hoverCloseTimer = setTimeout(() => {
             hoverCloseTimer = 0;
@@ -425,6 +433,11 @@ function bindSharePicker() {
 
 function bindTravelPicker() {
     bindPicker('travel');
+}
+
+/** The 1-9 key slides the number board into the body instead of ten key slots. */
+function bindNumpadPicker() {
+    bindPicker('numpad');
 }
 
 async function handleRemoteAction(action) {
@@ -576,10 +589,11 @@ export function syncRemotePanel() {
         if (slash) slash.style.opacity = audible ? '0' : '1';
     }
 
-    // Share key hides as a whole (cell stays) so the chrome row never reflows.
+    // Share key hides as a whole (cell included) so the grid closes the gap
+    // instead of leaving a key-shaped hole between Cast and Travel.
     const showShare = Boolean(player?.channel);
     queryAllInApp('.remote-share-btn').forEach((wrap) => {
-        wrap.classList.toggle('is-hidden', !showShare);
+        hideKeyCell(wrap, !showShare);
         if (showShare) return;
         // Drop a stale open tray so it cannot reappear with the next channel.
         wrap.classList.remove('is-open');
@@ -620,7 +634,7 @@ export function syncRemotePanel() {
     const multiTv = tvCount > 1;
 
     const rotateBtn = el('remote-rotate-btn');
-    rotateBtn?.classList.toggle('is-hidden', !multiTv);
+    hideKeyCell(rotateBtn, !multiTv);
 
     syncTvTravelPicker(multiTv);
 
@@ -688,7 +702,7 @@ function syncTvTravelPicker(multiTv) {
         MultiView.stopTvTravel?.();
         active = false;
     }
-    wrap?.classList.toggle('is-hidden', !multiTv);
+    hideKeyCell(wrap, !multiTv);
     if (!multiTv) closePicker('travel');
 
     if (btn) {
@@ -734,6 +748,7 @@ export const RemotePanel = {
         bindLayoutPicker();
         bindSharePicker();
         bindTravelPicker();
+        bindNumpadPicker();
         syncRemotePanel();
     },
 

@@ -8,7 +8,7 @@
  * volume percentage carries `data-remote-all-pct`), so a single sync pass keeps
  * every surface — including the OS popout document — in step.
  */
-import { queryAllInApp } from '../tvUtils.js';
+import { queryAllInApp, hideKeyCell } from '../tvUtils.js';
 import { PLAY_ALL_SVG, PAUSE_ALL_SVG } from './tileHoverControls.js';
 
 /** All buttons for one "all" action, across app documents. */
@@ -53,7 +53,10 @@ export function syncStopAllKeys(anyPlaying) {
     remoteAllKeys('stop').forEach((btn) => {
         btn.title = 'Stop all';
         btn.setAttribute('aria-label', 'Stop all');
-        btn.classList.toggle('is-hidden', !active);
+        // Full remote: hide the whole cell — the pin map keeps its slot, so the pad
+        // shows a hole instead of reflowing the keys below it. The mini fly-out copy
+        // has no cell of its own (hideKeyCell skips radio trays).
+        hideKeyCell(btn, !active);
         btn.setAttribute('aria-disabled', String(!active));
         btn.setAttribute('aria-pressed', String(active));
     });

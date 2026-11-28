@@ -47,3 +47,21 @@ export function queryAllInApp(selector) {
 export function els(query) {
     return Array.from(document.querySelectorAll(query));
 }
+
+/**
+ * Hide a keypad key *and* the grid cell that owns it.
+ *
+ * The remote keypad packs its keys with normal grid flow, so hiding only the
+ * button leaves a key-shaped hole where the next key does not move up. The cell
+ * is the flow item (`display: contents` groups drop straight through to the
+ * grid), which makes it the thing to hide. Keys with no cell of their own —
+ * the mini fly-out copies inside `radio-tray__popout`, module action buttons —
+ * just hide themselves.
+ */
+export function hideKeyCell(node, hidden) {
+    if (!node) return;
+    const hide = hidden === true;
+    node.classList.toggle('is-hidden', hide);
+    if (node.closest?.('.radio-tray__popout')) return;
+    node.closest?.('.remote-panel__cell')?.classList.toggle('is-hidden', hide);
+}

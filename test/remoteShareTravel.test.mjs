@@ -56,8 +56,8 @@ test('share key hides with the channel and closes its tray', () => {
     );
     assert.match(
         remotePanelJs,
-        /wrap\.classList\.toggle\('is-hidden', !showShare\)/,
-        'the wrap hides only when no channel is loaded'
+        /hideKeyCell\(wrap, !showShare\)/,
+        'the wrap and its grid cell hide only when no channel is loaded'
     );
     assert.match(
         remotePanelJs,
@@ -104,8 +104,8 @@ test('travel tray offers Off / Quick / Slow / Random and drives the global ring'
     );
     assert.match(
         remotePanelJs,
-        /wrap\?\.classList\.toggle\('is-hidden', !multiTv\)/,
-        'travel key hides with a single screen'
+        /hideKeyCell\(wrap, !multiTv\)/,
+        'travel key hides (cell included) with a single screen'
     );
 });
 
@@ -128,4 +128,51 @@ test('both trays reuse the layout picker slide-out recipe', () => {
         /shiftVar: '--travel-popout-shift'/,
         'JS clamps the travel tray'
     );
+});
+
+test('every remote tray opens on hover, on every surface', () => {
+    // One hover recipe for layout / share / travel / the number board, gated by
+    // pointer type only — the full remote, docked sheet and popout hover too.
+    assert.match(remotePanelJs, /wrap\.addEventListener\('pointerenter', \(e\) => \{\s*\n\s*if \(e\.pointerType === 'touch'\) return;/, 'hover opens the tray');
+    assert.match(remotePanelJs, /wrap\.addEventListener\('pointerleave', \(e\) => \{\s*\n\s*if \(e\.pointerType === 'touch'\) return;/, 'leaving arms the close timer');
+    assert.doesNotMatch(remotePanelJs, /!isMiniFloating\(\)\) return;/, 'no mini-only hover gate is left');
+    for (const id of ['remote-layout-picker-wrap', 'remote-share-picker-wrap', 'remote-travel-picker-wrap', 'remote-numpad-wrap']) {
+        assert.match(remotePanelJs, new RegExp(`wrapId: '${id}'`), `${id} is a registered picker`);
+    }
+    assert.match(remotePanelJs, /bindPicker\('numpad'\)/, 'the 1-9 key is wired like the other trays');
+
+    // The bind key is a picker too: hover opens the scope menu, leaving closes it.
+    const chanBindJs = read('js/ui/chanBindPicker.js');
+    assert.match(chanBindJs, /function openMenuEl\(menuEl, btnEl\)/, 'menu open helper is shared by click + hover');
+    assert.match(chanBindJs, /popup\.addEventListener\('pointerenter'/, 'hover opens the bind menu');
+    assert.match(chanBindJs, /popup\.addEventListener\('pointerleave'/, 'leaving closes the bind menu');
+    assert.match(chanBindJs, /MENU_HOVER_CLOSE_MS/, 'the bind menu keeps the tray grace period');
+    assert.doesNotMatch(chanBindJs, /!isMiniFloating/, 'the bind menu is not mini-gated');
+
+    // The "-all" fly-outs are a mini-only affordance: Play all / Stop all / Mute all
+    // have their own row-4 keys on every other surface.
+    assert.match(
+        css,
+        /body:not\(\.remote-mini-floating\) #remote-panel \.remote-panel__grid \.radio-tray__popout\s*\{\s*display:\s*none/s
+    );
+});
+
+test('1-9 key drops the number board into the keypad body', () => {
+    // One key replaces ten: the digits keep their ids, actions and accents.
+    assert.match(html, /id="remote-numpad-wrap"/);
+    assert.match(html, /id="remote-numpad-btn"[^>]*aria-haspopup="true"[^>]*aria-expanded="false"/);
+    assert.match(html, /class="[^"]*remote-panel__btn--numpad"[^>]*id="remote-numpad-btn"/);
+    const board = html.slice(html.indexOf('id="remote-numpad-popout"'), html.indexOf('data-remote-key="stop"'));
+    assert.equal((board.match(/data-remote-action="digit-/g) || []).length, 10, 'all ten digits live in the board');
+    assert.equal((html.match(/<div class="remote-panel__cell"[^>]*><button[^>]*remote-panel__btn--digit/g) || []).length, 0, 'no digit owns a grid cell');
+
+    // The board is a tray: absolute, three columns, clamped with its own var.
+    assert.match(css, /\.remote-panel__numpad-wrap\s*\{[^}]*position:\s*relative/s);
+    assert.match(css, /\.remote-panel__numpad-popout\s*\{[^}]*top:\s*calc\(100% \+ 0\.35rem\)/s);
+    assert.match(css, /\.remote-panel__numpad-popout\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*var\(--remote-btn-size/s);
+    assert.match(css, /\.remote-panel__numpad-popout\s*\{[^}]*z-index:\s*9000/s);
+    assert.match(css, /\.remote-panel__numpad-wrap\.is-open \.remote-panel__numpad-popout\s*\{[^}]*visibility:\s*visible/s);
+    assert.match(css, /\.remote-panel__numpad-popout #remote-digit-0\s*\{[^}]*grid-column:\s*2/s);
+    assert.match(remotePanelJs, /shiftVar: '--numpad-popout-shift'/);
+    assert.match(css, /--numpad-popout-shift/);
 });

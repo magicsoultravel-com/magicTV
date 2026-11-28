@@ -601,10 +601,66 @@ body.browser-shell-split .browser-dock-sheet__inner > .tv-module__actions--brows
     display: grid;
     grid-template-columns: repeat(var(--remote-grid-cols, 5), minmax(0, 1fr));
     gap: var(--remote-grid-gap, 0.4rem);
-    /* The grid already stretches its tracks to the panel width; a `min()` against
-       --remote-min-width would only shrink it and manufacture X overflow. */
     width: 100%;
+    /* Tracks are sized from the key, not from the panel. The expanded dock forces
+       the dialog to 2× --remote-min-width (remote-shell.css), and a pad that
+       stretched with it put every 40px key in a ~90px track: the stretch cells kept
+       their button centred, but the fixed-width `.radio-tray` cells aligned to the
+       track start, so play/stop/mute sat ~25px left of their column. Capping the
+       grid keeps the columns at --remote-btn-size and centres the block in the
+       slack instead. */
+    max-width: var(--remote-grid-width, 260px);
 }
+
+/* ===== Keypad map =====
+   The full remote's pad is a fixed 5-column × 6-row board plus the volume row:
+
+     r1: chan↑   ·       power    ·       vol↑        (slots 2 and 4 stay empty)
+     r2: bind    guide   fav      radio   mute
+     r3: chan↓   play    1-9      stop    vol↓
+     r4: popOut  full    cast     share   travel
+     r5: multiTV rotate  playAll  stopAll muteAll
+     r6: remote  browse  favs     recents settings
+     r7: volume split — auto-placed (grid-column: 1 / -1), so it lands in the first
+         fully free row: 7 normally, 6 while the nav row is dropped into the footer.
+
+   Every key is pinned, so hiding a conditional key (radio, stop all, rotate, share,
+   travel) leaves its slot empty instead of reflowing the rows below it, and
+   `syncNavPlacement()` stays free to re-parent the nav group without moving a key
+   on screen. Scoped away from the mini float, whose 4×3 pad repacks by `order`. */
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="chan-up"] { grid-area: 1 / 1; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="power"] { grid-area: 1 / 3; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="vol-up"] { grid-area: 1 / 5; }
+
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="bind"] { grid-area: 2 / 1; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="guide"] { grid-area: 2 / 2; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="fav"] { grid-area: 2 / 3; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="radio"] { grid-area: 2 / 4; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="mute"] { grid-area: 2 / 5; }
+
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="chan-down"] { grid-area: 3 / 1; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="play"] { grid-area: 3 / 2; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="numpad"] { grid-area: 3 / 3; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="stop"] { grid-area: 3 / 4; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="vol-down"] { grid-area: 3 / 5; }
+
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="popout"] { grid-area: 4 / 1; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="fullscreen"] { grid-area: 4 / 2; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="cast"] { grid-area: 4 / 3; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="share"] { grid-area: 4 / 4; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="travel"] { grid-area: 4 / 5; }
+
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="layout"] { grid-area: 5 / 1; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="rotate"] { grid-area: 5 / 2; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="play-all"] { grid-area: 5 / 3; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="stop-all"] { grid-area: 5 / 4; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="mute-all"] { grid-area: 5 / 5; }
+
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="nav-remote"] { grid-area: 6 / 1; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="nav-browse"] { grid-area: 6 / 2; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="nav-favs"] { grid-area: 6 / 3; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="nav-recents"] { grid-area: 6 / 4; }
+body:not(.remote-mini-floating) #remote-panel [data-remote-key="nav-settings"] { grid-area: 6 / 5; }
 
 /* Full remote only: the dialog is tall enough for the pad plus a chin of unused
    space at ~scale 1, so let the rows take that height (keys keep their fixed
@@ -636,6 +692,16 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid {
     line-height: 1;
 }
 
+/* Ten digit keys collapsed into one "1-9" key: the board slides out below it.
+   Tighter tracking keeps the label centred inside the same round key face. */
+.remote-panel__btn--numpad {
+    font-size: calc(0.78rem * var(--remote-scale, 1));
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
 .remote-panel__cell--volume {
     grid-column: 1 / -1;
     display: flex;
@@ -644,7 +710,8 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid {
     min-height: var(--remote-btn-size, 40px);
 }
 
-/* Radio tray — grid play/stop/mute cells host an "-all" fly-out (mini remote only). */
+/* Radio tray — the mini keypad's play/stop/mute cells host an "-all" fly-out
+   (the only surface that still needs one; see the mini-only rule further down). */
 .radio-tray {
     position: relative;
     min-height: var(--remote-btn-size, 40px);
@@ -734,11 +801,21 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid {
 
 /* Keypad play/stop/mute cells: the tray disables pointer events for chrome
    collapsing, so explicitly restore hits on the primary key. The "-all"
-   variant sits in a tile-style popout tray directly above the primary.
-   The tray slides out from behind the key (z-index below it), so it can
-   animate without ever stealing the primary's hits. */
+   variant sits in a tile-style popout tray directly above the primary (mini
+   float only — see the mini-only rule below). The tray slides out from behind
+   the key (z-index below it), so it can animate without ever stealing the
+   primary's hits. */
 .remote-panel__grid .radio-tray {
     overflow: visible;
+    /* The tray pins its own box to --remote-btn-size, so unlike the stretch cells
+       around it this item has BOTH a definite width and a definite height. A
+       definite size opts the item out of `stretch`, so the grid parks it at the
+       track start (width) and the row start (height) instead of centring it:
+       that was the play/stop/mute drift — left of their column, and ~10px above
+       their row once the full remote's rows grew past the key height. Centre the
+       box on both axes; the button inside then lands on the key grid. */
+    justify-self: center;
+    align-self: center;
 }
 
 .remote-panel__grid .radio-tray > .remote-panel__btn {
@@ -779,6 +856,17 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid {
     display: none;
 }
 
+/* The `-all` fly-out is a mini-pad affordance only: the mini's 4×3 pack has no
+   room for the dedicated Play all / Stop all / Mute all keys, so the tray is how
+   they stay reachable there. Every other surface (full remote, docked sheet,
+   external popout) lays those three keys out on row 4 of the keypad map, so this
+   tray copy would just duplicate them — and hovering Play would show "play all"
+   right under the real key. The buttons stay in the DOM because the mini tray
+   needs them. */
+body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__popout {
+    display: none;
+}
+
 .remote-panel__grid .radio-tray__popout > .radio-tray__btn {
     width: var(--remote-btn-size, 40px);
     height: var(--remote-btn-size, 40px);
@@ -793,12 +881,6 @@ body:not(.remote-mini-floating) #remote-panel .remote-panel__grid {
     visibility: visible;
     pointer-events: auto;
     transition-delay: 0.06s;
-}
-
-/* The full remote renders dedicated play/stop/mute-all keys in the keypad, so
-   the "-all" hover fly-outs are a mini-floating affordance only. */
-body:not(.remote-mini-floating) #remote-panel .remote-panel__grid .radio-tray__popout {
-    display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

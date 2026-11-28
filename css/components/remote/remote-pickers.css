@@ -39,6 +39,14 @@ body.remote-mini-floating .remote-panel__chan-bind-popup .chan-bind-menu {
     transform: none;
 }
 
+/* Full keypad: the bind key is the first key of row 2 — column 1 of the pad — so a
+ * centered 9.5rem menu would overhang the left edge of the panel's overflow-x clip
+ * just like the mini's did. Grow it rightward from the key. */
+body:not(.remote-mini-floating) #remote-panel .remote-panel__chan-bind-popup .chan-bind-menu {
+    left: 0;
+    transform: none;
+}
+
 .chan-bind-menu__item {
     display: block;
     width: 100%;
@@ -248,4 +256,72 @@ body.remote-mini-floating .remote-panel__layout-wrap.is-open.is-drop-down .remot
 .remote-panel__travel-option.is-active {
     background: color-mix(in srgb, currentColor var(--btn-tint-active), var(--remote-btn-face));
     border-color: color-mix(in srgb, currentColor var(--btn-ring-active), transparent);
+}
+
+/* Number board — the 1-9 key drops a 3×4 board of digits into the keypad body
+ * instead of occupying ten keys. Same wrap/tray recipe as the layout picker, but
+ * it opens DOWNWARD: the board is ~3 keys tall, so sliding it below the key keeps
+ * it inside the body (row 1 has five empty rows underneath) and off the chrome.
+ * ::after bridges the key→tray gap so crossing it never counts as a pointerleave.
+ * The tray is absolute, so it paints over rows 2-4 without reflowing the grid. */
+.remote-panel__numpad-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    --numpad-popout-shift: 0px;
+}
+
+.remote-panel__numpad-wrap::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    top: 100%;
+    height: calc(0.35rem + 16px);
+    pointer-events: none;
+}
+
+.remote-panel__numpad-popout {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 50%;
+    transform: translateX(calc(-50% + var(--numpad-popout-shift))) translateY(-4px);
+    display: grid;
+    grid-template-columns: repeat(3, var(--remote-btn-size, 40px));
+    grid-auto-rows: var(--remote-btn-size, 40px);
+    gap: calc(var(--remote-grid-gap, 0.4rem) / 2);
+    padding: 0.2rem;
+    border-radius: 8px;
+    background: var(--tv-bg-secondary, #12151f);
+    border: 1px solid color-mix(in srgb, var(--tv-border) 65%, transparent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        transform 0.22s ease,
+        opacity 0.22s ease,
+        visibility 0.22s ease 0.14s;
+    z-index: 9000;
+}
+
+.remote-panel__numpad-wrap.is-open .remote-panel__numpad-popout {
+    transform: translateX(calc(-50% + var(--numpad-popout-shift))) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.06s;
+}
+
+.remote-panel__numpad-popout .remote-panel__btn--digit {
+    width: var(--remote-btn-size, 40px);
+    height: var(--remote-btn-size, 40px);
+    min-width: var(--remote-btn-size, 40px);
+    padding: 0;
+}
+
+/* 1-9 in reading order, a lone 0 centred under the 8 (phone-dial shape). */
+.remote-panel__numpad-popout #remote-digit-0 {
+    grid-column: 2;
 }

@@ -2,7 +2,7 @@
  * Float-only Magic Radio shell — cassette-style transport overlay.
  * Uniform scale 0.5–1.5 (same model as Magic Remote undocked); independent of browser/remote CSS.
  */
-import { el, countryFlagEmoji } from '../tvUtils.js';
+import { el, countryFlagEmoji, hideKeyCell } from '../tvUtils.js';
 import { showAppToast } from './toast.js';
 import { loadPlayerState, savePlayerState } from '../storage/playerState.js';
 import { SettingsStore } from '../storage/settingsStore.js';
@@ -539,7 +539,7 @@ export const RadioModule = {
             const btn = el(id);
             if (!btn) return;
             btn.hidden = !enabled;
-            btn.classList.toggle('is-hidden', !enabled);
+            hideKeyCell(btn, !enabled);
             btn.classList.toggle('is-active', active);
             btn.setAttribute('aria-pressed', String(active));
         });

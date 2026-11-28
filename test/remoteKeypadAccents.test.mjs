@@ -62,14 +62,29 @@ test('mute-all button shows trimmed label (hover tray design)', () => {
 });
 
 test('numpad digit rows use main-1 / main-2 / main-3 accents', () => {
+    // 1-9 + 0 now live inside the 1-9 key's slide-out board, in dial order.
+    const popout = html.slice(
+        html.indexOf('id="remote-numpad-popout"'),
+        html.indexOf('data-remote-key="stop"')
+    );
     for (const id of ['remote-digit-1', 'remote-digit-2', 'remote-digit-3', 'remote-digit-0']) {
         assert.match(buttonChunk(id), /tv-controls__btn--main-1/);
+        assert.match(popout, new RegExp(`id="${id}"`), `${id} sits in the number board`);
     }
     for (const id of ['remote-digit-4', 'remote-digit-5', 'remote-digit-6']) {
         assert.match(buttonChunk(id), /tv-controls__btn--main-2/);
+        assert.match(popout, new RegExp(`id="${id}"`));
     }
     for (const id of ['remote-digit-7', 'remote-digit-8', 'remote-digit-9']) {
         assert.match(buttonChunk(id), /tv-controls__btn--main-3/);
+        assert.match(popout, new RegExp(`id="${id}"`));
+    }
+    // Reading order 1…9 then 0 — the CSS centres 0 in column 2.
+    let cursor = -1;
+    for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
+        const at = popout.indexOf(`id="remote-digit-${n}"`);
+        assert.ok(at > cursor, `digit ${n} keeps dial order`);
+        cursor = at;
     }
 });
 
@@ -81,11 +96,24 @@ test('chan/vol rockers and bind match tile hover accents', () => {
     assert.match(buttonChunk('remote-chan-bind-btn'), /tv-controls__btn--main-3/);
 });
 
-test('power lives in shell chrome', () => {
-    // Power + radio sit in the shell chrome row above the keypad (full remote).
-    assert.match(html, /remote-panel__cell--radio-power/);
+test('power + radio are keypad grid cells, not shell chrome', () => {
+    // Power and radio are normal keys now, so no conditional key leaves a hole.
+    assert.doesNotMatch(html, /remote-panel__cell--radio-power/);
+    assert.doesNotMatch(html, /remote-module__chrome-row/);
+
+    const gridStart = html.indexOf('class="remote-panel__grid"');
+    const splitIdx = html.indexOf('id="remote-volume-split"');
+    for (const [id, key] of [['remote-power-btn', 'power'], ['remote-radio-btn', 'radio']]) {
+        const btnIdx = html.indexOf(`id="${id}"`);
+        const cellIdx = html.lastIndexOf(`data-remote-key="${key}"`, btnIdx);
+        assert.ok(btnIdx > gridStart && btnIdx < splitIdx, `${id} sits in the keypad grid`);
+        assert.ok(cellIdx > gridStart && cellIdx < btnIdx, `${id} sits in its own keypad cell`);
+        assert.doesNotMatch(html.slice(cellIdx, btnIdx), /data-mini-slot=/, `${id} is not a mini key`);
+    }
     assert.match(html, /tv-controls__btn--main-3" id="remote-power-btn"/);
     assert.match(html, /id="remote-power-btn"[^>]*data-remote-action="power-off"/);
+    assert.match(html, /id="remote-radio-btn"[^>]*data-remote-action="radio-toggle"/);
+    assert.match(html, /class="[^"]*is-hidden"[^>]*id="remote-radio-btn"/);
 
     assert.match(html, /data-mini-slot="bind"/);
     assert.match(html, /data-mini-slot="play"/);
@@ -99,14 +127,12 @@ test('power lives in shell chrome', () => {
     
     const slots = (html.match(/data-mini-slot="[a-zA-Z]+"/g) || []);
     // Hover tray buttons
-    assert.match(html, /id="remote-radio-btn"[^>]*data-remote-action="radio-toggle"/);
     assert.match(html, /id="remote-mute-btn"[^>]*data-remote-action="mute"/);
     assert.match(html, /id="remote-mute-all-btn"[^>]*data-remote-action="mute-all"/);
     assert.match(html, /id="remote-play-btn"[^>]*data-remote-action="play"/);
     assert.match(html, /id="remote-play-all-btn"[^>]*data-remote-action="play-all"/);
     assert.match(html, /id="remote-stop-btn"[^>]*data-remote-action="stop"/);
     assert.match(html, /id="remote-stop-all-btn"[^>]*data-remote-action="stop-all"/);
-    assert.match(html, /class="[^"]*is-hidden"[^>]*id="remote-radio-btn"/);
     assert.match(html, /id="remote-external-popout-btn"[^>]*>/);
     assert.match(html, /id="remote-mini-float-btn"/);
 
@@ -123,14 +149,6 @@ test('power lives in shell chrome', () => {
     assert.match(html, /data-mini-slot="settings"/);
     assert.match(html, /data-mini-slot="voldown"/);
     assert.match(html, /data-mini-slot="layout"/);
-    
-    // Hover tray buttons
-    assert.match(html, /id="remote-play-all-btn"/);
-    assert.match(html, /data-remote-action="play-all"/);
-    assert.match(html, /id="remote-stop-all-btn"/);
-    assert.match(html, /data-remote-action="stop-all"/);
-    assert.match(html, /id="remote-mute-all-btn"/);
-    assert.match(html, /data-remote-action="mute-all"/);
     // The 12 mini keys are tagged
     assert.equal(new Set(slots).size, 12, 'exactly the 12 mini keys are tagged');
 
@@ -140,10 +158,97 @@ test('power lives in shell chrome', () => {
     // radio key removed from mini floating
     assert.doesNotMatch(css, /remote-radio-btn-mini/);
     assert.match(css, /\.remote-panel__cell--mini-only\s*\{\s*display:\s*none/s);
-    // Power + radio render in the chrome row, never inside the mini grid.
-    assert.match(html, /remote-module__chrome-row[\s\S]*?id="remote-power-btn"[\s\S]*?id="remote-radio-btn"[\s\S]*?<\/header>/);
-    // The "-all" hover fly-outs remain a mini-floating affordance only.
-    assert.match(css, /body:not\(\.remote-mini-floating\) #remote-panel \.remote-panel__grid \.radio-tray__popout\s*\{\s*display:\s*none/s);
+    // Power + radio are ordinary cells: the mini grid (data-mini-slot only) drops them.
+    assert.doesNotMatch(css, /remote-module__chrome-row/);
+    // The "-all" fly-outs are a mini-only affordance now: those three keys have
+    // their own row-4 cells on the full remote, the docked sheet and the popout.
+    assert.match(
+        css,
+        /body:not\(\.remote-mini-floating\) #remote-panel \.remote-panel__grid \.radio-tray__popout\s*\{\s*display:\s*none/s
+    );
+});
+
+test('every key is pinned to its designed slot, so hiding one leaves a hole', () => {
+    // The full keypad is a fixed map: row 1 carries three keys (cols 1 / 3 / 5),
+    // rows 2-6 carry five each. Conditional keys (radio, rotate, stop all, share,
+    // travel) therefore sit in the middle of the board without ever shifting a
+    // neighbour — their slot simply stays empty.
+    const map = {
+        'chan-up': [1, 1], power: [1, 3], 'vol-up': [1, 5],
+        bind: [2, 1], guide: [2, 2], fav: [2, 3], radio: [2, 4], mute: [2, 5],
+        'chan-down': [3, 1], play: [3, 2], numpad: [3, 3], stop: [3, 4], 'vol-down': [3, 5],
+        popout: [4, 1], fullscreen: [4, 2], cast: [4, 3], share: [4, 4], travel: [4, 5],
+        layout: [5, 1], rotate: [5, 2], 'play-all': [5, 3], 'stop-all': [5, 4], 'mute-all': [5, 5],
+        'nav-remote': [6, 1], 'nav-browse': [6, 2], 'nav-favs': [6, 3],
+        'nav-recents': [6, 4], 'nav-settings': [6, 5]
+    };
+
+    // Markup side: one tagged cell per slot, nothing extra.
+    const tagged = [...html.matchAll(/data-remote-key="([^"]+)"/g)].map((m) => m[1]);
+    assert.equal(tagged.length, 28, 'every keypad cell is tagged');
+    assert.equal(new Set(tagged).size, 28, 'no key is tagged twice');
+    assert.deepEqual(tagged.slice().sort(), Object.keys(map).slice().sort());
+
+    // The volume row stays the one unpinned child: a full-width auto-placed row.
+    assert.doesNotMatch(html, /data-remote-key="volume"/);
+    assert.match(html, /<div class="remote-panel__cell remote-panel__cell--volume">/);
+
+    // CSS side: every key owns exactly one slot, rows 1..6 in the 3/5/5/5/5/5 shape.
+    const css = readCssWithImports(join(root, 'css/components/remote.css'));
+    const rows = [];
+    for (const [key, [row, col]] of Object.entries(map)) {
+        assert.match(
+            css,
+            new RegExp(
+                `body:not\\(\\.remote-mini-floating\\) #remote-panel \\[data-remote-key="${key}"\\]\\s*\\{\\s*grid-area:\\s*${row}\\s*/\\s*${col};`
+            ),
+            `${key} is pinned to r${row}c${col}`
+        );
+        rows[row] = (rows[row] || []).concat(col);
+    }
+    assert.deepEqual(rows.slice(1).map((cols) => cols.length), [3, 5, 5, 5, 5, 5]);
+    assert.deepEqual(rows[1], [1, 3, 5], 'row 1 keeps cols 2 and 4 empty');
+    const slots = Object.values(map).map(([r, c]) => `${r}/${c}`);
+    assert.equal(new Set(slots).size, slots.length, 'no two keys share a slot');
+    assert.match(css, /\.remote-panel__grid\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--remote-grid-cols, 5\)/s);
+    assert.match(css, /\.remote-panel__cell--volume\s*\{[^}]*grid-column:\s*1 \/ -1/s);
+    // Hiding a key hides its cell, which is what leaves the pinned slot empty
+    // instead of letting the neighbours slide into it.
+    const tvUtilsJs = readFileSync(join(root, 'js/tvUtils.js'), 'utf8');
+    assert.match(tvUtilsJs, /export function hideKeyCell\(node, hidden\)/);
+    assert.match(tvUtilsJs, /node\.closest\?\.\('\.remote-panel__cell'\)\?\.classList\.toggle\('is-hidden', hide\)/);
+    for (const file of ['js/ui/remoteAllKeys.js', 'js/ui/radioModule.js']) {
+        assert.match(readFileSync(join(root, file), 'utf8'), /hideKeyCell\(/, `${file} hides cells, not just keys`);
+    }
+    assert.match(html, /id="remote-volume-split"/, 'volume keeps the last full-width row');
+});
+
+test('keypad tracks are capped at key size and the tray cells stay centred', () => {
+    const css = readCssWithImports(join(root, 'css/components/remote.css'));
+    // Natural pad width, and the dialog floor derived from it (one source of truth).
+    assert.match(
+        css,
+        /--remote-grid-width:\s*calc\(\s*var\(--remote-grid-cols\) \* var\(--remote-btn-size\)\s*\+ \(var\(--remote-grid-cols\) - 1\) \* var\(--remote-grid-gap\)\s*\)/s
+    );
+    assert.match(css, /--remote-min-width:\s*calc\(var\(--remote-grid-width\) \+ 2 \* var\(--remote-space-md\)\)/);
+    // The pad is capped to it, so the 2× expanded dock cannot stretch the tracks.
+    assert.match(css, /\.remote-panel__grid\s*\{[^}]*max-width:\s*var\(--remote-grid-width/s);
+    // `.radio-tray` is the one cell with a definite width AND height (the tray box),
+    // so the grid aligns it to the track/row start unless it is centred explicitly —
+    // that was the play/stop/mute drift this map fixes.
+    assert.match(css, /\.remote-panel__grid \.radio-tray\s*\{[^}]*justify-self:\s*center[^}]*align-self:\s*center/s);
+    // The remote column is pinned to --remote-min-width while the sheet around it can
+    // be wider, so it is centred instead of hugging the start (equal pad margins).
+    assert.match(
+        css,
+        /\.remote-module__host > #tv-catalog-body,\s*\.remote-dock-sheet__inner > #tv-catalog-body\s*\{[^}]*margin-left:\s*auto[^}]*margin-right:\s*auto/s
+    );
+    // Row 2 col 1 bind key: the 9.5rem scope menu grows rightward from the key, or it
+    // would overhang the panel's overflow-x clip.
+    assert.match(
+        css,
+        /body:not\(\.remote-mini-floating\) #remote-panel \.remote-panel__chan-bind-popup \.chan-bind-menu\s*\{[^}]*left:\s*0[^}]*transform:\s*none/s
+    );
 });
 
 test('keypad play/stop/mute hover popouts use a slide-out tray above the primary', () => {
@@ -173,7 +278,11 @@ test('keypad play/stop/mute hover popouts use a slide-out tray above the primary
         const cellIdx = html.lastIndexOf('<div class="remote-panel__cell', btnIdx);
         assert.ok(mosaicStart > 0 && btnIdx > mosaicStart && btnIdx < mosaicEnd, `${id} sits in the mosaic group`);
         assert.ok(cellIdx > 0 && cellIdx < btnIdx, `${id} sits in a keypad cell`);
-        assert.match(html.slice(cellIdx, btnIdx), /^<div class="remote-panel__cell">$/m, `${id} cell is a plain grid cell`);
+        assert.match(
+            html.slice(cellIdx, btnIdx),
+            /^<div class="remote-panel__cell" data-remote-key="[a-z-]+">$/m,
+            `${id} cell is a plain grid cell`
+        );
     }
 
     const css = readCssWithImports(join(root, 'css/components/remote.css'));

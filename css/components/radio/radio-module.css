@@ -577,12 +577,6 @@
     color: var(--tv-primary);
 }
 
-.remote-panel__cell--radio-power {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
 body.radio-enabled #remote-radio-btn.is-hidden {
     display: none;
 }

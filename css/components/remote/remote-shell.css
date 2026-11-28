@@ -18,11 +18,15 @@
     --remote-grid-gap: calc(0.4rem * var(--remote-scale, 1));
     --remote-space-md: calc(var(--tv-spacing-md, 1rem) * var(--remote-scale, 1));
     --remote-edge-inset: 1.5rem;
-    --remote-min-width: calc(
+    /* Natural keypad width: `--remote-grid-cols` fixed keys + the gaps between them.
+       The pad is capped to this so a wider column (the 2× expanded dock, the split
+       sheet) cannot stretch the tracks and drift the fixed-width `.radio-tray` cells
+       away from their column centre. */
+    --remote-grid-width: calc(
         var(--remote-grid-cols) * var(--remote-btn-size)
         + (var(--remote-grid-cols) - 1) * var(--remote-grid-gap)
-        + 2 * var(--remote-space-md)
     );
+    --remote-min-width: calc(var(--remote-grid-width) + 2 * var(--remote-space-md));
     --guide-slide-duration: 0.55s;
     --guide-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
     /* Thin side-face extrusion (bottom-right by default; flips on dock-right) */
@@ -387,6 +391,14 @@ body.remote-dock-side-right .browser-module .remote-module__dialog {
     width: var(--remote-min-width, 260px);
     min-width: var(--remote-min-width, 260px);
     max-width: var(--remote-min-width, 260px);
+    /* The remote column is pinned to its design width, but the sheet around it is
+       not (user resize, 2× expanded dock, the popout host): left alone, the column
+       hugs the start of the wider box and the keypad gets a wide gutter on one
+       side only. Auto cross-axis margins centre it, so the pad keeps the same
+       margin left and right. Zero free space (wing open, exact fit) → margins
+       collapse to 0 and nothing moves. */
+    margin-left: auto;
+    margin-right: auto;
     transition:
         flex-basis var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
         width var(--guide-slide-duration, 0.55s) var(--guide-slide-ease, cubic-bezier(0.16, 1, 0.3, 1)),
@@ -519,23 +531,6 @@ body.browser-shell-split #remote-shell {
         var(--remote-space-md, var(--tv-spacing-md, 1rem))
         calc(0.4rem * var(--remote-scale, 1));
     text-align: center;
-}
-
-.remote-module__chrome-row {
-    position: absolute;
-    top: calc(-0.75rem * var(--remote-scale, 1));
-    left: var(--remote-space-md, var(--tv-spacing-md, 1rem));
-    display: flex;
-    justify-content: flex-start;
-    z-index: 5;
-    pointer-events: auto;
-}
-
-.remote-module__chrome-row .remote-panel__cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--remote-btn-size, 40px);
 }
 
 .remote-module__brand {
@@ -821,7 +816,6 @@ html[data-catalog-chrome="bar"] body.catalog-bar-active #browser-shell > .remote
 body.remote-mini-floating #remote-module .remote-module__header,
 body.remote-mini-floating #remote-shell > .module-shell__chrome,
 body.remote-mini-floating #remote-shell .remote-module__channel-bar,
-body.remote-mini-floating #remote-shell .remote-module__chrome-row,
 body.remote-mini-floating #remote-shell .remote-module__footer,
 body.remote-mini-floating #remote-shell #remote-shell-screens-footer {
     display: none !important;

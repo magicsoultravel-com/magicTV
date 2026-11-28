@@ -212,13 +212,53 @@ function toggleMenuEl(menuEl, btnEl) {
         closeMenuEntry(menuEl, btnEl);
         return;
     }
+    openMenuEl(menuEl, btnEl);
+}
+
+/** Open one menu without the toggle — the hover path uses it on pointerenter. */
+function openMenuEl(menuEl, btnEl) {
+    if (!menuEl || !btnEl) return;
     closeAllMenus();
     const slotId = resolveSlotForMenu(menuEl);
     renderMenu(menuEl, slotId);
     menuEl.hidden = false;
-    openMenus.set(key, { menu: menuEl, btn: btnEl });
+    openMenus.set(menuKey(menuEl), { menu: menuEl, btn: btnEl });
     btnEl.setAttribute('aria-expanded', 'true');
     btnEl.classList.add('is-active');
+}
+
+/** Hover-intent grace (ms) — same 140ms as the remote popout trays. */
+const MENU_HOVER_CLOSE_MS = 140;
+
+/**
+ * The remote bind key is a scope picker, so it must behave like the other
+ * keypad trays: hover reveals, leaving dismisses. Pointer-type gated so touch
+ * keeps the plain click toggle, and wired on the popup (key + menu) so crossing
+ * into the list never counts as a leave.
+ */
+function bindRemoteBindHover(menuEl, btnEl) {
+    const popup = btnEl?.closest?.('.remote-panel__chan-bind-popup');
+    if (!popup || !menuEl || popup.dataset.bindHover === '1') return;
+    popup.dataset.bindHover = '1';
+
+    let timer = 0;
+    const cancel = () => {
+        if (timer) clearTimeout(timer);
+        timer = 0;
+    };
+    popup.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'touch') return;
+        cancel();
+        if (menuEl.hidden) openMenuEl(menuEl, btnEl);
+    });
+    popup.addEventListener('pointerleave', (e) => {
+        if (e.pointerType === 'touch') return;
+        cancel();
+        timer = setTimeout(() => {
+            timer = 0;
+            closeMenuEntry(menuEl, btnEl);
+        }, MENU_HOVER_CLOSE_MS);
+    });
 }
 
 function toggleMenu(menuId, btnId) {
@@ -319,6 +359,7 @@ export const ChanBindPicker = {
                 toggleMenu('remote-chan-bind-menu', 'remote-chan-bind-btn');
             });
         }
+        bindRemoteBindHover(el('remote-chan-bind-menu'), remoteBtn);
 
         if (catalogBtn && catalogBtn.dataset.bound !== '1') {
             catalogBtn.dataset.bound = '1';
